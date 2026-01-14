@@ -92,12 +92,51 @@ echo ""
 
 # 3. Mettre à jour le code
 info "Mise à jour du code depuis GitHub..."
+
+# Vérifier s'il y a des modifications locales
+HAS_CHANGES=false
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    HAS_CHANGES=true
+    warning "Modifications locales détectées"
+    info "Sauvegarde temporaire des modifications (stash)..."
+    if git stash push -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+        success "Modifications sauvegardées temporairement"
+    else
+        error "Impossible de sauvegarder les modifications locales"
+        echo "   Résolvez les conflits manuellement ou commitez vos changements"
+        echo "   Utilisez 'git status' pour voir les fichiers modifiés"
+        exit 1
+    fi
+    echo ""
+fi
+
+# Faire le pull
 if git pull origin master; then
     success "Code mis à jour"
+    
+    # Essayer de restaurer les modifications si elles existent
+    if [ "$HAS_CHANGES" = true ]; then
+        info "Tentative de restauration des modifications locales..."
+        if git stash pop > /dev/null 2>&1; then
+            success "Modifications locales restaurées"
+        else
+            warning "Conflits lors de la restauration des modifications"
+            echo "   Utilisez 'git stash list' pour voir les modifications sauvegardées"
+            echo "   Utilisez 'git stash show' pour voir les changements"
+            echo "   Utilisez 'git stash pop' manuellement pour restaurer"
+        fi
+    fi
 else
     error "Échec de la mise à jour git"
     echo "   Vérifiez votre connexion Internet et les permissions git"
     echo ""
+    
+    # Restaurer le stash si on avait fait un stash
+    if [ "$HAS_CHANGES" = true ]; then
+        info "Restauration des modifications locales..."
+        git stash pop > /dev/null 2>&1 || true
+    fi
+    
     warning "Restauration de la configuration..."
     if [ -f "$BACKUP_DIR/.env.backup" ]; then
         cp "$BACKUP_DIR/.env.backup" backend/.env
