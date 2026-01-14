@@ -4,6 +4,9 @@
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
+# S'assurer que tous les scripts sont exécutables
+find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+
 # Fonction pour lire le port configuré
 get_app_port() {
     local port=8000  # Port par défaut
