@@ -171,12 +171,77 @@ echo ""
 info "Configuration des scripts de gestion..."
 
 cd ..
-chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh 2>/dev/null || true
+chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh docker_port_mapping.sh 2>/dev/null || true
 
 success "Scripts configurés"
 echo ""
 
-# Étape 6b : Configurer CORS automatiquement
+# Étape 6b : Vérifier si on est dans Docker
+info "Vérification de l'environnement Docker..."
+
+IN_DOCKER=false
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    IN_DOCKER=true
+    CONTAINER_NAME=$(hostname)
+    success "Détecté : Conteneur Docker ($CONTAINER_NAME)"
+    echo ""
+    warning "⚠️  IMPORTANT : Configuration du mapping de port Docker requise"
+    echo ""
+    echo "Pour rendre l'application accessible depuis l'extérieur, vous devez mapper"
+    echo "le port 8000 du conteneur vers un port externe accessible."
+    echo ""
+    read -p "Port externe à utiliser (ex: 11840, laissez vide pour ignorer) : " EXTERNAL_PORT
+    echo ""
+    
+    if [ -n "$EXTERNAL_PORT" ]; then
+        info "Port externe configuré : $EXTERNAL_PORT"
+        echo "$EXTERNAL_PORT" > .docker_external_port
+        echo ""
+        warning "⚠️  Action requise depuis l'HÔTE Docker :"
+        echo "   1. Arrêtez ce conteneur : docker stop $CONTAINER_NAME"
+        echo "   2. Recréez avec mapping : docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME [image]"
+        echo ""
+        echo "   Ou utilisez le script : ./docker_port_mapping.sh"
+        echo ""
+    else
+        info "Mapping de port ignoré (vous pourrez le configurer plus tard)"
+    fi
+    echo ""
+else
+    info "Environnement standard (non-Docker)"
+fi
+
+# Étape 6c : Proposer un alias host
+info "Configuration d'un alias host (optionnel)..."
+
+read -p "Souhaitez-vous configurer un alias host pour l'accès ? (o/N) : " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Oo]$ ]]; then
+    read -p "Nom d'alias souhaité (ex: ovh-tracker) : " HOST_ALIAS
+    if [ -n "$HOST_ALIAS" ]; then
+        # Détecter l'IP
+        VM_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+        if [ -z "$VM_IP" ]; then
+            VM_IP=$(ip addr show 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1)
+        fi
+        
+        if [ -n "$VM_IP" ]; then
+            echo "$VM_IP    $HOST_ALIAS.local" > .host_alias
+            success "Alias configuré : $HOST_ALIAS.local -> $VM_IP"
+            echo ""
+            info "Pour utiliser cet alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
+            echo "C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+            echo "   $VM_IP    $HOST_ALIAS.local"
+            echo ""
+            echo "Puis accédez à : http://$HOST_ALIAS.local:8000"
+        else
+            warning "Impossible de déterminer l'IP, alias non configuré"
+        fi
+    fi
+    echo ""
+fi
+
+# Étape 6d : Configurer CORS automatiquement
 info "Configuration automatique de CORS pour l'accès réseau..."
 
 if [ -f "configure_cors.sh" ]; then
@@ -253,6 +318,38 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 info "Prochaines étapes :"
 echo ""
+
+# Afficher les instructions Docker si applicable
+if [ -f ".docker_external_port" ]; then
+    EXTERNAL_PORT=$(cat .docker_external_port)
+    CONTAINER_NAME=$(hostname)
+    warning "⚠️  ACTION REQUISE : Configuration du mapping de port Docker"
+    echo ""
+    echo "   Le conteneur doit être redémarré avec le mapping de port."
+    echo "   Depuis l'HÔTE Docker, exécutez :"
+    echo ""
+    echo "   1. Arrêter le conteneur :"
+    echo "      docker stop $CONTAINER_NAME"
+    echo ""
+    echo "   2. Recréer avec mapping (port $EXTERNAL_PORT) :"
+    echo "      docker commit $CONTAINER_NAME ovh-tracker:latest"
+    echo "      docker rm $CONTAINER_NAME"
+    echo "      docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME ovh-tracker:latest"
+    echo ""
+    echo "   Ou utilisez : ./docker_port_mapping.sh pour plus de détails"
+    echo ""
+fi
+
+# Afficher l'alias host si configuré
+if [ -f ".host_alias" ]; then
+    HOST_ALIAS_LINE=$(cat .host_alias)
+    info "📝 Alias host configuré :"
+    echo "   Ajoutez dans /etc/hosts (Linux/Mac) ou"
+    echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+    echo "   $HOST_ALIAS_LINE"
+    echo ""
+fi
+
 echo "1. Démarrer l'application :"
 echo "   cd $INSTALL_DIR"
 echo "   ./start.sh"

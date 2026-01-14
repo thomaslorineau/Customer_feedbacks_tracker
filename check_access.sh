@@ -171,20 +171,74 @@ else
 fi
 echo ""
 
+# 8. Vérifier si on est dans Docker et proposer remapping
+echo "8️⃣  Vérification Docker..."
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    echo "   ✅ Vous êtes dans un conteneur Docker"
+    CONTAINER_NAME=$(hostname)
+    echo "   Nom du conteneur: $CONTAINER_NAME"
+    echo ""
+    echo "   ⚠️  IMPORTANT : Le port 8000 du conteneur doit être mappé vers un port externe"
+    echo ""
+    echo "   📋 Pour configurer le mapping de port, exécutez :"
+    echo "      ./docker_port_mapping.sh"
+    echo ""
+    echo "   💡 Ou depuis l'hôte Docker, utilisez :"
+    echo "      docker run -d -p EXTERNAL_PORT:8000 --name $CONTAINER_NAME [image]"
+    echo "      (remplacez EXTERNAL_PORT par un port disponible, ex: 11840)"
+else
+    echo "   ℹ️  Vous n'êtes pas dans un conteneur Docker"
+fi
+echo ""
+
 # Résumé
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📋 RÉSUMÉ"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+# Détecter le hostname
+HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+
 if [ -n "$IP" ]; then
-    echo "🌐 URL à utiliser depuis un autre ordinateur sur le même réseau :"
-    echo "   http://$IP:8000"
+    # Priorité : hostname > IP publique > IP locale
+    if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
+        URL="http://$HOSTNAME_FULL:8000"
+        echo "🌐 URL recommandée (hostname) :"
+        echo "   $URL"
+        echo ""
+    fi
+    
+    # Vérifier si on est dans Docker
+    if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+        echo "⚠️  Vous êtes dans un conteneur Docker"
+        echo "   Le port 8000 doit être mappé vers un port externe (ex: 11840)"
+        echo "   Utilisez l'IP publique avec le port mappé :"
+        IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
+        if [ -n "$IP_PUBLIC" ]; then
+            echo "   http://$IP_PUBLIC:EXTERNAL_PORT"
+            echo "   (remplacez EXTERNAL_PORT par le port mappé, ex: 11840)"
+        else
+            echo "   http://IP_PUBLIQUE:EXTERNAL_PORT"
+        fi
+        echo ""
+        echo "   📋 Pour configurer le mapping : ./docker_port_mapping.sh"
+    else
+        echo "🌐 URL à utiliser depuis un autre ordinateur sur le même réseau :"
+        if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ]; then
+            echo "   http://$HOSTNAME_FULL:8000 (hostname)"
+        fi
+        echo "   http://$IP:8000 (IP locale)"
+    fi
     echo ""
     echo "⚠️  Si l'accès ne fonctionne pas :"
     echo "   1. Vérifiez que les deux machines sont sur le même réseau"
     echo "   2. Vérifiez le firewall de la VM (voir ci-dessus)"
-    echo "   3. Vérifiez les logs: tail -f backend/server.log"
-    echo "   4. Testez depuis la VM: curl http://localhost:8000"
+    if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+        echo "   3. ⚠️  Vérifiez le mapping de port Docker (voir section 8)"
+    fi
+    echo "   4. Vérifiez les logs: tail -f backend/server.log"
+    echo "   5. Testez depuis la VM: curl http://localhost:8000"
 else
     echo "⚠️  IP non déterminée. Utilisez: hostname -I"
 fi
