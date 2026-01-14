@@ -32,6 +32,17 @@ except locale.Error:
 
 app = FastAPI(title="ovh-complaints-tracker")
 
+# Mount static files for v2 frontend (mount subdirectories to avoid conflict with /v2 route)
+frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
+if frontend_v2_path.exists():
+    # Mount CSS and JS directories separately
+    css_path = frontend_v2_path / "css"
+    js_path = frontend_v2_path / "js"
+    if css_path.exists():
+        app.mount("/v2/css", StaticFiles(directory=str(css_path), html=False), name="v2-css")
+    if js_path.exists():
+        app.mount("/v2/js", StaticFiles(directory=str(js_path), html=False), name="v2-js")
+
 # Enable CORS for frontend - restrict to specific ports for security
 import os
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080').split(',')
@@ -1091,7 +1102,7 @@ async def serve_frontend():
     """Serve the frontend HTML file based on UI_VERSION config."""
     # Check for UI version in .app_config or environment variable
     app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
-    ui_version = "v1"  # default
+    ui_version = "v2"  # default to v2 now
     
     if app_config_path.exists():
         with open(app_config_path, "r", encoding="utf-8") as f:
@@ -1105,13 +1116,20 @@ async def serve_frontend():
     
     if ui_version == "v2":
         frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
+        if frontend_path.exists():
+            content = open(frontend_path, "r", encoding="utf-8").read()
+            # Replace relative paths with /v2/ paths for static files
+            content = content.replace('href="css/', 'href="/v2/css/')
+            content = content.replace('src="js/', 'src="/v2/js/')
+            return content
+        else:
+            raise HTTPException(status_code=404, detail="Frontend v2 not found")
     else:
         frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
-    
-    if frontend_path.exists():
-        return open(frontend_path, "r", encoding="utf-8").read()
-    else:
-        raise HTTPException(status_code=404, detail=f"Frontend {ui_version} not found")
+        if frontend_path.exists():
+            return open(frontend_path, "r", encoding="utf-8").read()
+        else:
+            raise HTTPException(status_code=404, detail="Frontend v1 not found")
 
 
 @app.get("/v1", response_class=HTMLResponse)
@@ -1134,10 +1152,23 @@ async def serve_frontend_v2():
         raise HTTPException(status_code=404, detail="Frontend v2 not found")
 
 
+# Mount static files for v2 frontend
+frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
+if frontend_v2_path.exists():
+    app.mount("/v2", StaticFiles(directory=str(frontend_v2_path), html=False), name="v2-static")
+    
+    # Also mount at root level for CSS/JS files when v2 is default
+    app.mount("/css", StaticFiles(directory=str(frontend_v2_path / "css"), html=False), name="v2-css")
+    app.mount("/js", StaticFiles(directory=str(frontend_v2_path / "js"), html=False), name="v2-js")
+
+
+class UIVersionPayload(BaseModel):
+    version: str = Field(..., pattern="^(v1|v2)$")
+
 @app.post("/admin/set-ui-version")
-async def set_ui_version(version: dict):
+async def set_ui_version(payload: UIVersionPayload):
     """Set the UI version (v1 or v2)."""
-    version_str = version.get("version") if isinstance(version, dict) else version
+    version_str = payload.version
     if version_str not in ["v1", "v2"]:
         raise HTTPException(status_code=400, detail="Version must be 'v1' or 'v2'")
     
@@ -1164,6 +1195,9 @@ async def set_ui_version(version: dict):
     with open(app_config_path, "w", encoding="utf-8") as f:
         f.writelines(config_lines)
     
+    # Update environment variable for current process
+    os.environ['UI_VERSION'] = version_str
+    
     return {"message": f"UI version set to {version_str}", "version": version_str}
 
 
@@ -1171,7 +1205,7 @@ async def set_ui_version(version: dict):
 async def get_ui_version():
     """Get the current UI version."""
     app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
-    ui_version = "v1"  # default
+    ui_version = "v2"  # default to v2
     
     if app_config_path.exists():
         with open(app_config_path, "r", encoding="utf-8") as f:
