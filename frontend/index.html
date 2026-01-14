@@ -1810,7 +1810,18 @@
             updateChartProductFilter();
             // Wait for modal to be visible, then update chart
             setTimeout(() => {
-                updateChart();
+                // Ensure allPosts is loaded
+                if (allPosts.length === 0) {
+                    console.warn('No posts loaded, loading from DB...');
+                    loadPostsFromDB().then(() => {
+                        updateChart();
+                    }).catch(err => {
+                        console.error('Failed to load posts:', err);
+                        addLog('❌ Failed to load posts for charts', 'error');
+                    });
+                } else {
+                    updateChart();
+                }
             }, 100);
         }
         
