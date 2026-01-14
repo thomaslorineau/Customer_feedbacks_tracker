@@ -1,5 +1,7 @@
 import locale
 from pathlib import Path
+import os
+import json
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -12,9 +14,10 @@ import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from apscheduler.schedulers.background import BackgroundScheduler
+import httpx
 
 from . import db
-from .scraper import x_scraper, stackoverflow, news, github, hackernews, trustpilot
+from .scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd
 from .analysis import sentiment
 
 # Configure locale for French support
@@ -29,10 +32,12 @@ except locale.Error:
 
 app = FastAPI(title="ovh-complaints-tracker")
 
-# Enable CORS for frontend - restrict to localhost for development
+# Enable CORS for frontend - restrict to specific ports for security
+import os
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080').split(',')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost", "http://localhost:*", "http://127.0.0.1:*", "file://"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
@@ -43,6 +48,25 @@ class ScrapeRequest(BaseModel):
     """Validated scrape request with input validation."""
     query: str = Field(default="OVH", min_length=1, max_length=100)
     limit: int = Field(default=50, ge=1, le=1000)
+
+
+class ImprovementIdeaRequest(BaseModel):
+    """Request model for generating improvement ideas."""
+    posts: List[dict] = Field(..., description="List of posts to analyze")
+    max_ideas: int = Field(default=5, ge=1, le=10, description="Maximum number of ideas to generate")
+
+
+class ImprovementIdea(BaseModel):
+    """Model for a single improvement idea."""
+    title: str = Field(..., description="Short title for the idea")
+    description: str = Field(..., description="Detailed description of the improvement idea")
+    priority: str = Field(..., description="Priority level: high, medium, or low")
+    related_posts_count: int = Field(..., description="Number of posts that support this idea")
+
+
+class ImprovementIdeasResponse(BaseModel):
+    """Response model for improvement ideas."""
+    ideas: List[ImprovementIdea] = Field(..., description="List of generated improvement ideas")
 
 
 class ScrapeResult(BaseModel):
@@ -100,9 +124,11 @@ def auto_scrape_job():
             else:
                 items = x_scraper.scrape_x_multi_queries(limit=per_query_limit)
 
+            added_count = 0
+            duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
-                db.insert_post({
+                if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
                     'content': it.get('content'),
@@ -110,8 +136,14 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
-                })
-            print(f"✓ Added {len(items)} posts from X/Twitter for '{query}'")
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from X/Twitter for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from X/Twitter for '{query}'")
         except Exception as e:
             print(f"✗ Error scraping X (non-fatal): {type(e).__name__}")
 
@@ -120,9 +152,11 @@ def auto_scrape_job():
         # Stack Overflow
         try:
             items = stackoverflow.scrape_stackoverflow(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
-                db.insert_post({
+                if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
                     'content': it.get('content'),
@@ -130,19 +164,27 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
-                })
-            print(f"✓ Added {len(items)} posts from Stack Overflow for '{query}'")
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from Stack Overflow for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from Stack Overflow for '{query}'")
         except Exception as e:
             print(f"✗ Error scraping Stack Overflow (non-fatal): {type(e).__name__}")
 
         time.sleep(0.5)
 
-        # Hacker News
+        # Reddit
         try:
-            items = hackernews.scrape_hackernews(query, limit=per_query_limit)
+            items = reddit.scrape_reddit(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
-                db.insert_post({
+                if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
                     'content': it.get('content'),
@@ -150,19 +192,111 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
-                })
-            print(f"✓ Added {len(items)} posts from Hacker News for '{query}'")
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from Reddit for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from Reddit for '{query}'")
         except Exception as e:
-            print(f"✗ Error scraping Hacker News (non-fatal): {type(e).__name__}")
+            print(f"✗ Error scraping Reddit (non-fatal): {type(e).__name__}")
+
+        time.sleep(0.5)
+
+        # OVH Forum
+        try:
+            items = ovh_forum.scrape_ovh_forum(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
+            for it in items:
+                an = sentiment.analyze(it.get('content') or '')
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': an['score'],
+                    'sentiment_label': an['label'],
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from OVH Forum for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from OVH Forum for '{query}'")
+        except Exception as e:
+            print(f"✗ Error scraping OVH Forum (non-fatal): {type(e).__name__}")
+
+        time.sleep(0.5)
+
+        # Mastodon
+        try:
+            items = mastodon.scrape_mastodon(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
+            for it in items:
+                an = sentiment.analyze(it.get('content') or '')
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': an['score'],
+                    'sentiment_label': an['label'],
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from Mastodon for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from Mastodon for '{query}'")
+        except Exception as e:
+            print(f"✗ Error scraping Mastodon (non-fatal): {type(e).__name__}")
+
+        time.sleep(0.5)
+
+        # G2 Crowd
+        try:
+            items = g2_crowd.scrape_g2_crowd(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
+            for it in items:
+                an = sentiment.analyze(it.get('content') or '')
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': an['score'],
+                    'sentiment_label': an['label'],
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} reviews from G2 Crowd for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} reviews from G2 Crowd for '{query}'")
+        except Exception as e:
+            print(f"✗ Error scraping G2 Crowd (non-fatal): {type(e).__name__}")
 
         time.sleep(0.5)
 
         # GitHub Issues
         try:
             items = github.scrape_github_issues(query, limit=per_query_limit)
+            added_count = 0
+            duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
-                db.insert_post({
+                if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
                     'content': it.get('content'),
@@ -170,8 +304,14 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
-                })
-            print(f"✓ Added {len(items)} posts from GitHub Issues for '{query}'")
+                }):
+                    added_count += 1
+                else:
+                    duplicate_count += 1
+            if duplicate_count > 0:
+                print(f"✓ Added {added_count} posts from GitHub Issues for '{query}' (skipped {duplicate_count} duplicates)")
+            else:
+                print(f"✓ Added {added_count} posts from GitHub Issues for '{query}'")
         except Exception as e:
             print(f"✗ Error scraping GitHub Issues (non-fatal): {type(e).__name__}")
 
@@ -182,6 +322,24 @@ def auto_scrape_job():
 @app.on_event("startup")
 def startup_event():
     db.init_db()
+    
+    # Automatically clean up sample/fake posts on startup
+    try:
+        deleted_count = db.delete_sample_posts()
+        if deleted_count > 0:
+            print(f"[CLEANUP] Removed {deleted_count} sample/fake posts from database")
+    except Exception as e:
+        print(f"[CLEANUP] Warning: Could not clean sample posts: {e}")
+    
+    # Automatically clean up non-OVH posts on startup
+    try:
+        deleted_count = db.delete_non_ovh_posts()
+        if deleted_count > 0:
+            print(f"[CLEANUP] Removed {deleted_count} non-OVH posts from database")
+        else:
+            print("[CLEANUP] All posts are OVH-related ✓")
+    except Exception as e:
+        print(f"[CLEANUP] Warning: Could not clean non-OVH posts: {e}")
     
     # Start scheduler
     if not scheduler.running:
@@ -219,12 +377,13 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
         return ScrapeResult(added=0)
 
     added = 0
+    skipped_duplicates = 0
     try:
         for it in items:
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
-            db.insert_post({
+            inserted = db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
                 'content': it.get('content'),
@@ -234,11 +393,17 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
             })
-            added += 1
+            if inserted:
+                added += 1
+            else:
+                skipped_duplicates += 1
     except Exception as e:
         print(f"[X SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
+    
+    if skipped_duplicates > 0:
+        print(f"[X SCRAPER] Skipped {skipped_duplicates} duplicate posts")
 
     return ScrapeResult(added=added)
 
@@ -253,7 +418,7 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
         'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
         'github': lambda q, l: github.scrape_github_issues(q, limit=l),
         'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow(q, limit=l),
-        'hackernews': lambda q, l: hackernews.scrape_hackernews(q, limit=l),
+        'reddit': lambda q, l: reddit.scrape_reddit(q, limit=l),
         'news': lambda q, l: news.scrape_google_news(q, limit=l),
         'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews(q, limit=l),
     }
@@ -271,10 +436,11 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
             pass
         return 0
     added = 0
+    duplicates = 0
     for it in items:
         try:
             an = sentiment.analyze(it.get('content') or '')
-            db.insert_post({
+            if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
                 'content': it.get('content'),
@@ -283,11 +449,17 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
                 'sentiment_score': an['score'],
                 'sentiment_label': an['label'],
                 'language': it.get('language', 'unknown'),
-            })
-            added += 1
+            }):
+                added += 1
+            else:
+                duplicates += 1  # Duplicate detected and skipped
         except Exception:
             # ignore per-item failures
             continue
+    
+    if duplicates > 0:
+        print(f"  ⚠️ Skipped {duplicates} duplicate(s) from {source}")
+    
     return added
 
 
@@ -444,7 +616,7 @@ async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
         an = sentiment.analyze(it.get('content') or '')
         it['sentiment_score'] = an['score']
         it['sentiment_label'] = an['label']
-        db.insert_post({
+        if db.insert_post({
             'source': it.get('source'),
             'author': it.get('author'),
             'content': it.get('content'),
@@ -453,8 +625,8 @@ async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
             'sentiment_score': it.get('sentiment_score'),
             'sentiment_label': it.get('sentiment_label'),
             'language': it.get('language', 'unknown'),
-        })
-        added += 1
+        }):
+            added += 1
     return {'added': added}
 
 
@@ -482,17 +654,18 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
     return {'added': added}
 
 
-@app.post("/scrape/hackernews", response_model=ScrapeResult)
-async def scrape_hackernews_endpoint(query: str = "OVH", limit: int = 50):
-    """Scrape Hacker News discussions about OVH."""
-    items = hackernews.scrape_hackernews(query, limit=limit)
+@app.post("/scrape/reddit", response_model=ScrapeResult)
+async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
+    """Scrape Reddit posts and discussions about OVH using RSS feeds."""
+    # Reddit scraper using RSS
+    items = reddit.scrape_reddit(query, limit=limit)
 
     added = 0
     for it in items:
         an = sentiment.analyze(it.get('content') or '')
         it['sentiment_score'] = an['score']
         it['sentiment_label'] = an['label']
-        db.insert_post({
+        if db.insert_post({
             'source': it.get('source'),
             'author': it.get('author'),
             'content': it.get('content'),
@@ -501,10 +674,112 @@ async def scrape_hackernews_endpoint(query: str = "OVH", limit: int = 50):
             'sentiment_score': it.get('sentiment_score'),
             'sentiment_label': it.get('sentiment_label'),
             'language': it.get('language', 'unknown'),
-        })
-        added += 1
+        }):
+            added += 1
     
     # Return success even if no items were added
+    return {'added': added}
+
+
+@app.post("/scrape/ovh-forum", response_model=ScrapeResult)
+async def scrape_ovh_forum_endpoint(query: str = "OVH", limit: int = 50):
+    """Scrape OVH Community Forum for customer feedback and discussions."""
+    try:
+        items = ovh_forum.scrape_ovh_forum(query, limit=limit)
+    except Exception as e:
+        logger.error(f"Error scraping OVH Forum: {e}")
+        return ScrapeResult(added=0)
+    
+    added = 0
+    skipped_duplicates = 0
+    for it in items:
+        an = sentiment.analyze(it.get('content') or '')
+        it['sentiment_score'] = an['score']
+        it['sentiment_label'] = an['label']
+        if db.insert_post({
+            'source': it.get('source'),
+            'author': it.get('author'),
+            'content': it.get('content'),
+            'url': it.get('url'),
+            'created_at': it.get('created_at'),
+            'sentiment_score': it.get('sentiment_score'),
+            'sentiment_label': it.get('sentiment_label'),
+            'language': it.get('language', 'unknown'),
+        }):
+            added += 1
+        else:
+            skipped_duplicates += 1
+    
+    if skipped_duplicates > 0:
+        logger.info(f"✓ Added {added} posts from OVH Forum (skipped {skipped_duplicates} duplicates)")
+    return {'added': added}
+
+
+@app.post("/scrape/mastodon", response_model=ScrapeResult)
+async def scrape_mastodon_endpoint(query: str = "OVH", limit: int = 50):
+    """Scrape Mastodon for posts about OVH using public API."""
+    try:
+        items = mastodon.scrape_mastodon(query, limit=limit)
+    except Exception as e:
+        logger.error(f"Error scraping Mastodon: {e}")
+        return ScrapeResult(added=0)
+    
+    added = 0
+    skipped_duplicates = 0
+    for it in items:
+        an = sentiment.analyze(it.get('content') or '')
+        it['sentiment_score'] = an['score']
+        it['sentiment_label'] = an['label']
+        if db.insert_post({
+            'source': it.get('source'),
+            'author': it.get('author'),
+            'content': it.get('content'),
+            'url': it.get('url'),
+            'created_at': it.get('created_at'),
+            'sentiment_score': it.get('sentiment_score'),
+            'sentiment_label': it.get('sentiment_label'),
+            'language': it.get('language', 'unknown'),
+        }):
+            added += 1
+        else:
+            skipped_duplicates += 1
+    
+    if skipped_duplicates > 0:
+        logger.info(f"✓ Added {added} posts from Mastodon (skipped {skipped_duplicates} duplicates)")
+    return {'added': added}
+
+
+@app.post("/scrape/g2-crowd", response_model=ScrapeResult)
+async def scrape_g2_crowd_endpoint(query: str = "OVH", limit: int = 50):
+    """Scrape G2 Crowd for OVH product reviews."""
+    try:
+        items = g2_crowd.scrape_g2_crowd(query, limit=limit)
+    except Exception as e:
+        logger.error(f"Error scraping G2 Crowd: {e}")
+        return ScrapeResult(added=0)
+    
+    added = 0
+    skipped_duplicates = 0
+    for it in items:
+        an = sentiment.analyze(it.get('content') or '')
+        it['sentiment_score'] = an['score']
+        it['sentiment_label'] = an['label']
+        if db.insert_post({
+            'source': it.get('source'),
+            'author': it.get('author'),
+            'content': it.get('content'),
+            'url': it.get('url'),
+            'created_at': it.get('created_at'),
+            'sentiment_score': it.get('sentiment_score'),
+            'sentiment_label': it.get('sentiment_label'),
+            'language': it.get('language', 'unknown'),
+        }):
+            added += 1
+        else:
+            skipped_duplicates += 1
+    
+    if skipped_duplicates > 0:
+        logger.info(f"✓ Added {added} reviews from G2 Crowd (skipped {skipped_duplicates} duplicates)")
     return {'added': added}
 
 
@@ -520,7 +795,7 @@ async def scrape_news_endpoint(query: str, limit: int = 50):
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
-            db.insert_post({
+            if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
                 'content': it.get('content'),
@@ -529,8 +804,8 @@ async def scrape_news_endpoint(query: str, limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
-            })
-            added += 1
+            }):
+                added += 1
     except Exception as e:
         print(f"[NEWS SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
         import traceback
@@ -555,7 +830,7 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
             
-            db.insert_post({
+            if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
                 'content': it.get('content'),
@@ -564,8 +839,8 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
-            })
-            added += 1
+            }):
+                added += 1
     except Exception as e:
         print(f"[TRUSTPILOT SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
         import traceback
@@ -587,9 +862,228 @@ async def post_saved_queries(payload: KeywordsPayload):
     return {'saved': len(payload.keywords)}
 
 
+@app.post('/admin/cleanup-hackernews-posts')
+async def cleanup_hackernews_posts():
+    """
+    Delete all posts from Hacker News (replaced by Reddit).
+    """
+    try:
+        deleted_count = db.delete_hackernews_posts()
+        return {
+            'deleted': deleted_count,
+            'message': f'Successfully removed {deleted_count} Hacker News posts from database'
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/admin/cleanup-duplicates')
+async def cleanup_duplicates():
+    """
+    Delete duplicate posts from the database.
+    Duplicates are identified by same URL or same content+author+source.
+    Keeps the oldest post (lowest ID) and deletes the rest.
+    """
+    try:
+        deleted_count = db.delete_duplicate_posts()
+        return {
+            'deleted': deleted_count,
+            'message': f'Successfully removed {deleted_count} duplicate posts from database'
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/admin/cleanup-non-ovh-posts')
+async def cleanup_non_ovh_posts():
+    """
+    Delete all posts from the database that do NOT mention OVH or its brands.
+    Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+    """
+    try:
+        deleted_count = db.delete_non_ovh_posts()
+        return {
+            'deleted': deleted_count,
+            'message': f'Successfully removed {deleted_count} non-OVH posts from database'
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+
 @app.get("/posts")
 async def get_posts(limit: int = 20, offset: int = 0, language: str = None):
-    return db.get_posts(limit=limit, offset=offset, language=language)
+    """Get posts from database, excluding sample data."""
+    posts = db.get_posts(limit=limit, offset=offset, language=language)
+    # Filter out sample posts
+    filtered = []
+    for post in posts:
+        url = post.get('url', '')
+        is_sample = (
+            '/sample' in url or
+            'example.com' in url or
+            '/status/174' in url or
+            url == 'https://trustpilot.com/sample'
+        )
+        if not is_sample:
+            filtered.append(post)
+    return filtered
+
+
+async def generate_ideas_with_llm(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
+    """
+    Generate improvement ideas using LLM API.
+    Supports OpenAI, Anthropic, or local LLM via environment variables.
+    """
+    # Prepare posts summary
+    posts_summary = []
+    for post in posts[:20]:  # Limit to 20 posts for context
+        posts_summary.append({
+            'content': post.get('content', '')[:500],  # Limit content length
+            'sentiment': post.get('sentiment_label', 'neutral'),
+            'source': post.get('source', 'Unknown')
+        })
+    
+    # Create prompt
+    prompt = f"""Analyze the following customer feedback posts about OVH products and generate {max_ideas} concrete product improvement ideas.
+
+Posts to analyze:
+{json.dumps(posts_summary, indent=2, ensure_ascii=False)}
+
+For each idea, provide:
+1. A clear, concise title (max 60 characters)
+2. A detailed description explaining the improvement and why it's needed
+3. Priority level (high/medium/low) based on impact and frequency
+4. Count of related posts that support this idea
+
+Format your response as a JSON array with this structure:
+[
+  {{
+    "title": "Idea title",
+    "description": "Detailed description...",
+    "priority": "high|medium|low",
+    "related_posts_count": 3
+  }}
+]
+
+Focus on actionable improvements that address real customer pain points. Be specific and practical."""
+
+    # Try to use LLM API (OpenAI, Anthropic, or local)
+    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    
+    if not api_key and llm_provider in ['openai', 'anthropic']:
+        # Fallback: Generate ideas using rule-based approach
+        return generate_ideas_fallback(posts, max_ideas)
+    
+    try:
+        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
+            # Use OpenAI API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                # Parse JSON from response
+                import re
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        elif llm_provider == 'anthropic':
+            # Use Anthropic API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': api_key,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                        'max_tokens': 2000,
+                        'messages': [
+                            {'role': 'user', 'content': prompt}
+                        ]
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['content'][0]['text']
+                
+                # Parse JSON from response
+                import re
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+    except Exception as e:
+        print(f"LLM API error: {e}")
+        # Fallback to rule-based generation
+        return generate_ideas_fallback(posts, max_ideas)
+    
+    # Fallback if no API configured
+    return generate_ideas_fallback(posts, max_ideas)
+
+
+def generate_ideas_fallback(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
+    """Fallback rule-based idea generation when LLM is not available."""
+    ideas = []
+    
+    # Analyze posts by theme
+    themes = {
+        'Performance': {'keywords': ['slow', 'lag', 'performance', 'speed', 'timeout'], 'posts': []},
+        'Reliability': {'keywords': ['down', 'crash', 'error', 'bug', 'broken'], 'posts': []},
+        'Support': {'keywords': ['support', 'help', 'ticket', 'response', 'wait'], 'posts': []},
+        'Documentation': {'keywords': ['documentation', 'docs', 'guide', 'tutorial'], 'posts': []},
+        'UI/UX': {'keywords': ['interface', 'ui', 'ux', 'confusing', 'unclear'], 'posts': []}
+    }
+    
+    for post in posts:
+        content_lower = post.get('content', '').lower()
+        for theme, data in themes.items():
+            if any(kw in content_lower for kw in data['keywords']):
+                data['posts'].append(post)
+    
+    # Generate ideas from themes
+    for theme, data in sorted(themes.items(), key=lambda x: len(x[1]['posts']), reverse=True)[:max_ideas]:
+        if len(data['posts']) > 0:
+            ideas.append(ImprovementIdea(
+                title=f"Improve {theme}",
+                description=f"Based on {len(data['posts'])} customer feedback posts, there are recurring issues related to {theme.lower()}. Consider reviewing and improving this aspect of the product.",
+                priority='high' if len(data['posts']) >= 5 else 'medium' if len(data['posts']) >= 2 else 'low',
+                related_posts_count=len(data['posts'])
+            ))
+    
+    return ideas
+
+
+@app.post("/generate-improvement-ideas", response_model=ImprovementIdeasResponse)
+async def generate_improvement_ideas(request: ImprovementIdeaRequest):
+    """Generate product improvement ideas based on customer feedback posts using LLM."""
+    try:
+        ideas = await generate_ideas_with_llm(request.posts, request.max_ideas)
+        return ImprovementIdeasResponse(ideas=ideas)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
 
 
 @app.get("/", response_class=HTMLResponse)

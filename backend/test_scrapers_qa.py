@@ -53,4 +53,34 @@ try:
 except Exception as e:
     print(f"   ❌ Google News error: {str(e)[:100]}")
 
+print("\n6️⃣ Testing OVH Forum scraper...")
+try:
+    from app.scraper import ovh_forum
+    result = ovh_forum.scrape_ovh_forum(query='OVH', limit=5)
+    print(f"   ✅ OVH Forum: {len(result)} posts found")
+    if result:
+        print(f"   First post: {result[0]['content'][:80]}")
+except Exception as e:
+    print(f"   ❌ OVH Forum error: {str(e)[:100]}")
+
+print("\n7️⃣ Testing Mastodon scraper...")
+try:
+    from app.scraper import mastodon
+    result = mastodon.scrape_mastodon(query='ovhcloud', limit=5)
+    print(f"   ✅ Mastodon: {len(result)} posts found")
+    if result:
+        print(f"   First post: {result[0]['content'][:80]}")
+except Exception as e:
+    print(f"   ❌ Mastodon error: {str(e)[:100]}")
+
+print("\n8️⃣ Testing G2 Crowd scraper...")
+try:
+    from app.scraper import g2_crowd
+    result = g2_crowd.scrape_g2_crowd(query='OVH', limit=5)
+    print(f"   ✅ G2 Crowd: {len(result)} reviews found")
+    if result:
+        print(f"   First review: {result[0]['content'][:80]}")
+except Exception as e:
+    print(f"   ❌ G2 Crowd error: {str(e)[:100]}")
+
 print("\n✅ Testing completed!")

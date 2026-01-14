@@ -5,6 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OVH Complaints Tracker</title>
     <style>
+        :root {
+            /* Dark Mode (default) */
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --bg-card-hover: #1a4d7a;
+            --text-primary: #fff;
+            --text-secondary: #aaa;
+            --text-muted: #666;
+            --border-color: #333;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --accent-primary: #00d4ff;
+            --accent-secondary: #0099ff;
+            --input-bg: #0f3460;
+            --modal-bg: rgba(15, 52, 96, 0.98);
+        }
+
+        body.light-mode {
+            /* Light Mode */
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #e8ecf1;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f0f4f8;
+            --text-primary: #000000;
+            --text-secondary: #1a1a1a;
+            --text-muted: #333333;
+            --border-color: #ddd;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --accent-primary: #0099ff;
+            --accent-secondary: #00d4ff;
+            --input-bg: #f8f9fa;
+            --modal-bg: rgba(255, 255, 255, 0.98);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -13,10 +47,11 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
             min-height: 100vh;
             padding: 20px;
+            transition: background 0.3s ease, color 0.3s ease;
         }
 
         .container {
@@ -39,9 +74,49 @@
         }
 
         .subtitle {
-            color: #aaa;
+            color: var(--text-secondary);
             font-size: 1.1em;
             margin-bottom: 30px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 1.2em;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px var(--shadow);
+        }
+
+        .info-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 8px 15px;
+            background: var(--accent-secondary);
+            border: none;
+            border-radius: 6px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            z-index: 999;
+        }
+
+        .info-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow);
         }
 
         .controls {
@@ -54,10 +129,10 @@
 
         .controls button, .controls select, .controls input {
             padding: 10px 20px;
-            border: none;
+            border: 1px solid var(--border-color);
             border-radius: 8px;
-            background: #0f3460;
-            color: #fff;
+            background: var(--input-bg);
+            color: var(--text-primary);
             cursor: pointer;
             font-size: 0.95em;
             transition: all 0.3s ease;
@@ -70,8 +145,8 @@
         }
 
         .controls button:hover, .controls select:hover {
-            background: #00d4ff;
-            color: #1a1a2e;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
         }
@@ -81,13 +156,13 @@
         }
 
         .apply-btn {
-            background: #00d4ff;
-            color: #1a1a2e;
+            background: var(--accent-primary);
+            color: var(--bg-primary);
             font-weight: bold;
         }
 
         .apply-btn:hover {
-            background: #0099ff;
+            background: var(--accent-secondary);
         }
 
         .stats {
@@ -99,17 +174,18 @@
         }
 
         .stat-card {
-            background: rgba(15, 52, 96, 0.6);
+            background: var(--bg-card);
             padding: 15px 25px;
             border-radius: 8px;
-            border-left: 3px solid #00d4ff;
+            border-left: 3px solid var(--accent-primary);
             text-align: center;
             cursor: pointer;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 8px var(--shadow);
         }
 
         .stat-card:hover {
-            background: rgba(15, 52, 96, 0.9);
+            background: var(--bg-card-hover);
             border-left-color: #34d399;
             transform: scale(1.05);
         }
@@ -117,12 +193,12 @@
         .stat-card strong {
             display: block;
             font-size: 1.8em;
-            color: #00d4ff;
+            color: var(--accent-primary);
             margin-bottom: 5px;
         }
 
         .stat-card small {
-            color: #aaa;
+            color: var(--text-secondary);
             font-size: 0.9em;
         }
 
@@ -134,21 +210,27 @@
         }
 
         .post-card {
-            background: rgba(15, 52, 96, 0.5);
-            border: 1px solid rgba(0, 212, 255, 0.2);
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 20px;
             transition: all 0.3s ease;
             display: flex;
             flex-direction: column;
             gap: 12px;
+            box-shadow: 0 2px 8px var(--shadow);
+            position: relative;
+            overflow: visible;
+            width: 100%;
+            min-height: 200px;
         }
 
         .post-card:hover {
-            background: rgba(15, 52, 96, 0.8);
-            border-color: #00d4ff;
+            background: var(--bg-card-hover);
+            border-color: var(--accent-primary);
             box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
             transform: translateY(-5px);
+            z-index: 10;
         }
 
         .post-header {
@@ -168,37 +250,37 @@
 
         .source-x {
             background: rgba(0, 0, 0, 0.6);
-            color: #fff;
+            color: var(--text-primary);
         }
 
         .source-reddit {
             background: rgba(255, 69, 0, 0.6);
-            color: #fff;
+            color: var(--text-primary);
         }
 
         .source-linkedin {
             background: rgba(0, 119, 181, 0.6);
-            color: #fff;
+            color: var(--text-primary);
         }
 
         .source-facebook {
             background: rgba(59, 89, 152, 0.6);
-            color: #fff;
+            color: var(--text-primary);
         }
 
         .post-date {
-            color: #888;
+            color: var(--text-muted);
             font-size: 0.85em;
         }
 
         .post-author {
-            color: #00d4ff;
+            color: var(--accent-primary);
             font-weight: bold;
             font-size: 0.95em;
         }
 
         .post-content {
-            color: #ccc;
+            color: var(--text-secondary);
             line-height: 1.6;
             flex-grow: 1;
             max-height: 120px;
@@ -238,31 +320,33 @@
         }
 
         .post-url {
-            color: #0099ff;
+            color: var(--accent-secondary);
             text-decoration: none;
             font-size: 0.85em;
             word-break: break-all;
+            font-weight: 500;
         }
 
         .post-url:hover {
             text-decoration: underline;
+            color: var(--accent-primary);
         }
 
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #888;
+            color: var(--text-muted);
         }
 
         .empty-state h2 {
             margin-bottom: 10px;
-            color: #aaa;
+            color: var(--text-secondary);
         }
 
         .loader {
             text-align: center;
             padding: 40px;
-            color: #00d4ff;
+            color: var(--accent-primary);
         }
 
         .loader span {
@@ -270,7 +354,7 @@
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: #00d4ff;
+            background: var(--accent-primary);
             animation: bounce 1.4s infinite ease-in-out both;
         }
 
@@ -323,7 +407,7 @@
             bottom: 30px;
             right: 30px;
             background: linear-gradient(135deg, #34d399, #10b981);
-            color: #fff;
+            color: var(--text-primary);
             padding: 18px 28px;
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(52, 211, 153, 0.4);
@@ -377,12 +461,12 @@
         }
 
         .log-entry.info {
-            color: #00d4ff;
-            border-left-color: #00d4ff;
+            color: var(--accent-primary);
+            border-left-color: var(--accent-primary);
         }
 
         .log-timestamp {
-            color: #888;
+            color: var(--text-muted);
             font-size: 0.8em;
             margin-right: 8px;
         }
@@ -390,7 +474,7 @@
             width: 14px;
             height: 14px;
             border: 2px solid rgba(255,255,255,0.15);
-            border-top-color: #00d4ff;
+            border-top-color: var(--accent-primary);
             border-radius: 50%;
             display: inline-block;
             vertical-align: middle;
@@ -399,6 +483,48 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        .btn-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: var(--text-primary);
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 8px;
+            animation: spin 1s linear infinite;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: var(--bg-card);
+            border-radius: 8px;
+        }
+
+        .sort-controls label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .filter-count {
+            display: inline-block;
+            background: var(--accent-primary);
+            color: #1a1a2e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 8px;
         }
 
         /* Job errors modal styles */
@@ -420,7 +546,7 @@
             border-radius: 12px;
             border: 1px solid rgba(239,68,68,0.12);
             box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            color: #fff;
+            color: var(--text-primary);
             padding: 18px;
         }
 
@@ -438,119 +564,402 @@
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
     <div class="container">
         <header>
-            <h1>🔍 OVH Complaints Tracker</h1>
-            <p class="subtitle">Real-time monitoring of domain complaints across social media</p>
-            <button onclick="toggleInfo()" style="position: absolute; top: 20px; right: 20px; padding: 8px 15px; background: #0099ff; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: bold;">ℹ️ Info</button>
+            <h1>💬 OVH Customer Feedback Tracker</h1>
+            <p class="subtitle">Monitor customer feedback, reviews & discussions across all OVH products</p>
+            <button onclick="toggleInfo()" class="info-button">ℹ️ Info</button>
         </header>
 
-        <!-- Row 1: Filters & Timeline -->
-        <div class="controls" style="margin-bottom: 15px; border-bottom: 1px solid rgba(0, 212, 255, 0.2); padding-bottom: 15px;">
-            <input type="text" id="searchInput" placeholder="Search posts...">
-            
-            <select id="languageFilter">
-                <option value="">All Languages</option>
-                <option value="fr">🇫🇷 Français (French)</option>
-                <option value="en">🇬🇧 English</option>
-                <option value="other">🌍 Other</option>
-            </select>
-            
-            <select id="keywordFilter">
-                <option value="">All Keywords</option>
-                <optgroup label="Domain Operations">
-                    <option value="domain-create">Domain Creation</option>
-                    <option value="domain-renew">Domain Renewal</option>
-                    <option value="domain-transfer">Domain Transfer</option>
-                    <option value="domain-trade">Domain Trade</option>
-                    <option value="domain-restore">Domain Restore</option>
-                </optgroup>
-                <optgroup label="DNS">
-                    <option value="dns">DNS Issues</option>
-                </optgroup>
-            </select>
-            
-            <input type="date" id="dateFrom" title="From Date">
-            <input type="date" id="dateTo" title="To Date">
-            <button onclick="applyDateFilter()" class="apply-btn">✓ Apply Timeline</button>
-            
-            <select id="sourceFilter">
-                <option value="">All Sources</option>
-                <option value="X/Twitter">Twitter/X</option>
-                <option value="Stack Overflow">Stack Overflow</option>
-                <option value="GitHub Issues">GitHub Issues</option>
-                <option value="GitHub Discussions">GitHub Discussions</option>
-                <option value="Hacker News">Hacker News</option>
-                <option value="Google News">Google News</option>
-                <option value="Trustpilot">Trustpilot</option>
-            </select>
-            
-            <select id="sentimentFilter">
-                <option value="">All Sentiments</option>
-                <option value="positive">Positive</option>
-                <option value="negative">Negative</option>
-                <option value="neutral">Neutral</option>
-            </select>
-        </div>
-
-        <!-- Keywords manager: let user add up to 10 keywords and persist them -->
-        <div class="controls" style="margin-bottom:20px; gap:8px; align-items:center;">
-            <input type="text" id="keywordInput" placeholder="Add keyword (press Enter or click +)" style="min-width:220px; max-width:400px;">
-            <button onclick="addKeyword()">＋ Add</button>
-            <label style="font-size:0.9em; color:#ccc;">Limit per scrape:</label>
-            <input type="number" id="keywordLimit" min="1" max="500" value="50" style="width:90px;">
-            <button onclick="runKeywordSearches()" class="apply-btn">Run keyword searches</button>
-            <button onclick="startBackgroundJob()" style="background:#7c3aed;">Start background job</button>
-            <button onclick="clearKeywords()" style="background:#ef4444;">Clear keywords</button>
+        <!-- Keywords manager: Configure what to search for -->
+        <div class="controls" style="margin-bottom:20px; gap:8px; align-items:center; background: rgba(0, 212, 255, 0.05); padding: 15px; border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.2);">
+            <h3 style="color: var(--accent-primary); margin: 0 0 10px 0; font-size: 1.1em;">🔑 Configure Keywords to Search</h3>
+            <input type="text" id="keywordInput" placeholder="Add keyword (e.g., 'ovh vps', 'ovh hosting', 'ovh support')" style="min-width:220px; max-width:400px;">
+            <button onclick="addKeyword()">＋ Add Keyword</button>
+            <button onclick="clearKeywords()" style="background:#ef4444;">Clear All</button>
+            <p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 10px; max-width: 700px;">
+                💡 <strong>How it works:</strong> Add keywords related to OVH products (e.g., "ovh vps", "ovh hosting", "ovh billing", "ovh support") and click "🆕 Scrape New Data" to collect customer feedback from all sources.
+            </p>
             <div id="keywordsList" style="width:100%; margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;"></div>
             <div id="keywordsSyncIndicator" style="display:none; margin-left:8px; color:#00d4ff; font-size:0.95em; align-items:center;">
                 <span class="spinner" aria-hidden="true"></span>
                 <span style="margin-left:8px; vertical-align:middle;">Syncing…</span>
             </div>
-            <div id="jobPanel" style="display:none; margin-left:12px; color:#fff; font-size:0.95em;">
-                <div style="margin-top:8px;">
-                    <strong id="jobStatusText">Job: —</strong>
-                    <div id="jobProgress" style="margin-top:6px; font-size:0.9em; color:#ccc;"></div>
-                    <div style="margin-top:6px;">
-                        <button id="startJobBtn" onclick="startBackgroundJob()" style="background:#7c3aed;">Start</button>
-                        <button id="cancelJobBtn" onclick="cancelBackgroundJob()" style="background:#ef4444;">Cancel Job</button>
-                    </div>
-                    <div id="jobDetails" style="margin-top:8px; font-size:0.85em; color:#aaa;"></div>
-                    <div id="jobErrors" style="margin-top:8px; font-size:0.85em; color:#ffb3b3; display:none; max-height:140px; overflow:auto; border-left:2px solid rgba(239,68,68,0.2); padding-left:8px;"></div>
-                    <button id="toggleErrorsBtn" onclick="openJobErrorsModal()" style="margin-top:8px; display:none; background:#ff8b8b;">Voir erreurs détaillées</button>
+        </div>
+
+        <!-- Primary action + Scraping buttons -->
+        <div class="controls" style="margin-bottom: 30px;">
+            <!-- PRIMARY ACTION - Left side -->
+            <button id="btnScrapeAll" onclick="scrapeAllSources()" style="background: linear-gradient(135deg, #00d4ff, #0099ff); font-weight: bold; font-size: 1.05em; padding: 12px 24px;" title="Lance tous les scrapers pour ajouter de nouveaux posts à la base de données">
+                <span class="btn-text">🆕 Scrape New Data</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="cancelBtn" onclick="cancelRequest()" style="display:none; background:#ef4444;">❌ Cancel</button>
+            
+            <!-- INDIVIDUAL SOURCE SCRAPERS -->
+            <button id="btnScrapeX" onclick="scrapeX()">
+                <span class="btn-text">🐦 X/Twitter</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeStackOverflow" onclick="scrapeStackOverflow()">
+                <span class="btn-text">📚 StackOverflow</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeNews" onclick="scrapeNews()">
+                <span class="btn-text">📰 News</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeReddit" onclick="scrapeReddit()">
+                <span class="btn-text">🔴 Reddit</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeTrustpilot" onclick="scrapeTrustpilot()">
+                <span class="btn-text">⭐ Trustpilot</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeGithub" onclick="scrapeGithub()">
+                <span class="btn-text">💻 GitHub</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeOvhForum" onclick="scrapeOvhForum()">
+                <span class="btn-text">💬 OVH Forum</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeMastodon" onclick="scrapeMastodon()">
+                <span class="btn-text">🐘 Mastodon</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            <button id="btnScrapeG2" onclick="scrapeG2Crowd()">
+                <span class="btn-text">⭐ G2 Crowd</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
+            
+            <!-- UTILITY BUTTONS -->
+            <button onclick="cleanupDuplicates()" style="background:#f59e0b;" title="Remove duplicate posts (same URL or same content+author+source)">🔄 Remove Duplicates</button>
+            <button onclick="cleanupNonOvhPosts()" style="background:#ff6b6b;" title="Remove all posts that don't mention OVH or its brands">🗑️ Remove Non-OVH Posts</button>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="controls" style="margin-bottom: 20px; margin-top: 30px; border-top: 2px solid rgba(0, 212, 255, 0.3); padding-top: 20px;">
+            <h3 style="color: var(--accent-primary); margin: 0 0 15px 0; font-size: 1.1em;">🔍 Filter & Search Results</h3>
+            
+            <input type="text" id="searchInput" placeholder="🔍 Search by keyword in posts (e.g., 'dns', 'billing', 'down')...">
+            
+            <select id="sentimentFilter">
+                <option value="">All Sentiments</option>
+                <option value="positive">✅ Positive</option>
+                <option value="negative">❌ Negative</option>
+                <option value="neutral">➖ Neutral</option>
+            </select>
+            
+            <select id="sourceFilter">
+                <option value="">All Sources</option>
+                <option value="X/Twitter">🐦 Twitter/X</option>
+                <option value="Stack Overflow">📚 Stack Overflow</option>
+                <option value="GitHub Issues">💻 GitHub Issues</option>
+                <option value="GitHub Discussions">💬 GitHub Discussions</option>
+                <option value="Reddit">🔴 Reddit</option>
+                <option value="Google News">📰 Google News</option>
+                <option value="Trustpilot">⭐ Trustpilot</option>
+            </select>
+            
+            <select id="languageFilter">
+                <option value="">All Languages</option>
+                <option value="fr">🇫🇷 Français</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="other">🌍 Other</option>
+            </select>
+            
+            <select id="ovhProductFilter" title="Filter by OVH Product">
+                <option value="">All OVH Products</option>
+                <optgroup label="🌐 Web & Hosting">
+                    <option value="web-hosting">Web Hosting</option>
+                    <option value="wordpress">WordPress Hosting</option>
+                    <option value="email">Email / Exchange</option>
+                    <option value="domain">Domain Names</option>
+                </optgroup>
+                <optgroup label="☁️ Cloud & Servers">
+                    <option value="vps">VPS (Virtual Private Server)</option>
+                    <option value="dedicated">Dedicated Servers</option>
+                    <option value="public-cloud">Public Cloud</option>
+                    <option value="private-cloud">Private Cloud</option>
+                    <option value="hosted-private-cloud">Hosted Private Cloud</option>
+                </optgroup>
+                <optgroup label="💾 Storage & Backup">
+                    <option value="object-storage">Object Storage</option>
+                    <option value="cloud-archive">Cloud Archive</option>
+                    <option value="nas-ha">NAS-HA</option>
+                    <option value="veeam">Veeam Backup</option>
+                </optgroup>
+                <optgroup label="🌍 Network & CDN">
+                    <option value="cdn">CDN</option>
+                    <option value="load-balancer">Load Balancer</option>
+                    <option value="ddos">DDoS Protection</option>
+                    <option value="vrack">vRack</option>
+                </optgroup>
+                <optgroup label="📱 Telecom">
+                    <option value="voip">VoIP / Telephony</option>
+                    <option value="sms">SMS</option>
+                    <option value="fax">Fax</option>
+                </optgroup>
+                <optgroup label="🔧 Support & Billing">
+                    <option value="support">Customer Support</option>
+                    <option value="billing">Billing Issues</option>
+                    <option value="manager">OVH Manager</option>
+                    <option value="api">OVH API</option>
+                </optgroup>
+            </select>
+            
+            <input type="date" id="dateFrom" title="From Date" placeholder="From">
+            <input type="date" id="dateTo" title="To Date" placeholder="To">
+            
+            <button onclick="applyFilters()" class="apply-btn" style="background: linear-gradient(135deg, #00d4ff, #0099ff); font-weight: bold; padding: 12px 24px;">✓ Apply Filters</button>
+            <button onclick="clearAllFilters()" style="background:#ef4444; margin-left:10px;">🗑️ Clear Filters</button>
+            <span id="activeFiltersCount" class="filter-count" style="display:none;">0</span>
+        </div>
+
+        <!-- Sort Controls -->
+        <div class="sort-controls" style="margin-bottom: 20px;">
+            <label>Sort by:</label>
+            <select id="sortBy" onchange="applySorting()">
+                <option value="date-desc">📅 Date (Newest)</option>
+                <option value="date-asc">📅 Date (Oldest)</option>
+                <option value="sentiment-desc">😡 Sentiment (Negative First)</option>
+                <option value="sentiment-asc">😊 Sentiment (Positive First)</option>
+                <option value="source-asc">📊 Source (A-Z)</option>
+                <option value="source-desc">📊 Source (Z-A)</option>
+            </select>
+        </div>
+
+        <!-- Global Stats (all posts in DB) -->
+        <div style="margin-bottom: 10px; padding: 10px; background: var(--bg-card); border-radius: 8px;">
+            <h3 style="color: var(--text-secondary); font-size: 0.9em; margin: 0 0 10px 0; display: flex; align-items: center; gap: 10px;">
+                📊 DATABASE STATS (Global)
+                <span onclick="openStatsInfoModal()" style="cursor: pointer; background: rgba(0, 212, 255, 0.2); padding: 4px 8px; border-radius: 50%; font-size: 0.9em; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;" onmouseover="this.style.background='rgba(0, 212, 255, 0.4)'; this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(0, 212, 255, 0.2)'; this.style.transform='scale(1)'" title="Cliquez pour plus d'informations">ℹ️</span>
+            </h3>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="stat-card" style="cursor: default;" title="Total posts dans la base de données">
+                    <strong id="globalTotalPosts">0</strong>
+                    <small>Total</small>
+                </div>
+                <div class="stat-card" style="cursor: default;" title="Posts positifs dans la base">
+                    <strong id="globalPositivePosts">0</strong>
+                    <small>Positive</small>
+                </div>
+                <div class="stat-card" style="cursor: default;" title="Posts négatifs dans la base">
+                    <strong id="globalNegativePosts">0</strong>
+                    <small>Negative</small>
+                </div>
+                <div class="stat-card" style="cursor: default;" title="Posts neutres dans la base">
+                    <strong id="globalNeutralPosts">0</strong>
+                    <small>Neutral</small>
                 </div>
             </div>
         </div>
 
-        <!-- Row 2: Scraping buttons -->
-        <div class="controls" style="margin-bottom: 30px;">
-            <button onclick="scrapeX()">Scrape X/Twitter</button>
-            <button onclick="scrapeGithub()">Scrape GitHub</button>
-            <button onclick="scrapeStackOverflow()">Scrape Stack Overflow</button>
-            <button onclick="scrapeHackerNews()">Scrape Hacker News</button>
-            <button onclick="scrapeNews()">Scrape Google News</button>
-            <button onclick="scrapeTrustpilot()">Scrape Trustpilot</button>
-            <button onclick="refreshPosts()">Refresh</button>
-            <button id="cancelBtn" onclick="cancelRequest()" style="display:none; background:#ef4444;">Cancel</button>
-            <button onclick="toggleBacklog()">📋 Backlog</button>
+        <!-- Filtered Stats (current view) -->
+        <div style="margin-bottom: 20px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
+            <h3 style="color: var(--accent-primary); font-size: 0.9em; margin: 0 0 10px 0;">🔍 FILTERED RESULTS (Current View)</h3>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="stat-card" onclick="filterBySentiment('')" title="Posts affichés après filtrage">
+                    <strong id="totalPosts">0</strong>
+                    <small>Total Displayed</small>
+                </div>
+                <div class="stat-card" onclick="filterBySentiment('positive')" title="Posts positifs affichés">
+                    <strong id="positivePosts">0</strong>
+                    <small>Positive</small>
+                </div>
+                <div class="stat-card" onclick="filterBySentiment('negative')" title="Posts négatifs affichés (complaints)">
+                    <strong id="negativePosts">0</strong>
+                    <small>Negative</small>
+                </div>
+                <div class="stat-card" onclick="filterBySentiment('neutral')" title="Posts neutres affichés">
+                    <strong id="neutralPosts">0</strong>
+                    <small>Neutral</small>
+                </div>
+            </div>
         </div>
 
-        <div class="stats">
-            <div class="stat-card" onclick="filterBySentiment('')">
-                <strong id="totalPosts">0</strong>
-                <small>Total Posts</small>
+        <!-- Statistics, Backlog & Export Buttons -->
+        <div style="margin-bottom: 30px; text-align: center; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
+            <button onclick="openChartModal()" style="padding: 18px 40px; background: linear-gradient(135deg, #00d4ff, #0099ff); border: none; border-radius: 12px; color: #1a1a2e; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(0, 212, 255, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(0, 212, 255, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(0, 212, 255, 0.4)'">
+                📊 Statistics
+            </button>
+            <button onclick="toggleBacklog()" style="padding: 18px 40px; background: linear-gradient(135deg, #34d399, #10b981); border: none; border-radius: 12px; color: #1a1a2e; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(52, 211, 153, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(52, 211, 153, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(52, 211, 153, 0.4)'">
+                📋 Backlog
+            </button>
+            <button onclick="exportFilteredResults()" style="padding: 18px 40px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px; color: #fff; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(16, 185, 129, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(16, 185, 129, 0.4)'">
+                📥 Export Posts
+            </button>
+        </div>
+
+        <!-- Chart Modal -->
+        <div id="chartModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 10000; overflow-y: auto;">
+            <div style="max-width: 90%; margin: 50px auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 15px; padding: 30px; box-shadow: 0 10px 50px rgba(0, 212, 255, 0.3); position: relative;">
+                <button onclick="closeChartModal()" style="position: absolute; top: 20px; right: 20px; background: #ef4444; border: none; border-radius: 50%; width: 40px; height: 40px; color: var(--text-primary); font-size: 1.5em; cursor: pointer; font-weight: bold; line-height: 1;">×</button>
+                
+                <h2 style="color: var(--accent-primary); margin-bottom: 25px; text-align: center; font-size: 1.8em;">📊 Statistics & Analysis</h2>
+                
+                <!-- Date Range Controls -->
+                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; padding: 15px; background: rgba(0, 212, 255, 0.05); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.2);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-secondary); font-size: 0.95em;">📅 From:</label>
+                        <input type="date" id="chartDateFrom" onchange="syncDateFiltersFromChart()" style="padding: 8px 12px; border: none; border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label style="color: var(--text-secondary); font-size: 0.95em;">📅 To:</label>
+                        <input type="date" id="chartDateTo" onchange="syncDateFiltersFromChart()" style="padding: 8px 12px; border: none; border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
+                    </div>
+                    <button onclick="applyChartDateFilter()" style="padding: 8px 20px; border: none; border-radius: 8px; background: var(--accent-primary); color: #1a1a2e; cursor: pointer; font-size: 1em; font-weight: bold;">✓ Apply Timeline</button>
+                    <button onclick="clearChartDates()" style="padding: 8px 20px; border: none; border-radius: 8px; background: #ef4444; color: var(--text-primary); cursor: pointer; font-size: 1em;">🗑️ Clear</button>
+                </div>
+                
+                <!-- Chart Controls -->
+                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
+                    <select id="chartSentimentFilter" onchange="updateChart()" style="padding: 10px 15px; border: none; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; font-size: 1em;">
+                        <option value="all">All Sentiments</option>
+                        <option value="positive">Positive Only</option>
+                        <option value="negative">Negative Only</option>
+                        <option value="neutral">Neutral Only</option>
+                    </select>
+                    <select id="chartProductFilter" onchange="updateChart()" style="padding: 10px 15px; border: none; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; font-size: 1em;">
+                        <option value="all">All Products</option>
+                        <!-- Options will be populated dynamically -->
+                    </select>
+                    <select id="chartGrouping" onchange="updateChart()" style="padding: 10px 15px; border: none; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; font-size: 1em;">
+                        <option value="day">By Day</option>
+                        <option value="week">By Week</option>
+                        <option value="month">By Month</option>
+                    </select>
+                    <button onclick="toggleChartView()" style="padding: 10px 15px; border: none; border-radius: 8px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; font-size: 1em;">📊 Toggle View (Bar/Line)</button>
+                    <button onclick="refreshChartData()" style="padding: 10px 15px; border: none; border-radius: 8px; background: #34d399; color: #1a1a2e; cursor: pointer; font-size: 1em; font-weight: bold;" title="Reload data from database">📥 Reload from DB</button>
+                </div>
+                
+                <!-- Charts Container -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                    <!-- Timeline Chart -->
+                    <div>
+                        <h3 style="color: var(--accent-primary); margin-bottom: 15px; text-align: center;">📈 Timeline & Histogram</h3>
+                        <canvas id="timelineChart" style="max-height: 400px; width: 100%;"></canvas>
+                    </div>
+                    <!-- Product Distribution Pie Chart -->
+                    <div>
+                        <h3 style="color: var(--accent-primary); margin-bottom: 15px; text-align: center;">🥧 Distribution by Product</h3>
+                        <canvas id="productPieChart" style="max-height: 400px; width: 100%;"></canvas>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
+                    <p style="color: var(--text-secondary); margin: 0; text-align: center;">
+                        💡 <strong>Tip:</strong> The charts respect all your date, sentiment, and product filters. Use "🆕 Scrape New Data" button to collect new posts from all sources.
+                    </p>
+                </div>
             </div>
-            <div class="stat-card" onclick="filterBySentiment('positive')">
-                <strong id="positivePosts">0</strong>
-                <small>Positive</small>
+        </div>
+
+        <!-- Stats Info Modal -->
+        <div id="statsInfoModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 10001; overflow-y: auto;">
+            <div style="max-width: 700px; margin: 50px auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 15px; padding: 30px; box-shadow: 0 10px 50px rgba(0, 212, 255, 0.3); position: relative;">
+                <button onclick="closeStatsInfoModal()" style="position: absolute; top: 20px; right: 20px; background: #ef4444; border: none; border-radius: 50%; width: 40px; height: 40px; color: var(--text-primary); font-size: 1.5em; cursor: pointer; font-weight: bold; line-height: 1;">×</button>
+                
+                <h2 style="color: var(--accent-primary); margin-bottom: 25px; text-align: center; font-size: 1.8em;">📊 Where do the statistics come from?</h2>
+                
+                <div style="color: #ddd; line-height: 1.8;">
+                    <div style="margin-bottom: 25px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-left: 4px solid #00d4ff; border-radius: 8px;">
+                        <h3 style="color: var(--accent-primary); margin: 0 0 10px 0; font-size: 1.2em;">🗄️ SQLite Database</h3>
+                        <p style="margin: 0;">All statistics come from the SQLite database <code style="background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; color: #34d399;">complaints.db</code> located in the backend folder.</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <h3 style="color: #34d399; margin: 0 0 15px 0; font-size: 1.1em;">📥 Data Sources:</h3>
+                        <ul style="list-style: none; padding: 0; margin: 0;">
+                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">🐦</span>
+                                <div>
+                                    <strong style="color: var(--text-primary);">X/Twitter</strong><br>
+                                    <small style="color: var(--text-secondary);">Posts and tweets via Nitter (open-source alternative)</small>
+                                </div>
+                            </li>
+                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">📚</span>
+                                <div>
+                                    <strong style="color: var(--text-primary);">StackOverflow</strong><br>
+                                    <small style="color: var(--text-secondary);">Technical questions and answers</small>
+                                </div>
+                            </li>
+                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">📰</span>
+                                <div>
+                                    <strong style="color: var(--text-primary);">Google News</strong><br>
+                                    <small style="color: var(--text-secondary);">Press articles and news</small>
+                                </div>
+                            </li>
+                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">🔴</span>
+                                <div>
+                                    <strong style="color: var(--text-primary);">Reddit</strong><br>
+                                    <small style="color: var(--text-secondary);">Community discussions and feedback</small>
+                                </div>
+                            </li>
+                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
+                                <span style="font-size: 1.5em; margin-right: 10px;">⭐</span>
+                                <div>
+                                    <strong style="color: var(--text-primary);">Trustpilot</strong><br>
+                                    <small style="color: var(--text-secondary);">Customer reviews and ratings</small>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <h3 style="color: #f59e0b; margin: 0 0 15px 0; font-size: 1.1em;">🤖 Automatic Analysis:</h3>
+                        <ul style="padding-left: 20px; margin: 0;">
+                            <li style="margin-bottom: 8px;"><strong>Sentiment Analysis (VADER)</strong>: Each post is automatically analyzed to determine if it's positive, negative, or neutral.</li>
+                            <li style="margin-bottom: 8px;"><strong>Language Detection</strong>: The language of each post is automatically detected (FR, EN, etc.).</li>
+                            <li style="margin-bottom: 8px;"><strong>Deduplication</strong>: Duplicate posts (same URL) are not added multiple times.</li>
+                            <li style="margin-bottom: 8px;"><strong>Automatic Filtering</strong>: Sample/fake posts are automatically excluded.</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="padding: 15px; background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; border-radius: 8px;">
+                        <h3 style="color: #ef4444; margin: 0 0 10px 0; font-size: 1.1em;">⚙️ Updates:</h3>
+                        <p style="margin: 0;">
+                            • <strong>Manual</strong>: Click "🆕 Scrape New Data" to launch all scrapers<br>
+                            • <strong>Automatic</strong>: The server automatically scrapes every 3 hours<br>
+                            • <strong>By source</strong>: Use individual buttons (🐦 X, 📚 SO, etc.)
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: 25px; text-align: center; padding: 15px; background: rgba(52, 211, 153, 0.1); border-radius: 8px; border: 1px solid rgba(52, 211, 153, 0.3);">
+                        <p style="margin: 0; color: #34d399;">
+                            ✅ <strong>All data is persistent</strong>: It's saved in the SQLite database and doesn't disappear on restart.
+                        </p>
+                    </div>
+                    
+                    <div style="margin-top: 15px; text-align: center; padding: 15px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
+                        <p style="margin: 0; color: var(--accent-primary);">
+                            🧹 <strong>Automatic Cleanup</strong>: On server startup, posts that don't mention OVH (or its brands: Kimsufi, SoYouStart) are automatically deleted.
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div class="stat-card" onclick="filterBySentiment('negative')">
-                <strong id="negativePosts">0</strong>
-                <small>Negative</small>
-            </div>
-            <div class="stat-card" onclick="filterBySentiment('neutral')">
-                <strong id="neutralPosts">0</strong>
-                <small>Neutral</small>
+        </div>
+
+        <!-- Post Preview Modal -->
+        <div id="postPreviewModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 10002; overflow-y: auto;">
+            <div style="max-width: 800px; margin: 50px auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 15px; padding: 30px; box-shadow: 0 10px 50px rgba(0, 212, 255, 0.3); position: relative;">
+                <button onclick="closePostPreviewModal()" style="position: absolute; top: 20px; right: 20px; background: #ef4444; border: none; border-radius: 50%; width: 40px; height: 40px; color: var(--text-primary); font-size: 1.5em; cursor: pointer; font-weight: bold; line-height: 1;">×</button>
+                
+                <h2 style="color: var(--accent-primary); margin-bottom: 25px; text-align: center; font-size: 1.8em;">👁️ Post Preview</h2>
+                
+                <div id="postPreviewContent" style="color: var(--text-primary); line-height: 1.8;">
+                    <!-- Content will be populated dynamically -->
+                </div>
+                
+                <div style="margin-top: 25px; text-align: center;">
+                    <a id="postPreviewLink" href="#" target="_blank" style="padding: 10px 20px; background: var(--accent-primary); color: #1a1a2e; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">🔗 Open Original Post</a>
+                </div>
             </div>
         </div>
 
@@ -560,39 +969,103 @@
 
         <div id="gallery" class="gallery"></div>
 
-        <div id="backlogPanel" style="display:none; margin-top:40px; padding:20px; background:rgba(15,52,96,0.6); border-radius:12px;">
-            <h2 style="margin-bottom:20px;">📋 Backlog (Commentaires Pertinents)</h2>
-            <button onclick="clearBacklog()" style="margin-bottom:15px; background:#ef4444;">Clear Backlog</button>
-            <button onclick="exportBacklog()" style="margin-bottom:15px;">Export CSV</button>
-            <div id="backlogGallery" class="gallery" style="margin-top:20px;"></div>
+        <!-- Backlog Sidebar -->
+        <div id="backlogSidebar" style="position: fixed; top: 0; right: -450px; width: 450px; height: 100vh; background: var(--bg-card); box-shadow: -5px 0 20px rgba(0, 0, 0, 0.3); z-index: 9999; transition: right 0.3s ease; overflow-y: auto; border-left: 2px solid var(--accent-primary);">
+            <div style="padding: 20px; border-bottom: 2px solid var(--border-color); background: var(--bg-card-hover); position: sticky; top: 0; z-index: 10;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; color: var(--text-primary); font-size: 1.5em;">📋 Backlog</h2>
+                    <button onclick="toggleBacklog()" style="background: #ef4444; border: none; border-radius: 50%; width: 35px; height: 35px; color: #fff; cursor: pointer; font-size: 1.2em; font-weight: bold; line-height: 1;">×</button>
+                </div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <button onclick="toggleBacklogView()" id="backlogViewToggle" style="padding: 8px 15px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); cursor: pointer; font-size: 0.9em;" title="Toggle between card and list view">📋 Card View</button>
+                    <button onclick="clearBacklog()" style="padding: 8px 15px; background: #ef4444; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-size: 0.9em;">🗑️ Clear</button>
+                    <button onclick="exportBacklog()" style="padding: 8px 15px; background: #10b981; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-size: 0.9em;">📥 Export CSV</button>
+                    <button onclick="generateImprovementIdeas()" style="padding: 8px 15px; background: var(--accent-primary); border: none; border-radius: 6px; color: #1a1a2e; cursor: pointer; font-size: 0.9em; font-weight: bold;">💡 Generate Ideas</button>
+                </div>
+            </div>
+            <div id="backlogGallery" style="padding: 20px;">
+                <!-- Backlog posts will be rendered here -->
+            </div>
+        </div>
+        
+        <!-- Backdrop for sidebar -->
+        <div id="backlogBackdrop" onclick="toggleBacklog()" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9998; transition: opacity 0.3s ease;"></div>
+
+        <!-- Improvement Ideas Modal -->
+        <div id="ideasModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 10003; overflow-y: auto;">
+            <div style="max-width: 900px; margin: 50px auto; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 15px; padding: 30px; box-shadow: 0 10px 50px rgba(0, 212, 255, 0.3); position: relative;">
+                <button onclick="closeIdeasModal()" style="position: absolute; top: 20px; right: 20px; background: #ef4444; border: none; border-radius: 50%; width: 40px; height: 40px; color: var(--text-primary); font-size: 1.5em; cursor: pointer; font-weight: bold; line-height: 1;">×</button>
+                
+                <h2 style="color: var(--accent-primary); margin-bottom: 25px; text-align: center; font-size: 1.8em;">💡 Product Improvement Ideas</h2>
+                
+                <div id="ideasContent" style="color: var(--text-primary);">
+                    <!-- Ideas will be populated here -->
+                </div>
+                
+                <div style="margin-top: 25px; text-align: center;">
+                    <button onclick="closeIdeasModal()" style="padding: 10px 20px; background: #6b7280; border: none; border-radius: 8px; color: #fff; cursor: pointer; font-size: 1em; margin-right: 10px;">Close</button>
+                </div>
+            </div>
         </div>
 
         <div id="infoPanel" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:1000; overflow-y:auto;">
             <div style="max-width:900px; margin:30px auto; background:rgba(26,26,46,0.95); padding:30px; border-radius:12px; border:1px solid rgba(0,212,255,0.3);">
                 <button onclick="toggleInfo()" style="float:right; padding:8px 15px; background:#ef4444; border:none; border-radius:6px; color:#fff; cursor:pointer; font-weight:bold;">✕ Close</button>
                 
-                <h1 style="color:#00d4ff; margin-bottom:20px;">ℹ️ Application Info & Disclaimer</h1>
+                <h1 style="color:#00d4ff; margin-bottom:20px;">💬 OVH Customer Feedback Tracker</h1>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">📖 What is OVH Complaints Tracker?</h2>
+                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">📖 What does it do?</h2>
                 <p style="line-height:1.6; color:#ccc;">
-                    OVH Complaints Tracker is a real-time monitoring tool that scrapes social media platforms and news sources 
-                    to track complaints and discussions about OVH domain services. The application analyzes sentiment to help 
-                    prioritize and understand customer feedback.
+                    <strong>OVH Customer Feedback Tracker</strong> is a monitoring tool that <strong>collects and accumulates customer feedback</strong> about <strong>all OVH products and services</strong> from multiple sources. 
+                    The data is <strong>stored permanently</strong> in a SQLite database and analyzed automatically for sentiment (positive, negative, neutral).
                 </p>
+
+                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🚀 How to use it?</h2>
+                <ol style="color:#ccc; line-height:2; margin-left:20px;">
+                    <li><strong>Step 1:</strong> Configure keywords for products you want to monitor (e.g., "ovh vps", "ovh hosting", "ovh billing")</li>
+                    <li><strong>Step 2:</strong> Click "🆕 Scrape New Data" to collect feedback from all sources</li>
+                    <li><strong>Step 3:</strong> Customer feedback is automatically saved to the database (no duplicates)</li>
+                    <li><strong>Step 4:</strong> Use the <strong>"All OVH Products"</strong> filter to show only posts about specific products (VPS, Hosting, Support, etc.)</li>
+                    <li><strong>Step 5:</strong> View timeline charts to analyze trends and sentiment over time</li>
+                </ol>
+
+                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🎯 Filter by Product</h2>
+                <p style="line-height:1.6; color:#ccc;">
+                    After scraping, use the <strong>"All OVH Products"</strong> dropdown to filter feedback by product category:
+                </p>
+                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                    <li><strong>🌐 Web & Hosting:</strong> Web Hosting, WordPress, Email, Domains</li>
+                    <li><strong>☁️ Cloud & Servers:</strong> VPS, Dedicated Servers, Public Cloud, Private Cloud</li>
+                    <li><strong>💾 Storage & Backup:</strong> Object Storage, NAS, Veeam Backup</li>
+                    <li><strong>🌍 Network & CDN:</strong> CDN, Load Balancer, DDoS Protection</li>
+                    <li><strong>📱 Telecom:</strong> VoIP, SMS, Fax</li>
+                    <li><strong>🔧 Support & Billing:</strong> Customer Support, Billing, OVH Manager, API</li>
+                </ul>
 
                 <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🌐 Data Sources</h2>
                 <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
-                    <li><strong>Trustpilot</strong> - ⭐ Real customer reviews and ratings</li>
-                    <li><strong>X (Twitter)</strong> - 💬 Real-time customer complaints and feedback</li>
-                    <li><strong>GitHub Issues</strong> - 📋 Customer experience complaints and feature requests</li>
-                    <li><strong>Stack Overflow</strong> - ❓ Customer technical support questions</li>
-                    <li><strong>Hacker News</strong> - 🔗 Tech community discussions about OVH</li>
-                    <li><strong>Google News</strong> - 📰 News articles and press releases</li>
+                    <li><strong>🐦 X (Twitter)</strong> - Real-time customer complaints and feedback</li>
+                    <li><strong>📚 Stack Overflow</strong> - Technical support questions</li>
+                    <li><strong>📰 Google News</strong> - News articles and press releases</li>
+                    <li><strong>🔴 Reddit</strong> - Community discussions and feedback</li>
+                    <li><strong>⭐ Trustpilot</strong> - Customer reviews and ratings</li>
+                    <li><strong>💻 GitHub</strong> - Issues and discussions</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔑 Search Keywords</h2>
+                <div style="margin-top: 25px; padding: 15px; background: rgba(255, 165, 0, 0.1); border-left: 4px solid #ff9800; border-radius: 8px;">
+                    <h3 style="color: #ff9800; margin: 0 0 10px 0;">⚠️ Why so few results in the past?</h3>
+                    <p style="margin: 0; color: #ccc; line-height: 1.8;">
+                        Public APIs (Twitter, StackOverflow, News, etc.) limit access to <strong>recent posts only</strong> (typically last 7-30 days).
+                        <br><br>
+                        📌 <strong>Solution:</strong> The application <strong>accumulates data over time</strong>. The more you scrape regularly, the more history you'll build!
+                        <br><br>
+                        💡 <strong>Tip:</strong> Launch "Scrape New Data" daily to build a complete history. Posts are permanently saved in the database.
+                    </p>
+                </div>
+
+                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔑 Keywords Configuration</h2>
                 <p style="line-height:1.6; color:#ccc;">
-                    The application automatically searches for the following keywords across all sources:
+                    Add specific keywords to search for. Examples:
                 </p>
                 <ul style="color:#ccc; line-height:1.8; margin-left:20px; background:rgba(0,212,255,0.1); padding:15px; border-radius:6px;">
                     <li><code style="background:#0f3460; padding:4px 8px; border-radius:4px;">"OVH domain"</code></li>
@@ -650,7 +1123,7 @@
                     <li><strong style="color:#ff8787;">❌ Reddit:</strong> Uses aggressive anti-scraping (403 Forbidden). Would require OAuth2 authentication and API credentials. Disabled for simplicity.</li>
                     <li><strong style="color:#ff8787;">❌ LinkedIn:</strong> Strictly prohibits automated data extraction in Terms of Service. No public API available for posts. Scraping violates legal terms.</li>
                     <li><strong style="color:#ff8787;">❌ Facebook:</strong> No public API for accessing posts. Requires special app review by Meta. Data extraction heavily restricted for privacy/security reasons.</li>
-                    <li><strong style="color:#34d399;">✅ Supported Instead:</strong> X/Twitter, GitHub Issues, Stack Overflow, Hacker News, Google News - All have public APIs or accessible without authentication</li>
+                    <li><strong style="color:#34d399;">✅ Supported Instead:</strong> X/Twitter, GitHub Issues, Stack Overflow, Reddit (RSS), Google News - All have public APIs or RSS feeds accessible without authentication</li>
                 </ul>
 
                 <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔧 Technical Details</h2>
@@ -662,21 +1135,51 @@
                     <li><strong>API Base:</strong> http://127.0.0.1:8000 (adjust if deployed)</li>
                 </ul>
 
-                <p style="margin-top:40px; padding-top:20px; border-top:1px solid rgba(0,212,255,0.2); color:#888; font-size:0.9em;">
+                <p style="margin-top:40px; padding-top:20px; border-top:1px solid rgba(0,212,255,0.2); color:var(--text-muted); font-size:0.9em;">
                     Last updated: January 2026 | For support or issues, check the backend logs
                 </p>
             </div>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
         const API_BASE = 'http://127.0.0.1:8000';
+        
+        // Theme Management
+        function toggleTheme() {
+            const body = document.body;
+            const isDark = !body.classList.contains('light-mode');
+            
+            if (isDark) {
+                body.classList.add('light-mode');
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.classList.remove('light-mode');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+        
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-mode');
+            }
+        }
+        
+        // Initialize theme on page load
+        initializeTheme();
+        
+        let timelineChart = null;
+        let productPieChart = null;
+        let chartView = 'bar'; // 'bar' or 'line'
+        let backlogView = 'card'; // 'card' or 'list'
 
         // LocalStorage for persistent filters
         function saveFilters() {
             const filters = {
                 searchInput: document.getElementById('searchInput').value,
-                keywordFilter: document.getElementById('keywordFilter').value,
+                ovhProductFilter: document.getElementById('ovhProductFilter').value,
                 sourceFilter: document.getElementById('sourceFilter').value,
                 sentimentFilter: document.getElementById('sentimentFilter').value,
                 dateFrom: document.getElementById('dateFrom').value,
@@ -838,7 +1341,231 @@
         function getSourceClass(source) {
             return `post-source source-${source}`;
         }
+        
+        function escapeHtml(unsafe) {
+            if (!unsafe) return '';
+            return String(unsafe)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // Store for manually edited product labels (post_id -> label)
+        function saveProductLabel(postId, label) {
+            const labels = loadProductLabels();
+            if (label && label.trim()) {
+                labels[postId] = label.trim();
+            } else {
+                delete labels[postId]; // Remove if empty
+            }
+            localStorage.setItem('ovh_product_labels', JSON.stringify(labels));
+        }
+        
+        function loadProductLabels() {
+            const saved = localStorage.getItem('ovh_product_labels');
+            return saved ? JSON.parse(saved) : {};
+        }
+        
+        function getProductLabel(postId, postContent, postLanguage) {
+            // First check if there's a manually edited label
+            const editedLabels = loadProductLabels();
+            if (editedLabels[postId]) {
+                return editedLabels[postId];
+            }
+            
+            // Otherwise detect automatically
+            const detectedProduct = detectOVHProduct(postContent);
+            if (detectedProduct) {
+                return detectedProduct;
+            }
+            
+            // Fallback to language if not unknown
+            if (postLanguage && postLanguage !== 'unknown') {
+                return postLanguage.toUpperCase();
+            }
+            
+            return null;
+        }
+        
+        function detectOVHProduct(postContent) {
+            if (!postContent) return null;
+            
+            const content = postContent.toLowerCase();
+            
+            // Product patterns with priority order (more specific first)
+            // Note: "support" is now lower priority to avoid false positives
+            const productPatterns = [
+                // Web & Hosting
+                { key: 'domain', pattern: /\b(domain|domaine|dns|zone|registrar|nameserver)\w*/i, label: '🌐 Domain' },
+                { key: 'wordpress', pattern: /\b(wordpress|wp\s*host)\w*/i, label: '📝 WordPress' },
+                { key: 'email', pattern: /\b(email|exchange|mail|mx|zimbra|smtp|imap)\w*/i, label: '📧 Email' },
+                { key: 'web-hosting', pattern: /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host)\w*/i, label: '🌐 Web Hosting' },
+                
+                // Cloud & Servers
+                { key: 'vps', pattern: /\b(vps|virtual\s*private\s*server)\w*/i, label: '☁️ VPS' },
+                { key: 'dedicated', pattern: /\b(dedicated|dédié|bare\s*metal|server\s*dedicated)\w*/i, label: '🖥️ Dedicated' },
+                { key: 'public-cloud', pattern: /\b(public\s*cloud|openstack|instance|compute)\w*/i, label: '☁️ Public Cloud' },
+                { key: 'private-cloud', pattern: /\b(private\s*cloud|vmware)\w*/i, label: '🔒 Private Cloud' },
+                { key: 'hosted-private-cloud', pattern: /\b(hosted\s*private\s*cloud|hpc)\w*/i, label: '🏢 Hosted Private Cloud' },
+                
+                // Storage & Backup
+                { key: 'object-storage', pattern: /\b(object\s*storage|swift|s3|storage)\w*/i, label: '💾 Object Storage' },
+                { key: 'cloud-archive', pattern: /\b(cloud\s*archive|archive)\w*/i, label: '📦 Archive' },
+                { key: 'nas-ha', pattern: /\b(nas|nas-ha)\w*/i, label: '💾 NAS' },
+                { key: 'veeam', pattern: /\b(veeam|backup)\w*/i, label: '💾 Backup' },
+                
+                // Network & CDN
+                { key: 'cdn', pattern: /\b(cdn|content\s*delivery)\w*/i, label: '🌍 CDN' },
+                { key: 'load-balancer', pattern: /\b(load\s*balancer|iplb)\w*/i, label: '⚖️ Load Balancer' },
+                { key: 'ddos', pattern: /\b(ddos|anti-ddos|protection)\w*/i, label: '🛡️ DDoS Protection' },
+                { key: 'vrack', pattern: /\b(vrack|private\s*network)\w*/i, label: '🔗 vRack' },
+                
+                // Telecom
+                { key: 'voip', pattern: /\b(voip|telephony|téléphonie|sip)\w*/i, label: '📞 VoIP' },
+                { key: 'sms', pattern: /\b(sms|text\s*message)\w*/i, label: '💬 SMS' },
+                { key: 'fax', pattern: /\b(fax|fax2mail)\w*/i, label: '📠 Fax' },
+                
+                // Support & Billing (lower priority - only if no other product found)
+                { key: 'billing', pattern: /\b(billing|facture|invoice|payment|paiement|refund|rembours)\w*/i, label: '💳 Billing' },
+                { key: 'manager', pattern: /\b(manager|control\s*panel|espace\s*client)\w*/i, label: '⚙️ Manager' },
+                { key: 'api', pattern: /\b(api|sdk|integration)\w*/i, label: '🔌 API' },
+                { key: 'support', pattern: /\b(support|ticket|assistance|help|service\s*client)\w*/i, label: '🎫 Support' },
+            ];
+            
+            // Check patterns in order (first match wins)
+            for (const product of productPatterns) {
+                if (product.pattern.test(content)) {
+                    return product.label;
+                }
+            }
+            
+            return null; // No product detected
+        }
+        
+        function editProductLabel(postId, currentLabel) {
+            const newLabel = prompt(`Edit product label for post #${postId}:\n\nCurrent: ${currentLabel || '(none)'}\n\nEnter new label (or leave empty to remove):`, currentLabel || '');
+            
+            if (newLabel !== null) { // User didn't cancel
+                saveProductLabel(postId, newLabel);
+                renderGallery(); // Refresh to show updated label
+                showToast('Product label updated', 'success');
+            }
+        }
 
+        async function loadPostsFromDB() {
+            try {
+                const response = await fetch(`${API_BASE}/posts?limit=1000`);
+                if (response.ok) {
+                    const posts = await response.json();
+                    // Filter out sample posts
+                    allPosts = posts.filter(post => {
+                        const url = post.url || '';
+                        const isSample = (
+                            url.includes('/sample') || 
+                            url.includes('example.com') ||
+                            url.includes('/status/174') ||
+                            url === 'https://trustpilot.com/sample'
+                        );
+                        return !isSample;
+                    });
+                    renderGallery();
+                    updateActiveFiltersCount();
+                    return true;
+                } else {
+                    addLog('❌ Failed to load posts', 'error');
+                    return false;
+                }
+            } catch (e) {
+                addLog(`❌ Error loading posts: ${e.message}`, 'error');
+                return false;
+            }
+        }
+        
+        async function cleanupDuplicates() {
+            const confirmed = confirm(
+                '🔄 Remove Duplicate Posts\n\n' +
+                'This will remove duplicate posts identified by:\n' +
+                '• Same URL\n' +
+                '• Same content + author + source\n\n' +
+                '✅ The oldest post (lowest ID) is kept\n' +
+                '❌ Duplicates are deleted\n\n' +
+                'This action is IRREVERSIBLE.\n\n' +
+                'Do you want to continue?'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                addLog('🔄 Cleaning up duplicate posts...', 'info');
+                showToast('Removing duplicate posts from database...', 'info');
+                
+                const response = await fetch(`${API_BASE}/admin/cleanup-duplicates`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`✅ ${data.deleted} duplicate posts deleted from database`, 'success');
+                    showToast(`Successfully removed ${data.deleted} duplicate posts`, 'success');
+                    
+                    // Reload posts after cleanup
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    const errorText = await response.text();
+                    addLog(`❌ Error: ${errorText}`, 'error');
+                    showToast(`Error: ${errorText}`, 'error');
+                }
+            } catch (e) {
+                addLog(`❌ Error cleaning duplicates: ${e.message}`, 'error');
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+        
+        async function cleanupNonOvhPosts() {
+            const confirmed = confirm(
+                '⚠️ WARNING: This action will delete ALL posts that do NOT mention OVH!\n\n' +
+                '✅ Posts kept: Those containing "ovh", "ovhcloud", "ovh cloud", "kimsufi" or "soyoustart"\n' +
+                '❌ Posts deleted: All others\n\n' +
+                'This action is IRREVERSIBLE.\n\n' +
+                'Do you want to continue?'
+            );
+            
+            if (!confirmed) {
+                return;
+            }
+            
+            try {
+                addLog('🗑️ Cleaning up non-OVH posts...', 'info');
+                showToast('Removing non-OVH posts from database...', 'info');
+                
+                const response = await fetch(`${API_BASE}/admin/cleanup-non-ovh-posts`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog(`✅ ${data.deleted} non-OVH posts deleted from database`, 'success');
+                    showToast(`Successfully removed ${data.deleted} non-OVH posts`, 'success');
+                    
+                    // Reload posts after cleanup
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    const errorText = await response.text();
+                    addLog(`❌ Error: ${errorText}`, 'error');
+                    showToast(`Error: ${errorText}`, 'error');
+                }
+            } catch (e) {
+                addLog(`❌ Error during cleanup: ${e.message}`, 'error');
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+        
         function applyDateFilter() {
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
@@ -858,19 +1585,259 @@
             
             addLog(`📅 Filtering from ${fromDisplay} to ${toDisplay}`, 'info');
             currentOffset = 0;
+            
+            // Just reload data from DB without scraping
             renderGallery();
+            showToast('Timeline filters applied', 'info');
         }
+        
+        function getAvailableProductLabels() {
+            // Get all unique product labels that exist in the database
+            const labels = new Set();
+            
+            allPosts.forEach(post => {
+                // Skip sample posts
+                const url = post.url || '';
+                const isSample = (
+                    url.includes('/sample') || 
+                    url.includes('example.com') ||
+                    url.includes('/status/174') ||
+                    url === 'https://trustpilot.com/sample'
+                );
+                if (isSample) return;
+                
+                // Get product label (with manual edit support)
+                const productLabel = getProductLabel(post.id, post.content, post.language);
+                if (productLabel) {
+                    labels.add(productLabel);
+                }
+            });
+            
+            return Array.from(labels).sort();
+        }
+        
+        function updateChartProductFilter() {
+            // Update the product filter dropdown with available labels
+            const productFilter = document.getElementById('chartProductFilter');
+            if (!productFilter) return;
+            
+            const currentValue = productFilter.value;
+            const availableLabels = getAvailableProductLabels();
+            
+            // Clear existing options except "All Products"
+            productFilter.innerHTML = '<option value="all">All Products</option>';
+            
+            // Add available product labels
+            availableLabels.forEach(label => {
+                const option = document.createElement('option');
+                option.value = label;
+                option.textContent = label;
+                productFilter.appendChild(option);
+            });
+            
+            // Restore previous selection if it still exists
+            if (currentValue && currentValue !== 'all') {
+                const option = Array.from(productFilter.options).find(opt => opt.value === currentValue);
+                if (option) {
+                    productFilter.value = currentValue;
+                }
+            }
+        }
+        
+        function openChartModal() {
+            document.getElementById('chartModal').style.display = 'block';
+            // Sync dates from main filters to chart filters
+            document.getElementById('chartDateFrom').value = document.getElementById('dateFrom').value;
+            document.getElementById('chartDateTo').value = document.getElementById('dateTo').value;
+            // Update product filter with available labels
+            updateChartProductFilter();
+            // Wait for modal to be visible, then update chart
+            setTimeout(() => {
+                updateChart();
+            }, 100);
+        }
+        
+        function closeChartModal() {
+            document.getElementById('chartModal').style.display = 'none';
+            // Destroy charts when modal closes to free memory
+            if (productPieChart) {
+                productPieChart.destroy();
+                productPieChart = null;
+            }
+        }
+        
+        function syncDateFiltersFromChart() {
+            // Sync chart date filters to main filters
+            const chartDateFrom = document.getElementById('chartDateFrom').value;
+            const chartDateTo = document.getElementById('chartDateTo').value;
+            
+            document.getElementById('dateFrom').value = chartDateFrom;
+            document.getElementById('dateTo').value = chartDateTo;
+        }
+        
+        function applyChartDateFilter() {
+            syncDateFiltersFromChart();
+            updateChart();
+            renderGallery(); // Also update main gallery
+            showToast('Timeline filter applied', 'success');
+        }
+        
+        function clearChartDates() {
+            document.getElementById('chartDateFrom').value = '';
+            document.getElementById('chartDateTo').value = '';
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            updateChart();
+            renderGallery();
+            showToast('Timeline filter cleared', 'info');
+        }
+        
+        function openStatsInfoModal() {
+            document.getElementById('statsInfoModal').style.display = 'block';
+        }
+        
+        function closeStatsInfoModal() {
+            document.getElementById('statsInfoModal').style.display = 'none';
+        }
+        
+        function openPostPreview(postId) {
+            // Find the post in allPosts
+            const post = allPosts.find(p => p.id === postId);
+            if (!post) {
+                showToast('Post not found', 'error');
+                return;
+            }
+            
+            const modal = document.getElementById('postPreviewModal');
+            const contentDiv = document.getElementById('postPreviewContent');
+            const linkDiv = document.getElementById('postPreviewLink');
+            
+            if (!modal || !contentDiv || !linkDiv) return;
+            
+            // Get product label
+            const productLabel = getProductLabel(post.id, post.content, post.language);
+            
+            // Format date
+            const postDate = new Date(post.created_at).toLocaleString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            // Build content HTML
+            contentDiv.innerHTML = `
+                <div style="margin-bottom: 20px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <strong style="color: var(--accent-primary); font-size: 1.1em;">${escapeHtml(post.source || 'Unknown Source')}</strong>
+                            ${productLabel ? `<span style="margin-left: 10px; padding: 4px 8px; background: rgba(52, 211, 153, 0.2); border-radius: 4px; color: #34d399; font-size: 0.9em;">${escapeHtml(productLabel)}</span>` : ''}
+                        </div>
+                        <span class="${getSentimentClass(post.sentiment_label)}" style="font-size: 0.95em;">
+                            ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
+                        </span>
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                        <strong>Author:</strong> ${escapeHtml(post.author || 'Unknown')}
+                    </div>
+                    <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                        <strong>Date:</strong> ${postDate}
+                    </div>
+                    ${post.language ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                        <strong>Language:</strong> ${escapeHtml(post.language.toUpperCase())}
+                    </div>` : ''}
+                </div>
+                
+                <div style="padding: 20px; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.2);">
+                    <h3 style="color: var(--accent-primary); margin-top: 0; margin-bottom: 15px; font-size: 1.2em;">Content:</h3>
+                    <div style="color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; max-height: 500px; overflow-y: auto;">
+                        ${escapeHtml(post.content || 'No content available')}
+                    </div>
+                </div>
+            `;
+            
+            // Set link
+            linkDiv.href = post.url || '#';
+            if (!post.url || post.url === '#') {
+                linkDiv.style.display = 'none';
+            } else {
+                linkDiv.style.display = 'inline-block';
+            }
+            
+            // Show modal
+            modal.style.display = 'block';
+        }
+        
+        function closePostPreviewModal() {
+            document.getElementById('postPreviewModal').style.display = 'none';
+        }
+        
+        async function refreshChartData() {
+            addLog('🔄 Refreshing chart data (loading from DB)...', 'info');
+            const success = await loadPostsFromDB();
+            if (success) {
+                updateChartProductFilter(); // Update product filter with new data
+                updateChart();
+                showToast('Chart data refreshed from database', 'success');
+            } else {
+                showToast('Failed to refresh chart data', 'error');
+            }
+        }
+        
+        // Close modals when clicking outside
+        document.addEventListener('click', function(event) {
+            const chartModal = document.getElementById('chartModal');
+            const statsModal = document.getElementById('statsInfoModal');
+            const postPreviewModal = document.getElementById('postPreviewModal');
+            
+            if (chartModal && event.target === chartModal) {
+                closeChartModal();
+            }
+            if (statsModal && event.target === statsModal) {
+                closeStatsInfoModal();
+            }
+            if (postPreviewModal && event.target === postPreviewModal) {
+                closePostPreviewModal();
+            }
+            const ideasModal = document.getElementById('ideasModal');
+            if (ideasModal && event.target === ideasModal) {
+                closeIdeasModal();
+            }
+        });
+        
+        // Close modals with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const chartModal = document.getElementById('chartModal');
+                const statsModal = document.getElementById('statsInfoModal');
+                const postPreviewModal = document.getElementById('postPreviewModal');
+                const ideasModal = document.getElementById('ideasModal');
+                
+                if (ideasModal && ideasModal.style.display !== 'none') {
+                    closeIdeasModal();
+                } else if (postPreviewModal && postPreviewModal.style.display !== 'none') {
+                    closePostPreviewModal();
+                } else if (chartModal && chartModal.style.display !== 'none') {
+                    closeChartModal();
+                } else if (statsModal && statsModal.style.display !== 'none') {
+                    closeStatsInfoModal();
+                }
+            }
+        });
 
         function clearAllFilters() {
             document.getElementById('searchInput').value = '';
             document.getElementById('sourceFilter').value = '';
             document.getElementById('sentimentFilter').value = '';
-            document.getElementById('keywordFilter').value = '';
+            document.getElementById('ovhProductFilter').value = '';
             document.getElementById('languageFilter').value = '';
             document.getElementById('dateFrom').value = '';
             document.getElementById('dateTo').value = '';
+            document.getElementById('sortBy').value = 'date-desc';
             currentOffset = 0;
             addLog('🔄 All filters cleared', 'info');
+            updateActiveFiltersCount();
             renderGallery();
         }
 
@@ -879,32 +1846,80 @@
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
             const sourceFilter = document.getElementById('sourceFilter').value;
             const sentimentFilter = document.getElementById('sentimentFilter').value;
-            const keywordFilter = document.getElementById('keywordFilter').value;
+            const ovhProductFilter = document.getElementById('ovhProductFilter').value;
             const languageFilter = document.getElementById('languageFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
-            // Define keyword patterns
-            const keywordPatterns = {
-                'domain-create': /\b(creat|register|new domain|domaine gratuit|inscription|enregist)\w*/i,
-                'domain-renew': /\b(renew|renewal|renouvellement|prolongement|expir|expiration)\w*/i,
-                'domain-transfer': /\b(transfer|transfér|migration|changement registrar)\w*/i,
-                'domain-trade': /\b(trade|trading|échange|vendre domaine|buy domain|acheter)\w*/i,
-                'domain-restore': /\b(restore|restoration|récupération|restore\s+domain)\w*/i,
-                'dns': /\b(dns|zone|record|name server|nameserver|propagation|résolution)\w*/i,
+            // Define OVH product patterns
+            const ovhProductPatterns = {
+                // Web & Hosting
+                'web-hosting': /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host)\w*/i,
+                'wordpress': /\b(wordpress|wp\s*host)\w*/i,
+                'email': /\b(email|exchange|mail|mx|zimbra)\w*/i,
+                'domain': /\b(domain|domaine|dns|zone|registrar)\w*/i,
+                
+                // Cloud & Servers
+                'vps': /\b(vps|virtual\s*private\s*server)\w*/i,
+                'dedicated': /\b(dedicated|dédié|bare\s*metal)\w*/i,
+                'public-cloud': /\b(public\s*cloud|openstack|instance)\w*/i,
+                'private-cloud': /\b(private\s*cloud|vmware)\w*/i,
+                'hosted-private-cloud': /\b(hosted\s*private\s*cloud|hpc)\w*/i,
+                
+                // Storage & Backup
+                'object-storage': /\b(object\s*storage|swift|s3)\w*/i,
+                'cloud-archive': /\b(cloud\s*archive|archive)\w*/i,
+                'nas-ha': /\b(nas|nas-ha)\w*/i,
+                'veeam': /\b(veeam|backup)\w*/i,
+                
+                // Network & CDN
+                'cdn': /\b(cdn|content\s*delivery)\w*/i,
+                'load-balancer': /\b(load\s*balancer|iplb)\w*/i,
+                'ddos': /\b(ddos|anti-ddos|protection)\w*/i,
+                'vrack': /\b(vrack|private\s*network)\w*/i,
+                
+                // Telecom
+                'voip': /\b(voip|telephony|téléphonie|sip)\w*/i,
+                'sms': /\b(sms|text\s*message)\w*/i,
+                'fax': /\b(fax|fax2mail)\w*/i,
+                
+                // Support & Billing
+                'support': /\b(support|ticket|assistance|help)\w*/i,
+                'billing': /\b(billing|facture|invoice|payment|paiement|refund|rembours)\w*/i,
+                'manager': /\b(manager|control\s*panel|espace\s*client)\w*/i,
+                'api': /\b(api|sdk|integration)\w*/i,
             };
 
             let filtered = allPosts.filter(post => {
+                // Filter out sample data first
+                const isSample = post.url && (
+                    post.url.includes('/sample') || 
+                    post.url.includes('example.com') ||
+                    post.url.includes('/status/174') ||
+                    post.url === 'https://trustpilot.com/sample'
+                );
+                if (isSample) {
+                    return false;
+                }
+                
                 const postContent = post.content.toLowerCase();
-                const matchesSearch = postContent.includes(searchTerm) || post.author.toLowerCase().includes(searchTerm);
+                const postUrl = (post.url || '').toLowerCase();
+                const postAuthor = (post.author || '').toLowerCase();
+                
+                // Improved search: check content, author, AND url
+                const matchesSearch = !searchTerm || 
+                    postContent.includes(searchTerm) || 
+                    postAuthor.includes(searchTerm) ||
+                    postUrl.includes(searchTerm);
+                    
                 const matchesSource = !sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
                 
-                // Keyword filter
-                let matchesKeyword = true;
-                if (keywordFilter && keywordPatterns[keywordFilter]) {
-                    matchesKeyword = keywordPatterns[keywordFilter].test(post.content);
+                // OVH Product filter - only applies if a product is selected
+                let matchesProduct = true;
+                if (ovhProductFilter && ovhProductPatterns[ovhProductFilter]) {
+                    matchesProduct = ovhProductPatterns[ovhProductFilter].test(post.content);
                 }
                 
                 // Date range filter
@@ -915,7 +1930,7 @@
                     if (dateTo && postDate > dateTo) matchesDate = false;
                 }
                 
-                return matchesSearch && matchesSource && matchesSentiment && matchesKeyword && matchesDate && matchesLanguage;
+                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage;
             });
 
             // Debug log to track filtering
@@ -924,7 +1939,7 @@
                     search: searchTerm || 'none',
                     source: sourceFilter || 'all',
                     sentiment: sentimentFilter || 'all',
-                    keyword: keywordFilter || 'all',
+                    product: ovhProductFilter || 'all',
                     language: languageFilter || 'all',
                     dateRange: (dateFrom || dateTo) ? `${dateFrom || '*'} to ${dateTo || '*'}` : 'all'
                 });
@@ -937,7 +1952,7 @@
                 if (searchTerm) activeFilters.push(`Search: "${searchTerm}"`);
                 if (sourceFilter) activeFilters.push(`Source: ${sourceFilter}`);
                 if (sentimentFilter) activeFilters.push(`Sentiment: ${sentimentFilter}`);
-                if (keywordFilter) activeFilters.push(`Keyword: ${keywordFilter}`);
+                if (ovhProductFilter) activeFilters.push(`Product: ${ovhProductFilter}`);
                 if (languageFilter) activeFilters.push(`Language: ${languageFilter}`);
                 if (dateFrom || dateTo) activeFilters.push(`Date: ${dateFrom || '*'} to ${dateTo || '*'}`);
                 
@@ -949,32 +1964,73 @@
                 return;
             }
 
+            // Apply sorting
+            const sortBy = document.getElementById('sortBy')?.value || 'date-desc';
+            if (sortBy === 'date-desc') {
+                filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (sortBy === 'date-asc') {
+                filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            } else if (sortBy === 'sentiment-desc') {
+                filtered.sort((a, b) => a.sentiment_score - b.sentiment_score);
+            } else if (sortBy === 'sentiment-asc') {
+                filtered.sort((a, b) => b.sentiment_score - a.sentiment_score);
+            } else if (sortBy === 'source-asc') {
+                filtered.sort((a, b) => a.source.localeCompare(b.source));
+            } else if (sortBy === 'source-desc') {
+                filtered.sort((a, b) => b.source.localeCompare(a.source));
+            }
+
             // Pagination
             const totalPosts = filtered.length;
             const paginated = filtered.slice(currentOffset, currentOffset + postsPerPage);
 
             gallery.innerHTML = paginated.map(post => {
-                // Detect sample/demo data
-                const isSample = post.url && (post.url.includes('/sample') || post.url.includes('/status/174'));
+                // Filter out sample data - don't display posts with sample URLs
+                const isSample = post.url && (
+                    post.url.includes('/sample') || 
+                    post.url.includes('example.com') ||
+                    post.url.includes('/status/174') ||
+                    post.url === 'https://trustpilot.com/sample'
+                );
+                
+                // Skip sample posts entirely
+                if (isSample) {
+                    return '';
+                }
+                
+                // Get product label (with manual edit support)
+                const productLabel = getProductLabel(post.id, post.content, post.language);
+                
                 return `
                 <div class="post-card">
                     <div class="post-header">
-                        <span class="${getSourceClass(post.source)}">${post.source}</span>
+                        <span class="${getSourceClass(post.source)}">${escapeHtml(post.source)}</span>
                         <span class="post-date">${formatDate(post.created_at)}</span>
-                        ${post.language ? `<span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px;">${post.language.toUpperCase()}</span>` : ''}
-                        ${isSample ? `<span style="font-size:0.7em; background:rgba(255,152,0,0.3); padding:3px 8px; border-radius:4px; margin-left:5px; border:1px solid rgba(255,152,0,0.5);" title="Demo data - scraper returned fallback sample">📋 SAMPLE</span>` : ''}
+                        ${productLabel ? `
+                            <span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px; display:inline-flex; align-items:center; gap:4px;">
+                                ${escapeHtml(productLabel)}
+                                <button onclick="editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
+                                        style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.9em; opacity:0.7;"
+                                        title="Edit product label">✏️</button>
+                            </span>
+                        ` : `
+                            <button onclick="editProductLabel(${post.id}, '')" 
+                                    style="font-size:0.75em; background:rgba(0,212,255,0.1); padding:4px 8px; border-radius:4px; margin-left:5px; border:1px dashed rgba(0,212,255,0.3); color:var(--accent-primary); cursor:pointer;"
+                                    title="Add product label">+ Label</button>
+                        `}
                     </div>
-                    <div class="post-author">@${post.author}</div>
-                    <div class="post-content">${post.content}</div>
+                    <div class="post-author">@${escapeHtml(post.author)}</div>
+                    <div class="post-content">${escapeHtml(post.content)}</div>
                     <div class="post-footer">
                         <span class="${getSentimentClass(post.sentiment_label)}">
                             ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
                         </span>
-                        <a href="${post.url}" target="_blank" class="post-url" ${isSample ? 'onclick="alert(\'This is sample data. Real scraper APIs require authentication keys.\'); return false;"' : ''}>View</a>
+                        <button onclick="openPostPreview(${post.id})" style="margin-left:10px; padding:6px 12px; background:#34d399; border:none; border-radius:6px; color:#1a1a2e; cursor:pointer; font-weight:500;">👁️ Preview</button>
+                        <a href="${escapeHtml(post.url)}" target="_blank" class="post-url" style="margin-left:10px;">View</a>
                         <button onclick="addToBacklog(${post.id})" style="margin-left:10px; padding:6px 12px; background:#0099ff; border:none; border-radius:6px; color:#fff; cursor:pointer;">Save</button>
                     </div>
                 </div>
-            `}).join('');
+            `}).filter(html => html !== '').join('');
 
             // Add load more button if there are more posts
             if (currentOffset + postsPerPage < totalPosts) {
@@ -1003,16 +2059,330 @@
             renderGallery();
         }
 
-        function updateStats(posts) {
-            const total = posts.length;
-            const positive = posts.filter(p => p.sentiment_label === 'positive').length;
-            const negative = posts.filter(p => p.sentiment_label === 'negative').length;
-            const neutral = posts.filter(p => p.sentiment_label === 'neutral').length;
+        function updateStats(filteredPosts) {
+            // Update FILTERED stats (current view)
+            const total = filteredPosts.length;
+            const positive = filteredPosts.filter(p => p.sentiment_label === 'positive').length;
+            const negative = filteredPosts.filter(p => p.sentiment_label === 'negative').length;
+            const neutral = filteredPosts.filter(p => p.sentiment_label === 'neutral').length;
 
             document.getElementById('totalPosts').textContent = total;
             document.getElementById('positivePosts').textContent = positive;
             document.getElementById('negativePosts').textContent = negative;
             document.getElementById('neutralPosts').textContent = neutral;
+            
+            // Update GLOBAL stats (all posts in DB)
+            const allRealPosts = allPosts.filter(post => {
+                const url = post.url || '';
+                const isSample = (
+                    url.includes('/sample') || 
+                    url.includes('example.com') ||
+                    url.includes('/status/174') ||
+                    url === 'https://trustpilot.com/sample'
+                );
+                return !isSample;
+            });
+            
+            const globalTotal = allRealPosts.length;
+            const globalPositive = allRealPosts.filter(p => p.sentiment_label === 'positive').length;
+            const globalNegative = allRealPosts.filter(p => p.sentiment_label === 'negative').length;
+            const globalNeutral = allRealPosts.filter(p => p.sentiment_label === 'neutral').length;
+
+            document.getElementById('globalTotalPosts').textContent = globalTotal;
+            document.getElementById('globalPositivePosts').textContent = globalPositive;
+            document.getElementById('globalNegativePosts').textContent = globalNegative;
+            document.getElementById('globalNeutralPosts').textContent = globalNeutral;
+        }
+        
+        function updateChart() {
+            // Only update chart if modal is open and canvas exists
+            const modal = document.getElementById('chartModal');
+            const canvas = document.getElementById('timelineChart');
+            if (!modal || modal.style.display === 'none' || !canvas) {
+                return;
+            }
+            
+            const sentimentFilter = document.getElementById('chartSentimentFilter')?.value || 'all';
+            const productFilter = document.getElementById('chartProductFilter')?.value || 'all';
+            const grouping = document.getElementById('chartGrouping')?.value || 'day';
+            
+            // Get date filters
+            const dateFrom = document.getElementById('dateFrom')?.value;
+            const dateTo = document.getElementById('dateTo')?.value;
+            
+            // Filter posts for chart
+            let chartPosts = allPosts.filter(post => {
+                const url = post.url || '';
+                const isSample = (
+                    url.includes('/sample') || 
+                    url.includes('example.com') ||
+                    url.includes('/status/174') ||
+                    url === 'https://trustpilot.com/sample'
+                );
+                if (isSample) return false;
+                
+                // Apply date range if set
+                if (dateFrom || dateTo) {
+                    const postDate = new Date(post.created_at).toISOString().split('T')[0];
+                    if (dateFrom && postDate < dateFrom) return false;
+                    if (dateTo && postDate > dateTo) return false;
+                }
+                
+                // Apply sentiment filter
+                if (sentimentFilter !== 'all' && post.sentiment_label !== sentimentFilter) {
+                    return false;
+                }
+                
+                // Apply product filter
+                if (productFilter !== 'all') {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    if (productLabel !== productFilter) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            // Group posts by time period
+            const grouped = {};
+            chartPosts.forEach(post => {
+                const date = new Date(post.created_at);
+                let key;
+                
+                if (grouping === 'day') {
+                    key = date.toISOString().split('T')[0];
+                } else if (grouping === 'week') {
+                    const weekStart = new Date(date);
+                    weekStart.setDate(date.getDate() - date.getDay());
+                    key = weekStart.toISOString().split('T')[0];
+                } else if (grouping === 'month') {
+                    key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                }
+                
+                if (!grouped[key]) {
+                    grouped[key] = { positive: 0, negative: 0, neutral: 0 };
+                }
+                grouped[key][post.sentiment_label]++;
+            });
+            
+            // Sort by date
+            const sortedKeys = Object.keys(grouped).sort();
+            
+            // Prepare chart data
+            const labels = sortedKeys.map(key => {
+                const date = new Date(key);
+                if (grouping === 'day') return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
+                if (grouping === 'week') return `Week ${date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`;
+                return date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+            });
+            
+            const positiveData = sortedKeys.map(key => grouped[key].positive);
+            const negativeData = sortedKeys.map(key => grouped[key].negative);
+            const neutralData = sortedKeys.map(key => grouped[key].neutral);
+            
+            // Destroy existing chart
+            if (timelineChart) {
+                timelineChart.destroy();
+            }
+            
+            // Create new chart
+            const ctx = document.getElementById('timelineChart');
+            if (!ctx) return;
+            
+            const datasets = [];
+            if (sentimentFilter === 'all' || sentimentFilter === 'negative') {
+                datasets.push({
+                    label: 'Negative',
+                    data: negativeData,
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    borderWidth: 1
+                });
+            }
+            if (sentimentFilter === 'all' || sentimentFilter === 'neutral') {
+                datasets.push({
+                    label: 'Neutral',
+                    data: neutralData,
+                    backgroundColor: 'rgba(107, 114, 128, 0.7)',
+                    borderColor: 'rgba(107, 114, 128, 1)',
+                    borderWidth: 1
+                });
+            }
+            if (sentimentFilter === 'all' || sentimentFilter === 'positive') {
+                datasets.push({
+                    label: 'Positive',
+                    data: positiveData,
+                    backgroundColor: 'rgba(52, 211, 153, 0.7)',
+                    borderColor: 'rgba(52, 211, 153, 1)',
+                    borderWidth: 1
+                });
+            }
+            
+            timelineChart = new Chart(ctx, {
+                type: chartView,
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: '#fff'
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `Posts over time (${grouping}) - ${sentimentFilter === 'all' ? 'All Sentiments' : sentimentFilter.charAt(0).toUpperCase() + sentimentFilter.slice(1)}`,
+                            color: '#00d4ff'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: chartView === 'bar',
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text-secondary').trim() || '#aaa',
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                color: document.body.classList.contains('light-mode') ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        y: {
+                            stacked: chartView === 'bar',
+                            beginAtZero: true,
+                            ticks: {
+                                color: getComputedStyle(document.body).getPropertyValue('--text-secondary').trim() || '#aaa',
+                                stepSize: 1
+                            },
+                            grid: {
+                                color: document.body.classList.contains('light-mode') ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Update product pie chart
+            updateProductPieChart(chartPosts);
+        }
+        
+        function updateProductPieChart(filteredPosts) {
+            // Only update if modal is open and canvas exists
+            const modal = document.getElementById('chartModal');
+            const canvas = document.getElementById('productPieChart');
+            if (!modal || modal.style.display === 'none' || !canvas) {
+                return;
+            }
+            
+            // Count posts by product
+            const productCounts = {};
+            let noProductCount = 0;
+            
+            filteredPosts.forEach(post => {
+                const productLabel = getProductLabel(post.id, post.content, post.language);
+                if (productLabel) {
+                    productCounts[productLabel] = (productCounts[productLabel] || 0) + 1;
+                } else {
+                    noProductCount++;
+                }
+            });
+            
+            // Prepare data for pie chart
+            const labels = Object.keys(productCounts);
+            const data = Object.values(productCounts);
+            
+            // Add "Unknown" if there are posts without product label
+            if (noProductCount > 0) {
+                labels.push('No Product');
+                data.push(noProductCount);
+            }
+            
+            // Generate colors for each product
+            const colors = [
+                'rgba(0, 212, 255, 0.7)',   // Cyan
+                'rgba(52, 211, 153, 0.7)',   // Green
+                'rgba(239, 68, 68, 0.7)',   // Red
+                'rgba(251, 191, 36, 0.7)',  // Yellow
+                'rgba(139, 92, 246, 0.7)',  // Purple
+                'rgba(236, 72, 153, 0.7)',  // Pink
+                'rgba(34, 197, 94, 0.7)',   // Emerald
+                'rgba(249, 115, 22, 0.7)',  // Orange
+                'rgba(59, 130, 246, 0.7)',  // Blue
+                'rgba(168, 85, 247, 0.7)',  // Violet
+            ];
+            
+            const backgroundColors = labels.map((_, index) => colors[index % colors.length]);
+            const borderColors = backgroundColors.map(color => color.replace('0.7', '1'));
+            
+            // Destroy existing chart
+            if (productPieChart) {
+                productPieChart.destroy();
+            }
+            
+            // Create new pie chart
+            const ctx = document.getElementById('productPieChart');
+            if (!ctx) return;
+            
+            productPieChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'right',
+                            labels: {
+                                color: '#fff',
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: `Distribution by Product (${filteredPosts.length} posts)`,
+                            color: '#00d4ff',
+                            font: {
+                                size: 16
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function toggleChartView() {
+            chartView = chartView === 'bar' ? 'line' : 'bar';
+            updateChart();
         }
 
         function filterBySentiment(sentiment) {
@@ -1033,6 +2403,22 @@
             }
         }
 
+        function setButtonLoading(buttonId, loading) {
+            const btn = document.getElementById(buttonId);
+            if (!btn) return;
+            const text = btn.querySelector('.btn-text');
+            const spinner = btn.querySelector('.btn-spinner');
+            if (loading) {
+                btn.disabled = true;
+                if (text) text.style.opacity = '0.7';
+                if (spinner) spinner.style.display = 'inline-block';
+            } else {
+                btn.disabled = false;
+                if (text) text.style.opacity = '1';
+                if (spinner) spinner.style.display = 'none';
+            }
+        }
+
         async function cancelScrape() {
             if (currentAbortController) {
                 currentAbortController.abort();
@@ -1040,32 +2426,182 @@
             }
         }
 
-        async function refreshPosts() {
-            try {
-                const response = await fetch(`${API_BASE}/posts?limit=1000&offset=0`);
-                const data = await response.json();
-                if (response.ok) {
-                    const previousCount = allPosts.length;
-                    allPosts = data;
-                    currentOffset = 0;
-                    renderGallery();
-                    addLog(`✅ Loaded ${data.length} posts from database (${data.length - previousCount > 0 ? '+' + (data.length - previousCount) + ' new' : 'no change'})`, 'success');
+        function updateActiveFiltersCount() {
+            const searchTerm = document.getElementById('searchInput').value;
+            const sourceFilter = document.getElementById('sourceFilter').value;
+            const sentimentFilter = document.getElementById('sentimentFilter').value;
+            const ovhProductFilter = document.getElementById('ovhProductFilter').value;
+            const languageFilter = document.getElementById('languageFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            
+            let count = 0;
+            if (searchTerm) count++;
+            if (sourceFilter) count++;
+            if (sentimentFilter) count++;
+            if (ovhProductFilter) count++;
+            if (languageFilter) count++;
+            if (dateFrom || dateTo) count++;
+            
+            const countEl = document.getElementById('activeFiltersCount');
+            if (countEl) {
+                if (count > 0) {
+                    countEl.textContent = count;
+                    countEl.style.display = 'inline-block';
                 } else {
-                    addLog('❌ Failed to load posts', 'error');
+                    countEl.style.display = 'none';
                 }
-            } catch (e) {
-                addLog(`❌ Error loading posts: ${e.message}`, 'error');
-            } finally {
-                showCancelBtn(false);
-                currentAbortController = null;
             }
         }
 
+        function applySorting() {
+            const sortBy = document.getElementById('sortBy').value;
+            currentOffset = 0;
+            renderGallery();
+        }
+
+        function exportFilteredResults() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const sourceFilter = document.getElementById('sourceFilter').value;
+            const sentimentFilter = document.getElementById('sentimentFilter').value;
+            const ovhProductFilter = document.getElementById('ovhProductFilter').value;
+            const languageFilter = document.getElementById('languageFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+
+            const ovhProductPatterns = {
+                // Web & Hosting
+                'web-hosting': /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host)\w*/i,
+                'wordpress': /\b(wordpress|wp\s*host)\w*/i,
+                'email': /\b(email|exchange|mail|mx|zimbra)\w*/i,
+                'domain': /\b(domain|domaine|dns|zone|registrar)\w*/i,
+                
+                // Cloud & Servers
+                'vps': /\b(vps|virtual\s*private\s*server)\w*/i,
+                'dedicated': /\b(dedicated|dédié|bare\s*metal)\w*/i,
+                'public-cloud': /\b(public\s*cloud|openstack|instance)\w*/i,
+                'private-cloud': /\b(private\s*cloud|vmware)\w*/i,
+                'hosted-private-cloud': /\b(hosted\s*private\s*cloud|hpc)\w*/i,
+                
+                // Storage & Backup
+                'object-storage': /\b(object\s*storage|swift|s3)\w*/i,
+                'cloud-archive': /\b(cloud\s*archive|archive)\w*/i,
+                'nas-ha': /\b(nas|nas-ha)\w*/i,
+                'veeam': /\b(veeam|backup)\w*/i,
+                
+                // Network & CDN
+                'cdn': /\b(cdn|content\s*delivery)\w*/i,
+                'load-balancer': /\b(load\s*balancer|iplb)\w*/i,
+                'ddos': /\b(ddos|anti-ddos|protection)\w*/i,
+                'vrack': /\b(vrack|private\s*network)\w*/i,
+                
+                // Telecom
+                'voip': /\b(voip|telephony|téléphonie|sip)\w*/i,
+                'sms': /\b(sms|text\s*message)\w*/i,
+                'fax': /\b(fax|fax2mail)\w*/i,
+                
+                // Support & Billing
+                'support': /\b(support|ticket|assistance|help)\w*/i,
+                'billing': /\b(billing|facture|invoice|payment|paiement|refund|rembours)\w*/i,
+                'manager': /\b(manager|control\s*panel|espace\s*client)\w*/i,
+                'api': /\b(api|sdk|integration)\w*/i,
+            };
+
+            let filtered = allPosts.filter(post => {
+                // Filter out sample data first
+                const isSample = post.url && (
+                    post.url.includes('/sample') || 
+                    post.url.includes('example.com') ||
+                    post.url.includes('/status/174') ||
+                    post.url === 'https://trustpilot.com/sample'
+                );
+                if (isSample) {
+                    return false;
+                }
+                
+                const postContent = post.content.toLowerCase();
+                const postUrl = (post.url || '').toLowerCase();
+                const postAuthor = (post.author || '').toLowerCase();
+                
+                // Improved search: check content, author, AND url
+                const matchesSearch = !searchTerm || 
+                    postContent.includes(searchTerm) || 
+                    postAuthor.includes(searchTerm) ||
+                    postUrl.includes(searchTerm);
+                const matchesSource = !sourceFilter || post.source === sourceFilter;
+                const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
+                const matchesLanguage = !languageFilter || post.language === languageFilter;
+                
+                let matchesKeyword = true;
+                if (keywordFilter && keywordPatterns[keywordFilter]) {
+                    matchesKeyword = keywordPatterns[keywordFilter].test(post.content);
+                }
+                
+                let matchesDate = true;
+                if (dateFrom || dateTo) {
+                    const postDate = new Date(post.created_at).toISOString().split('T')[0];
+                    if (dateFrom && postDate < dateFrom) matchesDate = false;
+                    if (dateTo && postDate > dateTo) matchesDate = false;
+                }
+                
+                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage;
+            });
+
+            // Apply sorting
+            const sortBy = document.getElementById('sortBy').value;
+            if (sortBy === 'date-desc') {
+                filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (sortBy === 'date-asc') {
+                filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            } else if (sortBy === 'sentiment-desc') {
+                filtered.sort((a, b) => a.sentiment_score - b.sentiment_score);
+            } else if (sortBy === 'sentiment-asc') {
+                filtered.sort((a, b) => b.sentiment_score - a.sentiment_score);
+            } else if (sortBy === 'source-asc') {
+                filtered.sort((a, b) => a.source.localeCompare(b.source));
+            } else if (sortBy === 'source-desc') {
+                filtered.sort((a, b) => b.source.localeCompare(a.source));
+            }
+
+            if (filtered.length === 0) {
+                showToast('No posts to export', 'error');
+                return;
+            }
+
+            const csv = [
+                ['ID', 'Source', 'Author', 'Content', 'URL', 'Date', 'Sentiment', 'Score', 'Language'],
+                ...filtered.map(p => [
+                    p.id,
+                    p.source,
+                    p.author,
+                    p.content.replace(/"/g, '""'),
+                    p.url,
+                    p.created_at,
+                    p.sentiment_label,
+                    p.sentiment_score,
+                    p.language || 'unknown'
+                ])
+            ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ovh-filtered-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            showToast(`Exported ${filtered.length} posts`, 'success');
+        }
+
+
         async function scrapeX() {
+            setButtonLoading('btnScrapeX', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1089,27 +2625,33 @@
                 const data = await response.json();
                 if (response.ok) {
                     addLog(`✅ Successfully scraped ${data.added} posts from X/Twitter`, 'success');
-                    await refreshPosts();
+                    showToast(`Scraped ${data.added} posts from X/Twitter`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
                     addLog(`❌ Error scraping X: ${e.message}`, 'error');
+                    showToast(`Error scraping X: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeX', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
         }
 
         async function scrapeStackOverflow() {
+            setButtonLoading('btnScrapeStackOverflow', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1133,27 +2675,33 @@
                 const data = await response.json();
                 if (response.ok) {
                     addLog(`✅ Successfully scraped ${data.added} questions from Stack Overflow`, 'success');
-                    await refreshPosts();
+                    showToast(`Scraped ${data.added} posts from Stack Overflow`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
                     addLog(`❌ Error scraping Stack Overflow: ${e.message}`, 'error');
+                    showToast(`Error scraping Stack Overflow: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeStackOverflow', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
         }
 
         async function scrapeNews() {
+            setButtonLoading('btnScrapeNews', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1177,27 +2725,33 @@
                 const data = await response.json();
                 if (response.ok) {
                     addLog(`✅ Successfully scraped ${data.added} articles from Google News`, 'success');
-                    await refreshPosts();
+                    showToast(`Scraped ${data.added} posts from Google News`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
                     addLog(`❌ Error scraping News: ${e.message}`, 'error');
+                    showToast(`Error scraping News: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeNews', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
         }
 
-        async function scrapeHackerNews() {
+        async function scrapeReddit() {
+            setButtonLoading('btnScrapeReddit', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1210,38 +2764,44 @@
             showCancelBtn(true);
             currentAbortController = new AbortController();
             
-            addLog('🔄 Starting Hacker News scraper...', 'info');
+            addLog('🔄 Starting Reddit scraper...', 'info');
             addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/hackernews?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                const response = await fetch(`${API_BASE}/scrape/reddit?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} discussions from Hacker News`, 'success');
-                    await refreshPosts();
+                    addLog(`✅ Successfully scraped ${data.added} posts from Reddit`, 'success');
+                    showToast(`Scraped ${data.added} posts from Reddit`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
-                    addLog(`❌ Error scraping Hacker News: ${e.message}`, 'error');
+                    addLog(`❌ Error scraping Reddit: ${e.message}`, 'error');
+                    showToast(`Error scraping Reddit: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeReddit', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
         }
 
         async function scrapeGithub() {
+            setButtonLoading('btnScrapeGithub', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1265,17 +2825,22 @@
                 const data = await response.json();
                 if (response.ok) {
                     addLog(`✅ Successfully scraped ${data.added} issues/discussions from GitHub`, 'success');
-                    await refreshPosts();
+                    showToast(`Scraped ${data.added} posts from GitHub`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
                     addLog(`❌ Error scraping GitHub: ${e.message}`, 'error');
+                    showToast(`Error scraping GitHub: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeGithub', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
@@ -1283,10 +2848,11 @@
 
 
         async function scrapeTrustpilot() {
+            setButtonLoading('btnScrapeTrustpilot', true);
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
-                keywords = ['OVH'];
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
             }
             
             // Combine keywords with AND
@@ -1310,50 +2876,535 @@
                 const data = await response.json();
                 if (response.ok) {
                     addLog(`✅ Successfully scraped ${data.added} reviews from Trustpilot`, 'success');
-                    await refreshPosts();
+                    showToast(`Scraped ${data.added} posts from Trustpilot`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
+                    showToast(`Error: ${data.detail}`, 'error');
                 }
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Scrape cancelled by user', 'error');
                 } else {
                     addLog(`❌ Error scraping Trustpilot: ${e.message}`, 'error');
+                    showToast(`Error scraping Trustpilot: ${e.message}`, 'error');
                 }
             } finally {
+                setButtonLoading('btnScrapeTrustpilot', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }
         }
 
-        async function refreshPosts() {
+        async function scrapeAllSources() {
+            setButtonLoading('btnScrapeAll', true);
             showCancelBtn(true);
             currentAbortController = new AbortController();
             
-            addLog('🔄 Refreshing posts...', 'info');
+            // Capture the abort controller locally to avoid null reference errors in async functions
+            const localAbortController = currentAbortController;
+            
+            // Clear previous logs and show log panel (like individual scrapers do)
+            clearLogs();
+            showLogs();
+            
+            addLog('🔄 Starting data collection - launching all scrapers...', 'info');
+            showToast('Collecting new data from all sources...', 'info');
+            
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured. Add keywords first!', 'error');
+                showToast('Please add keywords before scraping', 'error');
+                setButtonLoading('btnScrapeAll', false);
+                showCancelBtn(false);
+                currentAbortController = null;
+                return;
+            }
+            
+            let totalAdded = 0;
+            let completedScrapers = 0;
+            const totalScrapers = 9; // X, StackOverflow, News, Reddit, Trustpilot, GitHub, OVH Forum, Mastodon, G2 Crowd
             
             try {
-                const response = await fetch(`${API_BASE}/posts?limit=100`, {
-                    signal: currentAbortController.signal
+                // Run all scrapers in parallel
+                const scraperPromises = [];
+                
+                // 1. X/Twitter Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🐦 Scraping X/Twitter...', 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/x`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ X/Twitter scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ X/Twitter scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 2. StackOverflow Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting Stack Overflow scraper...', 'info');
+                            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/stackoverflow`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} questions from Stack Overflow (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping Stack Overflow (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ StackOverflow scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ StackOverflow scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 3. News Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting Google News scraper...', 'info');
+                            addLog(`📰 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/news`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} articles from Google News (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping Google News (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ Google News scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ Google News scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 4. Reddit Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting Reddit scraper...', 'info');
+                            addLog(`🔴 Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/reddit`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} posts from Reddit (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping Reddit (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ Reddit scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ Reddit scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 5. Trustpilot Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting Trustpilot scraper...', 'info');
+                            addLog(`⭐ Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/trustpilot`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 20 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} reviews from Trustpilot (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping Trustpilot (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ Trustpilot scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ Trustpilot scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 6. GitHub Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting GitHub scraper...', 'info');
+                            addLog(`💻 Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/github`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} issues from GitHub (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping GitHub (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ GitHub scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ GitHub scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 7. OVH Forum Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting OVH Forum scraper...', 'info');
+                            addLog(`💬 Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/ovh-forum`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} posts from OVH Forum (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping OVH Forum (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ OVH Forum scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ OVH Forum scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 8. Mastodon Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting Mastodon scraper...', 'info');
+                            addLog(`🐘 Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/mastodon`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} posts from Mastodon (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping Mastodon (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ Mastodon scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ Mastodon scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // 9. G2 Crowd Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting G2 Crowd scraper...', 'info');
+                            addLog(`⭐ Searching for: ${keywords.join(', ')}`, 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/g2-crowd`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    addLog(`✅ Successfully scraped ${result.added} reviews from G2 Crowd (keyword: ${keyword})`, 'success');
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping G2 Crowd (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ G2 Crowd scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ G2 Crowd scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
+                // Wait for all scrapers to complete
+                await Promise.all(scraperPromises);
+                
+                // Now load the updated data from database
+                addLog('📥 Loading updated data from database...', 'info');
+                const response = await fetch(`${API_BASE}/posts?limit=1000`, {
+                    signal: localAbortController.signal
                 });
+                
                 if (response.ok) {
-                    allPosts = await response.json();
-                    addLog(`✅ Loaded ${allPosts.length} posts from database`, 'success');
+                    const posts = await response.json();
+                    // Filter out sample posts
+                    allPosts = posts.filter(post => {
+                        const url = post.url || '';
+                        const isSample = (
+                            url.includes('/sample') || 
+                            url.includes('example.com') ||
+                            url.includes('/status/174') ||
+                            url === 'https://trustpilot.com/sample'
+                        );
+                        return !isSample;
+                    });
+                    const filteredCount = posts.length - allPosts.length;
+                    addLog(`✅ Full refresh complete! Added ${totalAdded} new posts. Total: ${allPosts.length} posts${filteredCount > 0 ? ` (${filteredCount} samples filtered)` : ''}`, 'success');
+                    showToast(`Refresh complete! ${totalAdded} new posts added`, 'success');
+                    
+                    // Render gallery with updated data
+                    renderGallery();
+                    updateActiveFiltersCount();
                 } else {
-                    addLog('Using mock data (API not available)', 'error');
-                    allPosts = [...mockPosts];
+                    addLog('❌ Failed to load updated data', 'error');
+                    showToast('Failed to load updated data', 'error');
+                    // Still render gallery to keep existing posts visible
+                    renderGallery();
                 }
+                
             } catch (e) {
                 if (e.name === 'AbortError') {
                     addLog('⛔ Refresh cancelled by user', 'error');
+                    showToast('Refresh cancelled', 'error');
                 } else {
-                    addLog('API not available, using mock data', 'error');
-                    allPosts = [...mockPosts];
+                    addLog(`❌ Refresh error: ${e.message}`, 'error');
+                    showToast(`Error: ${e.message}`, 'error');
                 }
+                // Keep existing posts visible even if there's an error
+                renderGallery();
             } finally {
+                setButtonLoading('btnScrapeAll', false);
                 showCancelBtn(false);
                 currentAbortController = null;
-                renderGallery();
+                updateActiveFiltersCount();
+            }
+        }
+
+        async function scrapeOvhForum() {
+            setButtonLoading('btnScrapeOvhForum', true);
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+            }
+            
+            const combinedQuery = keywords.join(' ');
+            
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            clearLogs();
+            showLogs();
+            showCancelBtn(true);
+            currentAbortController = new AbortController();
+            
+            addLog('🔄 Starting OVH Forum scraper...', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/scrape/ovh-forum?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                    method: 'POST',
+                    signal: currentAbortController.signal
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addLog(`✅ Successfully scraped ${data.added} posts from OVH Forum`, 'success');
+                    showToast(`Scraped ${data.added} posts from OVH Forum`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    addLog(`❌ Error scraping OVH Forum: ${data.detail || 'Unknown error'}`, 'error');
+                    showToast('Error scraping OVH Forum', 'error');
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    addLog(`❌ Error scraping OVH Forum: ${e.message}`, 'error');
+                    showToast('Error scraping OVH Forum', 'error');
+                }
+            } finally {
+                setButtonLoading('btnScrapeOvhForum', false);
+                showCancelBtn(false);
+                currentAbortController = null;
+            }
+        }
+
+        async function scrapeMastodon() {
+            setButtonLoading('btnScrapeMastodon', true);
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+            }
+            
+            const combinedQuery = keywords.join(' ');
+            
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            clearLogs();
+            showLogs();
+            showCancelBtn(true);
+            currentAbortController = new AbortController();
+            
+            addLog('🔄 Starting Mastodon scraper...', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/scrape/mastodon?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                    method: 'POST',
+                    signal: currentAbortController.signal
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addLog(`✅ Successfully scraped ${data.added} posts from Mastodon`, 'success');
+                    showToast(`Scraped ${data.added} posts from Mastodon`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    addLog(`❌ Error scraping Mastodon: ${data.detail || 'Unknown error'}`, 'error');
+                    showToast('Error scraping Mastodon', 'error');
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    addLog(`❌ Error scraping Mastodon: ${e.message}`, 'error');
+                    showToast('Error scraping Mastodon', 'error');
+                }
+            } finally {
+                setButtonLoading('btnScrapeMastodon', false);
+                showCancelBtn(false);
+                currentAbortController = null;
+            }
+        }
+
+        async function scrapeG2Crowd() {
+            setButtonLoading('btnScrapeG2', true);
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using defaults: ovhcloud, ovh cloud', 'info');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+            }
+            
+            const combinedQuery = keywords.join(' ');
+            
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            clearLogs();
+            showLogs();
+            showCancelBtn(true);
+            currentAbortController = new AbortController();
+            
+            addLog('🔄 Starting G2 Crowd scraper...', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            
+            try {
+                const response = await fetch(`${API_BASE}/scrape/g2-crowd?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                    method: 'POST',
+                    signal: currentAbortController.signal
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addLog(`✅ Successfully scraped ${data.added} reviews from G2 Crowd`, 'success');
+                    showToast(`Scraped ${data.added} reviews from G2 Crowd`, 'success');
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    addLog(`❌ Error scraping G2 Crowd: ${data.detail || 'Unknown error'}`, 'error');
+                    showToast('Error scraping G2 Crowd', 'error');
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    addLog(`❌ Error scraping G2 Crowd: ${e.message}`, 'error');
+                    showToast('Error scraping G2 Crowd', 'error');
+                }
+            } finally {
+                setButtonLoading('btnScrapeG2', false);
+                showCancelBtn(false);
+                currentAbortController = null;
             }
         }
 
@@ -1383,41 +3434,156 @@
         }
 
         function toggleBacklog() {
-            const panel = document.getElementById('backlogPanel');
-            if (panel.style.display === 'none') {
-                panel.style.display = 'block';
-                renderBacklog();
+            const sidebar = document.getElementById('backlogSidebar');
+            const backdrop = document.getElementById('backlogBackdrop');
+            
+            if (sidebar.style.right === '0px' || sidebar.style.right === '') {
+                // Close sidebar
+                sidebar.style.right = '-450px';
+                backdrop.style.display = 'none';
             } else {
-                panel.style.display = 'none';
+                // Open sidebar
+                sidebar.style.right = '0px';
+                backdrop.style.display = 'block';
+                renderBacklog();
             }
         }
 
+        // Comment management functions
+        function loadComments() {
+            const saved = localStorage.getItem('ovh_backlog_comments');
+            return saved ? JSON.parse(saved) : {};
+        }
+        
+        function saveComments(comments) {
+            localStorage.setItem('ovh_backlog_comments', JSON.stringify(comments));
+        }
+        
+        function getComment(postId) {
+            const comments = loadComments();
+            return comments[postId] || '';
+        }
+        
+        function saveComment(postId, comment) {
+            const comments = loadComments();
+            comments[postId] = comment;
+            saveComments(comments);
+            // Optional: show a subtle feedback
+            const textarea = document.getElementById(`comment-${postId}`);
+            if (textarea) {
+                const originalBg = textarea.style.background;
+                textarea.style.background = 'rgba(52, 211, 153, 0.2)';
+                setTimeout(() => {
+                    textarea.style.background = originalBg;
+                }, 300);
+            }
+        }
+        
+        function toggleBacklogView() {
+            backlogView = backlogView === 'card' ? 'list' : 'card';
+            const toggleBtn = document.getElementById('backlogViewToggle');
+            if (toggleBtn) {
+                toggleBtn.textContent = backlogView === 'card' ? '📋 Card View' : '📄 List View';
+            }
+            localStorage.setItem('ovh_backlog_view', backlogView);
+            renderBacklog();
+        }
+        
         function renderBacklog() {
             const backlog = loadBacklog();
             const backlogGallery = document.getElementById('backlogGallery');
+            
+            // Load saved view preference
+            const savedView = localStorage.getItem('ovh_backlog_view');
+            if (savedView) backlogView = savedView;
+            const toggleBtn = document.getElementById('backlogViewToggle');
+            if (toggleBtn) {
+                toggleBtn.textContent = backlogView === 'card' ? '📋 Card View' : '📄 List View';
+            }
 
             if (backlog.length === 0) {
-                backlogGallery.innerHTML = '<div class="empty-state"><p>No posts in backlog yet</p></div>';
+                backlogGallery.innerHTML = '<div class="empty-state"><p style="color: var(--text-secondary);">No posts in backlog yet. Click "Save" on any post to add it here.</p></div>';
                 return;
             }
 
-            backlogGallery.innerHTML = backlog.map(post => `
-                <div class="post-card">
-                    <div class="post-header">
-                        <span class="${getSourceClass(post.source)}">${post.source}</span>
-                        <span class="post-date">${formatDate(post.created_at)}</span>
+            if (backlogView === 'list') {
+                // Compact list view
+                backlogGallery.innerHTML = backlog.map(post => {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    const comment = getComment(post.id);
+                    const hasComment = comment && comment.trim().length > 0;
+                    
+                    return `
+                    <div style="padding: 12px; margin-bottom: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; border-left: 3px solid var(--accent-primary);">
+                        <div style="display: flex; justify-content: space-between; align-items: start; gap: 10px; margin-bottom: 8px;">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap;">
+                                    <span class="${getSourceClass(post.source)}" style="font-size: 0.75em;">${escapeHtml(post.source)}</span>
+                                    <span class="post-date" style="font-size: 0.75em;">${formatDate(post.created_at)}</span>
+                                    ${productLabel ? `<span style="font-size:0.7em; background:rgba(0,212,255,0.2); padding:2px 6px; border-radius:3px;">${escapeHtml(productLabel)}</span>` : ''}
+                                    <span class="${getSentimentClass(post.sentiment_label)}" style="font-size: 0.75em;">${post.sentiment_label.toUpperCase()}</span>
+                                </div>
+                                <div style="color: var(--text-primary); font-size: 0.9em; margin-bottom: 5px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                                    ${escapeHtml(post.content.substring(0, 200))}${post.content.length > 200 ? '...' : ''}
+                                </div>
+                                ${hasComment ? `<div style="font-size: 0.8em; color: var(--text-secondary); font-style: italic; margin-top: 5px;">💬 ${escapeHtml(comment.substring(0, 100))}${comment.length > 100 ? '...' : ''}</div>` : ''}
+                            </div>
+                            <div style="display: flex; gap: 5px; flex-shrink: 0;">
+                                <button onclick="openPostPreview(${post.id})" style="padding: 4px 8px; background: #34d399; border: none; border-radius: 4px; color: #1a1a2e; cursor: pointer; font-size: 0.75em;">👁️</button>
+                                <button onclick="removeFromBacklog(${post.id})" style="padding: 4px 8px; background: #ef4444; border: none; border-radius: 4px; color: #fff; cursor: pointer; font-size: 0.75em;">×</button>
+                            </div>
+                        </div>
                     </div>
-                    <div class="post-author">@${post.author}</div>
-                    <div class="post-content">${post.content}</div>
-                    <div class="post-footer">
-                        <span class="${getSentimentClass(post.sentiment_label)}">
-                            ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
-                        </span>
-                        <a href="${post.url}" target="_blank" class="post-url">View</a>
-                        <button onclick="removeFromBacklog(${post.id})" style="margin-left:10px; padding:6px 12px; background:#ef4444; border:none; border-radius:6px; color:#fff; cursor:pointer;">Remove</button>
+                    `;
+                }).join('');
+            } else {
+                // Card view (existing)
+                backlogGallery.innerHTML = backlog.map(post => {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    const comment = getComment(post.id);
+                    
+                    return `
+                    <div class="post-card" style="margin-bottom: 20px;">
+                        <div class="post-header">
+                            <span class="${getSourceClass(post.source)}">${escapeHtml(post.source)}</span>
+                            <span class="post-date">${formatDate(post.created_at)}</span>
+                            ${productLabel ? `
+                                <span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px; display:inline-flex; align-items:center; gap:4px;">
+                                    ${escapeHtml(productLabel)}
+                                    <button onclick="editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
+                                            style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.9em; opacity:0.7;"
+                                            title="Edit product label">✏️</button>
+                                </span>
+                            ` : `
+                                <button onclick="editProductLabel(${post.id}, '')" 
+                                        style="font-size:0.75em; background:rgba(0,212,255,0.1); padding:4px 8px; border-radius:4px; margin-left:5px; border:1px dashed rgba(0,212,255,0.3); color:var(--accent-primary); cursor:pointer;"
+                                        title="Add product label">+ Label</button>
+                            `}
+                        </div>
+                        <div class="post-author">@${escapeHtml(post.author)}</div>
+                        <div class="post-content" style="max-height: 150px; overflow-y: auto;">${escapeHtml(post.content)}</div>
+                        <div class="post-footer">
+                            <span class="${getSentimentClass(post.sentiment_label)}">
+                                ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
+                            </span>
+                            <button onclick="openPostPreview(${post.id})" style="margin-left:10px; padding:6px 12px; background:#34d399; border:none; border-radius:6px; color:#1a1a2e; cursor:pointer; font-weight:500; font-size:0.85em;">👁️ Preview</button>
+                            <a href="${escapeHtml(post.url)}" target="_blank" class="post-url" style="margin-left:10px; font-size:0.85em;">View</a>
+                            <button onclick="removeFromBacklog(${post.id})" style="margin-left:10px; padding:6px 12px; background:#ef4444; border:none; border-radius:6px; color:#fff; cursor:pointer; font-size:0.85em;">Remove</button>
+                        </div>
+                        <!-- Comment Section -->
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                            <label style="display: block; color: var(--text-secondary); font-size: 0.9em; margin-bottom: 8px; font-weight: bold;">💬 Notes/Comments:</label>
+                            <textarea 
+                                id="comment-${post.id}" 
+                                onchange="saveComment(${post.id}, this.value)"
+                                placeholder="Add your notes or comments about this post..."
+                                style="width: 100%; min-height: 80px; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); font-family: inherit; font-size: 0.9em; resize: vertical;"
+                            >${escapeHtml(comment)}</textarea>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                    `;
+                }).join('');
+            }
         }
 
         function removeFromBacklog(postId) {
@@ -1443,8 +3609,9 @@
                 return;
             }
 
+            const comments = loadComments();
             const csv = [
-                ['ID', 'Source', 'Author', 'Content', 'URL', 'Date', 'Sentiment', 'Score'],
+                ['ID', 'Source', 'Author', 'Content', 'URL', 'Date', 'Sentiment', 'Score', 'Comment'],
                 ...backlog.map(p => [
                     p.id,
                     p.source,
@@ -1453,7 +3620,8 @@
                     p.url,
                     p.created_at,
                     p.sentiment_label,
-                    p.sentiment_score
+                    p.sentiment_score,
+                    (comments[p.id] || '').replace(/"/g, '""')
                 ])
             ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
 
@@ -1466,6 +3634,154 @@
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
+        }
+        
+        async function generateImprovementIdeas() {
+            const backlog = loadBacklog();
+            if (backlog.length === 0) {
+                showToast('Backlog is empty. Add some posts first to generate ideas.', 'error');
+                return;
+            }
+            
+            // Show loading state
+            const generateBtn = document.querySelector('button[onclick="generateImprovementIdeas()"]');
+            const originalText = generateBtn ? generateBtn.textContent : '💡 Generate Ideas';
+            if (generateBtn) {
+                generateBtn.disabled = true;
+                generateBtn.textContent = '⏳ Analyzing...';
+            }
+            
+            try {
+                // Call backend API to generate ideas with LLM
+                const response = await fetch('http://127.0.0.1:8000/generate-improvement-ideas', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        posts: backlog,
+                        max_ideas: 5
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const ideas = data.ideas || [];
+                
+                if (ideas.length === 0) {
+                    showToast('No ideas generated. Try adding more posts to backlog.', 'error');
+                    return;
+                }
+                
+                // Display ideas in modal for validation
+                displayIdeasForValidation(ideas);
+                
+            } catch (error) {
+                console.error('Error generating ideas:', error);
+                showToast('Error generating ideas. Please check if the backend is running and LLM API is configured.', 'error');
+            } finally {
+                if (generateBtn) {
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = originalText;
+                }
+            }
+        }
+        
+        function displayIdeasForValidation(ideas) {
+            const modal = document.getElementById('ideasModal');
+            const contentDiv = document.getElementById('ideasContent');
+            
+            if (!modal || !contentDiv) return;
+            
+            contentDiv.innerHTML = ideas.map((idea, index) => {
+                const priorityColor = {
+                    'high': '#ef4444',
+                    'medium': '#f59e0b',
+                    'low': '#6b7280'
+                }[idea.priority] || '#6b7280';
+                
+                return `
+                    <div style="margin-bottom: 20px; padding: 20px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid ${priorityColor};">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
+                            <div style="flex: 1;">
+                                <h3 style="color: var(--accent-primary); margin: 0 0 10px 0; font-size: 1.2em;">${escapeHtml(idea.title)}</h3>
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                                    <span style="padding: 4px 10px; background: ${priorityColor}20; color: ${priorityColor}; border-radius: 4px; font-size: 0.85em; font-weight: bold;">
+                                        ${idea.priority.toUpperCase()} Priority
+                                    </span>
+                                    <span style="color: var(--text-secondary); font-size: 0.85em;">
+                                        📊 Based on ${idea.related_posts_count} post(s)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <p style="color: var(--text-primary); line-height: 1.6; margin-bottom: 15px; white-space: pre-wrap;">${escapeHtml(idea.description)}</p>
+                        <div style="display: flex; gap: 10px;">
+                            <button onclick="acceptIdea(${index})" style="padding: 10px 20px; background: #10b981; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: bold; flex: 1;">
+                                ✅ Add to Backlog
+                            </button>
+                            <button onclick="rejectIdea(${index})" style="padding: 10px 20px; background: #6b7280; border: none; border-radius: 6px; color: #fff; cursor: pointer; flex: 1;">
+                                ❌ Reject
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Store ideas temporarily for validation
+            window.pendingIdeas = ideas;
+            modal.style.display = 'block';
+        }
+        
+        function acceptIdea(index) {
+            const idea = window.pendingIdeas[index];
+            if (!idea) return;
+            
+            // Convert idea to post format and add to backlog
+            const ideaPost = {
+                id: `idea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                source: '💡 AI Generated Idea',
+                author: 'System',
+                content: `${idea.title}\n\n${idea.description}\n\nPriority: ${idea.priority}\nBased on: ${idea.related_posts_count} post(s)`,
+                url: '',
+                created_at: new Date().toISOString(),
+                sentiment_label: 'neutral',
+                sentiment_score: 0.0,
+                language: 'en'
+            };
+            
+            const backlog = loadBacklog();
+            backlog.push(ideaPost);
+            saveBacklog(backlog);
+            renderBacklog();
+            
+            // Remove accepted idea from modal
+            window.pendingIdeas.splice(index, 1);
+            if (window.pendingIdeas.length === 0) {
+                closeIdeasModal();
+                showToast('Idea added to backlog!', 'success');
+            } else {
+                displayIdeasForValidation(window.pendingIdeas);
+                showToast('Idea added to backlog!', 'success');
+            }
+        }
+        
+        function rejectIdea(index) {
+            window.pendingIdeas.splice(index, 1);
+            if (window.pendingIdeas.length === 0) {
+                closeIdeasModal();
+                showToast('Idea rejected', 'info');
+            } else {
+                displayIdeasForValidation(window.pendingIdeas);
+            }
+        }
+        
+        function closeIdeasModal() {
+            document.getElementById('ideasModal').style.display = 'none';
+            window.pendingIdeas = [];
         }
 
         function toggleInfo() {
@@ -1487,20 +3803,84 @@
             }
         });
 
-        // Event listeners with filter saving
-        const filterElements = ['searchInput', 'sourceFilter', 'sentimentFilter', 'keywordFilter', 'dateFrom', 'dateTo'];
+        // Event listeners with automatic filter application
+        const filterElements = ['searchInput', 'sourceFilter', 'sentimentFilter', 'ovhProductFilter', 'languageFilter', 'dateFrom', 'dateTo', 'sortBy'];
         
         filterElements.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                el.addEventListener('input', () => { saveFilters(); renderGallery(); });
-                el.addEventListener('change', () => { saveFilters(); renderGallery(); });
+                // Apply filters automatically on change
+                el.addEventListener('input', () => {
+                    currentOffset = 0;
+                    saveFilters();
+                    renderGallery();
+                    updateActiveFiltersCount();
+                });
+                el.addEventListener('change', () => {
+                    currentOffset = 0;
+                    saveFilters();
+                    renderGallery();
+                    updateActiveFiltersCount();
+                });
             }
         });
+        
+        // Apply filters button (still available for manual refresh)
+        function applyFilters() {
+            currentOffset = 0;
+            renderGallery();
+            updateActiveFiltersCount();
+            addLog('🔍 Filters applied', 'info');
+            showToast('Filters applied successfully', 'success');
+        }
+        
+        // Initialize event listeners after DOM is ready
+        function initializeEventListeners() {
+            // Enter key still works but filters now apply automatically on input/change
+            // This is kept for immediate feedback when user presses Enter
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        // Filters already apply automatically, but Enter can trigger immediate update
+                        currentOffset = 0;
+                        renderGallery();
+                        updateActiveFiltersCount();
+                    }
+                });
+            }
+            
+            console.log('✅ Event listeners initialized (filters apply automatically)');
+        }
 
-        // Load filters and render
+        // Initialize default keywords if none exist
+        function initializeDefaultKeywords() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                const defaultKeywords = [
+                    'ovhcloud',
+                    'ovh vps',
+                    'ovh hosting',
+                    'ovh dedicated',
+                    'ovh cloud',
+                    'ovh support',
+                    'ovh billing'
+                ];
+                saveKeywords(defaultKeywords);
+                addLog('🎯 Initialized default keywords covering main OVH products', 'info');
+            }
+        }
+        
+        // Load filters, posts from DB, and render
         loadFilters();
-        renderGallery();
+        initializeDefaultKeywords();
+        initializeEventListeners();
+        renderKeywords();
+        loadPostsFromDB().then(() => {
+            renderGallery();
+            addLog('✅ Application ready. Click "🆕 Scrape New Data" to collect posts from all sources.', 'info');
+        });
 
         // --- Keywords manager: persist and run searches ---
         function loadKeywords() {
@@ -1520,6 +3900,20 @@
             const list = document.getElementById('keywordsList');
             const keywords = loadKeywords();
             list.innerHTML = '';
+            
+            // Show count
+            const countEl = document.querySelector('#keywordsList + small') || document.createElement('small');
+            if (keywords.length > 0) {
+                countEl.textContent = `${keywords.length} keyword${keywords.length > 1 ? 's' : ''} active`;
+                countEl.style.color = '#00d4ff';
+                countEl.style.marginLeft = '10px';
+                if (!countEl.parentNode) {
+                    list.parentNode.insertBefore(countEl, list.nextSibling);
+                }
+            } else {
+                countEl.textContent = '';
+            }
+            
             keywords.forEach((kw, idx) => {
                 const chip = document.createElement('div');
                 chip.style.padding = '6px 10px';
@@ -1528,7 +3922,17 @@
                 chip.style.borderRadius = '16px';
                 chip.style.color = '#00d4ff';
                 chip.style.fontSize = '0.9em';
-                chip.textContent = kw;
+                chip.style.display = 'inline-flex';
+                chip.style.alignItems = 'center';
+                chip.style.marginRight = '6px';
+                chip.style.marginBottom = '6px';
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = kw;
+                textSpan.style.cursor = 'pointer';
+                textSpan.onclick = () => editKeyword(idx);
+                chip.appendChild(textSpan);
+                
                 const rem = document.createElement('button');
                 rem.textContent = '✕';
                 rem.style.marginLeft = '8px';
@@ -1536,14 +3940,31 @@
                 rem.style.border = 'none';
                 rem.style.color = '#ff9b9b';
                 rem.style.cursor = 'pointer';
-                rem.onclick = () => { removeKeyword(idx); };
+                rem.style.padding = '0';
+                rem.style.width = '18px';
+                rem.style.height = '18px';
+                rem.onclick = (e) => { e.stopPropagation(); removeKeyword(idx); };
                 chip.appendChild(rem);
                 list.appendChild(chip);
             });
             if (keywords.length === 0) {
-                list.innerHTML = '<small style="color:#aaa;">No keywords defined — add some to start searches.</small>';
+                list.innerHTML = '<small style="color:var(--text-muted);">No keywords defined — add some to start searches.</small>';
             }
         }
+
+        function editKeyword(index) {
+            const keywords = loadKeywords();
+            if (index < 0 || index >= keywords.length) return;
+            const oldValue = keywords[index];
+            const newValue = prompt('Edit keyword:', oldValue);
+            if (newValue && newValue.trim() && newValue !== oldValue) {
+                keywords[index] = newValue.trim();
+                saveKeywords(keywords);
+                renderKeywords();
+                showToast('Keyword updated', 'success');
+            }
+        }
+
 
         function addKeyword() {
             const input = document.getElementById('keywordInput');
@@ -1646,7 +4067,7 @@
 
             addLog(`🔎 Running searches for ${keywords.length} keywords (limit=${limit})`, 'info');
 
-            const sources = ['x','github','stackoverflow','hackernews','news','trustpilot'];
+            const sources = ['x','github','stackoverflow','reddit','news','trustpilot'];
 
             try {
                 for (const kw of keywords) {
@@ -1673,7 +4094,8 @@
                         }
                     }
                     // refresh posts after each keyword
-                    await refreshPosts();
+                    await loadPostsFromDB();
+                    renderGallery();
                 }
                 showToast('Keyword searches completed', 'success');
             } catch (e) {

@@ -17,24 +17,33 @@ def scrape_stackoverflow(query="OVH", limit=30):
     """
     Scrape Stack Overflow for questions about OVH.
     Uses official Stack Exchange API - free and no authentication needed.
+    Searches in title, body, and tags for better relevance.
     Retries automatically on network errors.
     Returns a list of post dictionaries ready for insertion.
     """
     last_error = None
     
+    # Limit query length to avoid 400 Bad Request
+    # Take only first 3 keywords if query is too long
+    if len(query) > 100:
+        keywords = query.split()[:3]
+        query = " ".join(keywords)
+        logger.info(f"[STACKOVERFLOW] Query too long, limited to: {query}")
+    
     for attempt in range(MAX_RETRIES):
         try:
+            # Use the /questions endpoint with tags
+            # More reliable than /search which has stricter rate limits
             params = {
                 "site": "stackoverflow",
-                "intitle": query,
+                "tagged": query.lower().replace(" ", ";"),  # Tags separated by semicolon
                 "sort": "creation",
                 "order": "desc",
-                "pagesize": limit,
-                "filter": "withbody",  # Includes body content
+                "pagesize": min(limit, 100),
             }
             
             response = httpx.get(
-                f"{STACKOVERFLOW_API}/search/advanced",
+                f"{STACKOVERFLOW_API}/questions",
                 params=params,
                 headers=DEFAULT_HEADERS,
                 timeout=Timeout(15.0, connect=5.0)
@@ -43,23 +52,31 @@ def scrape_stackoverflow(query="OVH", limit=30):
             data = response.json()
             
             if not data.get("items"):
-                raise RuntimeError(f"No Stack Overflow questions found for: {query}")
+                logger.warning(f"No Stack Overflow questions found for query: {query}")
+                return []
             
             posts = []
             for item in data["items"][:limit]:
                 try:
+                    # Extract title and body
+                    title = item.get("title", "")
+                    body = item.get("body", "") or ""
+                    
+                    # Get tags to verify relevance
+                    tags = item.get("tags", [])
+                    
                     # Extract relevant info
                     post = {
                         "source": "Stack Overflow",
                         "author": item.get("owner", {}).get("display_name", "Anonymous"),
-                        "content": (item.get("title", "") + "\n" + (item.get("body", "") or ""))[:500],
+                        "content": (title + "\n" + body)[:500],
                         "url": item.get("link", ""),
                         "created_at": datetime.fromtimestamp(item.get("creation_date", 0)).isoformat() if item.get("creation_date") else datetime.now().isoformat(),
                         "sentiment_score": 0.0,  # Will be analyzed in main.py
                         "sentiment_label": "neutral",
                     }
                     posts.append(post)
-                    logger.info(f"✓ Stack Overflow: {post['author']} - {post['content'][:30]}")
+                    logger.info(f"✓ Stack Overflow: {post['author']} - {title[:50]} (tags: {', '.join(tags[:3])})")
                 except Exception as e:
                     logger.warning(f"Could not parse SO question: {e}")
                     continue
@@ -69,7 +86,7 @@ def scrape_stackoverflow(query="OVH", limit=30):
             
             return posts
         
-        except (httpx.TimeoutError, httpx.ConnectError, httpx.NetworkError) as e:
+        except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as e:
             last_error = e
             if attempt < MAX_RETRIES - 1:
                 wait_time = RETRY_DELAY * (2 ** attempt)  # Exponential backoff

@@ -1,10 +1,10 @@
-# OVH Complaints Tracker
+# OVH Customer Feedback Tracker
 
-Real-time monitoring platform that collects and analyzes **customer complaints** and **feedback** about OVH domain services from multiple sources.
+Real-time monitoring platform that collects and analyzes **customer feedback** and **complaints** about all OVH products from multiple sources. Track sentiment, identify improvement opportunities, and generate actionable product enhancement ideas using AI.
 
 ## 🎯 Objective
 
-Track genuine customer complaints and feedback about OVH domain services (pricing, support quality, interface usability, renewal issues, etc.) across multiple platforms to identify patterns and pain points.
+Track genuine customer feedback and complaints about all OVH products (domains, VPS, hosting, cloud, billing, support, etc.) across multiple platforms to identify patterns, pain points, and opportunities for product improvement.
 
 ## 📊 Data Sources
 
@@ -17,13 +17,13 @@ The application collects **real customer feedback** from the following sources:
 | **Trustpilot** | ⭐ Customer Reviews | Real customer ratings and reviews on OVH | Real data |
 | **X/Twitter** | 💬 Social Media | Tweets with complaint keywords (bad support, expensive, etc.) | Real data (when available) |
 | **GitHub Issues** | 📋 Issue Tracker | Customer experience issues and feature requests | Real data |
-| **Stack Overflow** | ❓ Q&A Platform | Customer technical support questions about OVH domains | Real data |
-| **Hacker News** | 🔗 Tech Community | Technical discussions from tech community | Real data |
+| **Stack Overflow** | ❓ Q&A Platform | Customer technical support questions about OVH | Real data |
+| **Reddit** | 🔗 Social Community | Reddit discussions and posts about OVH products | Real data (RSS feeds) |
 | **Google News** | 📰 News Aggregator | News articles and press coverage about OVH | Real data |
 
 ### ❌ Not Supported
 
-- **Reddit**: Anti-scraping measures (403 Forbidden) - would require OAuth2
+- **Hacker News**: Decommissioned (not relevant for customer feedback)
 - **LinkedIn**: Strictly prohibits automated data extraction in ToS
 - **Facebook**: No public API - would violate platform terms
 
@@ -45,9 +45,25 @@ The application collects **real customer feedback** from the following sources:
   - Price complaints
   - Support quality issues
 
-### Management
-- **Backlog Feature**: Save important complaints for follow-up (localStorage)
-- **CSV Export**: Export filtered results for analysis
+### Management & Analysis
+- **Backlog Sidebar**: Dedicated side panel for managing posts to review
+  - Card view and compact list view
+  - Comments/notes for each post
+  - Export to CSV with comments
+- **Product Labeling**: Automatic detection of OVH products (Domain, VPS, Hosting, etc.)
+  - Manual override for incorrect labels
+  - Persistent storage in localStorage
+- **AI-Powered Idea Generation**: Generate product improvement ideas using LLM
+  - Supports OpenAI and Anthropic APIs
+  - Rule-based fallback when LLM unavailable
+  - Validation modal to accept/reject ideas
+- **Timeline & Histogram**: Visual analysis of posts over time
+  - Filter by sentiment, product, and date range
+  - Group by day/week/month
+  - Pie chart showing distribution by product
+- **Post Preview Modal**: View full post content without leaving the page
+- **Light/Dark Mode**: Toggle between themes with improved contrast
+- **CSV Export**: Export filtered results and backlog with comments
 - **Real-time Logs**: See scraping progress and errors in real-time
 
 ## 🏗️ Architecture
@@ -59,11 +75,11 @@ backend/
 │   ├── main.py              # FastAPI app, endpoints, scheduler
 │   ├── db.py                # SQLite database operations
 │   ├── scraper/
-│   │   ├── trustpilot.py    # ⭐ Trustpilot reviews (NEW)
+│   │   ├── trustpilot.py    # ⭐ Trustpilot reviews
 │   │   ├── x_scraper.py     # X/Twitter (complaint keywords)
 │   │   ├── github.py        # GitHub Issues (customer experience)
 │   │   ├── stackoverflow.py  # Stack Overflow Q&A
-│   │   ├── hackernews.py    # Hacker News discussions
+│   │   ├── reddit.py        # Reddit RSS feeds
 │   │   └── news.py          # Google News
 │   └── analysis/
 │       └── sentiment.py      # VADER sentiment analysis
@@ -90,6 +106,12 @@ frontend/
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+- **Python 3.11 or 3.12** (Python 3.13 has compatibility issues with snscrape)
+- Internet connection (for scraping)
+- Modern web browser
+
 ### 1. Setup Environment
 
 ```bash
@@ -105,34 +127,63 @@ venv\Scripts\Activate.ps1 # Windows PowerShell
 pip install -r backend/requirements.txt
 ```
 
-### 3. Run Backend
+### 3. Configure Environment Variables (Optional)
+
+Create a `.env` file in the `backend/` directory or set environment variables:
+
+```bash
+# Trustpilot API key (optional, for better scraping)
+TRUSTPILOT_API_KEY=your_api_key_here
+
+# CORS origins (optional, defaults to localhost:3000, localhost:8080)
+CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+
+# LLM API for idea generation (optional)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4o-mini  # Optional, defaults to gpt-4o-mini
+
+# Or use Anthropic
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+LLM_PROVIDER=anthropic
+ANTHROPIC_MODEL=claude-3-haiku-20240307  # Optional
+```
+
+### 4. Run Backend
 
 ```bash
 cd backend
 python -c "from app.main import app; import uvicorn; uvicorn.run(app, host='127.0.0.1', port=8000)"
 ```
 
-### 4. Run Frontend
+Or use the provided script:
+```bash
+python start_backend.py
+```
+
+### 5. Run Frontend
 
 ```bash
 cd frontend
 python -m http.server 3000
 ```
 
-### 5. Access Application
+### 6. Access Application
 
-Open browser: `http://127.0.0.1:3000/index.html`
+Open browser: `http://localhost:3000/index.html`
 
 ## 📋 API Endpoints
 
 ```
-POST /scrape/trustpilot        # Scrape Trustpilot reviews
-POST /scrape/x                 # Scrape X/Twitter (complaint keywords)
-POST /scrape/github            # Scrape GitHub Issues
-POST /scrape/stackoverflow     # Scrape Stack Overflow
-POST /scrape/hackernews        # Scrape Hacker News
-POST /scrape/news              # Scrape Google News
-GET  /posts?limit=100          # Get all posts from database
+POST /scrape/trustpilot              # Scrape Trustpilot reviews
+POST /scrape/x                       # Scrape X/Twitter (complaint keywords)
+POST /scrape/github                  # Scrape GitHub Issues
+POST /scrape/stackoverflow            # Scrape Stack Overflow
+POST /scrape/reddit                  # Scrape Reddit RSS feeds
+POST /scrape/news                    # Scrape Google News
+POST /generate-improvement-ideas     # Generate product improvement ideas (LLM)
+POST /admin/cleanup-duplicates       # Remove duplicate posts
+POST /admin/cleanup-hackernews-posts # Remove Hacker News posts
+GET  /posts?limit=100                # Get all posts from database
 ```
 
 ## 🔍 Search Keywords
@@ -170,33 +221,87 @@ Posts are classified using VADER sentiment analysis:
 
 ## ⚙️ Technical Stack
 
-- **Backend**: FastAPI, Python 3.13, uvicorn
-- **Scrapers**: httpx, snscrape (X), feedparser (RSS)
+- **Backend**: FastAPI, Python 3.11/3.12, uvicorn
+- **Scrapers**: httpx, feedparser (RSS), BeautifulSoup (HTML parsing)
 - **Analysis**: VADER sentiment analysis
-- **Database**: SQLite
+- **Database**: SQLite with indexes for performance
 - **Scheduling**: APScheduler (3-hour auto-scrape)
 - **Frontend**: Vanilla JavaScript, localStorage, CSS Grid
 - **Sentiment**: VADER (Valence Aware Dictionary and sEntiment Reasoner)
 
+**Note**: Python 3.13 is not recommended due to snscrape incompatibility. The X/Twitter scraper uses Nitter instances as an alternative.
+
 ## ⚠️ Important Notes
 
 ### Only Real Data
-- **No mock data in results** - if a scraper fails, returns 503 error instead
+- **No mock data in results** - if a scraper fails, returns empty list instead of sample data
 - **Trustpilot, GitHub, Stack Overflow** provide real customer feedback
-- **X/Twitter** searches complaint keywords, but snscrape incompatibility with Python 3.13 may cause unavailability
+- **X/Twitter** uses Nitter instances (Python 3.13 compatible alternative to snscrape)
 - **Google News** via RSS feeds (subject to rate limiting)
+- **Duplicate Detection**: Posts with the same URL are automatically skipped
 
 ### Rate Limiting
 Some APIs have rate limiting:
 - GitHub API: 60 requests/hour (unauthenticated)
 - Google News: May be rate-limited by Google
 - Trustpilot: Rate limiting may apply
+- Nitter instances: May have rate limits
+
+### Database Features
+- **Automatic duplicate detection** based on URL
+- **Indexed columns** for fast filtering (source, sentiment, date, language)
+- **Job persistence** for background scraping tasks
 
 ### Legal & Ethics
 - All scraped data is **publicly available** on social platforms
 - Users are responsible for complying with platform Terms of Service
 - This tool monitors public feedback only
 - No personal data collection - only public posts/reviews
+
+## 🔧 Known Issues
+
+### Python Version Compatibility
+- **Python 3.13**: Not fully supported due to snscrape incompatibility. Use Python 3.11 or 3.12.
+- **X/Twitter Scraper**: Uses Nitter instances as fallback when snscrape is unavailable
+
+### Scraper Limitations
+- **X/Twitter**: Relies on public Nitter instances which may be unstable
+- **Trustpilot**: HTML scraping may break if Trustpilot changes their page structure
+- **Reddit**: RSS feeds may have rate limits
+- **Rate Limiting**: Some sources may temporarily block requests if too many are made
+- **LLM API**: Idea generation requires API key (OpenAI or Anthropic). Falls back to rule-based generation if unavailable.
+
+### Database
+- SQLite is used for simplicity, but may not scale well beyond ~100k posts
+- Consider migrating to PostgreSQL for production use
+
+## 🐛 Troubleshooting
+
+### Backend won't start
+- **Check Python version**: `python --version` should be 3.11 or 3.12
+- **Check dependencies**: `pip install -r backend/requirements.txt`
+- **Check port availability**: Port 8000 must be free
+- **Check logs**: Look for error messages in console output
+
+### Scrapers return no data
+- **Check internet connection**: Scrapers require internet access
+- **Check rate limits**: Wait a few minutes and try again
+- **Check logs**: Look for error messages in the logs panel
+- **X/Twitter**: Nitter instances may be down, try again later
+
+### CORS errors in browser
+- **Check CORS_ORIGINS**: Ensure your frontend URL is in the allowed origins
+- **Default ports**: Frontend should run on 3000 or 8080, or configure CORS_ORIGINS
+
+### Database errors
+- **Check file permissions**: Ensure write access to `backend/data.db`
+- **Check disk space**: SQLite needs disk space for the database file
+- **Reset database**: Delete `backend/data.db` to start fresh (loses all data)
+
+### Frontend not loading
+- **Check backend is running**: Backend must be on `http://127.0.0.1:8000`
+- **Check browser console**: Look for JavaScript errors
+- **Check API_BASE**: Should be `http://127.0.0.1:8000` in `index.html`
 
 ## 🔧 Development
 
@@ -212,6 +317,33 @@ python test_scrapers_qa.py
 
 Backend logs are printed to console in real-time. Frontend logs appear in browser console.
 
+## 🌍 Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `TRUSTPILOT_API_KEY` | Trustpilot API key for better scraping | None | No |
+| `CORS_ORIGINS` | Comma-separated list of allowed CORS origins | `http://localhost:3000,http://localhost:8080,...` | No |
+| `OPENAI_API_KEY` | OpenAI API key for LLM idea generation | None | No |
+| `OPENAI_MODEL` | OpenAI model to use | `gpt-4o-mini` | No |
+| `ANTHROPIC_API_KEY` | Anthropic API key for LLM idea generation | None | No |
+| `LLM_PROVIDER` | LLM provider: `openai` or `anthropic` | `openai` | No |
+| `ANTHROPIC_MODEL` | Anthropic model to use | `claude-3-haiku-20240307` | No |
+
 ## 📝 License
 
 MIT License - feel free to use, modify, and distribute
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## 📚 Additional Resources
+
+- [Architecture Documentation](ARCHITECTURE.md) - Detailed system architecture
+- [Test Guide](GUIDE_TEST.md) - How to test the application
+- [Audit Report](AUDIT.md) - Security and code quality audit

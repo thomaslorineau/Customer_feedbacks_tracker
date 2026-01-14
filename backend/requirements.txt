@@ -10,3 +10,6 @@ urllib3
 beautifulsoup4
 lxml
 textblob
+# Optional: For JavaScript-heavy sites with anti-bot protection
+# selenium>=4.15.0
+# playwright>=1.40.0

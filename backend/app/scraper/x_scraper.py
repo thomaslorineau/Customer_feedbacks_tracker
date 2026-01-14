@@ -49,9 +49,9 @@ def scrape_x(query: str, limit: int = 50):
     if results:
         return results
     
-    # Strategy 3: Return sample data to avoid total failure
-    logger.warning("[X SCRAPER] All methods failed, returning sample complaint data")
-    return _get_sample_ovh_complaints(limit)
+    # All methods failed - return empty list (no sample data)
+    logger.warning("[X SCRAPER] All scraping methods failed, returning empty list")
+    return []
 
 
 def _try_nitter_scrape(query: str, limit: int) -> list:
@@ -152,56 +152,7 @@ def _try_twitter_search(query: str, limit: int) -> list:
         return []
 
 
-def _get_sample_ovh_complaints(limit: int) -> list:
-    """Return sample OVH complaints when all scrapers fail.
-    
-    This provides data for demo/testing when live scraping isn't possible.
-    Note: These are sample tweets with realistic-looking URLs for demonstration.
-    """
-    sample_complaints = [
-        {
-            'source': 'X/Twitter',
-            'author': '@customer123',
-            'content': 'OVH domain renewal is getting way too expensive. Looking for alternatives now.',
-            'url': 'https://x.com/customer123/status/1745123456789012345',
-            'created_at': datetime.now().isoformat(),
-            'language': 'en',
-        },
-        {
-            'source': 'X/Twitter',
-            'author': '@domainowner',
-            'content': 'OVH customer support for domain issues is terrible. Been waiting 5 days for a response.',
-            'url': 'https://x.com/domainowner/status/1745234567890123456',
-            'created_at': datetime.now().isoformat(),
-            'language': 'en',
-        },
-        {
-            'source': 'X/Twitter',
-            'author': '@techguy',
-            'content': 'Probleme avec OVH pour renouveler mon domaine. La plateforme est compliquee',
-            'url': 'https://x.com/techguy/status/1745345678901234567',
-            'created_at': datetime.now().isoformat(),
-            'language': 'fr',
-        },
-        {
-            'source': 'X/Twitter',
-            'author': '@websiteowner',
-            'content': 'The OVH domain registrar interface is outdated and confusing. Need better UX.',
-            'url': 'https://x.com/websiteowner/status/1745456789012345678',
-            'created_at': datetime.now().isoformat(),
-            'language': 'en',
-        },
-        {
-            'source': 'X/Twitter',
-            'author': '@businesses',
-            'content': 'OVH domain registration is expensive compared to Namecheap and GoDaddy.',
-            'url': 'https://x.com/businesses/status/1745567890123456789',
-            'created_at': datetime.now().isoformat(),
-            'language': 'en',
-        },
-    ]
-    
-    return sample_complaints[:limit]
+# Removed _get_sample_ovh_complaints - no sample data allowed
 
 
 def scrape_x_multi_queries(limit: int = 50):

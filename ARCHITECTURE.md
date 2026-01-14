@@ -14,9 +14,11 @@
 │  │  │(Real Data) │  │(Real Data) │  │(Real Data) │  │(Real Data) │    │   │
 │  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘    │   │
 │  │                                                                      │   │
-│  │  Filters: Source | Sentiment | Date | Keyword                      │   │
-│  │  Scrapers: Trustpilot | X | GitHub | Stack Overflow | HN | News   │   │
-│  │  Backlog: Save & Export complaints                                 │   │
+│  │  Filters: Source | Sentiment | Date | Product | Keyword            │   │
+│  │  Scrapers: Trustpilot | X | GitHub | Stack Overflow | Reddit | News│   │
+│  │  Backlog Sidebar: Card/List view | Comments | Export                │   │
+│  │  Charts: Timeline & Histogram | Product Distribution Pie Chart      │   │
+│  │  AI Ideas: LLM-powered improvement idea generation                 │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    │ HTTP GET /posts                         │
@@ -38,13 +40,15 @@
 │  │  main.py (FastAPI App + Scheduler)                                   │   │
 │  │                                                                      │   │
 │  │  HTTP Routes:                                                        │   │
-│  │  ├─ POST /scrape/trustpilot    ──┐                                  │   │
-│  │  ├─ POST /scrape/x              ──┼─► Scraper Router                │   │
-│  │  ├─ POST /scrape/github         ──┤    (Real data only)             │   │
-│  │  ├─ POST /scrape/stackoverflow  ──┤                                 │   │
-│  │  ├─ POST /scrape/hackernews     ──┤                                 │   │
-│  │  ├─ POST /scrape/news           ──┘                                 │   │
-│  │  └─ GET /posts                  ──► Database Fetch                  │   │
+│  │  ├─ POST /scrape/trustpilot         ──┐                              │   │
+│  │  ├─ POST /scrape/x                  ──┼─► Scraper Router            │   │
+│  │  ├─ POST /scrape/github             ──┤    (Real data only)         │   │
+│  │  ├─ POST /scrape/stackoverflow      ──┤                             │   │
+│  │  ├─ POST /scrape/reddit             ──┤                             │   │
+│  │  ├─ POST /scrape/news               ──┘                             │   │
+│  │  ├─ POST /generate-improvement-ideas─► LLM Idea Generation          │   │
+│  │  ├─ POST /admin/cleanup-duplicates ──► Database Cleanup             │   │
+│  │  └─ GET /posts                      ──► Database Fetch               │   │
 │  │                                                                      │   │
 │  │  APScheduler:                                                       │   │
 │  │  └─ auto_scrape_job() runs every 3 hours                            │   │
@@ -57,12 +61,12 @@
 │  │                                  ││                                       │
 │  │  ├─ trustpilot.py                ││  Real Reviews                         │
 │  │  │  └─ scrape_trustpilot_reviews()│  ├─ Ratings (⭐)                     │
-│  │  │     └─ Trustpilot API         ││  └─ Mock fallback                    │
+│  │  │     └─ HTML scraping          ││  └─ Empty list on failure            │
 │  │  │                                ││                                       │
 │  │  ├─ x_scraper.py                 ││  Complaint Tweets                     │
 │  │  │  └─ scrape_x_multi_queries()   │  ├─ "OVH support bad"                │
-│  │  │     └─ snscrape (Python 3.13) │  └─ "OVH expensive"                   │
-│  │  │        (may fail)              │                                       │
+│  │  │     └─ Nitter instances       │  └─ "OVH expensive"                   │
+│  │  │        (fallback)              │                                       │
 │  │  │                                ││                                       │
 │  │  ├─ github.py                     ││  Customer Experience Issues          │
 │  │  │  └─ scrape_github_issues()     ││  ├─ "OVH domain" (UX)               │
@@ -71,12 +75,12 @@
 │  │  │     └─ GitHub API              ││                                       │
 │  │  │                                ││                                       │
 │  │  ├─ stackoverflow.py              ││  Technical Questions                 │
-│  │  │  └─ scrape_stackoverflow()     ││  └─ "intitle:OVH"                   │
+│  │  │  └─ scrape_stackoverflow()     ││  └─ Stack Overflow API              │
 │  │  │     └─ Stack Overflow API      ││                                       │
 │  │  │                                ││                                       │
-│  │  ├─ hackernews.py                 ││  Tech Community Discussions          │
-│  │  │  └─ scrape_hackernews()        ││  └─ Algolia API search              │
-│  │  │     └─ Algolia API             ││                                       │
+│  │  ├─ reddit.py                     ││  Reddit Discussions                  │
+│  │  │  └─ scrape_reddit()            ││  └─ RSS feeds                       │
+│  │  │     └─ feedparser (RSS)        ││                                       │
 │  │  │                                ││                                       │
 │  │  └─ news.py                       ││  News & Articles                     │
 │  │     └─ scrape_google_news()       ││  └─ feedparser (RSS)                │
@@ -104,8 +108,10 @@
 │  │  db.py (SQLite Database Operations)                                 │   │
 │  │                                                                      │   │
 │  │  ├─ init_db()                      Initialize schema               │   │
-│  │  ├─ insert_post(post: dict)        Write to DB                     │   │
-│  │  └─ get_posts(limit: int)          Read from DB                    │   │
+│  │  ├─ insert_post(post: dict)        Write to DB (duplicate check)   │   │
+│  │  ├─ get_posts(limit: int)          Read from DB                    │   │
+│  │  ├─ delete_duplicate_posts()      Remove duplicates                │   │
+│  │  └─ delete_hackernews_posts()      Remove Hacker News posts        │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │       │                                                                      │
 │       ▼                                                                      │
@@ -169,11 +175,15 @@ Sentiment Analysis (sentiment.py) - Only if real data
        ▼
 Database Insert (db.py → insert_post)
        │
-       ▼
-SQLite: INSERT INTO posts (source, author, content, ...)
+       ├─► Check for duplicate URL
+       │   └─► If duplicate: skip insertion, return False
        │
        ▼
-Response: {added: n} (number of real posts added)
+SQLite: INSERT INTO posts (source, author, content, ...)
+       │   (Only if not duplicate)
+       │
+       ▼
+Response: {added: n} (number of new posts added, duplicates excluded)
 ```
 
 ### 2. Auto Scraping Flow (Every 3 hours)
@@ -249,7 +259,7 @@ ovh-complaints-tracker/
 │   │   │   ├── x_scraper.py              # X/Twitter scraper (complaint keywords)
 │   │   │   ├── github.py                 # GitHub Issues (customer experience)
 │   │   │   ├── stackoverflow.py          # Stack Overflow Q&A
-│   │   │   ├── hackernews.py             # Hacker News discussions
+│   │   │   ├── reddit.py                 # Reddit RSS feeds
 │   │   │   └── news.py                   # Google News RSS
 │   │   │
 │   │   └── analysis/
@@ -282,14 +292,17 @@ ovh-complaints-tracker/
 
 ## Key Design Decisions
 
-1. **Real Data Only**: No mock data fallbacks. If scraper fails, return 503 error instead of fake posts.
+1. **Real Data Only**: No mock data fallbacks. If scraper fails, return empty list instead of fake posts.
 2. **FastAPI**: Lightweight, async-capable, auto-documentation (Swagger).
-3. **SQLite**: Zero-config, file-based, good for small/medium datasets.
-4. **VADER Sentiment**: Fast, rule-based, tuned for social media language.
-5. **Vanilla JS Frontend**: No build step, easy to extend, uses localStorage for backlog persistence.
-6. **Modular Scrapers**: Each source (Trustpilot, X, GitHub, etc.) is isolated for independent development.
-7. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
-8. **APScheduler**: Background auto-scraping without external job queue.
+3. **SQLite**: Zero-config, file-based, good for small/medium datasets. Indexed for performance.
+4. **Duplicate Detection**: URL-based duplicate prevention to avoid data redundancy.
+5. **VADER Sentiment**: Fast, rule-based, tuned for social media language.
+6. **Vanilla JS Frontend**: No build step, easy to extend, uses localStorage for backlog persistence.
+7. **Modular Scrapers**: Each source (Trustpilot, X, GitHub, etc.) is isolated for independent development.
+8. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
+9. **APScheduler**: Background auto-scraping without external job queue.
+10. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
+11. **Fallback Strategies**: Scrapers use multiple strategies (HTML → API → empty list) for resilience.
 
 ## API Contract
 
@@ -300,23 +313,49 @@ Request:
   POST /scrape/trustpilot?query=OVH%20domain&limit=50
   
 Response (200 OK):
-  {"added": 5}
+  {"added": 5}  // Number of new posts added (duplicates excluded)
   
-Response (503 Error - Real data unavailable):
-  {"detail": "Trustpilot scraper unavailable"}
+Response (200 OK - No data found):
+  {"added": 0}  // Scraper succeeded but found no new posts
 ```
 
 ### POST /scrape/x
 
 ```
 Request:
-  POST /scrape/x?limit=50
+  POST /scrape/x?query=OVH&limit=50
   
 Response (200 OK - Real tweets found):
-  {"added": 12}
+  {"added": 12}  // New posts added
   
-Response (503 Error - snscrape broken on Python 3.13):
-  {"detail": "X/Twitter scraper unavailable (snscrape incompatibility with Python 3.13)"}
+Response (200 OK - No data):
+  {"added": 0}  // All methods failed or no new posts
+```
+
+### POST /scrape/keywords
+
+```
+Request:
+  POST /scrape/keywords?limit=50&concurrency=2&delay=0.5
+  Body: { "keywords": ["OVH", "domain"] }
+  
+Response (200 OK):
+  {"job_id": "uuid-123"}
+```
+
+### GET /scrape/jobs/{job_id}
+
+```
+Response (200 OK):
+  {
+    "id": "uuid-123",
+    "status": "running",
+    "progress": {"total": 12, "completed": 5},
+    "results": [{"added": 3}, {"added": 2}],
+    "errors": [],
+    "created_at": "2026-01-13T10:00:00",
+    "updated_at": "2026-01-13T10:05:00"
+  }
 ```
 
 ### POST /scrape/github
@@ -361,6 +400,69 @@ Response (200 OK - Real posts only):
   ]
 ```
 
+## Scraper Fallback Strategies
+
+### X/Twitter Scraper
+1. **Primary**: Nitter instances (nitter.net, nitter.poast.org, nitter.1d4.us)
+2. **Fallback**: Twitter API (requires authentication, currently disabled)
+3. **Final**: Empty list (no sample data)
+
+### Trustpilot Scraper
+1. **Primary**: HTML scraping from Trustpilot web page
+2. **Fallback**: Trustpilot API (if TRUSTPILOT_API_KEY is set)
+3. **Final**: Empty list (no sample data)
+
+### Other Scrapers
+- **GitHub, Stack Overflow, Hacker News, News**: Direct API calls with retry logic
+- **Error Handling**: Return empty list on failure, log errors for debugging
+
+## Background Job System
+
+The application supports background keyword scraping jobs:
+
+```
+POST /scrape/keywords
+  Body: { "keywords": ["OVH", "domain"] }
+  Response: { "job_id": "uuid-123" }
+
+GET /scrape/jobs/{job_id}
+  Response: {
+    "id": "uuid-123",
+    "status": "running|completed|failed|cancelled",
+    "progress": { "total": 12, "completed": 5 },
+    "results": [...],
+    "errors": [...]
+  }
+
+POST /scrape/jobs/{job_id}/cancel
+  Response: { "cancelled": true }
+```
+
+**Job Flow:**
+1. Job created in memory (JOBS dict) and database
+2. Background thread processes keywords across all sources
+3. Progress updated in real-time
+4. Results and errors persisted to database
+5. Frontend polls job status every 2 seconds
+
+## Error Handling Strategy
+
+### Scraper Level
+- **Network errors**: Retry with exponential backoff (3 attempts)
+- **HTTP errors**: Log and return empty list
+- **Parsing errors**: Skip item, continue with next
+- **All failures**: Return empty list (never sample data)
+
+### Database Level
+- **Duplicate URLs**: Skip insertion, return False
+- **Constraint violations**: Log error, skip item
+- **Connection errors**: Raise exception (handled by endpoint)
+
+### API Level
+- **Scraper failures**: Return `{added: 0}` with 200 status
+- **Database errors**: Return 500 with error detail
+- **Validation errors**: Return 400 with validation details
+
 ## Scaling Considerations
 
 - **More posts**: Use PostgreSQL instead of SQLite, add indexes on `(source, created_at, sentiment_label)`.
@@ -369,6 +471,7 @@ Response (200 OK - Real posts only):
 - **Real-time updates**: Add WebSocket endpoint to push new complaint alerts.
 - **Analytics**: Add dashboard for sentiment trends, source distribution, complaint categories.
 - **Caching**: Redis cache for `/posts` results (5-10 min TTL).
+- **Rate Limiting**: Add middleware to prevent API abuse.
 
 ## Future Enhancements
 
