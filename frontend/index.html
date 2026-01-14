@@ -997,10 +997,10 @@
                     
                     <div style="padding: 15px; background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; border-radius: 8px;">
                         <h3 style="color: #ef4444; margin: 0 0 10px 0; font-size: 1.1em;">⚙️ Updates:</h3>
-                        <p style="margin: 0;">
-                            • <strong>Manual</strong>: Click "🆕 Scrape New Data" to launch all scrapers<br>
-                            • <strong>Automatic</strong>: The server automatically scrapes every 3 hours<br>
-                            • <strong>By source</strong>: Use individual buttons (🐦 X, 📚 SO, etc.)
+                        <p style="margin: 0; color: var(--text-secondary);">
+                            • <strong style="color: var(--text-primary);">Manual</strong>: Click "🆕 Scrape New Data" to launch all scrapers<br>
+                            • <strong style="color: var(--text-primary);">Automatic</strong>: The server automatically scrapes every 3 hours<br>
+                            • <strong style="color: var(--text-primary);">By source</strong>: Use individual buttons (🐦 X, 📚 SO, etc.)
                         </p>
                     </div>
                     
@@ -1182,7 +1182,7 @@
                     <li><strong>Backlog & Export:</strong> Save posts and export as CSV for further analysis</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">⚠️ Limitations & Disclaimer</h2>
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">⚠️ Limitations & Disclaimer</h2>
                 <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px; background:rgba(239,68,68,0.1); padding:15px; border-radius:6px;">
                     <li><strong>Data Limitations:</strong> Scraping is subject to rate limits and may not capture all posts</li>
                     <li><strong>Sentiment Accuracy:</strong> VADER sentiment analysis is statistical and may have false positives</li>
@@ -1199,7 +1199,7 @@
                     <li><strong style="color:#34d399;">✅ Supported Instead:</strong> X/Twitter, GitHub Issues, Stack Overflow, Reddit (RSS), Google News - All have public APIs or RSS feeds accessible without authentication</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔧 Technical Details</h2>
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🔧 Technical Details</h2>
                 <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>Backend:</strong> FastAPI (Python) with SQLite database</li>
                     <li><strong>Frontend:</strong> Vanilla JavaScript with localStorage for backlog persistence</li>
