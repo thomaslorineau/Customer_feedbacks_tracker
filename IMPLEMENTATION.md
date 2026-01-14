@@ -945,6 +945,27 @@ sudo systemctl start ovh-tracker
 
 **Sans sudo (Installation manuelle) :**
 
+**Méthode automatique (recommandée) :**
+
+```bash
+# Se connecter au serveur
+ssh user@votre-vm
+
+# Mettre à jour l'application (fait tout automatiquement)
+cd ~/apps/complaints_tracker
+./update.sh
+```
+
+Le script `update.sh` fait automatiquement :
+- ✅ Arrête l'application
+- ✅ Sauvegarde la configuration (.env, .app_config, .host_alias)
+- ✅ Met à jour le code via `git pull`
+- ✅ Restaure la configuration
+- ✅ Met à jour les dépendances Python
+- ✅ Redémarre l'application
+
+**Méthode manuelle (si nécessaire) :**
+
 ```bash
 # Se connecter au serveur
 ssh user@votre-vm
