@@ -88,7 +88,513 @@ L'application est accessible sur `http://localhost:3000/index.html`
 
 ## Déploiement sur Serveur
 
-### Option 1 : Déploiement avec Systemd (Linux)
+### Option 1 : Installation sur VM Linux sans droits sudo
+
+Cette section décrit comment installer l'application sur une VM Linux du réseau local **sans avoir besoin de droits sudo**. Ce guide est conçu pour être suivi par quelqu'un qui n'est pas administrateur système.
+
+> 💡 **Conseil** : Si vous rencontrez des problèmes, notez les messages d'erreur et contactez votre administrateur système.
+
+**📋 Résumé rapide :**
+1. Télécharger le script d'installation
+2. Exécuter `./install.sh`
+3. Démarrer avec `./start.sh`
+4. Accéder à `http://IP_DE_LA_VM:8000`
+
+> 🚀 **Méthode rapide :** Utilisez le script d'installation automatique (recommandé) !
+
+#### Installation automatique (Recommandé)
+
+Le moyen le plus simple d'installer l'application est d'utiliser le script d'installation automatique :
+
+```bash
+# Télécharger le script d'installation
+curl -O https://raw.githubusercontent.com/thomaslorineau/complaints_tracker/master/install.sh
+
+# Ou si vous avez déjà cloné le dépôt :
+cd complaints_tracker
+chmod +x install.sh
+
+# Lancer l'installation
+./install.sh
+```
+
+Le script va automatiquement :
+- ✅ Vérifier que Python 3.11/3.12 est installé
+- ✅ Vérifier que Git est installé
+- ✅ Télécharger l'application depuis GitHub
+- ✅ Créer l'environnement virtuel Python
+- ✅ Installer toutes les dépendances
+- ✅ Configurer l'application
+- ✅ Préparer les scripts de démarrage
+
+**C'est tout !** L'installation est terminée. Vous pouvez ensuite démarrer l'application avec `./start.sh`.
+
+> 💡 **Note :** Si le script d'installation rencontre des problèmes, suivez les instructions manuelles ci-dessous.
+
+---
+
+#### Installation manuelle
+
+Si vous préférez installer manuellement ou si le script d'installation ne fonctionne pas :
+
+#### Prérequis
+
+Avant de commencer, vous devez avoir :
+- ✅ Accès SSH à la VM Linux (ou accès direct à la console)
+- ✅ Python 3.11 ou 3.12 installé sur la VM
+- ✅ Git installé sur la VM
+- ✅ Connexion Internet pour télécharger les dépendances
+- ✅ Au moins 500 MB d'espace disque libre
+
+> ⚠️ **Important** : Si Python ou Git ne sont pas installés, contactez votre administrateur système pour les installer. L'installation de Python sans sudo est complexe et peut ne pas fonctionner sur toutes les machines.
+
+#### Étape 1 : Vérifier que Python est installé (Installation manuelle)
+
+Ouvrez un terminal sur la VM et tapez :
+
+```bash
+python3 --version
+```
+
+**Résultat attendu :** `Python 3.11.x` ou `Python 3.12.x`
+
+Si vous voyez une version inférieure (comme 3.9 ou 3.10), contactez votre administrateur pour installer Python 3.11 ou 3.12.
+
+Vérifiez aussi Git :
+
+```bash
+git --version
+```
+
+Si Git n'est pas installé, contactez votre administrateur.
+
+#### Étape 2 : Télécharger l'application
+
+Dans le terminal, exécutez ces commandes une par une :
+
+```bash
+# Aller dans votre répertoire personnel
+cd ~
+
+# Créer un dossier pour l'application
+mkdir -p apps
+cd apps
+
+# Télécharger l'application depuis GitHub
+git clone https://github.com/thomaslorineau/complaints_tracker.git
+
+# Entrer dans le dossier de l'application
+cd complaints_tracker
+```
+
+✅ Si tout s'est bien passé, vous devriez voir plusieurs dossiers (`backend`, `frontend`, etc.).
+
+#### Étape 3 : Créer l'environnement Python
+
+L'application utilise un "environnement virtuel" Python pour isoler ses dépendances. Créez-le avec :
+
+```bash
+# Créer l'environnement virtuel
+python3 -m venv venv
+```
+
+Cela peut prendre quelques secondes. Ensuite, activez-le :
+
+```bash
+# Activer l'environnement virtuel
+source venv/bin/activate
+```
+
+✅ Vous devriez voir `(venv)` au début de votre ligne de commande. Cela signifie que l'environnement est actif.
+
+#### Étape 4 : Installer les dépendances
+
+L'application a besoin de plusieurs bibliothèques Python. Installez-les avec :
+
+```bash
+# Mettre à jour l'outil d'installation Python
+pip install --upgrade pip
+
+# Aller dans le dossier backend
+cd backend
+
+# Installer toutes les dépendances (cela peut prendre 2-5 minutes)
+pip install -r requirements.txt
+```
+
+⏳ **Patience** : L'installation peut prendre plusieurs minutes. Ne fermez pas le terminal.
+
+✅ Quand c'est terminé, vous devriez voir "Successfully installed" avec une liste de packages.
+
+> ⚠️ **Si vous avez des erreurs** : Notez le message d'erreur complet et contactez votre administrateur système. Certaines dépendances peuvent nécessiter des outils système installés par un administrateur.
+
+#### Étape 5 : Trouver l'adresse IP de la VM
+
+Avant de configurer l'application, vous devez connaître l'adresse IP de votre VM pour y accéder depuis d'autres ordinateurs du réseau.
+
+Dans le terminal, tapez :
+
+```bash
+hostname -I
+```
+
+Vous devriez voir une adresse IP, par exemple : `192.168.1.100`
+
+📝 **Notez cette adresse IP**, vous en aurez besoin pour accéder à l'application.
+
+Si cette commande ne fonctionne pas, essayez :
+
+```bash
+ip addr show | grep "inet " | grep -v 127.0.0.1
+```
+
+Cherchez une ligne avec une adresse qui commence par `192.168.` ou `10.` ou `172.` (ce sont des adresses de réseau local).
+
+#### Étape 6 : Configuration de l'application (optionnel)
+
+Cette étape est **optionnelle**. L'application fonctionne sans configuration, mais vous pouvez créer un fichier de configuration pour personnaliser certains paramètres.
+
+```bash
+# S'assurer d'être dans le dossier backend
+cd ~/apps/complaints_tracker/backend
+
+# Créer le fichier de configuration
+nano .env
+```
+
+Dans l'éditeur, ajoutez (remplacez `192.168.1.100` par l'IP de votre VM) :
+
+```
+# Autoriser l'accès depuis d'autres ordinateurs du réseau
+CORS_ORIGINS=http://localhost:8000,http://192.168.1.100:8000,http://192.168.1.100:3000
+```
+
+**Pour sauvegarder dans nano :**
+- Appuyez sur `Ctrl+O` (O comme "Output")
+- Appuyez sur `Enter` pour confirmer
+- Appuyez sur `Ctrl+X` pour quitter
+
+> 💡 **Note** : Si vous ne créez pas ce fichier, l'application fonctionnera quand même, mais l'accès depuis d'autres ordinateurs pourrait être limité. Vous pourrez toujours y accéder depuis la VM elle-même.
+
+#### Étape 7 : Démarrer l'application
+
+Il y a deux façons de démarrer l'application :
+
+**Méthode simple (recommandée) : Utiliser les scripts fournis**
+
+```bash
+# Retourner à la racine du projet
+cd ~/apps/complaints_tracker
+
+# Rendre les scripts exécutables (une seule fois)
+chmod +x start.sh stop.sh status.sh backup.sh
+
+# Démarrer l'application
+./start.sh
+```
+
+✅ Si tout va bien, vous verrez :
+```
+✅ Serveur démarré avec succès (PID: ...)
+🌐 Accès: http://192.168.1.100:8000
+```
+
+**Méthode manuelle :**
+
+Si les scripts ne fonctionnent pas, vous pouvez démarrer manuellement :
+
+```bash
+# Activer l'environnement virtuel
+source ~/apps/complaints_tracker/venv/bin/activate
+
+# Aller dans le dossier backend
+cd ~/apps/complaints_tracker/backend
+
+# Démarrer le serveur
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+> ⚠️ **Important** : Avec cette méthode, le serveur s'arrêtera si vous fermez le terminal. Utilisez plutôt la méthode avec les scripts.
+
+#### Étape 8 : Accéder à l'application
+
+Une fois l'application démarrée, vous pouvez y accéder de plusieurs façons :
+
+**Depuis la VM elle-même :**
+- Ouvrez un navigateur web sur la VM
+- Allez à : `http://localhost:8000`
+
+**Depuis un autre ordinateur du réseau local :**
+- Ouvrez un navigateur web sur votre ordinateur
+- Allez à : `http://IP_DE_LA_VM:8000` (remplacez par l'IP que vous avez notée à l'étape 5)
+- Exemple : `http://192.168.1.100:8000`
+
+✅ **L'application devrait s'afficher !**
+
+---
+
+## 🌐 Partager l'application sur le réseau local
+
+Une fois l'application démarrée, vous pouvez la partager avec d'autres personnes sur le même réseau local.
+
+### Étape 1 : Trouver l'adresse IP de la VM
+
+Si vous ne l'avez pas déjà notée, trouvez l'IP de votre VM :
+
+```bash
+hostname -I
+```
+
+Vous obtiendrez quelque chose comme : `192.168.1.100`
+
+### Étape 2 : Construire l'URL de l'application
+
+L'URL de votre application est :
+```
+http://IP_DE_LA_VM:8000
+```
+
+**Exemple :** Si l'IP de votre VM est `192.168.1.100`, l'URL sera :
+```
+http://192.168.1.100:8000
+```
+
+### Étape 3 : Partager l'URL
+
+Vous pouvez maintenant partager cette URL avec vos collègues :
+
+**Par email :**
+```
+Bonjour,
+
+L'application OVH Customer Feedback Tracker est maintenant disponible à l'adresse :
+http://192.168.1.100:8000
+
+Vous pouvez y accéder depuis votre navigateur web si vous êtes sur le même réseau local.
+
+Cordialement
+```
+
+**Par message/chat :**
+```
+L'app est disponible ici : http://192.168.1.100:8000
+```
+
+### Étape 4 : Accéder depuis un autre ordinateur
+
+Pour accéder à l'application depuis un autre ordinateur :
+
+1. **Assurez-vous que les deux machines sont sur le même réseau** (même Wi-Fi ou même réseau filaire)
+2. **Ouvrez un navigateur web** (Chrome, Firefox, Edge, Safari, etc.)
+3. **Tapez l'URL** dans la barre d'adresse : `http://192.168.1.100:8000`
+4. **Appuyez sur Entrée**
+
+✅ L'application devrait s'afficher !
+
+### Problèmes d'accès ?
+
+**Si l'application ne s'affiche pas depuis un autre ordinateur :**
+
+1. **Vérifiez que le serveur tourne bien :**
+   ```bash
+   cd ~/apps/complaints_tracker
+   ./status.sh
+   ```
+
+2. **Vérifiez que vous utilisez la bonne IP :**
+   ```bash
+   hostname -I
+   ```
+
+3. **Vérifiez que les deux machines sont sur le même réseau :**
+   - Les deux doivent être sur le même Wi-Fi ou le même réseau filaire
+   - Les adresses IP doivent commencer par les mêmes chiffres (ex: `192.168.1.x`)
+
+4. **Vérifiez le firewall :**
+   - Si vous avez un firewall activé sur la VM, il peut bloquer les connexions
+   - Contactez votre administrateur système pour ouvrir le port 8000
+
+5. **Testez depuis la VM elle-même :**
+   - Ouvrez un navigateur sur la VM et allez à `http://localhost:8000`
+   - Si ça fonctionne, le problème vient du réseau, pas de l'application
+
+### URLs utiles
+
+Une fois l'application accessible, voici les URLs importantes :
+
+- **Interface principale :** `http://IP_DE_LA_VM:8000`
+- **Documentation API :** `http://IP_DE_LA_VM:8000/docs`
+- **Liste des posts (API) :** `http://IP_DE_LA_VM:8000/posts?limit=10`
+
+---
+
+#### Étape 9 : Gérer l'application (arrêter, redémarrer, vérifier le statut)
+
+L'application fournit des scripts simples pour la gestion. Utilisez-les ainsi :
+
+**Vérifier le statut :**
+```bash
+cd ~/apps/complaints_tracker
+./status.sh
+```
+
+**Arrêter l'application :**
+```bash
+cd ~/apps/complaints_tracker
+./stop.sh
+```
+
+**Redémarrer l'application :**
+```bash
+cd ~/apps/complaints_tracker
+./stop.sh
+./start.sh
+```
+
+**Voir les logs (pour déboguer) :**
+```bash
+cd ~/apps/complaints_tracker/backend
+tail -f server.log
+```
+
+> 💡 **Astuce** : Si les scripts ne fonctionnent pas, vous pouvez les rendre exécutables avec : `chmod +x start.sh stop.sh status.sh backup.sh`
+    else
+        echo "❌ Serveur arrêté (PID fichier existe mais processus mort)"
+    fi
+else
+    # Chercher le processus
+    if pgrep -f "uvicorn app.main:app" > /dev/null; then
+        echo "⚠️  Serveur en cours d'exécution mais fichier PID manquant"
+        pgrep -f "uvicorn app.main:app"
+    else
+        echo "❌ Serveur arrêté"
+    fi
+fi
+```
+
+Rendre les scripts exécutables :
+
+```bash
+chmod +x ~/apps/complaints_tracker/start.sh
+chmod +x ~/apps/complaints_tracker/stop.sh
+chmod +x ~/apps/complaints_tracker/status.sh
+chmod +x ~/apps/complaints_tracker/backup.sh
+```
+
+**Note :** Ces scripts sont également disponibles à la racine du projet. Si vous avez cloné le dépôt, vous pouvez les utiliser directement depuis le répertoire du projet :
+
+```bash
+cd ~/apps/complaints_tracker
+./start.sh    # Démarrer l'application
+./stop.sh     # Arrêter l'application
+./status.sh   # Vérifier le statut
+./backup.sh   # Sauvegarder la base de données
+```
+
+#### Étape 10 : Automatiser le démarrage (optionnel)
+
+Si vous voulez que l'application démarre automatiquement quand vous vous connectez à la VM :
+
+```bash
+# Éditer le fichier de configuration
+nano ~/.bashrc
+```
+
+Ajoutez ces lignes à la fin du fichier :
+
+```bash
+# Démarrer l'application OVH Tracker automatiquement
+if [ -f "$HOME/apps/complaints_tracker/start.sh" ]; then
+    if ! pgrep -f "uvicorn app.main:app" > /dev/null; then
+        sleep 2
+        bash "$HOME/apps/complaints_tracker/start.sh" > /dev/null 2>&1 &
+    fi
+fi
+```
+
+Sauvegardez avec `Ctrl+O`, `Enter`, puis `Ctrl+X`.
+
+> ⚠️ **Note** : Cette méthode fonctionne seulement si vous vous connectez en SSH. Pour un démarrage automatique au boot de la VM, vous aurez besoin de l'aide d'un administrateur système.
+
+---
+
+## 📝 Résumé des commandes utiles
+
+Voici un résumé des commandes les plus utiles :
+
+**Gestion de l'application :**
+```bash
+cd ~/apps/complaints_tracker
+./start.sh      # Démarrer l'application
+./stop.sh       # Arrêter l'application
+./status.sh     # Vérifier le statut
+./backup.sh     # Sauvegarder la base de données
+```
+
+**Voir les logs :**
+```bash
+tail -f ~/apps/complaints_tracker/backend/server.log
+```
+
+**Trouver l'IP de la VM :**
+```bash
+hostname -I
+```
+
+**Tester que l'application fonctionne :**
+```bash
+curl http://localhost:8000/docs
+```
+
+**Redémarrer l'application :**
+```bash
+cd ~/apps/complaints_tracker
+./stop.sh
+./start.sh
+```
+
+#### Dépannage sans sudo
+
+**Problème : Port déjà utilisé**
+
+```bash
+# Trouver le processus utilisant le port
+lsof -i :8000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 8000
+
+# Si c'est votre processus, l'arrêter
+~/apps/complaints_tracker/stop.sh
+
+# Si c'est un autre processus, utiliser un autre port
+# Modifier start.sh pour utiliser --port 8001
+```
+
+**Problème : Permission refusée sur le port**
+
+```bash
+# Utiliser un port > 1024 (non-privilégié)
+# Modifier start.sh pour utiliser --port 8080
+```
+
+**Problème : Base de données verrouillée**
+
+```bash
+# Vérifier les processus utilisant la DB
+lsof ~/apps/complaints_tracker/backend/data.db 2>/dev/null
+
+# Arrêter tous les processus Python de l'application
+pkill -f "uvicorn app.main:app"
+```
+
+**Problème : Dépendances manquantes**
+
+```bash
+# Réinstaller les dépendances
+source ~/apps/complaints_tracker/venv/bin/activate
+cd ~/apps/complaints_tracker/backend
+pip install --force-reinstall -r requirements.txt
+```
+
+### Option 2 : Déploiement avec Systemd (Linux avec sudo)
 
 #### 1. Préparer le Serveur
 
@@ -350,6 +856,8 @@ LOG_LEVEL=INFO
 
 ### Mettre à Jour l'Application
 
+**Avec sudo (Systemd) :**
+
 ```bash
 # Se connecter au serveur
 ssh user@votre-serveur
@@ -370,7 +878,34 @@ pip install -r requirements.txt --upgrade
 sudo systemctl start ovh-tracker
 ```
 
+**Sans sudo (Installation manuelle) :**
+
+```bash
+# Se connecter au serveur
+ssh user@votre-vm
+
+# Arrêter l'application
+~/apps/complaints_tracker/stop.sh
+
+# Mettre à jour le code
+cd ~/apps/complaints_tracker
+git pull origin master
+
+# Mettre à jour les dépendances
+source venv/bin/activate
+cd backend
+pip install -r requirements.txt --upgrade
+
+# Redémarrer l'application
+~/apps/complaints_tracker/start.sh
+
+# Vérifier le statut
+~/apps/complaints_tracker/status.sh
+```
+
 ### Sauvegardes
+
+**Avec sudo (Systemd) :**
 
 ```bash
 # Script de sauvegarde quotidienne
@@ -388,7 +923,35 @@ Ajoutez au crontab :
 0 2 * * * /path/to/backup-script.sh
 ```
 
+**Sans sudo (Installation manuelle) :**
+
+```bash
+# Créer le script de sauvegarde
+cat > ~/apps/complaints_tracker/backup.sh << 'EOF'
+#!/bin/bash
+BACKUP_DIR="$HOME/backups/ovh-tracker"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p "$BACKUP_DIR"
+cp "$HOME/apps/complaints_tracker/backend/data.db" "$BACKUP_DIR/data_$DATE.db"
+# Garder seulement les 30 derniers backups
+find "$BACKUP_DIR" -name "data_*.db" -mtime +30 -delete
+echo "Sauvegarde effectuée: $BACKUP_DIR/data_$DATE.db"
+EOF
+
+chmod +x ~/apps/complaints_tracker/backup.sh
+
+# Tester la sauvegarde
+~/apps/complaints_tracker/backup.sh
+
+# Ajouter au crontab (sans sudo)
+crontab -e
+# Ajouter cette ligne pour une sauvegarde quotidienne à 2h du matin
+# 0 2 * * * $HOME/apps/complaints_tracker/backup.sh >> $HOME/backups/ovh-tracker/backup.log 2>&1
+```
+
 ### Logs
+
+**Avec sudo (Systemd) :**
 
 ```bash
 # Voir les logs du service
@@ -399,9 +962,27 @@ sudo tail -f /var/log/nginx/ovh-tracker-access.log
 sudo tail -f /var/log/nginx/ovh-tracker-error.log
 ```
 
+**Sans sudo (Installation manuelle) :**
+
+```bash
+# Voir les logs du serveur
+tail -f ~/apps/complaints_tracker/backend/server.log
+
+# Voir les dernières lignes
+tail -n 100 ~/apps/complaints_tracker/backend/server.log
+
+# Chercher des erreurs
+grep -i error ~/apps/complaints_tracker/backend/server.log
+
+# Voir les logs du frontend (si servi séparément)
+tail -f ~/apps/complaints_tracker/frontend.log
+```
+
 ## Dépannage
 
 ### Le Service ne Démarre Pas
+
+**Avec sudo (Systemd) :**
 
 ```bash
 # Vérifier les logs
@@ -412,6 +993,31 @@ sudo chown -R ovh-tracker:ovh-tracker /home/ovh-tracker/complaints_tracker
 
 # Vérifier le port
 sudo netstat -tlnp | grep 8000
+```
+
+**Sans sudo (Installation manuelle) :**
+
+```bash
+# Vérifier les logs
+tail -n 50 ~/apps/complaints_tracker/backend/server.log
+
+# Vérifier le statut
+~/apps/complaints_tracker/status.sh
+
+# Vérifier les processus
+ps aux | grep uvicorn
+
+# Vérifier le port
+netstat -tlnp 2>/dev/null | grep 8000 || ss -tlnp | grep 8000
+
+# Vérifier les permissions
+ls -la ~/apps/complaints_tracker/backend/data.db
+ls -la ~/apps/complaints_tracker/backend/server.log
+
+# Tester manuellement
+source ~/apps/complaints_tracker/venv/bin/activate
+cd ~/apps/complaints_tracker/backend
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Erreurs de Connexion

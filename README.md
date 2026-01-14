@@ -127,8 +127,34 @@ frontend/
 ### Prerequisites
 
 - **Python 3.11 or 3.12** (Python 3.13 has compatibility issues with snscrape)
+- **Git** (for cloning the repository)
 - Internet connection (for scraping)
 - Modern web browser
+
+### Installation Options
+
+**Option 1: Automatic Installation (Recommended for Linux VMs)**
+
+```bash
+# Download and run the installation script
+curl -O https://raw.githubusercontent.com/thomaslorineau/complaints_tracker/master/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+The script will automatically:
+- ✅ Check Python and Git installation
+- ✅ Download the application
+- ✅ Create virtual environment
+- ✅ Install all dependencies
+- ✅ Configure the application
+
+Then start the application:
+```bash
+./start.sh
+```
+
+**Option 2: Manual Installation**
 
 ### 1. Setup Environment
 
