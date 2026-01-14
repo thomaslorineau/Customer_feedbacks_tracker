@@ -95,6 +95,15 @@ info "Mise à jour du code depuis GitHub..."
 
 # Vérifier s'il y a des modifications locales (en excluant data.db et autres fichiers de DB)
 HAS_CHANGES=false
+
+# D'abord, résoudre les conflits avec data.db s'il y en a
+if git status --porcelain 2>/dev/null | grep -q "^UU.*backend/data.db\|^AA.*backend/data.db"; then
+    warning "Conflit de merge détecté avec data.db, résolution automatique..."
+    info "Conservation de la version locale de data.db..."
+    git checkout --ours backend/data.db 2>/dev/null || true
+    git add backend/data.db 2>/dev/null || true
+fi
+
 # Exclure les fichiers de base de données et autres fichiers qui ne doivent pas être versionnés
 EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/*.db' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__'"
 
