@@ -1088,9 +1088,96 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
-    """Serve the frontend HTML file."""
+    """Serve the frontend HTML file based on UI_VERSION config."""
+    # Check for UI version in .app_config or environment variable
+    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
+    ui_version = "v1"  # default
+    
+    if app_config_path.exists():
+        with open(app_config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("UI_VERSION="):
+                    ui_version = line.split("=", 1)[1].strip()
+                    break
+    
+    # Also check environment variable (takes precedence)
+    ui_version = os.getenv('UI_VERSION', ui_version)
+    
+    if ui_version == "v2":
+        frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
+    else:
+        frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
+    
+    if frontend_path.exists():
+        return open(frontend_path, "r", encoding="utf-8").read()
+    else:
+        raise HTTPException(status_code=404, detail=f"Frontend {ui_version} not found")
+
+
+@app.get("/v1", response_class=HTMLResponse)
+async def serve_frontend_v1():
+    """Serve the v1 frontend HTML file."""
     frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
     if frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
-        raise HTTPException(status_code=404, detail="Frontend not found")
+        raise HTTPException(status_code=404, detail="Frontend v1 not found")
+
+
+@app.get("/v2", response_class=HTMLResponse)
+async def serve_frontend_v2():
+    """Serve the v2 frontend HTML file."""
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
+    if frontend_path.exists():
+        return open(frontend_path, "r", encoding="utf-8").read()
+    else:
+        raise HTTPException(status_code=404, detail="Frontend v2 not found")
+
+
+@app.post("/admin/set-ui-version")
+async def set_ui_version(version: dict):
+    """Set the UI version (v1 or v2)."""
+    version_str = version.get("version") if isinstance(version, dict) else version
+    if version_str not in ["v1", "v2"]:
+        raise HTTPException(status_code=400, detail="Version must be 'v1' or 'v2'")
+    
+    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
+    
+    # Read existing config
+    config_lines = []
+    if app_config_path.exists():
+        with open(app_config_path, "r", encoding="utf-8") as f:
+            config_lines = f.readlines()
+    
+    # Update or add UI_VERSION
+    updated = False
+    for i, line in enumerate(config_lines):
+        if line.startswith("UI_VERSION="):
+            config_lines[i] = f"UI_VERSION={version_str}\n"
+            updated = True
+            break
+    
+    if not updated:
+        config_lines.append(f"UI_VERSION={version_str}\n")
+    
+    # Write back
+    with open(app_config_path, "w", encoding="utf-8") as f:
+        f.writelines(config_lines)
+    
+    return {"message": f"UI version set to {version_str}", "version": version_str}
+
+
+@app.get("/admin/get-ui-version")
+async def get_ui_version():
+    """Get the current UI version."""
+    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
+    ui_version = "v1"  # default
+    
+    if app_config_path.exists():
+        with open(app_config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("UI_VERSION="):
+                    ui_version = line.split("=", 1)[1].strip()
+                    break
+    
+    return {"version": ui_version}

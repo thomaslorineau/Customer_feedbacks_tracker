@@ -99,6 +99,46 @@
             box-shadow: 0 6px 20px var(--shadow);
         }
 
+        .version-toggle {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 1em;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px var(--shadow);
+            color: var(--text-primary);
+            font-weight: bold;
+        }
+
+        .version-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px var(--shadow);
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .version-btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+        }
+
+        .version-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
         .info-button {
             position: absolute;
             top: 20px;
@@ -631,6 +671,7 @@
 </head>
 <body>
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+    <button class="version-toggle" onclick="openVersionModal()" title="Switch UI Version">🔄 V1</button>
     <div class="container">
         <header>
             <h1>💬 OVH Customer Feedback Tracker</h1>

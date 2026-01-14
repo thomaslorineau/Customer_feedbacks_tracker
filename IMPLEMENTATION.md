@@ -503,29 +503,7 @@ cd ~/apps/complaints_tracker/backend
 tail -f server.log
 ```
 
-> 💡 **Astuce** : Si les scripts ne fonctionnent pas, vous pouvez les rendre exécutables avec : `chmod +x start.sh stop.sh status.sh backup.sh`
-    else
-        echo "❌ Serveur arrêté (PID fichier existe mais processus mort)"
-    fi
-else
-    # Chercher le processus
-    if pgrep -f "uvicorn app.main:app" > /dev/null; then
-        echo "⚠️  Serveur en cours d'exécution mais fichier PID manquant"
-        pgrep -f "uvicorn app.main:app"
-    else
-        echo "❌ Serveur arrêté"
-    fi
-fi
-```
-
-Rendre les scripts exécutables :
-
-```bash
-chmod +x ~/apps/complaints_tracker/start.sh
-chmod +x ~/apps/complaints_tracker/stop.sh
-chmod +x ~/apps/complaints_tracker/status.sh
-chmod +x ~/apps/complaints_tracker/backup.sh
-```
+> 💡 **Note** : Les scripts se rendent automatiquement exécutables. Plus besoin de faire `chmod +x` manuellement.
 
 **Note :** Ces scripts sont également disponibles à la racine du projet. Si vous avez cloné le dépôt, vous pouvez les utiliser directement depuis le répertoire du projet :
 
