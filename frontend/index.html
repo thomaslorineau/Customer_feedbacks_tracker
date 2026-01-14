@@ -2226,7 +2226,7 @@
                 }
                 
                 // Apply sentiment filter (support multi-selection)
-                if (sentimentFilter !== 'all') {
+                if (sentimentFilter !== 'all' || selectedSentiments.size > 0) {
                     // Check if we have multiple sentiments selected
                     if (selectedSentiments.size > 0) {
                         if (!selectedSentiments.has(post.sentiment_label)) {
@@ -2237,10 +2237,16 @@
                     }
                 }
                 
-                // Apply product filter
-                if (productFilter !== 'all') {
+                // Apply product filter (support multi-selection)
+                if (productFilter !== 'all' || selectedProducts.size > 0) {
                     const productLabel = getProductLabel(post.id, post.content, post.language);
-                    if (productLabel !== productFilter) {
+                    const productValue = productLabel || '';
+                    // Check if we have multiple products selected
+                    if (selectedProducts.size > 0) {
+                        if (!selectedProducts.has(productValue)) {
+                            return false;
+                        }
+                    } else if (productLabel !== productFilter) {
                         return false;
                     }
                 }
