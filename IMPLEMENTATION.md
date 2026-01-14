@@ -250,31 +250,38 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 
 Cherchez une ligne avec une adresse qui commence par `192.168.` ou `10.` ou `172.` (ce sont des adresses de réseau local).
 
-#### Étape 6 : Configuration de l'application (optionnel)
+#### Étape 6 : Configuration CORS pour l'accès réseau
 
-Cette étape est **optionnelle**. L'application fonctionne sans configuration, mais vous pouvez créer un fichier de configuration pour personnaliser certains paramètres.
+Pour permettre l'accès depuis d'autres ordinateurs du réseau, vous devez configurer CORS. Le script d'installation le fait automatiquement, mais vous pouvez le reconfigurer si nécessaire.
+
+**Méthode automatique (recommandée) :**
 
 ```bash
-# S'assurer d'être dans le dossier backend
-cd ~/apps/complaints_tracker/backend
+cd ~/apps/complaints_tracker
+./configure_cors.sh
+```
 
-# Créer le fichier de configuration
+Ce script détecte automatiquement :
+- Le hostname de la VM
+- L'IP locale
+- L'IP publique (si accessible)
+
+Puis configure le fichier `backend/.env` avec les bonnes origines CORS.
+
+**Méthode manuelle (si nécessaire) :**
+
+```bash
+cd ~/apps/complaints_tracker/backend
 nano .env
 ```
 
-Dans l'éditeur, ajoutez (remplacez `192.168.1.100` par l'IP de votre VM) :
+Ajoutez (remplacez par vos valeurs) :
 
 ```
-# Autoriser l'accès depuis d'autres ordinateurs du réseau
-CORS_ORIGINS=http://localhost:8000,http://192.168.1.100:8000,http://192.168.1.100:3000
+CORS_ORIGINS=http://localhost:8000,http://votre-hostname:8000,http://votre-ip:8000
 ```
 
-**Pour sauvegarder dans nano :**
-- Appuyez sur `Ctrl+O` (O comme "Output")
-- Appuyez sur `Enter` pour confirmer
-- Appuyez sur `Ctrl+X` pour quitter
-
-> 💡 **Note** : Si vous ne créez pas ce fichier, l'application fonctionnera quand même, mais l'accès depuis d'autres ordinateurs pourrait être limité. Vous pourrez toujours y accéder depuis la VM elle-même.
+> 💡 **Note** : Si vous ne configurez pas CORS, l'application fonctionnera depuis la VM, mais l'accès depuis d'autres ordinateurs pourrait être bloqué par le navigateur.
 
 #### Étape 7 : Démarrer l'application
 
@@ -539,6 +546,14 @@ tail -f ~/apps/complaints_tracker/backend/server.log
 **Trouver l'IP de la VM :**
 ```bash
 hostname -I
+```
+
+**Configurer CORS (si problème d'accès réseau) :**
+```bash
+cd ~/apps/complaints_tracker
+./configure_cors.sh
+./stop.sh
+./start.sh
 ```
 
 **Tester que l'application fonctionne :**

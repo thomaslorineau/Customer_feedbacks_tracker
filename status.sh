@@ -78,9 +78,10 @@ fi
 
 echo ""
 echo "📋 Commandes utiles:"
-echo "   Démarrage:  ./start.sh"
-echo "   Arrêt:      ./stop.sh"
-echo "   Statut:     ./status.sh"
-echo "   Diagnostic: ./check_access.sh"
-echo "   Logs:       tail -f $APP_DIR/backend/server.log"
+echo "   Démarrage:     ./start.sh"
+echo "   Arrêt:         ./stop.sh"
+echo "   Statut:        ./status.sh"
+echo "   Config CORS:   ./configure_cors.sh"
+echo "   Diagnostic:    ./check_access.sh"
+echo "   Logs:          tail -f $APP_DIR/backend/server.log"
 

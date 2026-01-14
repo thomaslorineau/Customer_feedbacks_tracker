@@ -10,6 +10,17 @@ if [ ! -d "venv" ]; then
     exit 1
 fi
 
+# Vérifier la configuration CORS
+if [ ! -f "backend/.env" ]; then
+    echo "⚠️  Fichier .env introuvable. Configuration CORS automatique..."
+    if [ -f "configure_cors.sh" ]; then
+        ./configure_cors.sh
+    else
+        echo "⚠️  Script configure_cors.sh non trouvé"
+        echo "   Créez backend/.env manuellement avec CORS_ORIGINS"
+    fi
+fi
+
 # Vérifier si le serveur tourne déjà
 if [ -f server.pid ]; then
     PID=$(cat server.pid)
