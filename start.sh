@@ -139,6 +139,19 @@ if ps -p $PID > /dev/null 2>&1; then
             IP=$(ip addr show 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1)
         fi
         
+        # Vérifier si un alias host a été configuré
+        HOST_ALIAS=""
+        HOST_ALIAS_IP=""
+        HOST_ALIAS_LINE=""
+        if [ -f "$APP_DIR/.host_alias" ]; then
+            HOST_ALIAS_LINE=$(cat "$APP_DIR/.host_alias")
+            HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
+            HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
+        fi
+        
+        # Détecter le hostname
+        HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+        
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "🌐 ACCÈS À L'APPLICATION"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -146,8 +159,26 @@ if ps -p $PID > /dev/null 2>&1; then
         echo "📍 Depuis cette VM :"
         echo "   http://localhost:8000"
         echo ""
-        if [ -n "$IP" ]; then
-            echo "📍 Depuis un autre ordinateur sur le même réseau :"
+        
+        # Priorité : alias configuré > hostname > IP
+        if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
+            echo "📍 Depuis un autre ordinateur sur le même réseau local (alias) :"
+            echo "   http://$HOST_ALIAS:8000"
+            echo ""
+            echo "💡 Partagez cette URL avec vos collègues :"
+            echo "   http://$HOST_ALIAS:8000"
+            echo ""
+            echo "⚠️  Important : Vos collègues doivent ajouter dans /etc/hosts (Linux/Mac) ou"
+            echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+            echo "   $HOST_ALIAS_LINE"
+        elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
+            echo "📍 Depuis un autre ordinateur sur le même réseau local (hostname) :"
+            echo "   http://$HOSTNAME_FULL:8000"
+            echo ""
+            echo "💡 Partagez cette URL avec vos collègues :"
+            echo "   http://$HOSTNAME_FULL:8000"
+        elif [ -n "$IP" ]; then
+            echo "📍 Depuis un autre ordinateur sur le même réseau local :"
             echo "   http://$IP:8000"
             echo ""
             echo "💡 Partagez cette URL avec vos collègues :"
