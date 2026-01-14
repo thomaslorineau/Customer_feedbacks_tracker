@@ -64,17 +64,54 @@ fi
 echo $PID > "$APP_DIR/backend/server.pid"
 
 # Attendre un peu pour vérifier que le serveur démarre correctement
-sleep 3
+echo "⏳ Attente du démarrage du serveur..."
+for i in {1..10}; do
+    sleep 1
+    if ps -p $PID > /dev/null 2>&1; then
+        # Vérifier que le port est écouté
+        if command -v lsof > /dev/null 2>&1; then
+            if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+                # Vérifier que c'est bien sur 0.0.0.0
+                LISTEN_ADDR=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
+                if echo "$LISTEN_ADDR" | grep -q "0.0.0.0\|::"; then
+                    break
+                fi
+            fi
+        elif command -v netstat > /dev/null 2>&1; then
+            if netstat -tlnp 2>/dev/null | grep -q ":8000 "; then
+                break
+            fi
+        elif command -v ss > /dev/null 2>&1; then
+            if ss -tlnp 2>/dev/null | grep -q ":8000 "; then
+                break
+            fi
+        fi
+    else
+        echo "❌ Le processus s'est arrêté immédiatement"
+        echo "📋 Vérifiez les logs: tail -20 $APP_DIR/backend/server.log"
+        rm -f "$APP_DIR/backend/server.pid"
+        exit 1
+    fi
+    echo -n "."
+done
+echo ""
 
 # Vérifier que le processus tourne toujours
 if ps -p $PID > /dev/null 2>&1; then
-    # Vérifier aussi que le port est bien écouté
-    sleep 1
+    # Vérifier que le port est bien écouté sur 0.0.0.0
+    PORT_OK=false
     if command -v lsof > /dev/null 2>&1; then
-        if ! lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-            echo "⚠️  Le processus démarre mais le port n'est pas encore écouté, attente..."
-            sleep 2
+        LISTEN_ADDR=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
+        if echo "$LISTEN_ADDR" | grep -q "0.0.0.0\|::"; then
+            PORT_OK=true
+        elif echo "$LISTEN_ADDR" | grep -q "127.0.0.1"; then
+            echo "⚠️  ATTENTION: Le serveur écoute seulement sur localhost (127.0.0.1)"
+            echo "   Il ne sera PAS accessible depuis le réseau"
+            echo "   Le serveur devrait écouter sur 0.0.0.0"
         fi
+    else
+        # Si lsof n'est pas disponible, on suppose que c'est OK
+        PORT_OK=true
     fi
     
     if ps -p $PID > /dev/null 2>&1; then
@@ -111,6 +148,12 @@ if ps -p $PID > /dev/null 2>&1; then
         echo ""
         echo "📚 Documentation API : http://localhost:8000/docs"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "⚠️  Si l'accès ne fonctionne pas depuis un autre ordinateur :"
+        echo "   1. Vérifiez que les deux machines sont sur le même réseau"
+        echo "   2. Vérifiez le firewall de la VM"
+        echo "   3. Exécutez le diagnostic: ./check_access.sh"
+        echo "   4. Vérifiez les logs: tail -f $APP_DIR/backend/server.log"
     else
         echo "❌ Le processus s'est arrêté immédiatement"
         echo "📋 Vérifiez les logs: tail -f $APP_DIR/backend/server.log"

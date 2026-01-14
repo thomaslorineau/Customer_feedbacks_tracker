@@ -171,7 +171,7 @@ echo ""
 info "Configuration des scripts de gestion..."
 
 cd ..
-chmod +x start.sh stop.sh status.sh backup.sh 2>/dev/null || true
+chmod +x start.sh stop.sh status.sh backup.sh check_access.sh 2>/dev/null || true
 
 success "Scripts configurés"
 echo ""
