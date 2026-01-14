@@ -188,13 +188,27 @@ echo ""
 
 # 8. Vérifier si on est dans Docker et proposer remapping
 echo "8️⃣  Vérification Docker..."
-if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+IN_DOCKER=false
+
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null || [[ "$HOSTNAME_FULL" == *"docker"* ]] || [[ "$HOSTNAME_FULL" == *".sdev-docker"* ]]; then
+    IN_DOCKER=true
     echo "   ✅ Vous êtes dans un conteneur Docker"
     CONTAINER_NAME=$(hostname)
     echo "   Nom du conteneur: $CONTAINER_NAME"
+    echo "   Hostname: $HOSTNAME_FULL"
     echo ""
     echo "   ℹ️  L'application écoute sur le port $APP_PORT dans le conteneur"
     echo "   💡 Assurez-vous que ce port est accessible depuis l'extérieur"
+    
+    # Si on est dans Docker et que le port n'est pas configuré, proposer de le configurer
+    if [ ! -f "backend/.app_config" ]; then
+        echo ""
+        echo "   ⚠️  Port non configuré (utilise le port par défaut 8000)"
+        echo "   💡 Pour configurer le port (ex: 11840), exécutez :"
+        echo "      echo 'APP_PORT=11840' > backend/.app_config"
+        echo "      ./stop.sh && ./start.sh"
+    fi
 else
     echo "   ℹ️  Vous n'êtes pas dans un conteneur Docker"
 fi
@@ -235,7 +249,7 @@ if [ -n "$IP" ]; then
     fi
     
     # Vérifier si on est dans Docker
-    if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+    if [ "$IN_DOCKER" = true ]; then
         echo "⚠️  Vous êtes dans un conteneur Docker"
         echo "   L'application écoute sur le port $APP_PORT"
         echo "   Utilisez l'IP publique avec le port $APP_PORT :"

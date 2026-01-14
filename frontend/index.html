@@ -1151,8 +1151,8 @@
                 return `http://${window.location.hostname}:8000`;
             }
             // Sinon, utiliser le même hostname et port que la page actuelle
-            // Le backend tourne sur le même port que le frontend
-            const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+            // Si le port est dans l'URL, l'utiliser, sinon utiliser le port par défaut 11840 pour Docker OVH
+            const port = window.location.port || '11840';
             return `${window.location.protocol}//${window.location.hostname}:${port}`;
         }
         
