@@ -250,7 +250,51 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 
 Cherchez une ligne avec une adresse qui commence par `192.168.` ou `10.` ou `172.` (ce sont des adresses de réseau local).
 
-#### Étape 6 : Configuration CORS pour l'accès réseau
+#### Étape 6 : Configuration Docker (si applicable)
+
+**Si vous êtes dans un conteneur Docker :**
+
+Le script d'installation détecte automatiquement si vous êtes dans un conteneur Docker et vous propose de configurer le mapping de port.
+
+**Configuration du mapping de port Docker :**
+
+Pour rendre l'application accessible depuis l'extérieur du conteneur, le port 8000 du conteneur doit être mappé vers un port externe (ex: 11840).
+
+**Méthode automatique (lors de l'installation) :**
+
+Le script `install.sh` vous demande le port externe à utiliser. Si vous le configurez, vous devrez redémarrer le conteneur depuis l'hôte Docker avec le mapping.
+
+**Méthode manuelle :**
+
+```bash
+# Voir les instructions détaillées
+cd ~/apps/complaints_tracker
+./docker_port_mapping.sh
+```
+
+**Commandes à exécuter depuis l'HÔTE Docker (pas dans le conteneur) :**
+
+```bash
+# 1. Arrêter le conteneur
+docker stop [nom-du-conteneur]
+
+# 2. Créer une image du conteneur
+docker commit [nom-du-conteneur] ovh-tracker:latest
+
+# 3. Supprimer l'ancien conteneur
+docker rm [nom-du-conteneur]
+
+# 4. Recréer avec mapping de port (remplacez 11840 par votre port)
+docker run -d -p 11840:8000 --name [nom-du-conteneur] ovh-tracker:latest
+```
+
+**Configuration d'un alias host (optionnel) :**
+
+Lors de l'installation, vous pouvez configurer un alias host pour un accès plus simple (ex: `ovh-tracker.local`).
+
+Le script vous demande si vous souhaitez configurer un alias et vous donne les instructions pour l'ajouter dans `/etc/hosts` (Linux/Mac) ou `C:\Windows\System32\drivers\etc\hosts` (Windows).
+
+#### Étape 7 : Configuration CORS pour l'accès réseau
 
 Pour permettre l'accès depuis d'autres ordinateurs du réseau, vous devez configurer CORS. Le script d'installation le fait automatiquement, mais vous pouvez le reconfigurer si nécessaire.
 
@@ -283,7 +327,7 @@ CORS_ORIGINS=http://localhost:8000,http://votre-hostname:8000,http://votre-ip:80
 
 > 💡 **Note** : Si vous ne configurez pas CORS, l'application fonctionnera depuis la VM, mais l'accès depuis d'autres ordinateurs pourrait être bloqué par le navigateur.
 
-#### Étape 7 : Démarrer l'application
+#### Étape 8 : Démarrer l'application
 
 Il y a deux façons de démarrer l'application :
 
@@ -435,7 +479,7 @@ Une fois l'application accessible, voici les URLs importantes :
 
 ---
 
-#### Étape 9 : Gérer l'application (arrêter, redémarrer, vérifier le statut)
+#### Étape 10 : Gérer l'application (arrêter, redémarrer, vérifier le statut)
 
 L'application fournit des scripts simples pour la gestion. Utilisez-les ainsi :
 
@@ -498,7 +542,7 @@ cd ~/apps/complaints_tracker
 ./backup.sh   # Sauvegarder la base de données
 ```
 
-#### Étape 10 : Automatiser le démarrage (optionnel)
+#### Étape 11 : Automatiser le démarrage (optionnel)
 
 Si vous voulez que l'application démarre automatiquement quand vous vous connectez à la VM :
 
