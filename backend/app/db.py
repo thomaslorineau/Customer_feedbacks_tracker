@@ -183,3 +183,73 @@ def get_saved_queries():
     rows = c.fetchall()
     conn.close()
     return [r[0] for r in rows]
+
+
+def delete_duplicate_posts():
+    """
+    Delete duplicate posts from the database.
+    Duplicates are identified by:
+    1. Same URL (keep the oldest post with lowest ID)
+    2. Same content + author + source (keep the oldest post with lowest ID)
+    Returns the number of deleted posts.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    deleted_count = 0
+    
+    # First, delete duplicates by URL (keep the oldest post)
+    c.execute('''
+        DELETE FROM posts
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM posts
+            WHERE url IS NOT NULL AND url != ''
+            GROUP BY url
+        )
+        AND url IS NOT NULL AND url != ''
+    ''')
+    deleted_count += c.rowcount
+    
+    # Then, delete duplicates by content + author + source (keep the oldest post)
+    c.execute('''
+        DELETE FROM posts
+        WHERE id NOT IN (
+            SELECT MIN(id)
+            FROM posts
+            GROUP BY content, author, source
+        )
+    ''')
+    deleted_count += c.rowcount
+    
+    conn.commit()
+    conn.close()
+    return deleted_count
+
+
+def delete_non_ovh_posts():
+    """
+    Delete all posts that do NOT mention OVH or its brands.
+    Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+    Returns the number of deleted posts.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    # Delete posts that don't contain OVH-related keywords
+    c.execute('''
+        DELETE FROM posts
+        WHERE (
+            LOWER(content) NOT LIKE '%ovh%'
+            AND LOWER(content) NOT LIKE '%ovhcloud%'
+            AND LOWER(content) NOT LIKE '%ovh cloud%'
+            AND LOWER(content) NOT LIKE '%kimsufi%'
+            AND LOWER(content) NOT LIKE '%soyoustart%'
+            AND LOWER(author) NOT LIKE '%ovh%'
+            AND LOWER(url) NOT LIKE '%ovh%'
+        )
+    ''')
+    
+    deleted_count = c.rowcount
+    conn.commit()
+    conn.close()
+    return deleted_count
