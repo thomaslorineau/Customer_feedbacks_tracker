@@ -5,39 +5,118 @@ echo "🐳 Configuration du mapping de port Docker"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Détecter l'environnement
+IN_CONTAINER=false
+ON_DOCKER_HOST=false
+CONTAINER_NAME=""
+HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+
 # Vérifier si on est dans un conteneur Docker
 if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
-    echo "✅ Vous êtes dans un conteneur Docker"
+    IN_CONTAINER=true
     CONTAINER_NAME=$(hostname)
+fi
+
+# Vérifier si on est sur un hôte Docker (peut avoir docker command)
+if command -v docker > /dev/null 2>&1; then
+    ON_DOCKER_HOST=true
+fi
+
+# Vérifier aussi par le hostname
+if [[ "$HOSTNAME_FULL" == *"docker"* ]] || [[ "$HOSTNAME_FULL" == *".sdev-docker"* ]]; then
+    ON_DOCKER_HOST=true
+    if [ -z "$CONTAINER_NAME" ]; then
+        CONTAINER_NAME=$(hostname)
+    fi
+fi
+
+if [ "$IN_CONTAINER" = true ]; then
+    echo "✅ Vous êtes dans un conteneur Docker"
     echo "   Nom du conteneur: $CONTAINER_NAME"
     echo ""
     echo "⚠️  Pour rendre l'application accessible depuis l'extérieur,"
     echo "   le port doit être mappé depuis l'hôte Docker."
     echo ""
-    echo "📋 Commandes à exécuter depuis l'HÔTE Docker (pas dans le conteneur) :"
+    echo "📋 Commandes à exécuter depuis l'HÔTE Docker :"
     echo ""
-    echo "1. Arrêter le conteneur actuel (si nécessaire) :"
+    echo "1. Trouver le nom/ID du conteneur :"
+    echo "   docker ps"
+    echo ""
+    echo "2. Arrêter le conteneur actuel :"
     echo "   docker stop $CONTAINER_NAME"
     echo ""
-    echo "2. Démarrer avec mapping de port (remplacez EXTERNAL_PORT par un port disponible, ex: 11840) :"
-    echo "   docker run -d -p EXTERNAL_PORT:8000 --name $CONTAINER_NAME [votre-image]"
-    echo ""
-    echo "   Exemple avec le port 11840 :"
-    echo "   docker run -d -p 11840:8000 --name $CONTAINER_NAME [votre-image]"
-    echo ""
-    echo "3. Ou si le conteneur existe déjà, utilisez docker commit puis recréez :"
+    echo "3. Créer une image du conteneur :"
     echo "   docker commit $CONTAINER_NAME ovh-tracker:latest"
-    echo "   docker stop $CONTAINER_NAME"
+    echo ""
+    echo "4. Supprimer l'ancien conteneur :"
     echo "   docker rm $CONTAINER_NAME"
+    echo ""
+    echo "5. Recréer avec mapping de port (remplacez 11840 par votre port) :"
     echo "   docker run -d -p 11840:8000 --name $CONTAINER_NAME ovh-tracker:latest"
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "💡 Ports couramment utilisés sur OVH : 11840, 11841, 11842, etc."
     echo "   Vérifiez les ports disponibles avec : docker ps"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+elif [ "$ON_DOCKER_HOST" = true ]; then
+    echo "ℹ️  Vous êtes sur un serveur Docker (hôte ou conteneur)"
+    echo "   Hostname: $HOSTNAME_FULL"
+    echo ""
+    
+    # Vérifier si docker est disponible
+    if command -v docker > /dev/null 2>&1; then
+        echo "✅ Docker est disponible"
+        echo ""
+        echo "📋 Vérification des conteneurs en cours :"
+        echo ""
+        docker ps --format "table {{.Names}}\t{{.Ports}}\t{{.Status}}" 2>/dev/null || echo "   Impossible d'exécuter docker ps"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📋 Pour mapper le port d'un conteneur existant :"
+        echo ""
+        echo "1. Trouver le conteneur qui exécute l'application :"
+        echo "   docker ps"
+        echo ""
+        echo "2. Arrêter le conteneur :"
+        echo "   docker stop [NOM_DU_CONTENEUR]"
+        echo ""
+        echo "3. Créer une image :"
+        echo "   docker commit [NOM_DU_CONTENEUR] ovh-tracker:latest"
+        echo ""
+        echo "4. Supprimer l'ancien conteneur :"
+        echo "   docker rm [NOM_DU_CONTENEUR]"
+        echo ""
+        echo "5. Recréer avec mapping de port (exemple avec port 11840) :"
+        echo "   docker run -d -p 11840:8000 --name [NOM_DU_CONTENEUR] ovh-tracker:latest"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "💡 Ports couramment utilisés sur OVH : 11840, 11841, 11842, etc."
+        echo ""
+        echo "⚠️  Si l'application tourne directement (pas dans Docker),"
+        echo "   vous n'avez pas besoin de mapping de port."
+        echo "   Utilisez simplement l'IP ou hostname avec le port 8000."
+    else
+        echo "⚠️  Docker n'est pas disponible dans ce contexte"
+        echo ""
+        echo "Si vous êtes dans un conteneur, le mapping doit être configuré"
+        echo "depuis l'hôte Docker qui gère ce conteneur."
+    fi
 else
-    echo "ℹ️  Vous n'êtes pas dans un conteneur Docker"
-    echo "   Ce script est destiné à être exécuté dans un conteneur Docker"
+    echo "ℹ️  Environnement standard (non-Docker détecté)"
+    echo ""
+    echo "Si vous êtes dans un conteneur Docker mais que la détection a échoué,"
+    echo "vous pouvez quand même utiliser ces instructions :"
+    echo ""
+    echo "📋 Pour mapper le port depuis l'hôte Docker :"
+    echo ""
+    echo "1. Trouver le conteneur :"
+    echo "   docker ps"
+    echo ""
+    echo "2. Arrêter et recréer avec mapping (exemple port 11840) :"
+    echo "   docker stop [NOM_CONTENEUR]"
+    echo "   docker commit [NOM_CONTENEUR] ovh-tracker:latest"
+    echo "   docker rm [NOM_CONTENEUR]"
+    echo "   docker run -d -p 11840:8000 --name [NOM_CONTENEUR] ovh-tracker:latest"
 fi
 echo ""
 
