@@ -4,6 +4,23 @@
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
+# Fonction pour obtenir le hostname depuis une IP (reverse DNS)
+get_hostname_from_ip() {
+    local ip=$1
+    local hostname=""
+    
+    # Essayer différentes méthodes de reverse DNS
+    if command -v host > /dev/null 2>&1; then
+        hostname=$(host "$ip" 2>/dev/null | grep "domain name pointer" | awk '{print $5}' | sed 's/\.$//' || echo "")
+    elif command -v nslookup > /dev/null 2>&1; then
+        hostname=$(nslookup "$ip" 2>/dev/null | grep "name" | awk '{print $4}' | head -1 || echo "")
+    elif command -v dig > /dev/null 2>&1; then
+        hostname=$(dig +short -x "$ip" 2>/dev/null | sed 's/\.$//' || echo "")
+    fi
+    
+    echo "$hostname"
+}
+
 # Fonction pour lire le port configuré
 get_app_port() {
     local port=8000  # Port par défaut
@@ -242,11 +259,20 @@ if [ -n "$IP" ]; then
         echo "   💡 Ajoutez dans /etc/hosts (Linux/Mac) ou C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
         echo "      $HOST_ALIAS_LINE"
         echo ""
-        # Afficher aussi l'IP publique
+        # Afficher aussi l'IP publique avec reverse DNS
         IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
         if [ -n "$IP_PUBLIC" ]; then
-            echo "🌐 URL pour accès INTERNET (IP publique - pas d'alias possible) :"
-            echo "   http://$IP_PUBLIC:$APP_PORT"
+            HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+            if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                echo "🌐 URL pour accès INTERNET (HOSTNAME) :"
+                echo "   http://$HOSTNAME_PUBLIC:$APP_PORT"
+                echo ""
+                echo "   Ou directement par IP :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+            else
+                echo "🌐 URL pour accès INTERNET (IP publique - pas d'alias possible) :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+            fi
             echo ""
         fi
     elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
@@ -260,10 +286,16 @@ if [ -n "$IP" ]; then
     if [ "$IN_DOCKER" = true ]; then
         echo "⚠️  Vous êtes dans un conteneur Docker"
         echo "   L'application écoute sur le port $APP_PORT"
-        echo "   Utilisez l'IP publique avec le port $APP_PORT :"
+        echo "   Utilisez l'IP publique ou le hostname avec le port $APP_PORT :"
         IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
         if [ -n "$IP_PUBLIC" ]; then
-            echo "   http://$IP_PUBLIC:$APP_PORT"
+            HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+            if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                echo "   http://$HOSTNAME_PUBLIC:$APP_PORT (hostname)"
+                echo "   http://$IP_PUBLIC:$APP_PORT (IP directe)"
+            else
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+            fi
         else
             echo "   http://IP_PUBLIQUE:$APP_PORT"
         fi
@@ -284,9 +316,15 @@ if [ -n "$IP" ]; then
         echo ""
         IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
         if [ -n "$IP_PUBLIC" ]; then
-            echo "   📍 Depuis INTERNET (IP publique) :"
-            echo "      http://$IP_PUBLIC:$APP_PORT"
-            echo "      ⚠️  Pas d'alias possible pour l'IP publique, utilisez directement l'IP"
+            HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+            echo "   📍 Depuis INTERNET :"
+            if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                echo "      http://$HOSTNAME_PUBLIC:$APP_PORT (hostname)"
+                echo "      http://$IP_PUBLIC:$APP_PORT (IP directe)"
+            else
+                echo "      http://$IP_PUBLIC:$APP_PORT"
+                echo "      ⚠️  Pas d'alias possible pour l'IP publique, utilisez directement l'IP"
+            fi
         fi
     fi
     echo ""

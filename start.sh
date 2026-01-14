@@ -7,6 +7,23 @@ cd "$APP_DIR"
 # S'assurer que tous les scripts sont exécutables
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 
+# Fonction pour obtenir le hostname depuis une IP (reverse DNS)
+get_hostname_from_ip() {
+    local ip=$1
+    local hostname=""
+    
+    # Essayer différentes méthodes de reverse DNS
+    if command -v host > /dev/null 2>&1; then
+        hostname=$(host "$ip" 2>/dev/null | grep "domain name pointer" | awk '{print $5}' | sed 's/\.$//' || echo "")
+    elif command -v nslookup > /dev/null 2>&1; then
+        hostname=$(nslookup "$ip" 2>/dev/null | grep "name" | awk '{print $4}' | head -1 || echo "")
+    elif command -v dig > /dev/null 2>&1; then
+        hostname=$(dig +short -x "$ip" 2>/dev/null | sed 's/\.$//' || echo "")
+    fi
+    
+    echo "$hostname"
+}
+
 # Fonction pour lire le port configuré
 get_app_port() {
     local port=8000  # Port par défaut
@@ -189,11 +206,23 @@ if ps -p $PID > /dev/null 2>&1; then
             # Afficher aussi l'IP publique si disponible
             IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
             if [ -n "$IP_PUBLIC" ]; then
-                echo "📍 Depuis Internet (IP PUBLIQUE - pas d'alias possible) :"
-                echo "   http://$IP_PUBLIC:$APP_PORT"
-                echo ""
-                echo "💡 URL à partager pour accès Internet :"
-                echo "   http://$IP_PUBLIC:$APP_PORT"
+                HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+                if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                    echo "📍 Depuis Internet (HOSTNAME) :"
+                    echo "   http://$HOSTNAME_PUBLIC:$APP_PORT"
+                    echo ""
+                    echo "   Ou directement par IP :"
+                    echo "   http://$IP_PUBLIC:$APP_PORT"
+                    echo ""
+                    echo "💡 URL à partager pour accès Internet :"
+                    echo "   http://$HOSTNAME_PUBLIC:$APP_PORT"
+                else
+                    echo "📍 Depuis Internet (IP PUBLIQUE - pas d'alias possible) :"
+                    echo "   http://$IP_PUBLIC:$APP_PORT"
+                    echo ""
+                    echo "💡 URL à partager pour accès Internet :"
+                    echo "   http://$IP_PUBLIC:$APP_PORT"
+                fi
             fi
         elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
             echo "📍 Depuis un autre ordinateur sur le même réseau local (hostname) :"

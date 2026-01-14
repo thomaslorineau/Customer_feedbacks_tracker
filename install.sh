@@ -28,6 +28,23 @@ error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+# Fonction pour obtenir le hostname depuis une IP (reverse DNS)
+get_hostname_from_ip() {
+    local ip=$1
+    local hostname=""
+    
+    # Essayer différentes méthodes de reverse DNS
+    if command -v host > /dev/null 2>&1; then
+        hostname=$(host "$ip" 2>/dev/null | grep "domain name pointer" | awk '{print $5}' | sed 's/\.$//' || echo "")
+    elif command -v nslookup > /dev/null 2>&1; then
+        hostname=$(nslookup "$ip" 2>/dev/null | grep "name" | awk '{print $4}' | head -1 || echo "")
+    elif command -v dig > /dev/null 2>&1; then
+        hostname=$(dig +short -x "$ip" 2>/dev/null | sed 's/\.$//' || echo "")
+    fi
+    
+    echo "$hostname"
+}
+
 # En-tête
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🚀 Installation de OVH Customer Feedback Tracker"
@@ -246,10 +263,16 @@ if [[ $REPLY =~ ^[Oo]$ ]]; then
             echo ""
             echo "Puis accédez à : http://$HOST_ALIAS.local:$APP_PORT"
             echo ""
-            info "Pour l'accès depuis Internet (IP publique), utilisez directement :"
+            info "Pour l'accès depuis Internet (IP publique), utilisez :"
             IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
             if [ -n "$IP_PUBLIC" ]; then
-                echo "   http://$IP_PUBLIC:$APP_PORT"
+                HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+                if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                    echo "   http://$HOSTNAME_PUBLIC:$APP_PORT (hostname)"
+                    echo "   http://$IP_PUBLIC:$APP_PORT (IP directe)"
+                else
+                    echo "   http://$IP_PUBLIC:$APP_PORT"
+                fi
             else
                 echo "   http://IP_PUBLIQUE:$APP_PORT"
             fi
@@ -417,14 +440,28 @@ SHARE_METHOD=""
             SHARE_METHOD="hostname"
         fi
 
-        # 3. IP publique
+        # 3. IP publique avec reverse DNS
         if [ -n "$IP_PUBLIC" ]; then
-            echo "📍 Depuis Internet (IP PUBLIQUE) :"
-            echo "   http://$IP_PUBLIC:$APP_PORT"
-            echo ""
-            if [ -z "$URL_TO_SHARE" ]; then
-                URL_TO_SHARE="http://$IP_PUBLIC:$APP_PORT"
-                SHARE_METHOD="ip_public"
+            HOSTNAME_PUBLIC=$(get_hostname_from_ip "$IP_PUBLIC")
+            if [ -n "$HOSTNAME_PUBLIC" ] && [ "$HOSTNAME_PUBLIC" != "$IP_PUBLIC" ]; then
+                echo "📍 Depuis Internet (HOSTNAME) :"
+                echo "   http://$HOSTNAME_PUBLIC:$APP_PORT"
+                echo ""
+                echo "   Ou directement par IP :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+                echo ""
+                if [ -z "$URL_TO_SHARE" ]; then
+                    URL_TO_SHARE="http://$HOSTNAME_PUBLIC:$APP_PORT"
+                    SHARE_METHOD="hostname_public"
+                fi
+            else
+                echo "📍 Depuis Internet (IP PUBLIQUE) :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+                echo ""
+                if [ -z "$URL_TO_SHARE" ]; then
+                    URL_TO_SHARE="http://$IP_PUBLIC:$APP_PORT"
+                    SHARE_METHOD="ip_public"
+                fi
             fi
         fi
 
