@@ -829,19 +829,19 @@
         <div style="margin-bottom: 20px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.3);">
             <h3 style="color: var(--accent-primary); font-size: 0.9em; margin: 0 0 10px 0;">🔍 FILTERED RESULTS (Current View)</h3>
             <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                <div class="stat-card" onclick="filterBySentiment('')" title="Posts affichés après filtrage">
+                <div class="stat-card" onclick="filterBySentiment('', event)" title="Posts affichés après filtrage">
                     <strong id="totalPosts">0</strong>
                     <small>Total Displayed</small>
                 </div>
-                <div class="stat-card" onclick="filterBySentiment('positive')" title="Posts positifs affichés">
+                <div class="stat-card" onclick="filterBySentiment('positive', event)" title="Posts positifs affichés">
                     <strong id="positivePosts">0</strong>
                     <small>Positive</small>
                 </div>
-                <div class="stat-card" onclick="filterBySentiment('negative')" title="Posts négatifs affichés (complaints)">
+                <div class="stat-card" onclick="filterBySentiment('negative', event)" title="Posts négatifs affichés (complaints)">
                     <strong id="negativePosts">0</strong>
                     <small>Negative</small>
                 </div>
-                <div class="stat-card" onclick="filterBySentiment('neutral')" title="Posts neutres affichés">
+                <div class="stat-card" onclick="filterBySentiment('neutral', event)" title="Posts neutres affichés">
                     <strong id="neutralPosts">0</strong>
                     <small>Neutral</small>
                 </div>
@@ -915,7 +915,7 @@
                     </div>
                     <!-- Product Distribution Pie Chart -->
                     <div>
-                        <h3 style="color: var(--accent-primary); margin-bottom: 10px; text-align: center;">🥧 Distribution by Product</h3>
+                        <h3 style="color: var(--accent-primary); margin-bottom: 10px; text-align: center;">🥧 Distribution per Product</h3>
                         <p style="color: var(--text-secondary); font-size: 0.85em; text-align: center; margin-bottom: 15px; font-style: italic;">
                             Click on a slice to filter posts by that product
                         </p>
@@ -1880,6 +1880,7 @@
             const chartModal = document.getElementById('chartModal');
             const statsModal = document.getElementById('statsInfoModal');
             const postPreviewModal = document.getElementById('postPreviewModal');
+            const filteredPostsModal = document.getElementById('filteredPostsModal');
             
             if (chartModal && event.target === chartModal) {
                 closeChartModal();
@@ -1889,6 +1890,9 @@
             }
             if (postPreviewModal && event.target === postPreviewModal) {
                 closePostPreviewModal();
+            }
+            if (filteredPostsModal && event.target === filteredPostsModal) {
+                closeFilteredPostsModal();
             }
             const ideasModal = document.getElementById('ideasModal');
             if (ideasModal && event.target === ideasModal) {
@@ -1903,8 +1907,11 @@
                 const statsModal = document.getElementById('statsInfoModal');
                 const postPreviewModal = document.getElementById('postPreviewModal');
                 const ideasModal = document.getElementById('ideasModal');
+                const filteredPostsModal = document.getElementById('filteredPostsModal');
                 
-                if (ideasModal && ideasModal.style.display !== 'none') {
+                if (filteredPostsModal && filteredPostsModal.style.display !== 'none') {
+                    closeFilteredPostsModal();
+                } else if (ideasModal && ideasModal.style.display !== 'none') {
                     closeIdeasModal();
                 } else if (postPreviewModal && postPreviewModal.style.display !== 'none') {
                     closePostPreviewModal();
@@ -2218,9 +2225,16 @@
                     if (dateTo && postDate > dateTo) return false;
                 }
                 
-                // Apply sentiment filter
-                if (sentimentFilter !== 'all' && post.sentiment_label !== sentimentFilter) {
-                    return false;
+                // Apply sentiment filter (support multi-selection)
+                if (sentimentFilter !== 'all') {
+                    // Check if we have multiple sentiments selected
+                    if (selectedSentiments.size > 0) {
+                        if (!selectedSentiments.has(post.sentiment_label)) {
+                            return false;
+                        }
+                    } else if (post.sentiment_label !== sentimentFilter) {
+                        return false;
+                    }
                 }
                 
                 // Apply product filter
@@ -2495,15 +2509,27 @@
                         if (elements.length > 0) {
                             const index = elements[0].index;
                             const clickedLabel = labels[index];
-                            
-                            // Filter by product
                             const productValue = clickedLabel === 'No Product' ? '' : clickedLabel;
-                            document.getElementById('ovhProductFilter').value = productValue;
-                            currentOffset = 0;
-                            saveFilters();
-                            renderGallery();
-                            addLog(`🔍 Filtered by product: ${clickedLabel}`, 'info');
-                            showToast(`Filtered by product: ${clickedLabel}`, 'info');
+                            
+                            // Handle multi-selection with CTRL
+                            if (event.event.ctrlKey || event.event.metaKey) {
+                                // Toggle selection
+                                if (selectedProducts.has(productValue)) {
+                                    selectedProducts.delete(productValue);
+                                } else {
+                                    selectedProducts.add(productValue);
+                                }
+                            } else {
+                                // Single selection - replace
+                                selectedProducts.clear();
+                                if (productValue) {
+                                    selectedProducts.add(productValue);
+                                }
+                            }
+                            
+                            // Update filter and show posts
+                            updateProductFilterFromSelection();
+                            showFilteredPosts('product', Array.from(selectedProducts));
                         }
                     },
                     plugins: {
@@ -2520,7 +2546,7 @@
                         },
                         title: {
                             display: true,
-                            text: `Distribution by Product (${filteredPosts.length} posts)`,
+                            text: `Distribution per Product (${filteredPosts.length} posts)`,
                             color: getComputedStyle(document.body).getPropertyValue('--accent-primary').trim() || '#00d4ff',
                             font: {
                                 size: 16
@@ -2547,12 +2573,149 @@
             updateChart();
         }
 
-        function filterBySentiment(sentiment) {
-            document.getElementById('sentimentFilter').value = sentiment;
+        function filterBySentiment(sentiment, event) {
+            // Handle multi-selection with CTRL
+            if (event && (event.ctrlKey || event.metaKey)) {
+                if (selectedSentiments.has(sentiment)) {
+                    selectedSentiments.delete(sentiment);
+                } else {
+                    selectedSentiments.add(sentiment);
+                }
+            } else {
+                // Single selection - replace
+                selectedSentiments.clear();
+                if (sentiment) {
+                    selectedSentiments.add(sentiment);
+                }
+            }
+            
+            // Update filter and show posts
+            updateSentimentFilterFromSelection();
+            if (selectedSentiments.size > 0) {
+                showFilteredPosts('sentiment', Array.from(selectedSentiments));
+            } else {
+                document.getElementById('sentimentFilter').value = '';
+                currentOffset = 0;
+                saveFilters();
+                renderGallery();
+            }
+            addLog(`🔍 Filtering by sentiment: ${Array.from(selectedSentiments).join(', ') || 'All'}`, 'info');
+        }
+        
+        function updateProductFilterFromSelection() {
+            if (selectedProducts.size === 0) {
+                document.getElementById('ovhProductFilter').value = '';
+            } else if (selectedProducts.size === 1) {
+                document.getElementById('ovhProductFilter').value = Array.from(selectedProducts)[0];
+            } else {
+                // Multiple products selected - we'll handle this in the filter logic
+                document.getElementById('ovhProductFilter').value = '';
+            }
             currentOffset = 0;
             saveFilters();
             renderGallery();
-            addLog(`🔍 Filtering by sentiment: ${sentiment || 'All'}`, 'info');
+        }
+        
+        function updateSentimentFilterFromSelection() {
+            if (selectedSentiments.size === 0) {
+                document.getElementById('sentimentFilter').value = '';
+            } else if (selectedSentiments.size === 1) {
+                document.getElementById('sentimentFilter').value = Array.from(selectedSentiments)[0];
+            } else {
+                // Multiple sentiments selected - we'll handle this in the filter logic
+                document.getElementById('sentimentFilter').value = '';
+            }
+        }
+        
+        function showFilteredPosts(filterType, filterValues) {
+            let filtered = allPosts.filter(post => {
+                // Filter out sample data
+                const url = post.url || '';
+                const isSample = (
+                    url.includes('/sample') || 
+                    url.includes('example.com') ||
+                    url.includes('/status/174') ||
+                    url === 'https://trustpilot.com/sample'
+                );
+                if (isSample) return false;
+                
+                if (filterType === 'product') {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    const productValue = productLabel || '';
+                    return filterValues.includes(productValue);
+                } else if (filterType === 'sentiment') {
+                    return filterValues.includes(post.sentiment_label);
+                }
+                return false;
+            });
+            
+            // Update modal title and count
+            const modal = document.getElementById('filteredPostsModal');
+            const titleEl = document.getElementById('filteredPostsTitle');
+            const countEl = document.getElementById('filteredPostsCount');
+            const contentEl = document.getElementById('filteredPostsContent');
+            
+            if (filterType === 'product') {
+                titleEl.textContent = `📋 Posts for: ${filterValues.join(', ') || 'No Product'}`;
+            } else if (filterType === 'sentiment') {
+                titleEl.textContent = `📋 Posts with sentiment: ${filterValues.join(', ')}`;
+            }
+            
+            countEl.textContent = `${filtered.length} post${filtered.length !== 1 ? 's' : ''} found`;
+            
+            // Render posts
+            contentEl.innerHTML = '';
+            if (filtered.length === 0) {
+                contentEl.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 40px;">No posts found</p>';
+            } else {
+                filtered.forEach(post => {
+                    const postDiv = document.createElement('div');
+                    postDiv.style.cssText = 'margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--accent-primary);';
+                    
+                    const sentimentColor = post.sentiment_label === 'positive' ? '#34d399' : 
+                                          post.sentiment_label === 'negative' ? '#ef4444' : '#6b7280';
+                    
+                    postDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                            <div>
+                                <strong style="color: var(--accent-primary);">${post.source.toUpperCase()}</strong>
+                                <span style="margin-left: 10px; color: var(--text-secondary);">by ${post.author || 'Unknown'}</span>
+                                <span style="margin-left: 10px; padding: 2px 8px; background: ${sentimentColor}; color: white; border-radius: 12px; font-size: 0.85em;">
+                                    ${post.sentiment_label.toUpperCase()}
+                                </span>
+                            </div>
+                            <span style="color: var(--text-muted); font-size: 0.9em;">${new Date(post.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <p style="color: var(--text-primary); line-height: 1.6; margin-bottom: 10px;">${post.content}</p>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <a href="${post.url}" target="_blank" style="color: var(--accent-primary); text-decoration: none; font-size: 0.9em;">🔗 View Original</a>
+                            <button onclick="openPostPreview(${post.id})" style="padding: 4px 12px; background: var(--accent-primary); color: #1a1a2e; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em;">👁️ Preview</button>
+                        </div>
+                    `;
+                    contentEl.appendChild(postDiv);
+                });
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeFilteredPostsModal() {
+            document.getElementById('filteredPostsModal').style.display = 'none';
+        }
+        
+        function applyFilteredPostsToGallery() {
+            // Apply the current selection to the main gallery
+            if (selectedProducts.size > 0) {
+                updateProductFilterFromSelection();
+            }
+            if (selectedSentiments.size > 0) {
+                updateSentimentFilterFromSelection();
+                currentOffset = 0;
+                saveFilters();
+                renderGallery();
+            }
+            closeFilteredPostsModal();
+            showToast('Filter applied to gallery', 'success');
         }
 
         // Abort controller for canceling requests
