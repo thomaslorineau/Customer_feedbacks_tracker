@@ -32,6 +32,10 @@ function setupEventListeners() {
     if (sentimentFilter) {
         sentimentFilter.addEventListener('change', (e) => {
             state.setFilter('sentiment', e.target.value);
+            // Clear critical filter flag if user manually changes sentiment
+            if (e.target.value !== 'negative') {
+                state.criticalFilterActive = false;
+            }
             updateDashboard();
         });
     }
@@ -52,11 +56,21 @@ function setupEventListeners() {
         });
     }
     
+    // Open critical posts button
+    const openCriticalPostsBtn = document.getElementById('openCriticalPostsBtn');
+    if (openCriticalPostsBtn) {
+        openCriticalPostsBtn.addEventListener('click', () => {
+            openCriticalPosts();
+        });
+    }
+    
     // Sort
     const sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
         sortSelect.addEventListener('change', (e) => {
-            sortPosts(e.target.value);
+            const sortValue = e.target.value;
+            console.log('Sort changed to:', sortValue);
+            sortPosts(sortValue);
         });
     }
     
@@ -96,6 +110,36 @@ function setupEventListeners() {
     if (navigateProductsNextBtn) {
         navigateProductsNextBtn.addEventListener('click', () => navigateProducts(1));
     }
+    
+    // Listen for date filter events from timeline chart
+    window.addEventListener('filterByDate', (event) => {
+        const clickedDate = event.detail.date;
+        if (clickedDate && state) {
+            // Set date filter to the clicked date (show posts from that day)
+            const dateFrom = clickedDate;
+            const dateTo = clickedDate;
+            
+            // Update date filters
+            const dateFromInput = document.getElementById('dateFrom');
+            const dateToInput = document.getElementById('dateTo');
+            
+            if (dateFromInput) dateFromInput.value = dateFrom;
+            if (dateToInput) dateToInput.value = dateTo;
+            
+            // Update state filters
+            state.setFilter('dateFrom', dateFrom);
+            state.setFilter('dateTo', dateTo);
+            
+            // Update dashboard to show filtered posts
+            updateDashboard();
+            
+            // Scroll to posts section
+            const postsSection = document.querySelector('.panel-bottom');
+            if (postsSection) {
+                postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
 }
 
 async function loadDashboardData() {
@@ -112,6 +156,7 @@ function updateDashboard() {
     updateWhatsHappening(state);
     updateProductDistribution();
     updatePostsList();
+    updateCriticalPostsButton();
     // Charts will be updated by charts.js
 }
 
@@ -157,6 +202,8 @@ function updateStatsBanner() {
     `;
 }
 
+let showAllProducts = false;
+
 function updateProductDistribution() {
     const productList = document.getElementById('productList');
     if (!productList || !state) return;
@@ -173,9 +220,12 @@ function updateProductDistribution() {
     });
     
     // Sort by count
-    const sortedProducts = Object.entries(productCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5);
+    const allProducts = Object.entries(productCounts)
+        .sort((a, b) => b[1] - a[1]);
+    
+    // Show top 5 or all products based on state
+    const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, 5);
+    const remainingCount = allProducts.length - 5;
     
     const total = posts.length;
     const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -218,11 +268,49 @@ function updateProductDistribution() {
             }
         });
     });
+    
+    // Update "Show More" button text
+    const showMoreProductsBtn = document.getElementById('showMoreProductsBtn');
+    if (showMoreProductsBtn) {
+        if (showAllProducts) {
+            showMoreProductsBtn.textContent = 'Show Less';
+            showMoreProductsBtn.style.display = 'inline-block';
+        } else if (remainingCount > 0) {
+            showMoreProductsBtn.textContent = `+ ${remainingCount} Other Products`;
+            showMoreProductsBtn.style.display = 'inline-block';
+        } else {
+            showMoreProductsBtn.style.display = 'none';
+        }
+    }
 }
 
 function updatePostsList() {
     const postsList = document.getElementById('postsList');
     if (!postsList || !state) return;
+    
+    // Show active critical filter indicator if needed
+    const panelHeader = document.querySelector('.panel-bottom .panel-header');
+    if (panelHeader) {
+        // Remove existing filter indicator
+        const existingIndicator = panelHeader.querySelector('.critical-filter-active');
+        if (existingIndicator) {
+            existingIndicator.remove();
+        }
+        
+        // Add filter indicator if critical filter is active
+        if (state.criticalFilterActive && state.filters.sentiment === 'negative') {
+            const filterIndicator = document.createElement('div');
+            filterIndicator.className = 'critical-filter-active';
+            filterIndicator.style.cssText = 'margin-top: 12px; display: flex; align-items: center; gap: 8px;';
+            filterIndicator.innerHTML = `
+                <span style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; font-size: 0.9em; color: #ef4444;">
+                    <span>🔴 Filtered: Critical Posts Only</span>
+                    <button onclick="clearCriticalFilter()" style="background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1.2em; padding: 0 4px; line-height: 1;" title="Clear filter">×</button>
+                </span>
+            `;
+            panelHeader.appendChild(filterIndicator);
+        }
+    }
     
     // Sort posts by recent/critical
     const sortValue = document.getElementById('sortSelect')?.value || 'recent';
@@ -232,8 +320,22 @@ function updatePostsList() {
         sortedPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     } else if (sortValue === 'critical') {
         sortedPosts.sort((a, b) => {
+            // First, prioritize negative posts
             if (a.sentiment_label === 'negative' && b.sentiment_label !== 'negative') return -1;
             if (a.sentiment_label !== 'negative' && b.sentiment_label === 'negative') return 1;
+            // Then by date (most recent first)
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    } else if (sortValue === 'engagement') {
+        sortedPosts.sort((a, b) => {
+            // Calculate engagement score (views + comments + reactions)
+            const engagementA = (a.views || 0) + (a.comments || 0) + (a.reactions || 0);
+            const engagementB = (b.views || 0) + (b.comments || 0) + (b.reactions || 0);
+            // Sort by engagement descending
+            if (engagementB !== engagementA) {
+                return engagementB - engagementA;
+            }
+            // If same engagement, sort by date
             return new Date(b.created_at) - new Date(a.created_at);
         });
     }
@@ -241,34 +343,39 @@ function updatePostsList() {
     // Show top 10
     sortedPosts = sortedPosts.slice(0, 10);
     
-    postsList.innerHTML = sortedPosts.map(post => {
+    // Clear existing content first
+    postsList.innerHTML = '';
+    
+    // Create and append each post item separately to avoid nesting issues
+    sortedPosts.forEach(post => {
         const timeAgo = getTimeAgo(post.created_at);
         const sourceIcon = getSourceIcon(post.source);
         const category = getProductLabelSimple(post) || 'General';
         const sentiment = post.sentiment_label || 'neutral';
         
-        return `
-            <div class="post-item">
-                <div class="post-source">
-                    <div class="source-icon ${post.source?.toLowerCase().replace(/\s+/g, '-')}">
-                        ${sourceIcon}
-                    </div>
-                    <div style="flex: 1;">
-                        <div class="source-name">${post.source || 'Unknown'}</div>
-                        <div class="post-time">${timeAgo}</div>
-                    </div>
-                    <span class="sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+        const postElement = document.createElement('div');
+        postElement.className = 'post-item';
+        postElement.innerHTML = `
+            <div class="post-source">
+                <div class="source-icon ${post.source?.toLowerCase().replace(/\s+/g, '-')}">
+                    ${sourceIcon}
                 </div>
-                <div class="post-content">
-                    ${truncateText(post.content || 'No content', 200)}
+                <div style="flex: 1;">
+                    <div class="source-name">${post.source || 'Unknown'}</div>
+                    <div class="post-time">${timeAgo}</div>
                 </div>
-                <div class="post-meta">
-                    <span class="post-category">${category}</span>
-                    <button class="post-action" data-url="${post.url || '#'}">Go to post</button>
-                </div>
+                <span class="sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+            </div>
+            <div class="post-content">
+                ${truncateText(post.content || 'No content', 200)}
+            </div>
+            <div class="post-meta">
+                <span class="post-category">${category}</span>
+                <button class="post-action" data-url="${post.url || '#'}">Go to post</button>
             </div>
         `;
-    }).join('');
+        postsList.appendChild(postElement);
+    });
     
     // Add event listeners to post action buttons
     postsList.querySelectorAll('.post-action').forEach(btn => {
@@ -318,7 +425,22 @@ function truncateText(text, maxLength) {
 }
 
 function sortPosts(sortValue) {
+    if (!state) return;
+    
+    // Update the select value if provided
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect && sortValue) {
+        sortSelect.value = sortValue;
+    }
+    
+    // Force update the posts list with the new sort
     updatePostsList();
+    
+    // Scroll to posts section to show the change
+    const postsSection = document.querySelector('.panel-bottom');
+    if (postsSection) {
+        postsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
 
 function filterByProduct(product) {
@@ -342,8 +464,8 @@ function clearProductFilter() {
 }
 
 function showMoreProducts() {
-    // Implement pagination or expand view
-    console.log('Show more products');
+    showAllProducts = !showAllProducts;
+    updateProductDistribution();
 }
 
 function navigateProducts(direction) {
@@ -391,6 +513,94 @@ function openPost(url) {
     }
 }
 
+function updateCriticalPostsButton() {
+    if (!state) return;
+    
+    const btn = document.getElementById('openCriticalPostsBtn');
+    const countSpan = document.getElementById('criticalPostsCount');
+    if (!btn || !countSpan) return;
+    
+    // Calculate critical posts (negative + recent)
+    const now = new Date();
+    const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const criticalPosts = (state.filteredPosts || []).filter(p => {
+        const postDate = new Date(p.created_at);
+        const isRecent = postDate >= last48h;
+        const isNegative = p.sentiment_label === 'negative';
+        return isRecent && isNegative;
+    });
+    
+    const count = criticalPosts.length;
+    countSpan.textContent = count;
+    
+    if (count > 0) {
+        btn.style.display = 'inline-flex';
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+function openCriticalPosts() {
+    if (!state) return;
+    
+    // Set filter to show only negative posts
+    state.setFilter('sentiment', 'negative');
+    
+    // Set sort to critical
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.value = 'critical';
+    }
+    
+    // Update sentiment filter dropdown
+    const sentimentFilter = document.getElementById('sentimentFilter');
+    if (sentimentFilter) {
+        sentimentFilter.value = 'negative';
+    }
+    
+    // Mark that critical filter is active
+    state.criticalFilterActive = true;
+    
+    // Update dashboard
+    updateDashboard();
+    
+    // Scroll to posts section
+    const postsSection = document.querySelector('.panel-bottom');
+    if (postsSection) {
+        postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // Highlight the section briefly
+        postsSection.style.transition = 'box-shadow 0.3s ease';
+        postsSection.style.boxShadow = '0 0 20px rgba(0, 153, 255, 0.5)';
+        setTimeout(() => {
+            postsSection.style.boxShadow = '';
+        }, 2000);
+    }
+}
+
+function clearCriticalFilter() {
+    if (!state) return;
+    
+    // Remove critical filter
+    state.setFilter('sentiment', 'all');
+    state.criticalFilterActive = false;
+    
+    // Update sentiment filter dropdown
+    const sentimentFilter = document.getElementById('sentimentFilter');
+    if (sentimentFilter) {
+        sentimentFilter.value = 'all';
+    }
+    
+    // Reset sort to recent
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+        sortSelect.value = 'recent';
+    }
+    
+    // Update dashboard
+    updateDashboard();
+}
+
 // Make functions available globally
 window.filterByProduct = filterByProduct;
 window.clearProductFilter = clearProductFilter;
@@ -399,6 +609,7 @@ window.navigateProducts = navigateProducts;
 window.resetFilters = resetFilters;
 window.scrapeAll = scrapeAll;
 window.openPost = openPost;
+window.clearCriticalFilter = clearCriticalFilter;
 
 export { updateDashboard, updateProductDistribution, updatePostsList };
 

@@ -80,6 +80,26 @@ class ImprovementIdeasResponse(BaseModel):
     ideas: List[ImprovementIdea] = Field(..., description="List of generated improvement ideas")
 
 
+class RecommendedActionRequest(BaseModel):
+    """Request model for generating recommended actions."""
+    posts: List[dict] = Field(..., description="List of posts to analyze")
+    recent_posts: List[dict] = Field(default=[], description="Recent posts (last 48h)")
+    stats: dict = Field(default={}, description="Statistics about posts")
+    max_actions: int = Field(default=5, ge=1, le=10, description="Maximum number of actions to generate")
+
+
+class RecommendedAction(BaseModel):
+    """Model for a single recommended action."""
+    icon: str = Field(..., description="Emoji icon for the action")
+    text: str = Field(..., description="Action description")
+    priority: str = Field(..., description="Priority level: high, medium, or low")
+
+
+class RecommendedActionsResponse(BaseModel):
+    """Response model for recommended actions."""
+    actions: List[RecommendedAction] = Field(..., description="List of generated recommended actions")
+
+
 class ScrapeResult(BaseModel):
     added: int
 
@@ -1095,6 +1115,212 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
         return ImprovementIdeasResponse(ideas=ideas)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
+
+
+async def generate_recommended_actions_with_llm(
+    posts: List[dict], 
+    recent_posts: List[dict], 
+    stats: dict,
+    max_actions: int = 5
+) -> List[RecommendedAction]:
+    """
+    Generate recommended actions using LLM API.
+    Supports OpenAI, Anthropic, or local LLM via environment variables.
+    """
+    # Prepare posts summary (focus on recent negative posts)
+    negative_posts = [p for p in recent_posts if p.get('sentiment_label') == 'negative']
+    posts_summary = []
+    for post in (negative_posts[:10] if negative_posts else posts[:15]):  # Limit to 10-15 posts
+        posts_summary.append({
+            'content': (post.get('content', '') or '')[:300],  # Limit content length
+            'sentiment': post.get('sentiment_label', 'neutral'),
+            'source': post.get('source', 'Unknown'),
+            'created_at': post.get('created_at', '')
+        })
+    
+    # Create prompt
+    prompt = f"""You are an OVHcloud customer support analyst. Analyze the following customer feedback posts and generate {max_actions} specific, actionable recommended actions.
+
+Statistics:
+- Total posts: {stats.get('total', 0)}
+- Negative posts (last 48h): {stats.get('recent_negative', 0)}
+- Spike detected: {stats.get('spike_detected', False)}
+- Top product impacted: {stats.get('top_product', 'N/A')}
+- Top issue: {stats.get('top_issue', 'N/A')}
+
+Recent negative posts to analyze:
+{json.dumps(posts_summary, indent=2, ensure_ascii=False)}
+
+Generate specific, actionable recommended actions that an OVHcloud support team should take. Each action should:
+1. Be specific and actionable (not generic)
+2. Address the actual issues found in the posts
+3. Include an appropriate emoji icon
+4. Have a priority level (high/medium/low) based on urgency and impact
+
+Format your response as a JSON array with this structure:
+[
+  {{
+    "icon": "🔍",
+    "text": "Investigate: [specific issue] (last 48h)",
+    "priority": "high"
+  }},
+  {{
+    "icon": "📣",
+    "text": "Check: [specific thing to check]",
+    "priority": "medium"
+  }},
+  {{
+    "icon": "💬",
+    "text": "Prepare: [specific response/macro]",
+    "priority": "medium"
+  }}
+]
+
+Focus on actions that directly address the issues found in the posts. Be specific - mention actual products, errors, or issues mentioned in the posts. Use appropriate emojis (🔍 for investigate, 📣 for check/announce, 💬 for communication, ⚠️ for alerts, etc.)."""
+
+    # Try to use LLM API (OpenAI, Anthropic, or local)
+    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    
+    if not api_key and llm_provider in ['openai', 'anthropic']:
+        # Fallback: Generate actions using rule-based approach
+        return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
+    
+    try:
+        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
+            # Use OpenAI API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {api_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 1500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                # Parse JSON from response
+                import re
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
+        
+        elif llm_provider == 'anthropic':
+            # Use Anthropic API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': api_key,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                        'max_tokens': 1500,
+                        'messages': [
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'system': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['content'][0]['text']
+                
+                # Parse JSON from response
+                import re
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
+        
+    except Exception as e:
+        print(f"LLM API error: {e}")
+        # Fallback to rule-based generation
+        return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
+    
+    # Fallback if no API key or other error
+    return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
+
+
+def generate_recommended_actions_fallback(
+    posts: List[dict], 
+    recent_posts: List[dict], 
+    stats: dict,
+    max_actions: int = 5
+) -> List[RecommendedAction]:
+    """Fallback rule-based action generation when LLM is not available."""
+    actions = []
+    
+    # Action 1: Investigate if spike detected
+    if stats.get('spike_detected') and stats.get('recent_negative', 0) > 0:
+        top_product = stats.get('top_product', '')
+        if top_product and top_product != 'N/A':
+            actions.append(RecommendedAction(
+                icon='🔍',
+                text=f'Investigate: {top_product} issues (last 48h)',
+                priority='high'
+            ))
+        else:
+            actions.append(RecommendedAction(
+                icon='🔍',
+                text='Investigate: Negative feedback spike (last 48h)',
+                priority='high'
+            ))
+    
+    # Action 2: Check status page if spike detected
+    if stats.get('spike_detected'):
+        actions.append(RecommendedAction(
+            icon='📣',
+            text='Check: Status page or ongoing incident',
+            priority='high'
+        ))
+    
+    # Action 3: Prepare support response
+    top_product = stats.get('top_product', '')
+    if top_product and top_product != 'N/A' and stats.get('recent_negative', 0) > 0:
+        actions.append(RecommendedAction(
+            icon='💬',
+            text=f'Prepare: Support macro / canned response for {top_product}',
+            priority='medium'
+        ))
+    elif stats.get('recent_negative', 0) > 0:
+        actions.append(RecommendedAction(
+            icon='💬',
+            text='Prepare: Support macro / canned response',
+            priority='medium'
+        ))
+    
+    # Limit to max_actions
+    return actions[:max_actions]
+
+
+@app.post("/api/recommended-actions", response_model=RecommendedActionsResponse)
+async def get_recommended_actions(request: RecommendedActionRequest):
+    """Generate recommended actions based on customer feedback posts using LLM."""
+    try:
+        actions = await generate_recommended_actions_with_llm(
+            request.posts, 
+            request.recent_posts, 
+            request.stats, 
+            request.max_actions
+        )
+        return RecommendedActionsResponse(actions=actions)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate recommended actions: {str(e)}")
 
 
 @app.get("/", response_class=HTMLResponse)

@@ -1,5 +1,6 @@
 // What's Happening analysis module
 import { getProductLabel } from './product-detection.js';
+import { API } from './api.js';
 
 export function updateWhatsHappening(state) {
     const posts = state.filteredPosts || [];
@@ -141,5 +142,75 @@ export function updateWhatsHappening(state) {
     }
     
     content.innerHTML = contentHTML;
+    
+    // Update Recommended Actions
+    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue);
+}
+
+async function updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue) {
+    const actionsContainer = document.getElementById('recommendedActions');
+    if (!actionsContainer) return;
+    
+    // Show loading state
+    actionsContainer.innerHTML = `
+        <div class="recommended-actions-header">
+            <h3>Recommended Actions</h3>
+        </div>
+        <div class="recommended-actions-list">
+            <div class="action-item" style="opacity: 0.6;">
+                <span class="action-icon">⏳</span>
+                <span class="action-text">Generating recommendations...</span>
+            </div>
+        </div>
+    `;
+    
+    try {
+        // Prepare stats for LLM
+        const stats = {
+            total: posts.length,
+            recent_negative: recentNegative,
+            spike_detected: spikeDetected,
+            top_product: topProduct ? topProduct[0] : 'N/A',
+            top_issue: topIssue ? topIssue[0] : 'N/A'
+        };
+        
+        // Call LLM API
+        const api = new API();
+        const response = await api.getRecommendedActions(posts, recentPosts, stats, 5);
+        const actions = response.actions || [];
+        
+        // Render actions
+        if (actions.length > 0) {
+            actionsContainer.innerHTML = `
+                <div class="recommended-actions-header">
+                    <h3>Recommended Actions</h3>
+                </div>
+                <div class="recommended-actions-list">
+                    ${actions.map(action => `
+                        <div class="action-item action-${action.priority}">
+                            <span class="action-icon">${action.icon}</span>
+                            <span class="action-text">${action.text}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            actionsContainer.innerHTML = '';
+        }
+    } catch (error) {
+        console.error('Error generating recommended actions:', error);
+        // Show error state
+        actionsContainer.innerHTML = `
+            <div class="recommended-actions-header">
+                <h3>Recommended Actions</h3>
+            </div>
+            <div class="recommended-actions-list">
+                <div class="action-item" style="opacity: 0.6;">
+                    <span class="action-icon">⚠️</span>
+                    <span class="action-text">Unable to generate recommendations. Please try again later.</span>
+                </div>
+            </div>
+        `;
+    }
 }
 

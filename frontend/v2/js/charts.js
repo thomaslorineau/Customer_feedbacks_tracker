@@ -108,7 +108,8 @@ export function updateTimelineChart(state) {
                         maxRotation: 45,
                         minRotation: 45,
                         autoSkip: true,
-                        maxTicksLimit: 20
+                        maxTicksLimit: 20,
+                        padding: 10
                     }
                 },
                 y: {
@@ -120,12 +121,27 @@ export function updateTimelineChart(state) {
                     }
                 }
             },
+            layout: {
+                padding: {
+                    bottom: 30,
+                    left: 10,
+                    right: 10,
+                    top: 10
+                }
+            },
             onClick: (event, elements) => {
                 if (elements.length > 0) {
                     const index = elements[0].index;
                     const clickedDate = sortedKeys[index];
-                    // Filter by date
-                    console.log('Filter by date:', clickedDate);
+                    
+                    // Filter posts by the clicked date
+                    if (clickedDate) {
+                        // Dispatch custom event that dashboard.js can listen to
+                        const filterEvent = new CustomEvent('filterByDate', {
+                            detail: { date: clickedDate }
+                        });
+                        window.dispatchEvent(filterEvent);
+                    }
                 }
             }
         }

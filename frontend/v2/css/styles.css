@@ -322,11 +322,13 @@ body {
     background: var(--bg-card);
     border-radius: 12px;
     padding: 24px;
+    padding-bottom: 50px;
     box-shadow: 0 2px 8px var(--shadow);
     border: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow: visible;
+    min-height: 0;
 }
 
 .panel-right {
@@ -351,6 +353,9 @@ body {
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+    margin-top: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 .panel-header {
@@ -440,8 +445,16 @@ body {
     flex: 1;
     min-height: 0;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
     max-height: 400px;
+    padding-bottom: 50px;
+    margin-bottom: 20px;
+}
+
+.chart-container canvas {
+    max-height: 100%;
+    width: 100% !important;
+    height: auto !important;
 }
 
 /* Product List */
@@ -568,11 +581,15 @@ body {
     gap: 16px;
     max-height: 600px;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 8px;
+    position: relative;
 }
 
 .posts-list .post-item {
-    margin-bottom: 0;
+    margin-bottom: 0 !important;
+    flex-shrink: 0;
+    flex-grow: 0;
 }
 
 .post-item {
@@ -585,12 +602,15 @@ body {
     border: 1px solid var(--border-color);
     transition: all 0.3s ease;
     position: relative;
-    z-index: 1;
+    z-index: auto;
     width: 100%;
     box-sizing: border-box;
     flex-shrink: 0;
-    min-height: fit-content;
+    flex-grow: 0;
+    min-height: auto;
     isolation: isolate;
+    contain: layout style paint;
+    margin: 0;
 }
 
 .post-item:hover {
@@ -604,6 +624,8 @@ body {
     align-items: center;
     gap: 8px;
     width: 100%;
+    position: relative;
+    z-index: auto;
 }
 
 .source-icon {
@@ -861,6 +883,8 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 16px;
 }
 
 .whats-happening-header h2 {
@@ -969,6 +993,93 @@ body {
     font-size: 0.9em;
     color: var(--text-secondary);
     line-height: 1.4;
+}
+
+/* Recommended Actions */
+.recommended-actions {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-color);
+}
+
+.recommended-actions-header {
+    margin-bottom: 16px;
+}
+
+.recommended-actions-header h3 {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.recommended-actions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.action-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.action-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+    transform: translateX(4px);
+}
+
+.action-item.action-high {
+    border-left: 4px solid #ef4444;
+}
+
+.action-item.action-medium {
+    border-left: 4px solid #f59e0b;
+}
+
+.action-icon {
+    font-size: 1.2em;
+    flex-shrink: 0;
+}
+
+.action-text {
+    font-size: 0.95em;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Critical Posts Button */
+.btn-critical-posts {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+}
+
+.btn-critical-posts:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+.btn-critical-posts:active {
+    transform: translateY(0);
 }
 
 .product-filter-active {

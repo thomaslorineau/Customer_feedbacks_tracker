@@ -65,6 +65,23 @@ export class API {
         }
         return response.json();
     }
+    
+    async getRecommendedActions(posts, recentPosts, stats, maxActions = 5) {
+        const response = await fetch(`${this.baseURL}/api/recommended-actions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                posts: posts,
+                recent_posts: recentPosts,
+                stats: stats,
+                max_actions: maxActions
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to get recommended actions: ${response.statusText}`);
+        }
+        return response.json();
+    }
 }
 
 
