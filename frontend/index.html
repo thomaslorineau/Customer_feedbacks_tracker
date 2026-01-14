@@ -644,6 +644,7 @@
             <input type="text" id="keywordInput" placeholder="Add keyword (e.g., 'ovh vps', 'ovh hosting', 'ovh support')" style="min-width:220px; max-width:400px;">
             <button onclick="addKeyword()">＋ Add Keyword</button>
             <button onclick="clearKeywords()" style="background:#ef4444;">Clear All</button>
+            <button id="revertKeywordsBtn" onclick="revertKeywords()" style="background:#6b7280; display:none;" title="Restore previously cleared keywords">↶ Revert</button>
             <p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 10px; max-width: 700px;">
                 💡 <strong>How it works:</strong> Add keywords related to OVH products (e.g., "ovh vps", "ovh hosting", "ovh billing", "ovh support") and click "🆕 Scrape New Data" to collect customer feedback from all sources.
             </p>
@@ -1080,20 +1081,20 @@
             </div>
         </div>
 
-        <div id="infoPanel" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:1000; overflow-y:auto;">
-            <div style="max-width:900px; margin:30px auto; background:rgba(26,26,46,0.95); padding:30px; border-radius:12px; border:1px solid rgba(0,212,255,0.3);">
+        <div id="infoPanel" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; z-index:1000; overflow-y:auto;">
+            <div class="modal-content" style="max-width:900px; margin:30px auto; padding:30px; border-radius:12px; border:1px solid rgba(0,212,255,0.3);">
                 <button onclick="toggleInfo()" style="float:right; padding:8px 15px; background:#ef4444; border:none; border-radius:6px; color:#fff; cursor:pointer; font-weight:bold;">✕ Close</button>
                 
-                <h1 style="color:#00d4ff; margin-bottom:20px;">💬 OVH Customer Feedback Tracker</h1>
+                <h1 style="color:var(--accent-primary); margin-bottom:20px;">💬 OVH Customer Feedback Tracker</h1>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">📖 What does it do?</h2>
-                <p style="line-height:1.6; color:#ccc;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">📖 What does it do?</h2>
+                <p style="line-height:1.6; color:var(--text-secondary);">
                     <strong>OVH Customer Feedback Tracker</strong> is a monitoring tool that <strong>collects and accumulates customer feedback</strong> about <strong>all OVH products and services</strong> from multiple sources. 
                     The data is <strong>stored permanently</strong> in a SQLite database and analyzed automatically for sentiment (positive, negative, neutral).
                 </p>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🚀 How to use it?</h2>
-                <ol style="color:#ccc; line-height:2; margin-left:20px;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🚀 How to use it?</h2>
+                <ol style="color:var(--text-secondary); line-height:2; margin-left:20px;">
                     <li><strong>Step 1:</strong> Configure keywords for products you want to monitor (e.g., "ovh vps", "ovh hosting", "ovh billing")</li>
                     <li><strong>Step 2:</strong> Click "🆕 Scrape New Data" to collect feedback from all sources</li>
                     <li><strong>Step 3:</strong> Customer feedback is automatically saved to the database (no duplicates)</li>
@@ -1101,11 +1102,11 @@
                     <li><strong>Step 5:</strong> View timeline charts to analyze trends and sentiment over time</li>
                 </ol>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🎯 Filter by Product</h2>
-                <p style="line-height:1.6; color:#ccc;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🎯 Filter by Product</h2>
+                <p style="line-height:1.6; color:var(--text-secondary);">
                     After scraping, use the <strong>"All OVH Products"</strong> dropdown to filter feedback by product category:
                 </p>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>🌐 Web & Hosting:</strong> Web Hosting, WordPress, Email, Domains</li>
                     <li><strong>☁️ Cloud & Servers:</strong> VPS, Dedicated Servers, Public Cloud, Private Cloud</li>
                     <li><strong>💾 Storage & Backup:</strong> Object Storage, NAS, Veeam Backup</li>
@@ -1114,8 +1115,8 @@
                     <li><strong>🔧 Support & Billing:</strong> Customer Support, Billing, OVH Manager, API</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🌐 Data Sources</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🌐 Data Sources</h2>
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>🐦 X (Twitter)</strong> - Real-time customer complaints and feedback</li>
                     <li><strong>📚 Stack Overflow</strong> - Technical support questions</li>
                     <li><strong>📰 Google News</strong> - News articles and press releases</li>
@@ -1126,7 +1127,7 @@
 
                 <div style="margin-top: 25px; padding: 15px; background: rgba(255, 165, 0, 0.1); border-left: 4px solid #ff9800; border-radius: 8px;">
                     <h3 style="color: #ff9800; margin: 0 0 10px 0;">⚠️ Why so few results in the past?</h3>
-                    <p style="margin: 0; color: #ccc; line-height: 1.8;">
+                    <p style="margin: 0; color: var(--text-secondary); line-height: 1.8;">
                         Public APIs (Twitter, StackOverflow, News, etc.) limit access to <strong>recent posts only</strong> (typically last 7-30 days).
                         <br><br>
                         📌 <strong>Solution:</strong> The application <strong>accumulates data over time</strong>. The more you scrape regularly, the more history you'll build!
@@ -1135,21 +1136,21 @@
                     </p>
                 </div>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔑 Keywords Configuration</h2>
-                <p style="line-height:1.6; color:#ccc;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🔑 Keywords Configuration</h2>
+                <p style="line-height:1.6; color:var(--text-secondary);">
                     Add specific keywords to search for. Examples:
                 </p>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px; background:rgba(0,212,255,0.1); padding:15px; border-radius:6px;">
-                    <li><code style="background:#0f3460; padding:4px 8px; border-radius:4px;">"OVH domain"</code></li>
-                    <li><code style="background:#0f3460; padding:4px 8px; border-radius:4px;">"OVH complaint"</code></li>
-                    <li><code style="background:#0f3460; padding:4px 8px; border-radius:4px;">"OVH support"</code></li>
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px; background:rgba(0,212,255,0.1); padding:15px; border-radius:6px;">
+                    <li><code style="background:var(--bg-card); padding:4px 8px; border-radius:4px;">"OVH domain"</code></li>
+                    <li><code style="background:var(--bg-card); padding:4px 8px; border-radius:4px;">"OVH complaint"</code></li>
+                    <li><code style="background:var(--bg-card); padding:4px 8px; border-radius:4px;">"OVH support"</code></li>
                 </ul>
-                <p style="line-height:1.6; color:#ccc; margin-top:15px;">
+                <p style="line-height:1.6; color:var(--text-secondary); margin-top:15px;">
                     You can also enter custom keywords in the "Scrape" buttons to search for specific terms.
                 </p>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">⚙️ How It Works</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">⚙️ How It Works</h2>
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>Manual Scraping:</strong> Click scraper buttons to fetch customer complaints immediately from each source</li>
                     <li><strong>Trustpilot Focus:</strong> Real customer reviews with ratings and sentiment signals</li>
                     <li><strong>X/Twitter Improvement:</strong> Searches complaint keywords (bad support, expensive, overpriced, confusing interface, etc.)</li>
@@ -1161,18 +1162,18 @@
                     <li><strong>Backlog:</strong> Save important complaints to your personal backlog for follow-up</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">📊 Sentiment Analysis</h2>
-                <p style="line-height:1.6; color:#ccc;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">📊 Sentiment Analysis</h2>
+                <p style="line-height:1.6; color:var(--text-secondary);">
                     Posts are classified as:
                 </p>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><span style="color:#34d399;">✓ POSITIVE</span> - Satisfactory feedback, positive experiences (score > 0.05)</li>
                     <li><span style="color:#d1d5db;">◇ NEUTRAL</span> - Factual statements, no clear sentiment (-0.05 to 0.05)</li>
                     <li><span style="color:#ef4444;">✗ NEGATIVE</span> - Complaints, issues, dissatisfaction (score < -0.05)</li>
                 </ul>
 
-                <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">💾 Features</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">💾 Features</h2>
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>Timeline Filter:</strong> Select date ranges to analyze posts over time</li>
                     <li><strong>Source Filter:</strong> Focus on specific platforms (X, Reddit, Google News, etc.)</li>
                     <li><strong>Sentiment Filter:</strong> Show only positive, negative, or neutral posts</li>
@@ -1628,7 +1629,10 @@
                 showToast('Removing non-OVH posts from database...', 'info');
                 
                 const response = await fetch(`${API_BASE}/admin/cleanup-non-ovh-posts`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
                 if (response.ok) {
@@ -1643,10 +1647,12 @@
                     const errorText = await response.text();
                     addLog(`❌ Error: ${errorText}`, 'error');
                     showToast(`Error: ${errorText}`, 'error');
+                    console.error('Cleanup non-OVH posts error:', errorText);
                 }
             } catch (e) {
                 addLog(`❌ Error during cleanup: ${e.message}`, 'error');
                 showToast(`Error: ${e.message}`, 'error');
+                console.error('Cleanup non-OVH posts exception:', e);
             }
         }
         
@@ -2624,6 +2630,11 @@
             const languageFilter = document.getElementById('languageFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
+            const keywordFilter = document.getElementById('keywordFilter') ? document.getElementById('keywordFilter').value : '';
+
+            const keywordPatterns = {
+                // Add keyword patterns if needed
+            };
 
             const ovhProductPatterns = {
                 // Web & Hosting
@@ -2693,6 +2704,12 @@
                     matchesKeyword = keywordPatterns[keywordFilter].test(post.content);
                 }
                 
+                let matchesProduct = true;
+                if (ovhProductFilter && ovhProductFilter !== 'all') {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    matchesProduct = productLabel === ovhProductFilter;
+                }
+                
                 let matchesDate = true;
                 if (dateFrom || dateTo) {
                     const postDate = new Date(post.created_at).toISOString().split('T')[0];
@@ -2700,7 +2717,7 @@
                     if (dateTo && postDate > dateTo) matchesDate = false;
                 }
                 
-                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage;
+                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage && matchesKeyword;
             });
 
             // Apply sorting
@@ -4147,11 +4164,38 @@
 
         function clearKeywords() {
             if (!confirm('Clear all saved keywords?')) return;
+            
+            // Save current keywords before clearing (for revert)
+            const currentKeywords = loadKeywords();
+            if (currentKeywords && currentKeywords.length > 0) {
+                localStorage.setItem('ovh_queries_backup', JSON.stringify(currentKeywords));
+                document.getElementById('revertKeywordsBtn').style.display = 'inline-block';
+            }
+            
             localStorage.removeItem('ovh_queries');
             // also clear on server
             saveKeywords([]);
             renderKeywords();
             showToast('Keywords cleared', 'success');
+        }
+
+        function revertKeywords() {
+            const backup = localStorage.getItem('ovh_queries_backup');
+            if (!backup) {
+                showToast('No backup found to restore', 'error');
+                return;
+            }
+            
+            try {
+                const keywords = JSON.parse(backup);
+                saveKeywords(keywords);
+                renderKeywords();
+                document.getElementById('revertKeywordsBtn').style.display = 'none';
+                localStorage.removeItem('ovh_queries_backup');
+                showToast('Keywords restored', 'success');
+            } catch (e) {
+                showToast('Error restoring keywords', 'error');
+            }
         }
 
         // Sync functions with backend
