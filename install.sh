@@ -190,32 +190,24 @@ if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null || [[ "$HOSTN
     echo "   Hostname: $HOSTNAME_FULL"
     echo "   Conteneur: $CONTAINER_NAME"
     echo ""
-    warning "⚠️  IMPORTANT : Configuration du mapping de port Docker"
+    warning "⚠️  IMPORTANT : Configuration du port d'écoute"
     echo ""
-    echo "Pour rendre l'application accessible depuis l'extérieur, le port 8000"
-    echo "du conteneur doit être mappé vers un port externe (ex: 11840)."
+    echo "Sur les serveurs Docker OVH, l'application doit écouter directement sur"
+    echo "le port externe accessible (ex: 11840) plutôt que sur le port 8000."
     echo ""
-    read -p "Port externe à utiliser (ex: 11840, laissez vide si déjà mappé) : " EXTERNAL_PORT
+    read -p "Port à utiliser (ex: 11840, laissez vide pour 8000 par défaut) : " EXTERNAL_PORT
     echo ""
     
     if [ -n "$EXTERNAL_PORT" ]; then
-        info "Port externe configuré : $EXTERNAL_PORT"
-        echo "$EXTERNAL_PORT" > .docker_external_port
+        info "Port configuré : $EXTERNAL_PORT"
+        echo "APP_PORT=$EXTERNAL_PORT" > backend/.app_config
+        success "Configuration sauvegardée dans backend/.app_config"
         echo ""
-        warning "⚠️  ACTION REQUISE : Redémarrer le conteneur avec mapping de port"
-        echo ""
-        echo "Depuis l'HÔTE Docker (ou avec docker si disponible), exécutez :"
-        echo ""
-        echo "   docker stop $CONTAINER_NAME"
-        echo "   docker commit $CONTAINER_NAME ovh-tracker:latest"
-        echo "   docker rm $CONTAINER_NAME"
-        echo "   docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME ovh-tracker:latest"
-        echo ""
+        info "L'application écoutera sur le port $EXTERNAL_PORT"
+        echo "Redémarrez avec : ./stop.sh && ./start.sh"
     else
-        info "Mapping de port ignoré (supposé déjà configuré ou à faire manuellement)"
-        echo ""
-        info "Si le port n'est pas mappé, vous devrez le faire plus tard avec :"
-        echo "   ./docker_port_mapping.sh"
+        info "Port par défaut 8000 conservé (pour développement local)"
+        echo "APP_PORT=8000" > backend/.app_config
     fi
     echo ""
 else
@@ -244,7 +236,7 @@ if [[ $REPLY =~ ^[Oo]$ ]]; then
             echo "C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
             echo "   $VM_IP    $HOST_ALIAS.local"
             echo ""
-            echo "Puis accédez à : http://$HOST_ALIAS.local:8000"
+            echo "Puis accédez à : http://$HOST_ALIAS.local:$APP_PORT"
         else
             warning "Impossible de déterminer l'IP, alias non configuré"
         fi
@@ -379,65 +371,54 @@ echo ""
 URL_TO_SHARE=""
 SHARE_METHOD=""
 
-# 1. Alias configuré
-if [ -f ".host_alias" ]; then
-    HOST_ALIAS_LINE=$(cat .host_alias)
-    HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
-    HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
-    if [ -n "$HOST_ALIAS" ]; then
-        echo "📍 Depuis un autre ordinateur (ALIAS - recommandé) :"
-        echo "   http://$HOST_ALIAS:8000"
-        echo ""
-        echo "   ⚠️  Pour utiliser l'alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
-        echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
-        echo "   $HOST_ALIAS_LINE"
-        echo ""
-        URL_TO_SHARE="http://$HOST_ALIAS:8000"
-        SHARE_METHOD="alias"
-    fi
-fi
-
-# 2. Hostname (si pas d'alias ou en complément)
-if [ -z "$URL_TO_SHARE" ] && [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
-    echo "📍 Depuis un autre ordinateur (HOSTNAME) :"
-    echo "   http://$HOSTNAME_FULL:8000"
-    echo ""
-    URL_TO_SHARE="http://$HOSTNAME_FULL:8000"
-    SHARE_METHOD="hostname"
-fi
-
-# 3. IP publique avec port Docker si applicable
-if [ -n "$IP_PUBLIC" ]; then
-    if [ -f ".docker_external_port" ]; then
-        EXTERNAL_PORT=$(cat .docker_external_port)
-        echo "📍 Depuis Internet (IP PUBLIQUE avec port Docker) :"
-        echo "   http://$IP_PUBLIC:$EXTERNAL_PORT"
-        echo ""
-        if [ -z "$URL_TO_SHARE" ]; then
-            URL_TO_SHARE="http://$IP_PUBLIC:$EXTERNAL_PORT"
-            SHARE_METHOD="ip_public_docker"
+        # 1. Alias configuré
+        if [ -f ".host_alias" ]; then
+            HOST_ALIAS_LINE=$(cat .host_alias)
+            HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
+            HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
+            if [ -n "$HOST_ALIAS" ]; then
+                echo "📍 Depuis un autre ordinateur (ALIAS - recommandé) :"
+                echo "   http://$HOST_ALIAS:$APP_PORT"
+                echo ""
+                echo "   ⚠️  Pour utiliser l'alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
+                echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+                echo "   $HOST_ALIAS_LINE"
+                echo ""
+                URL_TO_SHARE="http://$HOST_ALIAS:$APP_PORT"
+                SHARE_METHOD="alias"
+            fi
         fi
-    else
-        echo "📍 Depuis Internet (IP PUBLIQUE) :"
-        echo "   http://$IP_PUBLIC:8000"
-        echo ""
-        if [ -z "$URL_TO_SHARE" ]; then
-            URL_TO_SHARE="http://$IP_PUBLIC:8000"
-            SHARE_METHOD="ip_public"
-        fi
-    fi
-fi
 
-# 4. IP locale
-if [ -n "$VM_IP" ]; then
-    echo "📍 Depuis le réseau local (IP INTERNE) :"
-    echo "   http://$VM_IP:8000"
-    echo ""
-    if [ -z "$URL_TO_SHARE" ]; then
-        URL_TO_SHARE="http://$VM_IP:8000"
-        SHARE_METHOD="ip_local"
-    fi
-fi
+        # 2. Hostname (si pas d'alias ou en complément)
+        if [ -z "$URL_TO_SHARE" ] && [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
+            echo "📍 Depuis un autre ordinateur (HOSTNAME) :"
+            echo "   http://$HOSTNAME_FULL:$APP_PORT"
+            echo ""
+            URL_TO_SHARE="http://$HOSTNAME_FULL:$APP_PORT"
+            SHARE_METHOD="hostname"
+        fi
+
+        # 3. IP publique
+        if [ -n "$IP_PUBLIC" ]; then
+            echo "📍 Depuis Internet (IP PUBLIQUE) :"
+            echo "   http://$IP_PUBLIC:$APP_PORT"
+            echo ""
+            if [ -z "$URL_TO_SHARE" ]; then
+                URL_TO_SHARE="http://$IP_PUBLIC:$APP_PORT"
+                SHARE_METHOD="ip_public"
+            fi
+        fi
+
+        # 4. IP locale
+        if [ -n "$VM_IP" ]; then
+            echo "📍 Depuis le réseau local (IP INTERNE) :"
+            echo "   http://$VM_IP:$APP_PORT"
+            echo ""
+            if [ -z "$URL_TO_SHARE" ]; then
+                URL_TO_SHARE="http://$VM_IP:$APP_PORT"
+                SHARE_METHOD="ip_local"
+            fi
+        fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 if [ -n "$URL_TO_SHARE" ]; then

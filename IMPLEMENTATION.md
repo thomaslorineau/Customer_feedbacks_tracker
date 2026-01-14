@@ -238,7 +238,7 @@ Dans le terminal, tapez :
 hostname -I
 ```
 
-Vous devriez voir une adresse IP, par exemple : `192.168.1.100`
+Vous devriez voir une adresse IP, par exemple : `10.19.64.153` (IP interne) ou `5.196.197.1` (IP publique)
 
 📝 **Notez cette adresse IP**, vous en aurez besoin pour accéder à l'application.
 
@@ -347,7 +347,7 @@ chmod +x start.sh stop.sh status.sh backup.sh
 ✅ Si tout va bien, vous verrez :
 ```
 ✅ Serveur démarré avec succès (PID: ...)
-🌐 Accès: http://192.168.1.100:8000
+🌐 Accès: http://VOTRE_IP:VOTRE_PORT
 ```
 
 **Méthode manuelle :**
@@ -378,7 +378,7 @@ Une fois l'application démarrée, vous pouvez y accéder de plusieurs façons :
 **Depuis un autre ordinateur du réseau local :**
 - Ouvrez un navigateur web sur votre ordinateur
 - Allez à : `http://IP_DE_LA_VM:8000` (remplacez par l'IP que vous avez notée à l'étape 5)
-- Exemple : `http://192.168.1.100:8000`
+- Exemple : `http://10.19.64.153:11840` (port 11840 pour Docker OVH) ou `http://5.196.197.1:11840`
 
 ✅ **L'application devrait s'afficher !**
 
@@ -396,7 +396,7 @@ Si vous ne l'avez pas déjà notée, trouvez l'IP de votre VM :
 hostname -I
 ```
 
-Vous obtiendrez quelque chose comme : `192.168.1.100`
+Vous obtiendrez quelque chose comme : `10.19.64.153` (IP interne) ou `5.196.197.1` (IP publique)
 
 ### Étape 2 : Construire l'URL de l'application
 
@@ -405,10 +405,15 @@ L'URL de votre application est :
 http://IP_DE_LA_VM:8000
 ```
 
-**Exemple :** Si l'IP de votre VM est `192.168.1.100`, l'URL sera :
+**Exemple :** Si l'IP de votre VM est `10.19.64.153` (interne) ou `5.196.197.1` (publique), l'URL sera :
 ```
-http://192.168.1.100:8000
+http://10.19.64.153:11840
 ```
+ou
+```
+http://5.196.197.1:11840
+```
+(Le port peut varier selon votre configuration - 8000 par défaut, 11840 sur Docker OVH)
 
 ### Étape 3 : Partager l'URL
 
@@ -419,7 +424,8 @@ Vous pouvez maintenant partager cette URL avec vos collègues :
 Bonjour,
 
 L'application OVH Customer Feedback Tracker est maintenant disponible à l'adresse :
-http://192.168.1.100:8000
+http://VOTRE_IP:VOTRE_PORT
+(Remplacez VOTRE_IP et VOTRE_PORT par les valeurs détectées lors de l'installation)
 
 Vous pouvez y accéder depuis votre navigateur web si vous êtes sur le même réseau local.
 
@@ -428,7 +434,7 @@ Cordialement
 
 **Par message/chat :**
 ```
-L'app est disponible ici : http://192.168.1.100:8000
+L'app est disponible ici : http://VOTRE_IP:VOTRE_PORT
 ```
 
 ### Étape 4 : Accéder depuis un autre ordinateur
@@ -437,7 +443,7 @@ Pour accéder à l'application depuis un autre ordinateur :
 
 1. **Assurez-vous que les deux machines sont sur le même réseau** (même Wi-Fi ou même réseau filaire)
 2. **Ouvrez un navigateur web** (Chrome, Firefox, Edge, Safari, etc.)
-3. **Tapez l'URL** dans la barre d'adresse : `http://192.168.1.100:8000`
+3. **Tapez l'URL** dans la barre d'adresse : `http://VOTRE_IP:VOTRE_PORT`
 4. **Appuyez sur Entrée**
 
 ✅ L'application devrait s'afficher !

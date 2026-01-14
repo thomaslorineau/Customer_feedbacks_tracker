@@ -2,10 +2,27 @@
 # Script de vérification du statut
 
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$APP_DIR"
+
+# Fonction pour lire le port configuré
+get_app_port() {
+    local port=8000  # Port par défaut
+    if [ -f "backend/.app_config" ] && grep -q "APP_PORT=" backend/.app_config; then
+        port=$(grep "APP_PORT=" backend/.app_config | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    elif [ -f "backend/.env" ] && grep -q "APP_PORT=" backend/.env; then
+        port=$(grep "APP_PORT=" backend/.env | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    fi
+    echo "$port"
+}
+
+APP_PORT=$(get_app_port)
+
 cd "$APP_DIR/backend"
 
 echo "📊 Statut de l'application OVH Customer Feedback Tracker"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "ℹ️  Port configuré : $APP_PORT"
+echo ""
 
 # Vérifier le fichier PID
 if [ -f server.pid ]; then
@@ -22,17 +39,17 @@ if [ -f server.pid ]; then
         
         # Vérifier le port
         if command -v lsof > /dev/null 2>&1; then
-            PORT_INFO=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null)
+            PORT_INFO=$(lsof -Pi :$APP_PORT -sTCP:LISTEN 2>/dev/null)
             if [ -n "$PORT_INFO" ]; then
-                echo "   Port 8000: Écouté"
+                echo "   Port $APP_PORT: Écouté"
             fi
         elif command -v netstat > /dev/null 2>&1; then
-            if netstat -tlnp 2>/dev/null | grep -q ":8000 "; then
-                echo "   Port 8000: Écouté"
+            if netstat -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
+                echo "   Port $APP_PORT: Écouté"
             fi
         elif command -v ss > /dev/null 2>&1; then
-            if ss -tlnp 2>/dev/null | grep -q ":8000 "; then
-                echo "   Port 8000: Écouté"
+            if ss -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
+                echo "   Port $APP_PORT: Écouté"
             fi
         fi
         
@@ -43,11 +60,11 @@ if [ -f server.pid ]; then
                 IP=$(ip addr show 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1)
             fi
             if [ -n "$IP" ]; then
-                echo "   Accès réseau: http://$IP:8000"
+                echo "   Accès réseau: http://$IP:$APP_PORT"
             fi
         fi
-        echo "   Accès local: http://localhost:8000"
-        echo "   Documentation: http://localhost:8000/docs"
+        echo "   Accès local: http://localhost:$APP_PORT"
+        echo "   Documentation: http://localhost:$APP_PORT/docs"
         
         # Afficher la taille des logs
         if [ -f server.log ]; then

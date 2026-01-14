@@ -264,3 +264,4 @@ Ce guide fournit des techniques techniques. Vous êtes responsable de :
 
 **En cas de doute, utilisez les APIs officielles ou contactez le propriétaire du site.**
 
+

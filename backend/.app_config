@@ -1,0 +1,5 @@
+# Port d'écoute de l'application
+# 8000 = port par défaut pour développement local
+# 11840 = port pour VM Docker OVH (ou autre port selon votre configuration)
+APP_PORT=8000
+

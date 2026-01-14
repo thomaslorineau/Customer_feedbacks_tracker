@@ -4,6 +4,19 @@
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
+# Fonction pour lire le port configuré
+get_app_port() {
+    local port=8000  # Port par défaut
+    if [ -f "backend/.app_config" ] && grep -q "APP_PORT=" backend/.app_config; then
+        port=$(grep "APP_PORT=" backend/.app_config | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    elif [ -f "backend/.env" ] && grep -q "APP_PORT=" backend/.env; then
+        port=$(grep "APP_PORT=" backend/.env | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    fi
+    echo "$port"
+}
+
+APP_PORT=$(get_app_port)
+
 # Vérifier que l'environnement virtuel existe
 if [ ! -d "venv" ]; then
     echo "❌ Environnement virtuel introuvable. Exécutez d'abord: python3 -m venv venv"
@@ -36,9 +49,9 @@ fi
 
 # Vérifier si un autre processus utilise le port
 if command -v lsof > /dev/null 2>&1; then
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
-        echo "⚠️  Le port 8000 est déjà utilisé"
-        lsof -Pi :8000 -sTCP:LISTEN
+    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "⚠️  Le port $APP_PORT est déjà utilisé"
+        lsof -Pi :$APP_PORT -sTCP:LISTEN
         exit 1
     fi
 fi
@@ -54,7 +67,7 @@ mkdir -p "$APP_DIR/backend"
 if command -v setsid > /dev/null 2>&1; then
     # setsid crée un nouveau groupe de processus, détachant complètement du terminal
     # Utiliser bash -c pour s'assurer que l'environnement virtuel est activé dans le sous-processus
-    setsid bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
+    setsid bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
     PID=$!
     # Détacher le processus du shell actuel avec disown si disponible
     if command -v disown > /dev/null 2>&1; then
@@ -64,7 +77,7 @@ else
     # Alternative avec nohup et redirection complète
     # Utiliser bash -c pour s'assurer que l'environnement virtuel est activé
     # exec remplace le processus bash par python, évitant les problèmes de signal
-    nohup bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port 8000" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
+    nohup bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
     PID=$!
     # Détacher le processus
     if command -v disown > /dev/null 2>&1; then
@@ -81,19 +94,19 @@ for i in {1..10}; do
     if ps -p $PID > /dev/null 2>&1; then
         # Vérifier que le port est écouté
         if command -v lsof > /dev/null 2>&1; then
-            if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
                 # Vérifier que c'est bien sur 0.0.0.0
-                LISTEN_ADDR=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
+                LISTEN_ADDR=$(lsof -Pi :$APP_PORT -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
                 if echo "$LISTEN_ADDR" | grep -q "0.0.0.0\|::"; then
                     break
                 fi
             fi
         elif command -v netstat > /dev/null 2>&1; then
-            if netstat -tlnp 2>/dev/null | grep -q ":8000 "; then
+            if netstat -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
                 break
             fi
         elif command -v ss > /dev/null 2>&1; then
-            if ss -tlnp 2>/dev/null | grep -q ":8000 "; then
+            if ss -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
                 break
             fi
         fi
@@ -112,7 +125,7 @@ if ps -p $PID > /dev/null 2>&1; then
     # Vérifier que le port est bien écouté sur 0.0.0.0
     PORT_OK=false
     if command -v lsof > /dev/null 2>&1; then
-        LISTEN_ADDR=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
+        LISTEN_ADDR=$(lsof -Pi :$APP_PORT -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
         if echo "$LISTEN_ADDR" | grep -q "0.0.0.0\|::"; then
             PORT_OK=true
         elif echo "$LISTEN_ADDR" | grep -q "127.0.0.1"; then
@@ -157,38 +170,38 @@ if ps -p $PID > /dev/null 2>&1; then
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         echo "📍 Depuis cette VM :"
-        echo "   http://localhost:8000"
+        echo "   http://localhost:$APP_PORT"
         echo ""
         
         # Priorité : alias configuré > hostname > IP
         if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
             echo "📍 Depuis un autre ordinateur sur le même réseau local (alias) :"
-            echo "   http://$HOST_ALIAS:8000"
+            echo "   http://$HOST_ALIAS:$APP_PORT"
             echo ""
             echo "💡 Partagez cette URL avec vos collègues :"
-            echo "   http://$HOST_ALIAS:8000"
+            echo "   http://$HOST_ALIAS:$APP_PORT"
             echo ""
             echo "⚠️  Important : Vos collègues doivent ajouter dans /etc/hosts (Linux/Mac) ou"
             echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
             echo "   $HOST_ALIAS_LINE"
         elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
             echo "📍 Depuis un autre ordinateur sur le même réseau local (hostname) :"
-            echo "   http://$HOSTNAME_FULL:8000"
+            echo "   http://$HOSTNAME_FULL:$APP_PORT"
             echo ""
             echo "💡 Partagez cette URL avec vos collègues :"
-            echo "   http://$HOSTNAME_FULL:8000"
+            echo "   http://$HOSTNAME_FULL:$APP_PORT"
         elif [ -n "$IP" ]; then
             echo "📍 Depuis un autre ordinateur sur le même réseau local :"
-            echo "   http://$IP:8000"
+            echo "   http://$IP:$APP_PORT"
             echo ""
             echo "💡 Partagez cette URL avec vos collègues :"
-            echo "   http://$IP:8000"
+            echo "   http://$IP:$APP_PORT"
         else
             echo "📍 Pour accéder depuis le réseau, trouvez l'IP avec :"
             echo "   hostname -I"
         fi
         echo ""
-        echo "📚 Documentation API : http://localhost:8000/docs"
+        echo "📚 Documentation API : http://localhost:$APP_PORT/docs"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
         echo "⚠️  Si l'accès ne fonctionne pas depuis un autre ordinateur :"

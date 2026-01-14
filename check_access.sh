@@ -4,8 +4,23 @@
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$APP_DIR"
 
+# Fonction pour lire le port configuré
+get_app_port() {
+    local port=8000  # Port par défaut
+    if [ -f "backend/.app_config" ] && grep -q "APP_PORT=" backend/.app_config; then
+        port=$(grep "APP_PORT=" backend/.app_config | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    elif [ -f "backend/.env" ] && grep -q "APP_PORT=" backend/.env; then
+        port=$(grep "APP_PORT=" backend/.env | cut -d= -f2 | tr -d ' ' | tr -d '\r')
+    fi
+    echo "$port"
+}
+
+APP_PORT=$(get_app_port)
+
 echo "🔍 Diagnostic d'accessibilité de l'application"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+echo "ℹ️  Port configuré : $APP_PORT"
 echo ""
 
 # 1. Vérifier que le processus tourne
@@ -27,38 +42,38 @@ fi
 echo ""
 
 # 2. Vérifier que le port est écouté
-echo "2️⃣  Vérification du port 8000..."
+echo "2️⃣  Vérification du port $APP_PORT..."
 PORT_LISTENING=false
 
 if command -v lsof > /dev/null 2>&1; then
-    if lsof -Pi :8000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if lsof -Pi :$APP_PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
         PORT_LISTENING=true
-        PORT_INFO=$(lsof -Pi :8000 -sTCP:LISTEN)
-        echo "   ✅ Port 8000 écouté"
+        PORT_INFO=$(lsof -Pi :$APP_PORT -sTCP:LISTEN)
+        echo "   ✅ Port $APP_PORT écouté"
         echo "   Détails:"
         echo "$PORT_INFO" | sed 's/^/      /'
     fi
 elif command -v netstat > /dev/null 2>&1; then
-    if netstat -tlnp 2>/dev/null | grep -q ":8000 "; then
+    if netstat -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
         PORT_LISTENING=true
-        PORT_INFO=$(netstat -tlnp 2>/dev/null | grep ":8000 ")
-        echo "   ✅ Port 8000 écouté"
+        PORT_INFO=$(netstat -tlnp 2>/dev/null | grep ":$APP_PORT ")
+        echo "   ✅ Port $APP_PORT écouté"
         echo "   Détails:"
         echo "$PORT_INFO" | sed 's/^/      /'
     fi
 elif command -v ss > /dev/null 2>&1; then
-    if ss -tlnp 2>/dev/null | grep -q ":8000 "; then
+    if ss -tlnp 2>/dev/null | grep -q ":$APP_PORT "; then
         PORT_LISTENING=true
-        PORT_INFO=$(ss -tlnp 2>/dev/null | grep ":8000 ")
-        echo "   ✅ Port 8000 écouté"
+        PORT_INFO=$(ss -tlnp 2>/dev/null | grep ":$APP_PORT ")
+        echo "   ✅ Port $APP_PORT écouté"
         echo "   Détails:"
         echo "$PORT_INFO" | sed 's/^/      /'
     fi
 fi
 
 if [ "$PORT_LISTENING" = false ]; then
-    echo "   ❌ Port 8000 non écouté"
-    echo "   💡 Le serveur ne semble pas écouter sur le port 8000"
+    echo "   ❌ Port $APP_PORT non écouté"
+    echo "   💡 Le serveur ne semble pas écouter sur le port $APP_PORT"
     echo "   📋 Vérifiez les logs: tail -f backend/server.log"
     exit 1
 fi
@@ -67,7 +82,7 @@ echo ""
 # 3. Vérifier sur quelle interface le port est écouté
 echo "3️⃣  Interface d'écoute..."
 if command -v lsof > /dev/null 2>&1; then
-    LISTEN_ADDR=$(lsof -Pi :8000 -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
+    LISTEN_ADDR=$(lsof -Pi :$APP_PORT -sTCP:LISTEN 2>/dev/null | grep LISTEN | awk '{print $9}' | head -1)
     if echo "$LISTEN_ADDR" | grep -q "0.0.0.0\|::"; then
         echo "   ✅ Port écouté sur toutes les interfaces (0.0.0.0)"
         echo "   ✅ Accessible depuis le réseau"
@@ -85,7 +100,7 @@ echo ""
 # 4. Tester l'accès local
 echo "4️⃣  Test d'accès local (localhost)..."
 if command -v curl > /dev/null 2>&1; then
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:8000/ 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost:$APP_PORT/ 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "307" ]; then
         echo "   ✅ Serveur répond (code HTTP: $HTTP_CODE)"
     else
@@ -93,7 +108,7 @@ if command -v curl > /dev/null 2>&1; then
         echo "   📋 Vérifiez les logs: tail -f backend/server.log"
     fi
 elif command -v wget > /dev/null 2>&1; then
-    if wget -q --spider --timeout=5 http://localhost:8000/ 2>/dev/null; then
+    if wget -q --spider --timeout=5 http://localhost:$APP_PORT/ 2>/dev/null; then
         echo "   ✅ Serveur répond"
     else
         echo "   ❌ Serveur ne répond pas"
@@ -118,13 +133,13 @@ if [ -n "$IP" ]; then
     echo "   IP trouvée: $IP"
     echo ""
     echo "   📍 URL d'accès depuis le réseau:"
-    echo "      http://$IP:8000"
+    echo "      http://$IP:$APP_PORT"
     echo ""
     
     # 6. Tester l'accès depuis l'IP
     echo "6️⃣  Test d'accès depuis l'IP ($IP)..."
     if command -v curl > /dev/null 2>&1; then
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://$IP:8000/ 2>/dev/null || echo "000")
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://$IP:$APP_PORT/ 2>/dev/null || echo "000")
         if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "307" ]; then
             echo "   ✅ Serveur accessible depuis l'IP (code HTTP: $HTTP_CODE)"
         else
@@ -132,7 +147,7 @@ if [ -n "$IP" ]; then
             echo "   💡 Vérifiez le firewall de la VM"
         fi
     elif command -v wget > /dev/null 2>&1; then
-        if wget -q --spider --timeout=5 http://$IP:8000/ 2>/dev/null; then
+        if wget -q --spider --timeout=5 http://$IP:$APP_PORT/ 2>/dev/null; then
             echo "   ✅ Serveur accessible depuis l'IP"
         else
             echo "   ❌ Serveur non accessible depuis l'IP"
@@ -150,21 +165,21 @@ echo ""
 # 7. Vérifier le firewall
 echo "7️⃣  Vérification du firewall..."
 if command -v firewall-cmd > /dev/null 2>&1; then
-    if firewall-cmd --list-ports 2>/dev/null | grep -q "8000"; then
-        echo "   ✅ Port 8000 ouvert dans firewalld"
+    if firewall-cmd --list-ports 2>/dev/null | grep -q "$APP_PORT"; then
+        echo "   ✅ Port $APP_PORT ouvert dans firewalld"
     else
-        echo "   ⚠️  Port 8000 peut-être bloqué par firewalld"
+        echo "   ⚠️  Port $APP_PORT peut-être bloqué par firewalld"
         echo "   💡 Pour ouvrir (nécessite sudo):"
-        echo "      sudo firewall-cmd --permanent --add-port=8000/tcp"
+        echo "      sudo firewall-cmd --permanent --add-port=$APP_PORT/tcp"
         echo "      sudo firewall-cmd --reload"
     fi
 elif command -v ufw > /dev/null 2>&1; then
-    if ufw status 2>/dev/null | grep -q "8000"; then
-        echo "   ✅ Port 8000 ouvert dans ufw"
+    if ufw status 2>/dev/null | grep -q "$APP_PORT"; then
+        echo "   ✅ Port $APP_PORT ouvert dans ufw"
     else
-        echo "   ⚠️  Port 8000 peut-être bloqué par ufw"
+        echo "   ⚠️  Port $APP_PORT peut-être bloqué par ufw"
         echo "   💡 Pour ouvrir (nécessite sudo):"
-        echo "      sudo ufw allow 8000/tcp"
+        echo "      sudo ufw allow $APP_PORT/tcp"
     fi
 else
     echo "   ℹ️  Aucun firewall détecté (ou nécessite sudo pour vérifier)"
@@ -178,14 +193,8 @@ if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
     CONTAINER_NAME=$(hostname)
     echo "   Nom du conteneur: $CONTAINER_NAME"
     echo ""
-    echo "   ⚠️  IMPORTANT : Le port 8000 du conteneur doit être mappé vers un port externe"
-    echo ""
-    echo "   📋 Pour configurer le mapping de port, exécutez :"
-    echo "      ./docker_port_mapping.sh"
-    echo ""
-    echo "   💡 Ou depuis l'hôte Docker, utilisez :"
-    echo "      docker run -d -p EXTERNAL_PORT:8000 --name $CONTAINER_NAME [image]"
-    echo "      (remplacez EXTERNAL_PORT par un port disponible, ex: 11840)"
+    echo "   ℹ️  L'application écoute sur le port $APP_PORT dans le conteneur"
+    echo "   💡 Assurez-vous que ce port est accessible depuis l'extérieur"
 else
     echo "   ℹ️  Vous n'êtes pas dans un conteneur Docker"
 fi
@@ -212,14 +221,14 @@ fi
 if [ -n "$IP" ]; then
     # Priorité : alias configuré > hostname > IP publique > IP locale
     if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
-        URL="http://$HOST_ALIAS:8000"
+        URL="http://$HOST_ALIAS:$APP_PORT"
         echo "🌐 URL recommandée (alias configuré) :"
         echo "   $URL"
         echo "   💡 Ajoutez dans /etc/hosts (Linux/Mac) ou C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
         echo "      $HOST_ALIAS_LINE"
         echo ""
     elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
-        URL="http://$HOSTNAME_FULL:8000"
+        URL="http://$HOSTNAME_FULL:$APP_PORT"
         echo "🌐 URL recommandée (hostname) :"
         echo "   $URL"
         echo ""
@@ -228,37 +237,32 @@ if [ -n "$IP" ]; then
     # Vérifier si on est dans Docker
     if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
         echo "⚠️  Vous êtes dans un conteneur Docker"
-        echo "   Le port 8000 doit être mappé vers un port externe (ex: 11840)"
-        echo "   Utilisez l'IP publique avec le port mappé :"
+        echo "   L'application écoute sur le port $APP_PORT"
+        echo "   Utilisez l'IP publique avec le port $APP_PORT :"
         IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
         if [ -n "$IP_PUBLIC" ]; then
-            echo "   http://$IP_PUBLIC:EXTERNAL_PORT"
-            echo "   (remplacez EXTERNAL_PORT par le port mappé, ex: 11840)"
+            echo "   http://$IP_PUBLIC:$APP_PORT"
         else
-            echo "   http://IP_PUBLIQUE:EXTERNAL_PORT"
+            echo "   http://IP_PUBLIQUE:$APP_PORT"
         fi
         echo ""
-        echo "   📋 Pour configurer le mapping : ./docker_port_mapping.sh"
     else
         echo "🌐 URL à utiliser depuis un autre ordinateur sur le même réseau :"
         if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
-            echo "   http://$HOST_ALIAS:8000 (alias configuré)"
+            echo "   http://$HOST_ALIAS:$APP_PORT (alias configuré)"
             echo "   💡 N'oubliez pas d'ajouter dans /etc/hosts : $HOST_ALIAS_LINE"
         fi
         if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ]; then
-            echo "   http://$HOSTNAME_FULL:8000 (hostname)"
+            echo "   http://$HOSTNAME_FULL:$APP_PORT (hostname)"
         fi
-        echo "   http://$IP:8000 (IP locale)"
+        echo "   http://$IP:$APP_PORT (IP locale)"
     fi
     echo ""
     echo "⚠️  Si l'accès ne fonctionne pas :"
     echo "   1. Vérifiez que les deux machines sont sur le même réseau"
     echo "   2. Vérifiez le firewall de la VM (voir ci-dessus)"
-    if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
-        echo "   3. ⚠️  Vérifiez le mapping de port Docker (voir section 8)"
-    fi
-    echo "   4. Vérifiez les logs: tail -f backend/server.log"
-    echo "   5. Testez depuis la VM: curl http://localhost:8000"
+    echo "   3. Vérifiez les logs: tail -f backend/server.log"
+    echo "   4. Testez depuis la VM: curl http://localhost:$APP_PORT"
 else
     echo "⚠️  IP non déterminée. Utilisez: hostname -I"
 fi

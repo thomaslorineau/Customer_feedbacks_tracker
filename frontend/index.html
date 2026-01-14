@@ -1144,7 +1144,19 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script>
-        const API_BASE = 'http://127.0.0.1:8000';
+        // Détection automatique de l'URL du backend
+        function getApiBase() {
+            // Si on est sur localhost, utiliser le port 8000 par défaut
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                return `http://${window.location.hostname}:8000`;
+            }
+            // Sinon, utiliser le même hostname et port que la page actuelle
+            // Le backend tourne sur le même port que le frontend
+            const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+            return `${window.location.protocol}//${window.location.hostname}:${port}`;
+        }
+        
+        const API_BASE = getApiBase();
         
         // Theme Management
         function toggleTheme() {
@@ -3653,7 +3665,7 @@
             
             try {
                 // Call backend API to generate ideas with LLM
-                const response = await fetch('http://127.0.0.1:8000/generate-improvement-ideas', {
+                const response = await fetch(`${API_BASE}/generate-improvement-ideas`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
