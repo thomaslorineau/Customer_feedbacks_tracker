@@ -938,7 +938,7 @@
                 
                 <h2 style="color: var(--accent-primary); margin-bottom: 25px; text-align: center; font-size: 1.8em;">📊 Where do the statistics come from?</h2>
                 
-                <div style="color: #ddd; line-height: 1.8;">
+                <div style="color: var(--text-secondary); line-height: 1.8;">
                     <div style="margin-bottom: 25px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-left: 4px solid #00d4ff; border-radius: 8px;">
                         <h3 style="color: var(--accent-primary); margin: 0 0 10px 0; font-size: 1.2em;">🗄️ SQLite Database</h3>
                         <p style="margin: 0;">All statistics come from the SQLite database <code style="background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; color: #34d399;">complaints.db</code> located in the backend folder.</p>
@@ -1183,7 +1183,7 @@
                 </ul>
 
                 <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">⚠️ Limitations & Disclaimer</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px; background:rgba(239,68,68,0.1); padding:15px; border-radius:6px;">
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px; background:rgba(239,68,68,0.1); padding:15px; border-radius:6px;">
                     <li><strong>Data Limitations:</strong> Scraping is subject to rate limits and may not capture all posts</li>
                     <li><strong>Sentiment Accuracy:</strong> VADER sentiment analysis is statistical and may have false positives</li>
                     <li><strong>Data Privacy:</strong> This tool monitors publicly available social media data only</li>
@@ -1192,7 +1192,7 @@
                 </ul>
 
                 <h2 style="color:#ff6b6b; margin-top:30px; margin-bottom:15px;">🚫 Why Some Platforms Are Not Supported</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px; background:rgba(255,107,107,0.1); padding:15px; border-radius:6px;">
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px; background:rgba(255,107,107,0.1); padding:15px; border-radius:6px;">
                     <li><strong style="color:#ff8787;">❌ Reddit:</strong> Uses aggressive anti-scraping (403 Forbidden). Would require OAuth2 authentication and API credentials. Disabled for simplicity.</li>
                     <li><strong style="color:#ff8787;">❌ LinkedIn:</strong> Strictly prohibits automated data extraction in Terms of Service. No public API available for posts. Scraping violates legal terms.</li>
                     <li><strong style="color:#ff8787;">❌ Facebook:</strong> No public API for accessing posts. Requires special app review by Meta. Data extraction heavily restricted for privacy/security reasons.</li>
@@ -1200,7 +1200,7 @@
                 </ul>
 
                 <h2 style="color:#00d4ff; margin-top:30px; margin-bottom:15px;">🔧 Technical Details</h2>
-                <ul style="color:#ccc; line-height:1.8; margin-left:20px;">
+                <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>Backend:</strong> FastAPI (Python) with SQLite database</li>
                     <li><strong>Frontend:</strong> Vanilla JavaScript with localStorage for backlog persistence</li>
                     <li><strong>Sentiment:</strong> VADER SentimentIntensityAnalyzer</li>
@@ -1589,7 +1589,10 @@
                 showToast('Removing duplicate posts from database...', 'info');
                 
                 const response = await fetch(`${API_BASE}/admin/cleanup-duplicates`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
                 
                 if (response.ok) {
