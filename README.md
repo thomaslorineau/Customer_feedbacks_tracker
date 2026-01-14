@@ -20,12 +20,24 @@ The application collects **real customer feedback** from the following sources:
 | **Stack Overflow** | ❓ Q&A Platform | Customer technical support questions about OVH | Real data |
 | **Reddit** | 🔗 Social Community | Reddit discussions and posts about OVH products | Real data (RSS feeds) |
 | **Google News** | 📰 News Aggregator | News articles and press coverage about OVH | Real data |
+| **OVH Forum** | 💬 Community Forum | Official OVH Community Forum discussions | Real data |
+| **Mastodon** | 🐘 Social Network | Mastodon posts about OVH products | Real data |
+| **G2 Crowd** | ⭐ Review Platform | B2B software reviews and ratings | Real data |
 
 ### ❌ Not Supported
 
 - **Hacker News**: Decommissioned (not relevant for customer feedback)
 - **LinkedIn**: Strictly prohibits automated data extraction in ToS
 - **Facebook**: No public API - would violate platform terms
+
+### 🛡️ Anti-Bot Protection
+
+The application includes advanced anti-bot techniques:
+- **Realistic headers** with rotating User-Agents
+- **Human-like delays** between requests
+- **Stealth sessions** with retry strategies
+- **Selenium/Playwright support** for JavaScript-heavy sites (optional)
+- See [Anti-Bot Guide](backend/ANTI_BOT_GUIDE.md) for details
 
 ## ⚡ Key Features
 
@@ -57,7 +69,8 @@ The application collects **real customer feedback** from the following sources:
   - Supports OpenAI and Anthropic APIs
   - Rule-based fallback when LLM unavailable
   - Validation modal to accept/reject ideas
-- **Timeline & Histogram**: Visual analysis of posts over time
+- **Statistics & Analysis**: Visual analysis of posts over time
+  - Timeline & Histogram with sentiment filtering
   - Filter by sentiment, product, and date range
   - Group by day/week/month
   - Pie chart showing distribution by product
@@ -80,7 +93,12 @@ backend/
 │   │   ├── github.py        # GitHub Issues (customer experience)
 │   │   ├── stackoverflow.py  # Stack Overflow Q&A
 │   │   ├── reddit.py        # Reddit RSS feeds
-│   │   └── news.py          # Google News
+│   │   ├── news.py          # Google News
+│   │   ├── ovh_forum.py     # OVH Community Forum
+│   │   ├── mastodon.py      # Mastodon social network
+│   │   ├── g2_crowd.py      # G2 Crowd reviews
+│   │   ├── anti_bot_helpers.py  # Anti-bot protection utilities
+│   │   └── selenium_helper.py  # Browser automation (optional)
 │   └── analysis/
 │       └── sentiment.py      # VADER sentiment analysis
 ├── requirements.txt         # Python dependencies
@@ -180,6 +198,9 @@ POST /scrape/github                  # Scrape GitHub Issues
 POST /scrape/stackoverflow            # Scrape Stack Overflow
 POST /scrape/reddit                  # Scrape Reddit RSS feeds
 POST /scrape/news                    # Scrape Google News
+POST /scrape/ovh-forum               # Scrape OVH Community Forum
+POST /scrape/mastodon                # Scrape Mastodon posts
+POST /scrape/g2-crowd                # Scrape G2 Crowd reviews
 POST /generate-improvement-ideas     # Generate product improvement ideas (LLM)
 POST /admin/cleanup-duplicates       # Remove duplicate posts
 POST /admin/cleanup-hackernews-posts # Remove Hacker News posts
@@ -346,4 +367,15 @@ Contributions are welcome! Please:
 
 - [Architecture Documentation](ARCHITECTURE.md) - Detailed system architecture
 - [Test Guide](GUIDE_TEST.md) - How to test the application
-- [Audit Report](AUDIT.md) - Security and code quality audit
+- [Implementation Guide](IMPLEMENTATION.md) - Step-by-step setup and deployment guide
+- [Anti-Bot Guide](backend/ANTI_BOT_GUIDE.md) - Techniques for bypassing anti-scraping protection
+- [Audit Report](AUDIT.md) - Security and code quality audit (may be outdated)
+
+## 📸 Screenshots
+
+Screenshots of the application are available in the `docs/screenshots/` directory (to be added). Key features include:
+- Main dashboard with post cards
+- Statistics modal with timeline and pie charts
+- Backlog sidebar with comments
+- Post preview modal
+- Light and dark mode themes

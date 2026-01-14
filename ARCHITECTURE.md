@@ -26,8 +26,11 @@
 │                                    │ HTTP POST /scrape/x                     │
 │                                    │ HTTP POST /scrape/github                │
 │                                    │ HTTP POST /scrape/stackoverflow         │
-│                                    │ HTTP POST /scrape/hackernews            │
+│                                    │ HTTP POST /scrape/reddit                │
 │                                    │ HTTP POST /scrape/news                  │
+│                                    │ HTTP POST /scrape/ovh-forum            │
+│                                    │ HTTP POST /scrape/mastodon             │
+│                                    │ HTTP POST /scrape/g2-crowd             │
 │                                    ▼                                         │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
@@ -57,7 +60,7 @@
 │       │                              │                                       │
 │       ▼                              │                                       │
 │  ┌──────────────────────────────────┐│                                       │
-│  │  scraper/ (6 Scraper Modules)   ││                                       │
+│  │  scraper/ (9 Scraper Modules)   ││                                       │
 │  │                                  ││                                       │
 │  │  ├─ trustpilot.py                ││  Real Reviews                         │
 │  │  │  └─ scrape_trustpilot_reviews()│  ├─ Ratings (⭐)                     │
@@ -82,8 +85,26 @@
 │  │  │  └─ scrape_reddit()            ││  └─ RSS feeds                       │
 │  │  │     └─ feedparser (RSS)        ││                                       │
 │  │  │                                ││                                       │
-│  │  └─ news.py                       ││  News & Articles                     │
-│  │     └─ scrape_google_news()       ││  └─ feedparser (RSS)                │
+│  │  ├─ news.py                       ││  News & Articles                     │
+│  │  │  └─ scrape_google_news()       ││  └─ feedparser (RSS)                │
+│  │  │                                ││                                       │
+│  │  ├─ ovh_forum.py                  ││  OVH Community Forum                 │
+│  │  │  └─ scrape_ovh_forum()        ││  └─ HTML scraping                   │
+│  │  │     └─ BeautifulSoup           ││                                       │
+│  │  │                                ││                                       │
+│  │  ├─ mastodon.py                   ││  Mastodon Posts                      │
+│  │  │  └─ scrape_mastodon()          ││  └─ Mastodon API                     │
+│  │  │                                ││                                       │
+│  │  ├─ g2_crowd.py                   ││  G2 Crowd Reviews                    │
+│  │  │  └─ scrape_g2_crowd()         ││  └─ HTML scraping                   │
+│  │  │     └─ BeautifulSoup           ││                                       │
+│  │  │                                ││                                       │
+│  │  ├─ anti_bot_helpers.py          ││  Anti-Bot Protection                 │
+│  │  │  ├─ get_realistic_headers()   ││  └─ Headers, delays, stealth        │
+│  │  │  └─ create_stealth_session()  ││                                       │
+│  │  │                                ││                                       │
+│  │  └─ selenium_helper.py           ││  Browser Automation (Optional)       │
+│  │     └─ scrape_with_playwright()   ││  └─ For JS-heavy sites              │
 │  │        └─ RSS feeds               ││                                       │
 │  └──────────────────────────────────┘│                                       │
 │       │                               ▼                                       │
@@ -111,7 +132,7 @@
 │  │  ├─ insert_post(post: dict)        Write to DB (duplicate check)   │   │
 │  │  ├─ get_posts(limit: int)          Read from DB                    │   │
 │  │  ├─ delete_duplicate_posts()      Remove duplicates                │   │
-│  │  └─ delete_hackernews_posts()      Remove Hacker News posts        │   │
+│  │  └─ delete_duplicate_posts()      Remove duplicate posts          │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │       │                                                                      │
 │       ▼                                                                      │
@@ -199,8 +220,11 @@ auto_scrape_job()
        │   ├─ x_scraper.scrape_x_multi_queries()
        │   ├─ github.scrape_github_issues()
        │   ├─ stackoverflow.scrape_stackoverflow()
-       │   ├─ hackernews.scrape_hackernews()
-       │   └─ news.scrape_google_news()
+       │   ├─ reddit.scrape_reddit()
+       │   ├─ news.scrape_google_news()
+       │   ├─ ovh_forum.scrape_ovh_forum()
+       │   ├─ mastodon.scrape_mastodon()
+       │   └─ g2_crowd.scrape_g2_crowd()
        │
        ├─ For each scraper:
        │   ├─ Try: Scrape → Analyze → Insert
@@ -413,7 +437,9 @@ Response (200 OK - Real posts only):
 3. **Final**: Empty list (no sample data)
 
 ### Other Scrapers
-- **GitHub, Stack Overflow, Hacker News, News**: Direct API calls with retry logic
+- **GitHub, Stack Overflow, Reddit, News**: Direct API calls with retry logic
+- **OVH Forum, G2 Crowd**: HTML scraping with anti-bot protection
+- **Mastodon**: Mastodon API with hashtag search
 - **Error Handling**: Return empty list on failure, log errors for debugging
 
 ## Background Job System
