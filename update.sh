@@ -136,6 +136,13 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
     echo ""
 fi
 
+# Résoudre les conflits avec data.db avant le pull si nécessaire
+if git status --porcelain 2>/dev/null | grep -q "backend/data.db"; then
+    info "Résolution préventive des conflits avec data.db..."
+    git checkout --ours backend/data.db 2>/dev/null || true
+    git add backend/data.db 2>/dev/null || true
+fi
+
 # Faire le pull
 if git pull origin master; then
     success "Code mis à jour"
