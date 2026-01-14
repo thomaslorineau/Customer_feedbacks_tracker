@@ -236,11 +236,19 @@ if [ -n "$IP" ]; then
     # Priorité : alias configuré > hostname > IP publique > IP locale
     if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
         URL="http://$HOST_ALIAS:$APP_PORT"
-        echo "🌐 URL recommandée (alias configuré) :"
+        echo "🌐 URL recommandée pour RÉSEAU LOCAL (alias configuré) :"
         echo "   $URL"
+        echo "   ⚠️  IMPORTANT : L'alias fonctionne UNIQUEMENT pour l'IP locale ($IP)"
         echo "   💡 Ajoutez dans /etc/hosts (Linux/Mac) ou C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
         echo "      $HOST_ALIAS_LINE"
         echo ""
+        # Afficher aussi l'IP publique
+        IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
+        if [ -n "$IP_PUBLIC" ]; then
+            echo "🌐 URL pour accès INTERNET (IP publique - pas d'alias possible) :"
+            echo "   http://$IP_PUBLIC:$APP_PORT"
+            echo ""
+        fi
     elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
         URL="http://$HOSTNAME_FULL:$APP_PORT"
         echo "🌐 URL recommandée (hostname) :"
@@ -261,15 +269,25 @@ if [ -n "$IP" ]; then
         fi
         echo ""
     else
-        echo "🌐 URL à utiliser depuis un autre ordinateur sur le même réseau :"
+        echo "🌐 URL à utiliser depuis un autre ordinateur :"
+        echo ""
+        echo "   📍 Sur le RÉSEAU LOCAL :"
         if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
-            echo "   http://$HOST_ALIAS:$APP_PORT (alias configuré)"
-            echo "   💡 N'oubliez pas d'ajouter dans /etc/hosts : $HOST_ALIAS_LINE"
+            echo "      http://$HOST_ALIAS:$APP_PORT (alias - ajoutez dans /etc/hosts)"
+            echo "      http://$IP:$APP_PORT (IP locale directe)"
+        else
+            echo "      http://$IP:$APP_PORT (IP locale)"
         fi
         if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ]; then
-            echo "   http://$HOSTNAME_FULL:$APP_PORT (hostname)"
+            echo "      http://$HOSTNAME_FULL:$APP_PORT (hostname)"
         fi
-        echo "   http://$IP:$APP_PORT (IP locale)"
+        echo ""
+        IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
+        if [ -n "$IP_PUBLIC" ]; then
+            echo "   📍 Depuis INTERNET (IP publique) :"
+            echo "      http://$IP_PUBLIC:$APP_PORT"
+            echo "      ⚠️  Pas d'alias possible pour l'IP publique, utilisez directement l'IP"
+        fi
     fi
     echo ""
     echo "⚠️  Si l'accès ne fonctionne pas :"

@@ -237,11 +237,22 @@ if [[ $REPLY =~ ^[Oo]$ ]]; then
             echo "$VM_IP    $HOST_ALIAS.local" > .host_alias
             success "Alias configuré : $HOST_ALIAS.local -> $VM_IP"
             echo ""
-            info "Pour utiliser cet alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
-            echo "C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+            warning "⚠️  IMPORTANT : L'alias host fonctionne UNIQUEMENT pour l'IP locale ($VM_IP)"
+            echo "   Il ne fonctionne PAS pour l'IP publique."
+            echo ""
+            info "Pour utiliser cet alias sur votre machine locale, ajoutez dans"
+            echo "/etc/hosts (Linux/Mac) ou C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
             echo "   $VM_IP    $HOST_ALIAS.local"
             echo ""
             echo "Puis accédez à : http://$HOST_ALIAS.local:$APP_PORT"
+            echo ""
+            info "Pour l'accès depuis Internet (IP publique), utilisez directement :"
+            IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
+            if [ -n "$IP_PUBLIC" ]; then
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+            else
+                echo "   http://IP_PUBLIQUE:$APP_PORT"
+            fi
         else
             warning "Impossible de déterminer l'IP, alias non configuré"
         fi
@@ -376,18 +387,21 @@ echo ""
 URL_TO_SHARE=""
 SHARE_METHOD=""
 
-        # 1. Alias configuré
+        # 1. Alias configuré (uniquement pour IP locale)
         if [ -f ".host_alias" ]; then
             HOST_ALIAS_LINE=$(cat .host_alias)
             HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
             HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
-            if [ -n "$HOST_ALIAS" ]; then
-                echo "📍 Depuis un autre ordinateur (ALIAS - recommandé) :"
+            if [ -n "$HOST_ALIAS" ] && [ "$HOST_ALIAS_IP" = "$VM_IP" ]; then
+                echo "📍 Depuis un autre ordinateur sur le RÉSEAU LOCAL (ALIAS) :"
                 echo "   http://$HOST_ALIAS:$APP_PORT"
                 echo ""
-                echo "   ⚠️  Pour utiliser l'alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
+                echo "   ⚠️  IMPORTANT : L'alias fonctionne UNIQUEMENT pour l'IP locale ($VM_IP)"
+                echo "   Pour utiliser l'alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
                 echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
                 echo "   $HOST_ALIAS_LINE"
+                echo ""
+                echo "   ⚠️  Pour l'accès depuis Internet, utilisez l'IP publique (voir ci-dessous)"
                 echo ""
                 URL_TO_SHARE="http://$HOST_ALIAS:$APP_PORT"
                 SHARE_METHOD="alias"

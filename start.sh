@@ -178,15 +178,23 @@ if ps -p $PID > /dev/null 2>&1; then
         
         # Priorité : alias configuré > hostname > IP
         if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
-            echo "📍 Depuis un autre ordinateur sur le même réseau local (alias) :"
+            echo "📍 Depuis un autre ordinateur sur le RÉSEAU LOCAL (alias) :"
             echo "   http://$HOST_ALIAS:$APP_PORT"
             echo ""
-            echo "💡 Partagez cette URL avec vos collègues :"
-            echo "   http://$HOST_ALIAS:$APP_PORT"
-            echo ""
-            echo "⚠️  Important : Vos collègues doivent ajouter dans /etc/hosts (Linux/Mac) ou"
+            echo "   ⚠️  IMPORTANT : L'alias fonctionne UNIQUEMENT pour l'IP locale ($IP)"
+            echo "   Vos collègues doivent ajouter dans /etc/hosts (Linux/Mac) ou"
             echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
             echo "   $HOST_ALIAS_LINE"
+            echo ""
+            # Afficher aussi l'IP publique si disponible
+            IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || echo "")
+            if [ -n "$IP_PUBLIC" ]; then
+                echo "📍 Depuis Internet (IP PUBLIQUE - pas d'alias possible) :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+                echo ""
+                echo "💡 URL à partager pour accès Internet :"
+                echo "   http://$IP_PUBLIC:$APP_PORT"
+            fi
         elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
             echo "📍 Depuis un autre ordinateur sur le même réseau local (hostname) :"
             echo "   http://$HOSTNAME_FULL:$APP_PORT"
