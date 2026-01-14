@@ -2549,6 +2549,37 @@
                 data.push(noProductCount);
             }
             
+            // Check if we have data to display
+            if (labels.length === 0 || data.length === 0 || data.every(d => d === 0)) {
+                console.warn('No product data to display in pie chart');
+                // Destroy existing chart if any
+                if (productPieChart) {
+                    productPieChart.destroy();
+                    productPieChart = null;
+                }
+                // Show empty message
+                const pieContainer = canvas.parentElement;
+                if (pieContainer) {
+                    // Remove existing empty message if any
+                    const existingMsg = pieContainer.querySelector('.empty-pie-msg');
+                    if (existingMsg) existingMsg.remove();
+                    
+                    const emptyMsg = document.createElement('p');
+                    emptyMsg.className = 'empty-pie-msg';
+                    emptyMsg.style.cssText = 'color: var(--text-muted); text-align: center; padding: 40px; font-style: italic;';
+                    emptyMsg.textContent = 'No product data available. Try adjusting filters or scrape new data.';
+                    pieContainer.appendChild(emptyMsg);
+                }
+                return;
+            }
+            
+            // Remove empty message if it exists
+            const pieContainer = canvas.parentElement;
+            if (pieContainer) {
+                const existingMsg = pieContainer.querySelector('.empty-pie-msg');
+                if (existingMsg) existingMsg.remove();
+            }
+            
             // Generate colors for each product
             const colors = [
                 'rgba(0, 212, 255, 0.7)',   // Cyan
@@ -2573,7 +2604,10 @@
             
             // Create new pie chart
             const ctx = document.getElementById('productPieChart');
-            if (!ctx) return;
+            if (!ctx) {
+                console.error('Product pie chart canvas not found');
+                return;
+            }
             
             productPieChart = new Chart(ctx, {
                 type: 'pie',
