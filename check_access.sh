@@ -200,9 +200,25 @@ echo ""
 # Détecter le hostname
 HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
 
+# Vérifier si un alias host a été configuré
+HOST_ALIAS=""
+HOST_ALIAS_IP=""
+if [ -f ".host_alias" ]; then
+    HOST_ALIAS_LINE=$(cat .host_alias)
+    HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
+    HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
+fi
+
 if [ -n "$IP" ]; then
-    # Priorité : hostname > IP publique > IP locale
-    if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
+    # Priorité : alias configuré > hostname > IP publique > IP locale
+    if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
+        URL="http://$HOST_ALIAS:8000"
+        echo "🌐 URL recommandée (alias configuré) :"
+        echo "   $URL"
+        echo "   💡 Ajoutez dans /etc/hosts (Linux/Mac) ou C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+        echo "      $HOST_ALIAS_LINE"
+        echo ""
+    elif [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
         URL="http://$HOSTNAME_FULL:8000"
         echo "🌐 URL recommandée (hostname) :"
         echo "   $URL"
@@ -225,6 +241,10 @@ if [ -n "$IP" ]; then
         echo "   📋 Pour configurer le mapping : ./docker_port_mapping.sh"
     else
         echo "🌐 URL à utiliser depuis un autre ordinateur sur le même réseau :"
+        if [ -n "$HOST_ALIAS" ] && [ -n "$HOST_ALIAS_IP" ] && [ "$HOST_ALIAS_IP" = "$IP" ]; then
+            echo "   http://$HOST_ALIAS:8000 (alias configuré)"
+            echo "   💡 N'oubliez pas d'ajouter dans /etc/hosts : $HOST_ALIAS_LINE"
+        fi
         if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ]; then
             echo "   http://$HOSTNAME_FULL:8000 (hostname)"
         fi
