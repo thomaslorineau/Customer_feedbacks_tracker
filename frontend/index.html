@@ -1323,6 +1323,8 @@
         let productPieChart = null;
         let chartView = 'bar'; // 'bar' or 'line'
         let backlogView = 'card'; // 'card' or 'list'
+        let selectedProducts = new Set(); // Multi-selection for products
+        let selectedSentiments = new Set(); // Multi-selection for sentiments
 
         // LocalStorage for persistent filters
         function saveFilters() {
@@ -1342,12 +1344,19 @@
             if (saved) {
                 try {
                     const filters = JSON.parse(saved);
-                    document.getElementById('searchInput').value = filters.searchInput || '';
-                    document.getElementById('keywordFilter').value = filters.keywordFilter || '';
-                    document.getElementById('sourceFilter').value = filters.sourceFilter || '';
-                    document.getElementById('sentimentFilter').value = filters.sentimentFilter || '';
-                    document.getElementById('dateFrom').value = filters.dateFrom || '';
-                    document.getElementById('dateTo').value = filters.dateTo || '';
+                    const searchInput = document.getElementById('searchInput');
+                    const keywordFilter = document.getElementById('keywordFilter');
+                    const sourceFilter = document.getElementById('sourceFilter');
+                    const sentimentFilter = document.getElementById('sentimentFilter');
+                    const dateFrom = document.getElementById('dateFrom');
+                    const dateTo = document.getElementById('dateTo');
+                    
+                    if (searchInput) searchInput.value = filters.searchInput || '';
+                    if (keywordFilter) keywordFilter.value = filters.keywordFilter || '';
+                    if (sourceFilter) sourceFilter.value = filters.sourceFilter || '';
+                    if (sentimentFilter) sentimentFilter.value = filters.sentimentFilter || '';
+                    if (dateFrom) dateFrom.value = filters.dateFrom || '';
+                    if (dateTo) dateTo.value = filters.dateTo || '';
                     console.log('✅ Filters restored from localStorage');
                 } catch (e) {
                     console.log('Could not restore filters:', e);
