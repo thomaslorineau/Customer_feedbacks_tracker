@@ -180,35 +180,46 @@ echo ""
 info "Vérification de l'environnement Docker..."
 
 IN_DOCKER=false
-if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null; then
+HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+
+# Détection Docker améliorée : /.dockerenv, cgroup, ou hostname contenant "docker"
+if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null || [[ "$HOSTNAME_FULL" == *"docker"* ]] || [[ "$HOSTNAME_FULL" == *".sdev-docker"* ]]; then
     IN_DOCKER=true
     CONTAINER_NAME=$(hostname)
-    success "Détecté : Conteneur Docker ($CONTAINER_NAME)"
+    success "Détecté : Environnement Docker"
+    echo "   Hostname: $HOSTNAME_FULL"
+    echo "   Conteneur: $CONTAINER_NAME"
     echo ""
-    warning "⚠️  IMPORTANT : Configuration du mapping de port Docker requise"
+    warning "⚠️  IMPORTANT : Configuration du mapping de port Docker"
     echo ""
-    echo "Pour rendre l'application accessible depuis l'extérieur, vous devez mapper"
-    echo "le port 8000 du conteneur vers un port externe accessible."
+    echo "Pour rendre l'application accessible depuis l'extérieur, le port 8000"
+    echo "du conteneur doit être mappé vers un port externe (ex: 11840)."
     echo ""
-    read -p "Port externe à utiliser (ex: 11840, laissez vide pour ignorer) : " EXTERNAL_PORT
+    read -p "Port externe à utiliser (ex: 11840, laissez vide si déjà mappé) : " EXTERNAL_PORT
     echo ""
     
     if [ -n "$EXTERNAL_PORT" ]; then
         info "Port externe configuré : $EXTERNAL_PORT"
         echo "$EXTERNAL_PORT" > .docker_external_port
         echo ""
-        warning "⚠️  Action requise depuis l'HÔTE Docker :"
-        echo "   1. Arrêtez ce conteneur : docker stop $CONTAINER_NAME"
-        echo "   2. Recréez avec mapping : docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME [image]"
+        warning "⚠️  ACTION REQUISE : Redémarrer le conteneur avec mapping de port"
         echo ""
-        echo "   Ou utilisez le script : ./docker_port_mapping.sh"
+        echo "Depuis l'HÔTE Docker (ou avec docker si disponible), exécutez :"
+        echo ""
+        echo "   docker stop $CONTAINER_NAME"
+        echo "   docker commit $CONTAINER_NAME ovh-tracker:latest"
+        echo "   docker rm $CONTAINER_NAME"
+        echo "   docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME ovh-tracker:latest"
         echo ""
     else
-        info "Mapping de port ignoré (vous pourrez le configurer plus tard)"
+        info "Mapping de port ignoré (supposé déjà configuré ou à faire manuellement)"
+        echo ""
+        info "Si le port n'est pas mappé, vous devrez le faire plus tard avec :"
+        echo "   ./docker_port_mapping.sh"
     fi
     echo ""
 else
-    info "Environnement standard (non-Docker)"
+    info "Environnement standard (non-Docker détecté)"
 fi
 
 # Étape 6c : Proposer un alias host
@@ -241,62 +252,83 @@ if [[ $REPLY =~ ^[Oo]$ ]]; then
     echo ""
 fi
 
-# Étape 6d : Configurer CORS automatiquement
+# Étape 6d : Configurer CORS automatiquement (intégré directement)
 info "Configuration automatique de CORS pour l'accès réseau..."
 
-if [ -f "configure_cors.sh" ]; then
-    ./configure_cors.sh > /dev/null 2>&1
-    success "CORS configuré automatiquement"
-    echo ""
-    info "Pour voir la configuration CORS :"
-    echo "   cat backend/.env | grep CORS_ORIGINS"
-else
-    warning "Script configure_cors.sh non trouvé, configuration CORS manuelle nécessaire"
-fi
-echo ""
+# Détecter toutes les URLs possibles pour CORS
+CORS_ORIGINS="http://localhost:8000,http://localhost:3000,http://localhost:8080,http://127.0.0.1:8000"
 
-# Étape 7 : Configuration optionnelle
-info "Configuration de l'application..."
-
-# Trouver l'IP de la VM
-VM_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
-if [ -z "$VM_IP" ]; then
-    VM_IP=$(ip addr show 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1 || echo "")
+# Ajouter le hostname si disponible
+if [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ]; then
+    CORS_ORIGINS="$CORS_ORIGINS,http://$HOSTNAME_FULL:8000,http://$HOSTNAME_FULL:3000"
 fi
 
-cd backend
+# Ajouter l'IP locale
+if [ -n "$VM_IP" ]; then
+    CORS_ORIGINS="$CORS_ORIGINS,http://$VM_IP:8000,http://$VM_IP:3000"
+fi
 
-# Créer le fichier .env s'il n'existe pas
-if [ ! -f ".env" ]; then
-    info "Création du fichier de configuration .env..."
-    
-    # Construire la configuration CORS
-    CORS_ORIGINS="http://localhost:8000,http://localhost:3000,http://localhost:8080"
-    if [ -n "$VM_IP" ]; then
-        CORS_ORIGINS="$CORS_ORIGINS,http://$VM_IP:8000,http://$VM_IP:3000,http://$VM_IP:8080"
+# Ajouter l'IP publique si disponible
+IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo "")
+if [ -n "$IP_PUBLIC" ]; then
+    CORS_ORIGINS="$CORS_ORIGINS,http://$IP_PUBLIC:8000"
+    # Si on a un port externe Docker, l'ajouter aussi
+    if [ -f ".docker_external_port" ]; then
+        EXTERNAL_PORT=$(cat .docker_external_port)
+        CORS_ORIGINS="$CORS_ORIGINS,http://$IP_PUBLIC:$EXTERNAL_PORT"
     fi
-    
+fi
+
+# Ajouter l'alias si configuré
+if [ -f ".host_alias" ]; then
+    HOST_ALIAS=$(cat .host_alias | awk '{print $2}')
+    if [ -n "$HOST_ALIAS" ]; then
+        CORS_ORIGINS="$CORS_ORIGINS,http://$HOST_ALIAS:8000"
+    fi
+fi
+
+# Créer/mettre à jour le fichier .env avec CORS
+cd backend
+if [ -f ".env" ]; then
+    # Mettre à jour CORS_ORIGINS si existe, sinon ajouter
+    if grep -q "^CORS_ORIGINS=" .env; then
+        sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS=$CORS_ORIGINS|" .env
+    else
+        echo "CORS_ORIGINS=$CORS_ORIGINS" >> .env
+    fi
+else
     cat > .env << EOF
 # Configuration CORS - Autoriser l'accès depuis le réseau local
 CORS_ORIGINS=$CORS_ORIGINS
 
 # Configuration LLM (optionnel - l'application fonctionne sans)
-# Décommentez et remplissez si vous avez une clé API
 # OPENAI_API_KEY=votre_cle_api_openai
 # OPENAI_MODEL=gpt-4o-mini
-
-# Ou utiliser Anthropic
-# ANTHROPIC_API_KEY=votre_cle_api_anthropic
-# LLM_PROVIDER=anthropic
-# ANTHROPIC_MODEL=claude-3-haiku-20240307
 EOF
-    
-    success "Fichier .env créé"
-else
-    info "Fichier .env existe déjà, conservation de la configuration actuelle"
+fi
+cd ..
+
+success "CORS configuré automatiquement"
+echo ""
+
+# Étape 7 : Récupérer toutes les informations réseau
+info "Collecte des informations réseau..."
+
+# Trouver l'IP locale
+VM_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+if [ -z "$VM_IP" ]; then
+    VM_IP=$(ip addr show 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1 || echo "")
 fi
 
-cd ..
+# Trouver l'IP publique
+if [ -z "$IP_PUBLIC" ]; then
+    IP_PUBLIC=$(curl -s --max-time 2 ifconfig.me 2>/dev/null || curl -s --max-time 2 ipinfo.io/ip 2>/dev/null || echo "")
+fi
+
+# Hostname
+if [ -z "$HOSTNAME_FULL" ]; then
+    HOSTNAME_FULL=$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo "")
+fi
 
 echo ""
 
@@ -311,12 +343,10 @@ fi
 
 echo ""
 
-# Résumé
+# Résumé final avec toutes les informations
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 success "Installation terminée avec succès !"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-info "Prochaines étapes :"
 echo ""
 
 # Afficher les instructions Docker si applicable
@@ -328,72 +358,129 @@ if [ -f ".docker_external_port" ]; then
     echo "   Le conteneur doit être redémarré avec le mapping de port."
     echo "   Depuis l'HÔTE Docker, exécutez :"
     echo ""
-    echo "   1. Arrêter le conteneur :"
-    echo "      docker stop $CONTAINER_NAME"
-    echo ""
-    echo "   2. Recréer avec mapping (port $EXTERNAL_PORT) :"
-    echo "      docker commit $CONTAINER_NAME ovh-tracker:latest"
-    echo "      docker rm $CONTAINER_NAME"
-    echo "      docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME ovh-tracker:latest"
-    echo ""
-    echo "   Ou utilisez : ./docker_port_mapping.sh pour plus de détails"
+    echo "   docker stop $CONTAINER_NAME"
+    echo "   docker commit $CONTAINER_NAME ovh-tracker:latest"
+    echo "   docker rm $CONTAINER_NAME"
+    echo "   docker run -d -p $EXTERNAL_PORT:8000 --name $CONTAINER_NAME ovh-tracker:latest"
     echo ""
 fi
 
-# Afficher l'alias host si configuré
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🌐 URLS D'ACCÈS À L'APPLICATION"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# URL locale
+echo "📍 Depuis cette machine (localhost) :"
+echo "   http://localhost:8000"
+echo ""
+
+# Priorité d'affichage : alias > hostname > IP publique > IP locale
+URL_TO_SHARE=""
+SHARE_METHOD=""
+
+# 1. Alias configuré
 if [ -f ".host_alias" ]; then
     HOST_ALIAS_LINE=$(cat .host_alias)
-    info "📝 Alias host configuré :"
-    echo "   Ajoutez dans /etc/hosts (Linux/Mac) ou"
-    echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
-    echo "   $HOST_ALIAS_LINE"
-    echo ""
+    HOST_ALIAS_IP=$(echo "$HOST_ALIAS_LINE" | awk '{print $1}')
+    HOST_ALIAS=$(echo "$HOST_ALIAS_LINE" | awk '{print $2}')
+    if [ -n "$HOST_ALIAS" ]; then
+        echo "📍 Depuis un autre ordinateur (ALIAS - recommandé) :"
+        echo "   http://$HOST_ALIAS:8000"
+        echo ""
+        echo "   ⚠️  Pour utiliser l'alias, ajoutez dans /etc/hosts (Linux/Mac) ou"
+        echo "   C:\\Windows\\System32\\drivers\\etc\\hosts (Windows) :"
+        echo "   $HOST_ALIAS_LINE"
+        echo ""
+        URL_TO_SHARE="http://$HOST_ALIAS:8000"
+        SHARE_METHOD="alias"
+    fi
 fi
 
+# 2. Hostname (si pas d'alias ou en complément)
+if [ -z "$URL_TO_SHARE" ] && [ -n "$HOSTNAME_FULL" ] && [ "$HOSTNAME_FULL" != "localhost" ] && [[ "$HOSTNAME_FULL" != *"docker"* ]]; then
+    echo "📍 Depuis un autre ordinateur (HOSTNAME) :"
+    echo "   http://$HOSTNAME_FULL:8000"
+    echo ""
+    URL_TO_SHARE="http://$HOSTNAME_FULL:8000"
+    SHARE_METHOD="hostname"
+fi
+
+# 3. IP publique avec port Docker si applicable
+if [ -n "$IP_PUBLIC" ]; then
+    if [ -f ".docker_external_port" ]; then
+        EXTERNAL_PORT=$(cat .docker_external_port)
+        echo "📍 Depuis Internet (IP PUBLIQUE avec port Docker) :"
+        echo "   http://$IP_PUBLIC:$EXTERNAL_PORT"
+        echo ""
+        if [ -z "$URL_TO_SHARE" ]; then
+            URL_TO_SHARE="http://$IP_PUBLIC:$EXTERNAL_PORT"
+            SHARE_METHOD="ip_public_docker"
+        fi
+    else
+        echo "📍 Depuis Internet (IP PUBLIQUE) :"
+        echo "   http://$IP_PUBLIC:8000"
+        echo ""
+        if [ -z "$URL_TO_SHARE" ]; then
+            URL_TO_SHARE="http://$IP_PUBLIC:8000"
+            SHARE_METHOD="ip_public"
+        fi
+    fi
+fi
+
+# 4. IP locale
+if [ -n "$VM_IP" ]; then
+    echo "📍 Depuis le réseau local (IP INTERNE) :"
+    echo "   http://$VM_IP:8000"
+    echo ""
+    if [ -z "$URL_TO_SHARE" ]; then
+        URL_TO_SHARE="http://$VM_IP:8000"
+        SHARE_METHOD="ip_local"
+    fi
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ -n "$URL_TO_SHARE" ]; then
+    echo "💡 URL À PARTAGER AVEC VOS COLLÈGUES :"
+    echo "   $URL_TO_SHARE"
+    if [ "$SHARE_METHOD" = "alias" ]; then
+        echo ""
+        echo "   ⚠️  N'oubliez pas : vos collègues doivent ajouter l'alias dans /etc/hosts"
+    elif [ "$SHARE_METHOD" = "ip_public_docker" ] || [ "$SHARE_METHOD" = "ip_public" ]; then
+        echo ""
+        echo "   ⚠️  Vérifiez que le port est ouvert dans le firewall"
+    elif [ "$SHARE_METHOD" = "ip_local" ]; then
+        echo ""
+        echo "   ⚠️  Les deux machines doivent être sur le même réseau local"
+    fi
+else
+    echo "⚠️  Impossible de déterminer l'URL d'accès réseau"
+    echo "   Utilisez : ./check_access.sh pour plus d'informations"
+fi
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+echo "📋 Prochaines étapes :"
+echo ""
 echo "1. Démarrer l'application :"
 echo "   cd $INSTALL_DIR"
 echo "   ./start.sh"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🌐 ACCÈS À L'APPLICATION"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "2. Vérifier l'accessibilité :"
+echo "   ./check_access.sh"
 echo ""
-if [ -n "$VM_IP" ]; then
-    echo "📍 Depuis cette VM (localhost) :"
-    echo "   http://localhost:8000"
-    echo ""
-    echo "📍 Depuis un autre ordinateur sur le même réseau local :"
-    echo "   http://$VM_IP:8000"
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "💡 URL À PARTAGER AVEC VOS COLLÈGUES :"
-    echo "   http://$VM_IP:8000"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "⚠️  Important :"
-    echo "   - Les deux machines doivent être sur le même réseau (Wi-Fi ou filaire)"
-    echo "   - Si l'accès ne fonctionne pas, vérifiez le firewall de la VM"
-    echo ""
-else
-    echo "📍 Depuis cette VM :"
-    echo "   http://localhost:8000"
-    echo ""
-    echo "📍 Pour accéder depuis le réseau, trouvez l'IP de cette VM :"
-    echo "   hostname -I"
-    echo ""
-    echo "   Puis utilisez : http://IP_TROUVEE:8000"
-    echo ""
-fi
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "2. Vérifier le statut :"
+echo "3. Vérifier le statut :"
 echo "   ./status.sh"
 echo ""
-echo "3. Voir les logs :"
-echo "   tail -f backend/server.log"
-echo ""
-echo "4. Arrêter l'application :"
-echo "   ./stop.sh"
-echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Lancer le diagnostic d'accessibilité
+echo ""
+info "Lancement du diagnostic d'accessibilité..."
+echo ""
+if [ -f "check_access.sh" ]; then
+    ./check_access.sh
+else
+    warning "Script check_access.sh non trouvé"
+fi
 
