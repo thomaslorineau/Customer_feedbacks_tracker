@@ -104,6 +104,14 @@
             border-radius: 8px;
             border-left: 3px solid #00d4ff;
             text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            background: rgba(15, 52, 96, 0.9);
+            border-left-color: #34d399;
+            transform: scale(1.05);
         }
 
         .stat-card strong {
@@ -378,6 +386,55 @@
             font-size: 0.8em;
             margin-right: 8px;
         }
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.15);
+            border-top-color: #00d4ff;
+            border-radius: 50%;
+            display: inline-block;
+            vertical-align: middle;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Job errors modal styles */
+        .job-errors-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .job-errors-modal {
+            width: 100%;
+            max-width: 980px;
+            background: linear-gradient(180deg, rgba(22,22,34,0.98), rgba(18,18,28,0.98));
+            border-radius: 12px;
+            border: 1px solid rgba(239,68,68,0.12);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 18px;
+        }
+
+        .job-errors-header { display:flex; align-items:center; justify-content:space-between; gap:12px }
+        .job-errors-title { color:#ffb3b3; margin:0; font-size:1.1em }
+        .job-errors-actions button { margin-left:8px; }
+
+        .btn { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:600 }
+        .btn-ghost { background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.06) }
+        .btn-primary { background:#7c3aed; color:#fff }
+        .btn-danger { background:#ef4444; color:#fff }
+        .btn-copy { background:#00d4ff; color:#10203a }
+
+        .job-errors-content { margin-top:12px; max-height:520px; overflow:auto; font-family:monospace; font-size:0.92em; color:#ffdede; white-space:pre-wrap; }
     </style>
 </head>
 <body>
@@ -391,6 +448,13 @@
         <!-- Row 1: Filters & Timeline -->
         <div class="controls" style="margin-bottom: 15px; border-bottom: 1px solid rgba(0, 212, 255, 0.2); padding-bottom: 15px;">
             <input type="text" id="searchInput" placeholder="Search posts...">
+            
+            <select id="languageFilter">
+                <option value="">All Languages</option>
+                <option value="fr">🇫🇷 Français (French)</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="other">🌍 Other</option>
+            </select>
             
             <select id="keywordFilter">
                 <option value="">All Keywords</option>
@@ -427,6 +491,35 @@
             </select>
         </div>
 
+        <!-- Keywords manager: let user add up to 10 keywords and persist them -->
+        <div class="controls" style="margin-bottom:20px; gap:8px; align-items:center;">
+            <input type="text" id="keywordInput" placeholder="Add keyword (press Enter or click +)" style="min-width:220px; max-width:400px;">
+            <button onclick="addKeyword()">＋ Add</button>
+            <label style="font-size:0.9em; color:#ccc;">Limit per scrape:</label>
+            <input type="number" id="keywordLimit" min="1" max="500" value="50" style="width:90px;">
+            <button onclick="runKeywordSearches()" class="apply-btn">Run keyword searches</button>
+            <button onclick="startBackgroundJob()" style="background:#7c3aed;">Start background job</button>
+            <button onclick="clearKeywords()" style="background:#ef4444;">Clear keywords</button>
+            <div id="keywordsList" style="width:100%; margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+            <div id="keywordsSyncIndicator" style="display:none; margin-left:8px; color:#00d4ff; font-size:0.95em; align-items:center;">
+                <span class="spinner" aria-hidden="true"></span>
+                <span style="margin-left:8px; vertical-align:middle;">Syncing…</span>
+            </div>
+            <div id="jobPanel" style="display:none; margin-left:12px; color:#fff; font-size:0.95em;">
+                <div style="margin-top:8px;">
+                    <strong id="jobStatusText">Job: —</strong>
+                    <div id="jobProgress" style="margin-top:6px; font-size:0.9em; color:#ccc;"></div>
+                    <div style="margin-top:6px;">
+                        <button id="startJobBtn" onclick="startBackgroundJob()" style="background:#7c3aed;">Start</button>
+                        <button id="cancelJobBtn" onclick="cancelBackgroundJob()" style="background:#ef4444;">Cancel Job</button>
+                    </div>
+                    <div id="jobDetails" style="margin-top:8px; font-size:0.85em; color:#aaa;"></div>
+                    <div id="jobErrors" style="margin-top:8px; font-size:0.85em; color:#ffb3b3; display:none; max-height:140px; overflow:auto; border-left:2px solid rgba(239,68,68,0.2); padding-left:8px;"></div>
+                    <button id="toggleErrorsBtn" onclick="openJobErrorsModal()" style="margin-top:8px; display:none; background:#ff8b8b;">Voir erreurs détaillées</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Row 2: Scraping buttons -->
         <div class="controls" style="margin-bottom: 30px;">
             <button onclick="scrapeX()">Scrape X/Twitter</button>
@@ -441,19 +534,19 @@
         </div>
 
         <div class="stats">
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterBySentiment('')">
                 <strong id="totalPosts">0</strong>
                 <small>Total Posts</small>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterBySentiment('positive')">
                 <strong id="positivePosts">0</strong>
                 <small>Positive</small>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterBySentiment('negative')">
                 <strong id="negativePosts">0</strong>
                 <small>Negative</small>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" onclick="filterBySentiment('neutral')">
                 <strong id="neutralPosts">0</strong>
                 <small>Neutral</small>
             </div>
@@ -722,7 +815,9 @@
             },
         ];
 
-        let allPosts = [...mockPosts];
+        let allPosts = [];
+        let currentOffset = 0;
+        const postsPerPage = 20;
 
         function formatDate(dateStr) {
             const date = new Date(dateStr);
@@ -760,6 +855,7 @@
             const toDisplay = dateTo ? new Date(dateTo).toLocaleDateString('fr-FR') : 'today';
             
             addLog(`📅 Filtering from ${fromDisplay} to ${toDisplay}`, 'info');
+            currentOffset = 0;
             renderGallery();
         }
 
@@ -769,6 +865,7 @@
             const sourceFilter = document.getElementById('sourceFilter').value;
             const sentimentFilter = document.getElementById('sentimentFilter').value;
             const keywordFilter = document.getElementById('keywordFilter').value;
+            const languageFilter = document.getElementById('languageFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
@@ -787,6 +884,7 @@
                 const matchesSearch = postContent.includes(searchTerm) || post.author.toLowerCase().includes(searchTerm);
                 const matchesSource = !sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
+                const matchesLanguage = !languageFilter || post.language === languageFilter;
                 
                 // Keyword filter
                 let matchesKeyword = true;
@@ -802,7 +900,7 @@
                     if (dateTo && postDate > dateTo) matchesDate = false;
                 }
                 
-                return matchesSearch && matchesSource && matchesSentiment && matchesKeyword && matchesDate;
+                return matchesSearch && matchesSource && matchesSentiment && matchesKeyword && matchesDate && matchesLanguage;
             });
 
             updateStats(filtered);
@@ -812,11 +910,16 @@
                 return;
             }
 
-            gallery.innerHTML = filtered.map(post => `
+            // Pagination
+            const totalPosts = filtered.length;
+            const paginated = filtered.slice(currentOffset, currentOffset + postsPerPage);
+
+            gallery.innerHTML = paginated.map(post => `
                 <div class="post-card">
                     <div class="post-header">
                         <span class="${getSourceClass(post.source)}">${post.source}</span>
                         <span class="post-date">${formatDate(post.created_at)}</span>
+                        ${post.language ? `<span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px;">${post.language.toUpperCase()}</span>` : ''}
                     </div>
                     <div class="post-author">@${post.author}</div>
                     <div class="post-content">${post.content}</div>
@@ -829,6 +932,32 @@
                     </div>
                 </div>
             `).join('');
+
+            // Add load more button if there are more posts
+            if (currentOffset + postsPerPage < totalPosts) {
+                const loadMoreDiv = document.createElement('div');
+                loadMoreDiv.style.textAlign = 'center';
+                loadMoreDiv.style.marginTop = '30px';
+                loadMoreDiv.style.gridColumn = '1 / -1';
+                const loadMoreBtn = document.createElement('button');
+                loadMoreBtn.onclick = loadMorePosts;
+                loadMoreBtn.style.padding = '12px 30px';
+                loadMoreBtn.style.background = '#00d4ff';
+                loadMoreBtn.style.color = '#1a1a2e';
+                loadMoreBtn.style.border = 'none';
+                loadMoreBtn.style.borderRadius = '8px';
+                loadMoreBtn.style.cursor = 'pointer';
+                loadMoreBtn.style.fontWeight = 'bold';
+                loadMoreBtn.style.fontSize = '1em';
+                loadMoreBtn.textContent = `📥 Load More (${currentOffset + postsPerPage}/${totalPosts})`;
+                loadMoreDiv.appendChild(loadMoreBtn);
+                gallery.appendChild(loadMoreDiv);
+            }
+        }
+
+        function loadMorePosts() {
+            currentOffset += postsPerPage;
+            renderGallery();
         }
 
         function updateStats(posts) {
@@ -841,6 +970,14 @@
             document.getElementById('positivePosts').textContent = positive;
             document.getElementById('negativePosts').textContent = negative;
             document.getElementById('neutralPosts').textContent = neutral;
+        }
+
+        function filterBySentiment(sentiment) {
+            document.getElementById('sentimentFilter').value = sentiment;
+            currentOffset = 0;
+            saveFilters();
+            renderGallery();
+            addLog(`🔍 Filtering by sentiment: ${sentiment || 'All'}`, 'info');
         }
 
         // Abort controller for canceling requests
@@ -862,10 +999,11 @@
 
         async function refreshPosts() {
             try {
-                const response = await fetch(`${API_BASE}/posts?limit=100`);
+                const response = await fetch(`${API_BASE}/posts?limit=1000&offset=0`);
                 const data = await response.json();
                 if (response.ok) {
                     allPosts = data;
+                    currentOffset = 0;
                     renderGallery();
                     addLog(`✅ Loaded ${data.length} posts from database`, 'success');
                 } else {
@@ -1271,6 +1409,400 @@
         // Load filters and render
         loadFilters();
         renderGallery();
+
+        // --- Keywords manager: persist and run searches ---
+        function loadKeywords() {
+            const saved = localStorage.getItem('ovh_queries');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function saveKeywords(keywords) {
+            localStorage.setItem('ovh_queries', JSON.stringify(keywords));
+            // attempt to sync to server (fire-and-forget)
+            syncKeywordsToServer(keywords).catch(err => {
+                console.warn('Could not sync keywords to server:', err);
+            });
+        }
+
+        function renderKeywords() {
+            const list = document.getElementById('keywordsList');
+            const keywords = loadKeywords();
+            list.innerHTML = '';
+            keywords.forEach((kw, idx) => {
+                const chip = document.createElement('div');
+                chip.style.padding = '6px 10px';
+                chip.style.background = 'rgba(0,212,255,0.08)';
+                chip.style.border = '1px solid rgba(0,212,255,0.12)';
+                chip.style.borderRadius = '16px';
+                chip.style.color = '#00d4ff';
+                chip.style.fontSize = '0.9em';
+                chip.textContent = kw;
+                const rem = document.createElement('button');
+                rem.textContent = '✕';
+                rem.style.marginLeft = '8px';
+                rem.style.background = 'transparent';
+                rem.style.border = 'none';
+                rem.style.color = '#ff9b9b';
+                rem.style.cursor = 'pointer';
+                rem.onclick = () => { removeKeyword(idx); };
+                chip.appendChild(rem);
+                list.appendChild(chip);
+            });
+            if (keywords.length === 0) {
+                list.innerHTML = '<small style="color:#aaa;">No keywords defined — add some to start searches.</small>';
+            }
+        }
+
+        function addKeyword() {
+            const input = document.getElementById('keywordInput');
+            const value = (input.value || '').trim();
+            if (!value) return;
+            let keywords = loadKeywords();
+            if (keywords.length >= 10) { showToast('Max 10 keywords allowed', 'error'); return; }
+            if (keywords.includes(value)) { showToast('Keyword already added', 'error'); input.value = ''; return; }
+            keywords.push(value);
+            saveKeywords(keywords);
+            input.value = '';
+            renderKeywords();
+            showToast(`Added keyword: ${value}`, 'success');
+        }
+
+        function removeKeyword(index) {
+            let keywords = loadKeywords();
+            if (index < 0 || index >= keywords.length) return;
+            const removed = keywords.splice(index,1)[0];
+            saveKeywords(keywords);
+            renderKeywords();
+            showToast(`Removed: ${removed}`, 'info');
+        }
+
+        function clearKeywords() {
+            if (!confirm('Clear all saved keywords?')) return;
+            localStorage.removeItem('ovh_queries');
+            // also clear on server
+            saveKeywords([]);
+            renderKeywords();
+            showToast('Keywords cleared', 'success');
+        }
+
+        // Sync functions with backend
+        async function syncKeywordsToServer(keywords) {
+            showSyncIndicator(true);
+            addLog('🔁 Syncing keywords to server...', 'info');
+            try {
+                const resp = await fetch(`${API_BASE}/settings/queries`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keywords })
+                });
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    showToast(`Server sync failed: ${txt}`, 'error');
+                    addLog(`❌ Server sync failed: ${txt}`, 'error');
+                    console.warn('Server sync failed', txt);
+                } else {
+                    showToast('Keywords synced to server', 'info');
+                    addLog('✅ Keywords synced to server', 'success');
+                }
+            } catch (e) {
+                console.warn('syncKeywordsToServer error', e);
+                showToast('Network error: could not sync keywords', 'error');
+                addLog(`❌ Network error during keywords sync: ${e.message || e}`, 'error');
+            } finally {
+                showSyncIndicator(false);
+            }
+        }
+
+        async function loadKeywordsFromServer() {
+            showSyncIndicator(true);
+            try {
+                const resp = await fetch(`${API_BASE}/settings/queries`);
+                if (!resp.ok) return renderKeywords();
+                const data = await resp.json();
+                if (data && Array.isArray(data.keywords) && data.keywords.length > 0) {
+                    // overwrite local keywords with server list without re-syncing
+                    localStorage.setItem('ovh_queries', JSON.stringify(data.keywords));
+                    addLog('✅ Loaded keywords from server', 'success');
+                }
+            } catch (e) {
+                console.warn('Could not load keywords from server', e);
+                addLog('❌ Could not load keywords from server', 'error');
+            } finally {
+                showSyncIndicator(false);
+                renderKeywords();
+            }
+        }
+
+        function showSyncIndicator(show) {
+            const el = document.getElementById('keywordsSyncIndicator');
+            if (!el) return;
+            el.style.display = show ? 'inline-block' : 'none';
+        }
+
+        async function runKeywordSearches() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                showToast('No keywords to search', 'error');
+                return;
+            }
+
+            const limit = Math.max(1, Math.min(500, Number(document.getElementById('keywordLimit').value || 50)));
+            clearLogs();
+            showLogs();
+            showCancelBtn(true);
+            currentAbortController = new AbortController();
+
+            addLog(`🔎 Running searches for ${keywords.length} keywords (limit=${limit})`, 'info');
+
+            const sources = ['x','github','stackoverflow','hackernews','news','trustpilot'];
+
+            try {
+                for (const kw of keywords) {
+                    addLog(`➡️ Keyword: "${kw}"`, 'info');
+                    for (const s of sources) {
+                        const url = `${API_BASE}/scrape/${s}?query=${encodeURIComponent(kw)}&limit=${limit}`;
+                        addLog(`   • Calling ${s}...`, 'info');
+                        try {
+                            const resp = await fetch(url, { method: 'POST', signal: currentAbortController.signal });
+                            if (resp.ok) {
+                                const data = await resp.json();
+                                addLog(`   ✓ ${s}: added ${data.added}`, 'success');
+                            } else {
+                                const txt = await resp.text();
+                                addLog(`   ✗ ${s} error: ${txt}`, 'error');
+                            }
+                        } catch (e) {
+                            if (e.name === 'AbortError') {
+                                addLog('⛔ Operation aborted', 'error');
+                                throw e;
+                            } else {
+                                addLog(`   ✗ ${s} fetch failed: ${e.message}`, 'error');
+                            }
+                        }
+                    }
+                    // refresh posts after each keyword
+                    await refreshPosts();
+                }
+                showToast('Keyword searches completed', 'success');
+            } catch (e) {
+                if (e.name === 'AbortError') {
+                    showToast('Searches cancelled', 'error');
+                } else {
+                    showToast('Error during searches', 'error');
+                }
+            } finally {
+                showCancelBtn(false);
+                currentAbortController = null;
+            }
+        }
+
+        // wire Enter key to add keyword
+        document.getElementById('keywordInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); addKeyword(); }
+        });
+
+        // Render saved keywords on load
+        renderKeywords();
+
+        // Job polling / background job UI
+        let jobPollInterval = null;
+
+        function persistLastJob(jobId) {
+            if (!jobId) return localStorage.removeItem('ovh_last_job');
+            localStorage.setItem('ovh_last_job', jobId);
+        }
+
+        function loadLastJob() {
+            return localStorage.getItem('ovh_last_job');
+        }
+
+        async function startBackgroundJob() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) { showToast('No keywords to start job', 'error'); return; }
+            const limit = Math.max(1, Math.min(500, Number(document.getElementById('keywordLimit').value || 50)));
+            const concurrency = 2;
+            const delay = 0.5;
+
+            addLog('🚀 Starting background job for keywords...', 'info');
+            showLogs();
+            try {
+                const resp = await fetch(`${API_BASE}/scrape/keywords?limit=${limit}&concurrency=${concurrency}&delay=${delay}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keywords })
+                });
+                if (!resp.ok) {
+                    const txt = await resp.text();
+                    addLog(`❌ Failed to start background job: ${txt}`, 'error');
+                    showToast('Failed to start job', 'error');
+                    return;
+                }
+                const data = await resp.json();
+                const jobId = data.job_id || data.jobId || data.id;
+                if (!jobId) {
+                    addLog('❌ No job id returned from server', 'error');
+                    showToast('Server did not return job id', 'error');
+                    return;
+                }
+                persistLastJob(jobId);
+                addLog(`✅ Background job started: ${jobId}`, 'success');
+                document.getElementById('jobPanel').style.display = 'block';
+                updateJobPanel({ id: jobId, status: 'pending', progress: { total: 0, completed: 0 } });
+                // start polling
+                if (jobPollInterval) clearInterval(jobPollInterval);
+                jobPollInterval = setInterval(() => pollJobStatus(jobId), 2000);
+                // immediate poll
+                pollJobStatus(jobId);
+            } catch (e) {
+                addLog(`❌ Error starting background job: ${e.message}`, 'error');
+                showToast('Network error starting job', 'error');
+            }
+        }
+
+        async function pollJobStatus(jobId) {
+            try {
+                const resp = await fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(jobId)}`);
+                if (!resp.ok) {
+                    addLog(`❌ Could not fetch job ${jobId}: ${resp.statusText}`, 'error');
+                    return;
+                }
+                const status = await resp.json();
+                updateJobPanel(status);
+                if (status.status === 'completed' || status.status === 'failed' || status.status === 'cancelled') {
+                    clearInterval(jobPollInterval);
+                    jobPollInterval = null;
+                    persistLastJob(null);
+                    showToast(`Job ${status.status}`, status.status === 'completed' ? 'success' : 'error');
+                }
+            } catch (e) {
+                addLog(`❌ Error polling job: ${e.message}`, 'error');
+            }
+        }
+
+        function updateJobPanel(status) {
+            const statusText = document.getElementById('jobStatusText');
+            const jobProgress = document.getElementById('jobProgress');
+            const jobDetails = document.getElementById('jobDetails');
+            if (!statusText || !jobProgress || !jobDetails) return;
+            statusText.textContent = `Job: ${status.id || '–'} — ${status.status || 'unknown'}`;
+            const total = (status.progress && status.progress.total) || 0;
+            const completed = (status.progress && status.progress.completed) || 0;
+            jobProgress.innerHTML = `Progress: ${completed} / ${total}`;
+            const results = Array.isArray(status.results) ? status.results.length : (status.results && status.results.length) || 0;
+            const errors = Array.isArray(status.errors) ? status.errors.length : (status.errors && status.errors.length) || 0;
+            jobDetails.innerHTML = `ID: ${status.id || '–'} <br> Results entries: ${results} • Errors: ${errors} <br> Updated: ${status.updated_at || ''}`;
+            // also push some log lines for visibility
+            if (status.results && status.results.length > 0) {
+                const last = status.results[status.results.length-1];
+                addLog(`🔔 Task result: ${JSON.stringify(last)}`, 'info');
+            }
+            const jobErrorsEl = document.getElementById('jobErrors');
+            const toggleBtn = document.getElementById('toggleErrorsBtn');
+            if (status.errors && status.errors.length > 0) {
+                const lastE = status.errors[status.errors.length-1];
+                addLog(`⚠️ Task error: ${lastE}`, 'error');
+                if (jobErrorsEl) {
+                    jobErrorsEl.style.display = 'block';
+                    jobErrorsEl.innerHTML = status.errors.map(e => `<div style="margin-bottom:6px;">${e}</div>`).join('');
+                }
+                if (toggleBtn) toggleBtn.style.display = 'inline-block';
+            } else {
+                if (jobErrorsEl) {
+                    jobErrorsEl.style.display = 'none';
+                    jobErrorsEl.innerHTML = '';
+                }
+                if (toggleBtn) toggleBtn.style.display = 'none';
+            }
+        }
+
+        function toggleJobErrors() {
+            const el = document.getElementById('jobErrors');
+            if (!el) return;
+            el.style.display = (el.style.display === 'block') ? 'none' : 'block';
+        }
+
+        async function cancelBackgroundJob() {
+            const jobId = loadLastJob();
+            if (!jobId) {
+                showToast('No active job to cancel', 'error');
+                return;
+            }
+            try {
+                const resp = await fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+                if (resp.ok) {
+                    addLog(`🛑 Cancel requested for job ${jobId}`, 'info');
+                    persistLastJob(null);
+                    clearInterval(jobPollInterval);
+                    jobPollInterval = null;
+                    document.getElementById('jobPanel').style.display = 'none';
+                    showToast('Job cancellation requested', 'info');
+                } else {
+                    const txt = await resp.text();
+                    addLog(`❌ Cancel failed: ${txt}`, 'error');
+                    showToast('Cancel failed', 'error');
+                }
+            } catch (e) {
+                addLog(`❌ Error cancelling job: ${e.message}`, 'error');
+                showToast('Network error cancelling job', 'error');
+            }
+        }
+
+        // On load, if there's a recent job, resume polling
+        (function resumeLastJob() {
+            const last = loadLastJob();
+            if (last) {
+                document.getElementById('jobPanel').style.display = 'block';
+                jobPollInterval = setInterval(() => pollJobStatus(last), 2000);
+                pollJobStatus(last);
+            }
+        })();
+
+        // --- Job Errors Modal ---
+        // Create modal HTML dynamically and attach to body
+        (function createJobErrorsModal(){
+            const overlay = document.createElement('div');
+            overlay.id = 'jobErrorsModal';
+            overlay.className = 'job-errors-modal-overlay';
+            overlay.innerHTML = `
+                <div class="job-errors-modal" role="dialog" aria-modal="true">
+                    <div class="job-errors-header">
+                        <h3 class="job-errors-title">Erreurs du job</h3>
+                        <div class="job-errors-actions">
+                            <button id="copyErrorsBtn" class="btn btn-copy">Copier</button>
+                            <button id="downloadErrorsBtn" class="btn btn-ghost">Télécharger</button>
+                            <button id="closeErrorsBtn" class="btn btn-danger">Fermer</button>
+                        </div>
+                    </div>
+                    <div id="jobErrorsContent" class="job-errors-content"></div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // close handlers
+            document.getElementById('closeErrorsBtn').onclick = () => { overlay.style.display='none'; };
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.style.display='none'; });
+
+            document.getElementById('copyErrorsBtn').onclick = async () => {
+                const txt = document.getElementById('jobErrorsContent').innerText;
+                try { await navigator.clipboard.writeText(txt); showToast('Erreurs copiées', 'info'); } catch(e){ showToast('Impossible de copier', 'error'); }
+            };
+
+            document.getElementById('downloadErrorsBtn').onclick = () => {
+                const txt = document.getElementById('jobErrorsContent').innerText;
+                const blob = new Blob([txt], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `job-errors-${new Date().toISOString()}.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            };
+        })();
+
+        function openJobErrorsModal() {
+            const overlay = document.getElementById('jobErrorsModal');
+            const content = document.getElementById('jobErrorsContent');
+            const jobErrorsEl = document.getElementById('jobErrors');
+            if (!overlay || !content) return;
+            content.innerText = jobErrorsEl ? jobErrorsEl.innerText : 'Aucune erreur.';
+            overlay.style.display = 'flex';
+        }
     </script>
 </body>
 </html>

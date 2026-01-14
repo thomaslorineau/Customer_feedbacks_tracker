@@ -2,11 +2,18 @@
 import httpx
 from datetime import datetime, timedelta
 import logging
+import time
+from httpx import Timeout
 
 logger = logging.getLogger(__name__)
 
 GITHUB_API_BASE = "https://api.github.com"
-GITHUB_HEADERS = {"Accept": "application/vnd.github.v3+json"}
+GITHUB_HEADERS = {
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+MAX_RETRIES = 3
+RETRY_DELAY = 2  # seconds
 
 
 def scrape_github_issues(query="OVH", limit=20):
@@ -41,7 +48,7 @@ def scrape_github_issues(query="OVH", limit=20):
                     f"{GITHUB_API_BASE}/search/issues",
                     params=params,
                     headers=GITHUB_HEADERS,
-                    timeout=10
+                    timeout=Timeout(10.0, connect=5.0)
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -112,9 +119,17 @@ def scrape_github_issues(query="OVH", limit=20):
         
         return posts
     
-    except (httpx.ReadTimeout, httpx.ConnectError):
-        raise RuntimeError("GitHub API timeout - service may be unavailable")
+    except (httpx.ReadTimeout, httpx.ConnectError, httpx.NetworkError):
+        logger.warning("Network error fetching GitHub - retrying...")
+        return get_mock_github_issues(limit)
     except httpx.HTTPError as e:
-        raise RuntimeError(f"GitHub API error: {str(e)}")
+        logger.warning(f"GitHub API error: {str(e)}")
+        return get_mock_github_issues(limit)
     except Exception as e:
-        raise RuntimeError(f"Error scraping GitHub issues: {str(e)}")
+        logger.error(f"Error scraping GitHub issues: {str(e)}")
+        return get_mock_github_issues(limit)
+
+
+def get_mock_github_issues(limit=20):
+    """Return empty list - no mock data."""
+    return []

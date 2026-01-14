@@ -5,3 +5,8 @@ vaderSentiment
 httpx
 feedparser
 apscheduler
+requests
+urllib3
+beautifulsoup4
+lxml
+textblob
