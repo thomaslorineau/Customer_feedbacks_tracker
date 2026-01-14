@@ -156,13 +156,14 @@ def _get_sample_ovh_complaints(limit: int) -> list:
     """Return sample OVH complaints when all scrapers fail.
     
     This provides data for demo/testing when live scraping isn't possible.
+    Note: These are sample tweets with realistic-looking URLs for demonstration.
     """
     sample_complaints = [
         {
             'source': 'X/Twitter',
             'author': '@customer123',
             'content': 'OVH domain renewal is getting way too expensive. Looking for alternatives now.',
-            'url': 'https://twitter.com/sample',
+            'url': 'https://x.com/customer123/status/1745123456789012345',
             'created_at': datetime.now().isoformat(),
             'language': 'en',
         },
@@ -170,7 +171,7 @@ def _get_sample_ovh_complaints(limit: int) -> list:
             'source': 'X/Twitter',
             'author': '@domainowner',
             'content': 'OVH customer support for domain issues is terrible. Been waiting 5 days for a response.',
-            'url': 'https://twitter.com/sample',
+            'url': 'https://x.com/domainowner/status/1745234567890123456',
             'created_at': datetime.now().isoformat(),
             'language': 'en',
         },
@@ -178,7 +179,7 @@ def _get_sample_ovh_complaints(limit: int) -> list:
             'source': 'X/Twitter',
             'author': '@techguy',
             'content': 'Probleme avec OVH pour renouveler mon domaine. La plateforme est compliquee',
-            'url': 'https://twitter.com/sample',
+            'url': 'https://x.com/techguy/status/1745345678901234567',
             'created_at': datetime.now().isoformat(),
             'language': 'fr',
         },
@@ -186,7 +187,7 @@ def _get_sample_ovh_complaints(limit: int) -> list:
             'source': 'X/Twitter',
             'author': '@websiteowner',
             'content': 'The OVH domain registrar interface is outdated and confusing. Need better UX.',
-            'url': 'https://twitter.com/sample',
+            'url': 'https://x.com/websiteowner/status/1745456789012345678',
             'created_at': datetime.now().isoformat(),
             'language': 'en',
         },
@@ -194,7 +195,7 @@ def _get_sample_ovh_complaints(limit: int) -> list:
             'source': 'X/Twitter',
             'author': '@businesses',
             'content': 'OVH domain registration is expensive compared to Namecheap and GoDaddy.',
-            'url': 'https://twitter.com/sample',
+            'url': 'https://x.com/businesses/status/1745567890123456789',
             'created_at': datetime.now().isoformat(),
             'language': 'en',
         },

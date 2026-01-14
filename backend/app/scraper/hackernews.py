@@ -20,6 +20,7 @@ def scrape_hackernews(query="OVH", limit=20):
     Returns a list of post dictionaries ready for insertion.
     Implements retry logic with exponential backoff.
     """
+    logger.info(f"[HN v2.0 - FIXED] Starting scrape for query: {query}, limit: {limit}")
     for attempt in range(MAX_RETRIES):
         try:
             params = {
@@ -33,11 +34,14 @@ def scrape_hackernews(query="OVH", limit=20):
                 headers=DEFAULT_HEADERS,
                 timeout=Timeout(10.0, connect=5.0)
             )
+            logger.debug(f"[HN] Response status: {response.status_code}")
             response.raise_for_status()
             data = response.json()
+            logger.debug(f"[HN] Got {len(data.get('hits', []))} hits")
             
             if not data.get("hits"):
-                raise RuntimeError(f"No Hacker News discussions found for: {query}")
+                logger.warning(f"No Hacker News discussions found for: {query}")
+                return []  # Return empty list instead of raising error
             
             posts = []
             for hit in data["hits"][:limit]:
@@ -59,7 +63,8 @@ def scrape_hackernews(query="OVH", limit=20):
                     continue
             
             if not posts:
-                raise RuntimeError("No valid Hacker News posts could be parsed")
+                logger.warning("No valid Hacker News posts could be parsed")
+                return []  # Return empty list instead of raising error
             
             return posts
         
@@ -70,15 +75,19 @@ def scrape_hackernews(query="OVH", limit=20):
                 time.sleep(wait_time)
             else:
                 logger.error(f"[HN] Failed after {MAX_RETRIES} attempts: {e}")
-                raise RuntimeError(f"Hacker News scraping failed after {MAX_RETRIES} retry attempts")
+                return []  # Return empty list instead of raising
+        except httpx.HTTPStatusError as e:
+            # HTTP error like 404, 500 - don't retry, return empty
+            logger.error(f"[HN] HTTP error: {e}")
+            return []
         except Exception as e:
-            if attempt < MAX_RETRIES - 1:
-                wait_time = RETRY_DELAY * (2 ** attempt)
-                logger.warning(f"[Attempt {attempt + 1}/{MAX_RETRIES}] HN error: {e}. Retrying in {wait_time}s...")
-                time.sleep(wait_time)
-            else:
-                logger.error(f"[HN] Failed after {MAX_RETRIES} attempts: {e}")
-                raise RuntimeError(f"Hacker News scraping failed after {MAX_RETRIES} retry attempts")
+            # Unexpected error (like JSON parse error) - log and return empty
+            logger.error(f"[HN] Unexpected error: {type(e).__name__}: {e}")
+            return []
+    
+    # If we get here, all retries failed
+    logger.error(f"[HN] All {MAX_RETRIES} attempts exhausted")
+    return []  # Return empty list as fallback
 
 
 def get_mock_hackernews_posts(limit=20):

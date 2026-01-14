@@ -479,8 +479,10 @@
                 <option value="X/Twitter">Twitter/X</option>
                 <option value="Stack Overflow">Stack Overflow</option>
                 <option value="GitHub Issues">GitHub Issues</option>
+                <option value="GitHub Discussions">GitHub Discussions</option>
                 <option value="Hacker News">Hacker News</option>
                 <option value="Google News">Google News</option>
+                <option value="Trustpilot">Trustpilot</option>
             </select>
             
             <select id="sentimentFilter">
@@ -859,6 +861,19 @@
             renderGallery();
         }
 
+        function clearAllFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('sourceFilter').value = '';
+            document.getElementById('sentimentFilter').value = '';
+            document.getElementById('keywordFilter').value = '';
+            document.getElementById('languageFilter').value = '';
+            document.getElementById('dateFrom').value = '';
+            document.getElementById('dateTo').value = '';
+            currentOffset = 0;
+            addLog('🔄 All filters cleared', 'info');
+            renderGallery();
+        }
+
         function renderGallery() {
             const gallery = document.getElementById('gallery');
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
@@ -903,10 +918,34 @@
                 return matchesSearch && matchesSource && matchesSentiment && matchesKeyword && matchesDate && matchesLanguage;
             });
 
+            // Debug log to track filtering
+            if (allPosts.length !== filtered.length) {
+                console.log(`[FILTER] ${allPosts.length} total posts -> ${filtered.length} after filters`, {
+                    search: searchTerm || 'none',
+                    source: sourceFilter || 'all',
+                    sentiment: sentimentFilter || 'all',
+                    keyword: keywordFilter || 'all',
+                    language: languageFilter || 'all',
+                    dateRange: (dateFrom || dateTo) ? `${dateFrom || '*'} to ${dateTo || '*'}` : 'all'
+                });
+            }
+
             updateStats(filtered);
 
             if (filtered.length === 0) {
-                gallery.innerHTML = '<div class="empty-state"><h2>No posts found</h2><p>Try adjusting your filters or scrape more data.</p></div>';
+                const activeFilters = [];
+                if (searchTerm) activeFilters.push(`Search: "${searchTerm}"`);
+                if (sourceFilter) activeFilters.push(`Source: ${sourceFilter}`);
+                if (sentimentFilter) activeFilters.push(`Sentiment: ${sentimentFilter}`);
+                if (keywordFilter) activeFilters.push(`Keyword: ${keywordFilter}`);
+                if (languageFilter) activeFilters.push(`Language: ${languageFilter}`);
+                if (dateFrom || dateTo) activeFilters.push(`Date: ${dateFrom || '*'} to ${dateTo || '*'}`);
+                
+                const filterInfo = activeFilters.length > 0 
+                    ? `<p style="color:#ff9800;">Active filters hiding ${allPosts.length} posts:</p><ul style="text-align:left; max-width:500px; margin:15px auto;">${activeFilters.map(f => `<li>${f}</li>`).join('')}</ul><button onclick="clearAllFilters()" style="margin-top:15px; padding:12px 24px; background:#00d4ff; border:none; border-radius:8px; color:#1a1a2e; font-weight:bold; cursor:pointer;">Clear all filters</button>`
+                    : `<p>Try scraping data or adjusting your filters.</p>`;
+                
+                gallery.innerHTML = `<div class="empty-state"><h2>No posts found</h2>${filterInfo}</div>`;
                 return;
             }
 
@@ -914,12 +953,16 @@
             const totalPosts = filtered.length;
             const paginated = filtered.slice(currentOffset, currentOffset + postsPerPage);
 
-            gallery.innerHTML = paginated.map(post => `
+            gallery.innerHTML = paginated.map(post => {
+                // Detect sample/demo data
+                const isSample = post.url && (post.url.includes('/sample') || post.url.includes('/status/174'));
+                return `
                 <div class="post-card">
                     <div class="post-header">
                         <span class="${getSourceClass(post.source)}">${post.source}</span>
                         <span class="post-date">${formatDate(post.created_at)}</span>
                         ${post.language ? `<span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px;">${post.language.toUpperCase()}</span>` : ''}
+                        ${isSample ? `<span style="font-size:0.7em; background:rgba(255,152,0,0.3); padding:3px 8px; border-radius:4px; margin-left:5px; border:1px solid rgba(255,152,0,0.5);" title="Demo data - scraper returned fallback sample">📋 SAMPLE</span>` : ''}
                     </div>
                     <div class="post-author">@${post.author}</div>
                     <div class="post-content">${post.content}</div>
@@ -927,11 +970,11 @@
                         <span class="${getSentimentClass(post.sentiment_label)}">
                             ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
                         </span>
-                        <a href="${post.url}" target="_blank" class="post-url">View</a>
+                        <a href="${post.url}" target="_blank" class="post-url" ${isSample ? 'onclick="alert(\'This is sample data. Real scraper APIs require authentication keys.\'); return false;"' : ''}>View</a>
                         <button onclick="addToBacklog(${post.id})" style="margin-left:10px; padding:6px 12px; background:#0099ff; border:none; border-radius:6px; color:#fff; cursor:pointer;">Save</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
             // Add load more button if there are more posts
             if (currentOffset + postsPerPage < totalPosts) {
@@ -1002,10 +1045,11 @@
                 const response = await fetch(`${API_BASE}/posts?limit=1000&offset=0`);
                 const data = await response.json();
                 if (response.ok) {
+                    const previousCount = allPosts.length;
                     allPosts = data;
                     currentOffset = 0;
                     renderGallery();
-                    addLog(`✅ Loaded ${data.length} posts from database`, 'success');
+                    addLog(`✅ Loaded ${data.length} posts from database (${data.length - previousCount > 0 ? '+' + (data.length - previousCount) + ' new' : 'no change'})`, 'success');
                 } else {
                     addLog('❌ Failed to load posts', 'error');
                 }
@@ -1018,6 +1062,15 @@
         }
 
         async function scrapeX() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1026,10 +1079,10 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting X/Twitter scraper...', 'info');
-            addLog('📝 Using multiple queries: complaint, down, support, billing, issue', 'info');
+            addLog(`📝 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/x?query=ovh%20domain&limit=10`, {
+                const response = await fetch(`${API_BASE}/scrape/x?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
@@ -1046,7 +1099,6 @@
                 } else {
                     addLog(`❌ Error scraping X: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;
@@ -1054,6 +1106,15 @@
         }
 
         async function scrapeStackOverflow() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1062,10 +1123,10 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Stack Overflow scraper...', 'info');
-            addLog('🔍 Searching Stack Overflow for OVH questions', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/stackoverflow?query=OVH&limit=50`, {
+                const response = await fetch(`${API_BASE}/scrape/stackoverflow?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
@@ -1082,7 +1143,6 @@
                 } else {
                     addLog(`❌ Error scraping Stack Overflow: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;
@@ -1090,6 +1150,15 @@
         }
 
         async function scrapeNews() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1098,10 +1167,10 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Google News scraper...', 'info');
-            addLog('📰 Fetching RSS feed for OVH domain news', 'info');
+            addLog(`📰 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/news?query=ovh%20domain&limit=20`, {
+                const response = await fetch(`${API_BASE}/scrape/news?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
@@ -1118,7 +1187,6 @@
                 } else {
                     addLog(`❌ Error scraping News: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;
@@ -1126,6 +1194,15 @@
         }
 
         async function scrapeHackerNews() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1134,10 +1211,10 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Hacker News scraper...', 'info');
-            addLog('🔍 Searching Hacker News discussions for OVH', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/hackernews?query=OVH&limit=50`, {
+                const response = await fetch(`${API_BASE}/scrape/hackernews?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
@@ -1154,7 +1231,6 @@
                 } else {
                     addLog(`❌ Error scraping Hacker News: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;
@@ -1162,6 +1238,15 @@
         }
 
         async function scrapeGithub() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1170,16 +1255,16 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting GitHub Issues scraper...', 'info');
-            addLog('🔍 Searching GitHub API for OVH issues', 'info');
+            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/github?query=OVH&limit=50`, {
+                const response = await fetch(`${API_BASE}/scrape/github?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} issues from GitHub`, 'success');
+                    addLog(`✅ Successfully scraped ${data.added} issues/discussions from GitHub`, 'success');
                     await refreshPosts();
                 } else {
                     addLog(`❌ Error: ${data.detail}`, 'error');
@@ -1190,7 +1275,6 @@
                 } else {
                     addLog(`❌ Error scraping GitHub: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;
@@ -1199,6 +1283,15 @@
 
 
         async function scrapeTrustpilot() {
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                addLog('⚠️ No keywords configured - using default "OVH"', 'info');
+                keywords = ['OVH'];
+            }
+            
+            // Combine keywords with AND
+            const combinedQuery = keywords.join(' ');
+            
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
             clearLogs();
@@ -1207,10 +1300,10 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Trustpilot scraper...', 'info');
-            addLog('⭐ Fetching customer reviews for OVH', 'info');
+            addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/trustpilot?query=OVH%20domain&limit=50`, {
+                const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
@@ -1227,7 +1320,6 @@
                 } else {
                     addLog(`❌ Error scraping Trustpilot: ${e.message}`, 'error');
                 }
-                renderGallery();
             } finally {
                 showCancelBtn(false);
                 currentAbortController = null;

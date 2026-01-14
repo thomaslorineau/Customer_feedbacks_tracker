@@ -1,4 +1,4 @@
-"""GitHub Issues scraper for OVH complaints."""
+"""GitHub Issues and Discussions scraper for OVH complaints."""
 import httpx
 from datetime import datetime, timedelta
 import logging
@@ -18,116 +18,121 @@ RETRY_DELAY = 2  # seconds
 
 def scrape_github_issues(query="OVH", limit=20):
     """
-    Scrape GitHub issues for OVH domain customer complaints and feedback.
-    Focuses on user experience issues and service feedback, not technical bugs.
-    Returns a list of issue dictionaries ready for insertion.
+    Scrape GitHub issues AND discussions for OVH domain customer complaints and feedback.
+    Returns a list of issue/discussion dictionaries ready for insertion.
     """
+    all_posts = []
+    
     try:
-        # Build customer experience-focused queries
-        domain_keywords = [
-            "OVH domain",
-            "OVH customer",
-            "OVH support",
-            "OVH renewal",
-            "OVH experience",
-        ]
+        # 1. Search Issues
+        logger.info(f"[GitHub] Searching issues for: {query}")
+        issues = _search_github_issues(query, limit // 2)
+        all_posts.extend(issues)
         
-        all_posts = []
-        for keyword in domain_keywords:
-            try:
-                search_query = f"{keyword} is:issue"
-                
-                params = {
-                    "q": search_query,
-                    "sort": "updated",
-                    "order": "desc",
-                    "per_page": max(5, limit // len(domain_keywords)),
-                }
-                
-                response = httpx.get(
-                    f"{GITHUB_API_BASE}/search/issues",
-                    params=params,
-                    headers=GITHUB_HEADERS,
-                    timeout=Timeout(10.0, connect=5.0)
-                )
-                response.raise_for_status()
-                data = response.json()
-                
-                if not data.get("items"):
-                    logger.info(f"No GitHub issues found for: {keyword}")
-                    continue
-                
-                for issue in data["items"]:
-                    try:
-                        # Extract relevant info
-                        post = {
-                            "source": "GitHub Issues",
-                            "author": issue["user"]["login"],
-                            "content": (issue["title"] + "\n" + (issue["body"] or ""))[:500],
-                            "url": issue["html_url"],
-                            "created_at": issue["created_at"],
-                            "sentiment_score": 0.0,  # Will be analyzed in main.py
-                            "sentiment_label": "neutral",
-                        }
-                        all_posts.append(post)
-                        logger.info(f"✓ GitHub issue ({keyword}): {issue['title'][:50]}")
-                    except Exception as e:
-                        logger.warning(f"Could not parse GitHub issue: {e}")
-                        continue
-            except Exception as e:
-                logger.warning(f"Error searching for '{keyword}': {e}")
-                continue
+        # 2. Search Discussions
+        logger.info(f"[GitHub] Searching discussions for: {query}")
+        discussions = _search_github_discussions(query, limit // 2)
+        all_posts.extend(discussions)
         
         if not all_posts:
-            # Fallback: search with basic OVH term
-            search_query = "OVH domain is:issue"
-            params = {
-                "q": search_query,
-                "sort": "updated",
-                "order": "desc",
-                "per_page": limit,
-            }
-            
-            response = httpx.get(
-                f"{GITHUB_API_BASE}/search/issues",
-                params=params,
-                headers=GITHUB_HEADERS,
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-            
-            for issue in data.get("items", [])[:limit]:
-                try:
-                    post = {
-                        "source": "GitHub Issues",
-                        "author": issue["user"]["login"],
-                        "content": (issue["title"] + "\n" + (issue["body"] or ""))[:500],
-                        "url": issue["html_url"],
-                        "created_at": issue["created_at"],
-                        "sentiment_score": 0.0,
-                        "sentiment_label": "neutral",
-                    }
-                    all_posts.append(post)
-                except Exception as e:
-                    logger.warning(f"Could not parse GitHub issue: {e}")
-                    continue
+            logger.warning(f"No GitHub issues or discussions found for: {query}")
+            return []
         
-        posts = all_posts[:limit]
-        if not posts:
-            raise RuntimeError("No valid GitHub issues could be parsed")
+        logger.info(f"[GitHub] Found {len(all_posts)} items ({len(issues)} issues + {len(discussions)} discussions)")
+        return all_posts[:limit]
+    
+    except Exception as e:
+        logger.error(f"Error scraping GitHub: {str(e)}")
+        return []
+
+
+def _search_github_issues(query: str, limit: int) -> list:
+    """Search GitHub issues."""
+    try:
+        search_query = f"{query} is:issue"
+        params = {
+            "q": search_query,
+            "sort": "updated",
+            "order": "desc",
+            "per_page": min(100, limit),
+        }
+        
+        response = httpx.get(
+            f"{GITHUB_API_BASE}/search/issues",
+            params=params,
+            headers=GITHUB_HEADERS,
+            timeout=Timeout(10.0, connect=5.0)
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        posts = []
+        for issue in data.get("items", []):
+            try:
+                post = {
+                    "source": "GitHub Issues",
+                    "author": issue["user"]["login"],
+                    "content": (issue["title"] + "\n" + (issue["body"] or ""))[:500],
+                    "url": issue["html_url"],
+                    "created_at": issue["created_at"],
+                    "sentiment_score": 0.0,
+                    "sentiment_label": "neutral",
+                }
+                posts.append(post)
+                logger.debug(f"✓ GitHub issue: {issue['title'][:50]}")
+            except Exception as e:
+                logger.warning(f"Could not parse GitHub issue: {e}")
+                continue
         
         return posts
-    
-    except (httpx.ReadTimeout, httpx.ConnectError, httpx.NetworkError):
-        logger.warning("Network error fetching GitHub - retrying...")
-        return get_mock_github_issues(limit)
-    except httpx.HTTPError as e:
-        logger.warning(f"GitHub API error: {str(e)}")
-        return get_mock_github_issues(limit)
     except Exception as e:
-        logger.error(f"Error scraping GitHub issues: {str(e)}")
-        return get_mock_github_issues(limit)
+        logger.warning(f"Error searching GitHub issues: {e}")
+        return []
+
+
+def _search_github_discussions(query: str, limit: int) -> list:
+    """Search GitHub discussions using GitHub's search API."""
+    try:
+        # GitHub search supports discussions via is:discussion
+        search_query = f"{query} is:discussion"
+        params = {
+            "q": search_query,
+            "sort": "updated",
+            "order": "desc",
+            "per_page": min(100, limit),
+        }
+        
+        response = httpx.get(
+            f"{GITHUB_API_BASE}/search/issues",  # Yes, discussions are searchable via /search/issues
+            params=params,
+            headers=GITHUB_HEADERS,
+            timeout=Timeout(10.0, connect=5.0)
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        posts = []
+        for discussion in data.get("items", []):
+            try:
+                post = {
+                    "source": "GitHub Discussions",
+                    "author": discussion["user"]["login"],
+                    "content": (discussion["title"] + "\n" + (discussion["body"] or ""))[:500],
+                    "url": discussion["html_url"],
+                    "created_at": discussion["created_at"],
+                    "sentiment_score": 0.0,
+                    "sentiment_label": "neutral",
+                }
+                posts.append(post)
+                logger.debug(f"✓ GitHub discussion: {discussion['title'][:50]}")
+            except Exception as e:
+                logger.warning(f"Could not parse GitHub discussion: {e}")
+                continue
+        
+        return posts
+    except Exception as e:
+        logger.warning(f"Error searching GitHub discussions: {e}")
+        return []
 
 
 def get_mock_github_issues(limit=20):

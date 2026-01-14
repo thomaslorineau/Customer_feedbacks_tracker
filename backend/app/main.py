@@ -503,6 +503,8 @@ async def scrape_hackernews_endpoint(query: str = "OVH", limit: int = 50):
             'language': it.get('language', 'unknown'),
         })
         added += 1
+    
+    # Return success even if no items were added
     return {'added': added}
 
 
