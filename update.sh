@@ -93,19 +93,45 @@ echo ""
 # 3. Mettre à jour le code
 info "Mise à jour du code depuis GitHub..."
 
-# Vérifier s'il y a des modifications locales
+# Vérifier s'il y a des modifications locales (en excluant data.db et autres fichiers de DB)
 HAS_CHANGES=false
-if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+# Exclure les fichiers de base de données et autres fichiers qui ne doivent pas être versionnés
+EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/*.db' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__'"
+
+# Vérifier les modifications (sans les fichiers exclus)
+if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --quiet $EXCLUDE_PATTERNS 2>/dev/null; then
     HAS_CHANGES=true
     warning "Modifications locales détectées"
     info "Sauvegarde temporaire des modifications (stash)..."
-    if git stash push -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+    
+    # Essayer de stash en excluant les fichiers problématiques
+    if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
         success "Modifications sauvegardées temporairement"
     else
-        error "Impossible de sauvegarder les modifications locales"
-        echo "   Résolvez les conflits manuellement ou commitez vos changements"
-        echo "   Utilisez 'git status' pour voir les fichiers modifiés"
-        exit 1
+        # Si le stash échoue, essayer de résoudre les conflits avec data.db
+        warning "Conflit détecté avec data.db, résolution automatique..."
+        
+        # Si data.db a un conflit de merge, utiliser notre version locale
+        if git status --porcelain | grep -q "backend/data.db"; then
+            info "Résolution du conflit avec data.db (conservation de la version locale)..."
+            git checkout --ours backend/data.db 2>/dev/null || true
+            git add backend/data.db 2>/dev/null || true
+        fi
+        
+        # Réessayer le stash
+        if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+            success "Modifications sauvegardées temporairement (après résolution)"
+        else
+            error "Impossible de sauvegarder les modifications locales"
+            echo "   Résolvez les conflits manuellement ou commitez vos changements"
+            echo "   Utilisez 'git status' pour voir les fichiers modifiés"
+            echo ""
+            echo "   Pour résoudre manuellement :"
+            echo "   1. git checkout --ours backend/data.db  # Garder votre version locale"
+            echo "   2. git add backend/data.db"
+            echo "   3. Relancez ./update.sh"
+            exit 1
+        fi
     fi
     echo ""
 fi
