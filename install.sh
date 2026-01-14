@@ -364,7 +364,7 @@ echo ""
 
 # URL locale
 echo "📍 Depuis cette machine (localhost) :"
-echo "   http://localhost:8000"
+echo "   http://localhost:$APP_PORT"
 echo ""
 
 # Priorité d'affichage : alias > hostname > IP publique > IP locale
