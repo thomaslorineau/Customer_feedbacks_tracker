@@ -373,15 +373,4 @@ Contributions are welcome! Please:
 
 ## 📸 Screenshots
 
-Screenshots of the application are available in the `docs/screenshots/` directory. See [Screenshots Guide](docs/screenshots/TAKE_SCREENSHOTS.md) for instructions on taking screenshots.
-
-### Key Features Showcased:
-- **Main Dashboard**: Post cards, filters, and real-time statistics
-- **Statistics & Analysis**: Timeline, histogram, and product distribution charts
-- **Backlog Management**: Sidebar with posts, comments, and AI idea generation
-- **Post Preview**: Full content modal with metadata
-- **Filtering**: Advanced filtering by source, sentiment, product, and keywords
-- **Export**: CSV export functionality for filtered results
-- **Themes**: Light and dark mode support
-
-> **Note**: Screenshots will be added to the repository. For now, see the [Implementation Guide](IMPLEMENTATION.md) for setup instructions.
+Screenshots of the application can be added to the `docs/screenshots/` directory to showcase key features.
