@@ -172,6 +172,13 @@ fi
 rm -rf "$BACKUP_DIR"
 echo ""
 
+# 4b. Rendre tous les scripts exécutables (au cas où les permissions sont perdues)
+info "Configuration des permissions des scripts..."
+chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
+find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+success "Permissions des scripts configurées"
+echo ""
+
 # 5. Vérifier si requirements.txt a changé
 info "Vérification des dépendances..."
 if [ -f "backend/requirements.txt" ]; then

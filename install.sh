@@ -171,7 +171,12 @@ echo ""
 info "Configuration des scripts de gestion..."
 
 cd ..
-chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh update.sh 2>/dev/null || true
+# Rendre tous les scripts exécutables
+info "Configuration des permissions des scripts..."
+chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
+
+# Rendre aussi exécutables tous les scripts .sh dans le répertoire
+find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 success "Scripts configurés"
 echo ""
