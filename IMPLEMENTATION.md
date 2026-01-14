@@ -254,82 +254,57 @@ Cherchez une ligne avec une adresse qui commence par `192.168.` ou `10.` ou `172
 
 **Si vous êtes dans un conteneur Docker :**
 
-Le script d'installation détecte automatiquement si vous êtes dans un conteneur Docker et vous propose de configurer le mapping de port.
+Le script d'installation détecte automatiquement si vous êtes dans un conteneur Docker (par hostname, `/.dockerenv`, ou `cgroup`) et vous propose de configurer le port d'écoute.
 
-**Configuration du mapping de port Docker :**
+**Configuration du port d'écoute :**
 
-Pour rendre l'application accessible depuis l'extérieur du conteneur, le port 8000 du conteneur doit être mappé vers un port externe (ex: 11840).
+Sur les serveurs Docker OVH, l'application doit écouter directement sur le port externe accessible (ex: 11840) plutôt que sur le port 8000 par défaut.
 
 **Méthode automatique (lors de l'installation) :**
 
-Le script `install.sh` vous demande le port externe à utiliser. Si vous le configurez, vous devrez redémarrer le conteneur depuis l'hôte Docker avec le mapping.
-
-**Méthode manuelle :**
+Le script `install.sh` vous demande le port à utiliser (ex: 11840). La configuration est sauvegardée dans `backend/.app_config` :
 
 ```bash
-# Voir les instructions détaillées
-cd ~/apps/complaints_tracker
-./docker_port_mapping.sh
+APP_PORT=11840
 ```
 
-**Commandes à exécuter depuis l'HÔTE Docker (pas dans le conteneur) :**
-
+L'application écoutera directement sur ce port. Redémarrez avec :
 ```bash
-# 1. Arrêter le conteneur
-docker stop [nom-du-conteneur]
-
-# 2. Créer une image du conteneur
-docker commit [nom-du-conteneur] ovh-tracker:latest
-
-# 3. Supprimer l'ancien conteneur
-docker rm [nom-du-conteneur]
-
-# 4. Recréer avec mapping de port (remplacez 11840 par votre port)
-docker run -d -p 11840:8000 --name [nom-du-conteneur] ovh-tracker:latest
+./stop.sh && ./start.sh
 ```
 
 **Configuration d'un alias host (optionnel) :**
 
 Lors de l'installation, vous pouvez configurer un alias host pour un accès plus simple (ex: `ovh-tracker.local`).
 
-Le script vous demande si vous souhaitez configurer un alias et vous donne les instructions pour l'ajouter dans `/etc/hosts` (Linux/Mac) ou `C:\Windows\System32\drivers\etc\hosts` (Windows).
+⚠️ **IMPORTANT** : L'alias host fonctionne **UNIQUEMENT pour l'IP locale** (ex: `10.19.64.153`), pas pour l'IP publique.
+
+- Chaque machine doit ajouter l'alias dans son `/etc/hosts` (Linux/Mac) ou `C:\Windows\System32\drivers\etc\hosts` (Windows)
+- Pour l'accès depuis Internet, utilisez directement l'IP publique ou le hostname résolu (voir ci-dessous)
 
 #### Étape 7 : Configuration CORS pour l'accès réseau
 
-Pour permettre l'accès depuis d'autres ordinateurs du réseau, vous devez configurer CORS. Le script d'installation le fait automatiquement, mais vous pouvez le reconfigurer si nécessaire.
+Pour permettre l'accès depuis d'autres ordinateurs du réseau, vous devez configurer CORS. Le script d'installation le fait **automatiquement** et détecte :
 
-**Méthode automatique (recommandée) :**
+- Le hostname de la VM
+- L'IP locale (ex: `10.19.64.153`)
+- L'IP publique (ex: `5.196.197.1`)
+- Le hostname résolu depuis l'IP publique (reverse DNS, ex: `tlorinea.sdev-docker.ha.ovh.net`)
+- L'alias host configuré (si applicable)
+- Le port configuré (8000 par défaut, ou celui configuré dans `backend/.app_config`)
+
+La configuration CORS est automatiquement mise à jour dans `backend/.env` avec toutes les URLs possibles.
+
+**Reconfiguration manuelle (si nécessaire) :**
 
 ```bash
 cd ~/apps/complaints_tracker
 ./configure_cors.sh
 ```
 
-Ce script détecte automatiquement :
-- Le hostname de la VM
-- L'IP locale
-- L'IP publique (si accessible)
-
-Puis configure le fichier `backend/.env` avec les bonnes origines CORS.
-
-**Méthode manuelle (si nécessaire) :**
-
-```bash
-cd ~/apps/complaints_tracker/backend
-nano .env
-```
-
-Ajoutez (remplacez par vos valeurs) :
-
-```
-CORS_ORIGINS=http://localhost:8000,http://votre-hostname:8000,http://votre-ip:8000
-```
-
-> 💡 **Note** : Si vous ne configurez pas CORS, l'application fonctionnera depuis la VM, mais l'accès depuis d'autres ordinateurs pourrait être bloqué par le navigateur.
+> 💡 **Note** : La configuration CORS est automatique lors de l'installation. Vous n'avez généralement pas besoin de la reconfigurer manuellement.
 
 #### Étape 8 : Démarrer l'application
-
-Il y a deux façons de démarrer l'application :
 
 **Méthode simple (recommandée) : Utiliser les scripts fournis**
 
@@ -337,17 +312,18 @@ Il y a deux façons de démarrer l'application :
 # Retourner à la racine du projet
 cd ~/apps/complaints_tracker
 
-# Rendre les scripts exécutables (une seule fois)
-chmod +x start.sh stop.sh status.sh backup.sh
-
 # Démarrer l'application
 ./start.sh
 ```
 
+> 💡 **Note** : Les scripts se rendent automatiquement exécutables. Plus besoin de faire `chmod +x` manuellement.
+
 ✅ Si tout va bien, vous verrez :
 ```
 ✅ Serveur démarré avec succès (PID: ...)
-🌐 Accès: http://VOTRE_IP:VOTRE_PORT
+🌐 Accès:
+- Réseau local : http://10.19.64.153:11840
+- Internet : http://tlorinea.sdev-docker.ha.ovh.net:11840
 ```
 
 **Méthode manuelle :**
@@ -378,7 +354,8 @@ Une fois l'application démarrée, vous pouvez y accéder de plusieurs façons :
 **Depuis un autre ordinateur du réseau local :**
 - Ouvrez un navigateur web sur votre ordinateur
 - Allez à : `http://IP_DE_LA_VM:8000` (remplacez par l'IP que vous avez notée à l'étape 5)
-- Exemple : `http://10.19.64.153:11840` (port 11840 pour Docker OVH) ou `http://5.196.197.1:11840`
+- Exemple réseau local : `http://10.19.64.153:11840`
+- Exemple Internet : `http://tlorinea.sdev-docker.ha.ovh.net:11840` (hostname résolu automatiquement)
 
 ✅ **L'application devrait s'afficher !**
 
@@ -396,7 +373,16 @@ Si vous ne l'avez pas déjà notée, trouvez l'IP de votre VM :
 hostname -I
 ```
 
-Vous obtiendrez quelque chose comme : `10.19.64.153` (IP interne) ou `5.196.197.1` (IP publique)
+Vous obtiendrez quelque chose comme : `10.19.64.153` (IP interne)
+
+Pour l'IP publique, utilisez :
+```bash
+curl -s ifconfig.me
+```
+
+Vous obtiendrez : `5.196.197.1` (IP publique)
+
+Le hostname de l'IP publique est automatiquement résolu via reverse DNS (ex: `tlorinea.sdev-docker.ha.ovh.net`)
 
 ### Étape 2 : Construire l'URL de l'application
 
@@ -423,18 +409,19 @@ Vous pouvez maintenant partager cette URL avec vos collègues :
 ```
 Bonjour,
 
-L'application OVH Customer Feedback Tracker est maintenant disponible à l'adresse :
-http://VOTRE_IP:VOTRE_PORT
-(Remplacez VOTRE_IP et VOTRE_PORT par les valeurs détectées lors de l'installation)
+L'application OVH Customer Feedback Tracker est maintenant disponible :
 
-Vous pouvez y accéder depuis votre navigateur web si vous êtes sur le même réseau local.
+Sur le réseau local : http://10.19.64.153:11840
+Depuis Internet : http://tlorinea.sdev-docker.ha.ovh.net:11840
+
+Vous pouvez y accéder depuis votre navigateur web.
 
 Cordialement
 ```
 
 **Par message/chat :**
 ```
-L'app est disponible ici : http://VOTRE_IP:VOTRE_PORT
+L'app est disponible ici : http://tlorinea.sdev-docker.ha.ovh.net:11840
 ```
 
 ### Étape 4 : Accéder depuis un autre ordinateur
@@ -443,7 +430,9 @@ Pour accéder à l'application depuis un autre ordinateur :
 
 1. **Assurez-vous que les deux machines sont sur le même réseau** (même Wi-Fi ou même réseau filaire)
 2. **Ouvrez un navigateur web** (Chrome, Firefox, Edge, Safari, etc.)
-3. **Tapez l'URL** dans la barre d'adresse : `http://VOTRE_IP:VOTRE_PORT`
+3. **Tapez l'URL** dans la barre d'adresse :
+   - Sur le réseau local : `http://10.19.64.153:11840`
+   - Depuis Internet : `http://tlorinea.sdev-docker.ha.ovh.net:11840`
 4. **Appuyez sur Entrée**
 
 ✅ L'application devrait s'afficher !
@@ -973,9 +962,11 @@ ssh user@votre-vm
 # Arrêter l'application
 ~/apps/complaints_tracker/stop.sh
 
-# Mettre à jour le code
+# Mettre à jour le code (gère automatiquement les modifications locales)
 cd ~/apps/complaints_tracker
+git stash  # Sauvegarder les modifications locales si nécessaire
 git pull origin master
+git stash pop  # Restaurer les modifications si nécessaire
 
 # Mettre à jour les dépendances
 source venv/bin/activate
@@ -988,6 +979,8 @@ pip install -r requirements.txt --upgrade
 # Vérifier le statut
 ~/apps/complaints_tracker/status.sh
 ```
+
+> 💡 **Note** : Le script `update.sh` gère automatiquement les modifications locales via `git stash`, donc vous n'avez généralement pas besoin de le faire manuellement.
 
 ### Sauvegardes
 

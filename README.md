@@ -148,11 +148,16 @@ The script will automatically:
 - ✅ Create virtual environment
 - ✅ Install all dependencies
 - ✅ Configure the application
+- ✅ Configure port (8000 default, or custom for Docker OVH)
+- ✅ Configure CORS automatically
+- ✅ Detect hostname via reverse DNS for public IP
 
 Then start the application:
 ```bash
 ./start.sh
 ```
+
+The application will display all access URLs (local network, Internet with hostname, etc.)
 
 **Option 2: Manual Installation**
 
@@ -337,8 +342,9 @@ Some APIs have rate limiting:
 - **X/Twitter**: Nitter instances may be down, try again later
 
 ### CORS errors in browser
-- **Check CORS_ORIGINS**: Ensure your frontend URL is in the allowed origins
-- **Default ports**: Frontend should run on 3000 or 8080, or configure CORS_ORIGINS
+- **CORS is configured automatically** during installation
+- The frontend automatically detects the backend URL (no manual configuration needed)
+- If issues persist, run: `./configure_cors.sh`
 
 ### Database errors
 - **Check file permissions**: Ensure write access to `backend/data.db`
@@ -346,9 +352,10 @@ Some APIs have rate limiting:
 - **Reset database**: Delete `backend/data.db` to start fresh (loses all data)
 
 ### Frontend not loading
-- **Check backend is running**: Backend must be on `http://127.0.0.1:8000`
+- **Check backend is running**: Use `./status.sh` to verify
 - **Check browser console**: Look for JavaScript errors
-- **Check API_BASE**: Should be `http://127.0.0.1:8000` in `index.html`
+- **Frontend auto-detects backend URL**: No manual configuration needed
+- **Check port**: Ensure the port matches your configuration (see `backend/.app_config`)
 
 ## 🔧 Development
 
