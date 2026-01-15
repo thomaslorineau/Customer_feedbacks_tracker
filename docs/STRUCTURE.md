@@ -98,6 +98,9 @@ backend/
 - `POST /scrape/{source}` - Déclencher un scraper
 - `GET /api/posts` - Récupérer les posts
 - `GET /api/stats` - Statistiques
+- `GET /api/posts-for-improvement` - Posts classés par priority score (sentiment * keyword_relevance * recency)
+- `GET /api/pain-points` - Points de douleur récurrents
+- `GET /api/product-opportunities` - Opportunités par produit
 - `GET /api/logs` - Logs de scraping
 
 ---

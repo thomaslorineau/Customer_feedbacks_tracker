@@ -382,7 +382,7 @@ ovh-complaints-tracker/
 11. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
 12. **Fallback Strategies**: Scrapers use multiple strategies (HTML → API → empty list) for resilience.
 13. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters.
-14. **Opportunity Scoring**: Custom algorithm combining sentiment, recency, and engagement for prioritization.
+14. **Priority Scoring**: Multiplicative algorithm: `sentiment * keyword_relevance * recency` (0-100 scale) for accurate prioritization.
 15. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
 16. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
 
@@ -561,7 +561,7 @@ POST /scrape/jobs/{job_id}/cancel
 
 - [ ] Multi-language support (French, German, Spanish)
 - [ ] Complaint category detection (pricing, support, UX, delivery, etc.)
-- [ ] Priority scoring: `sentiment * keyword_relevance * recency`
+- [x] Priority scoring: `sentiment * keyword_relevance * recency` ✅ Implemented
 - [ ] Admin dashboard with trend charts and heatmaps
 - [ ] Email/Slack alerts for critical complaints
 - [ ] Manual tagging and flagging by support team

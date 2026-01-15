@@ -1943,38 +1943,61 @@ async def get_posts_for_improvement(
     if source and source != 'all':
         filtered = [p for p in filtered if p.get('source') == source]
     
-    # Calculate opportunity score for each post
+    # Calculate priority score for each post using: sentiment * keyword_relevance * recency
     now = time.time()
     posts_with_scores = []
+    
+    # Get pain point keywords for keyword relevance calculation
+    pain_point_keywords = []
+    pain_point_patterns = {
+        'Refund Delays': ['refund', 'rembours', 'remboursement', 'pending refund', 'delayed refund'],
+        'Billing Clarity': ['billing', 'invoice', 'facture', 'charge', 'confusing', 'unclear'],
+        'HTTPS/SSL Renewal': ['ssl', 'https', 'certificate', 'renewal', 'expired', 'certificat'],
+        'Support Response Time': ['support', 'response', 'slow', 'unresponsive', 'waiting', 'ticket'],
+        'VPS Backups': ['backup', 'vps backup', 'backup error', 'backup fail', 'sauvegarde'],
+        'Domain Issues': ['domain', 'dns', 'nameserver', 'domaine', 'expired domain'],
+        'Email Problems': ['email', 'mail', 'mx record', 'smtp', 'imap', 'exchange']
+    }
+    for pattern in pain_point_patterns.values():
+        pain_point_keywords.extend([k.lower() for k in pattern])
+    
     for post in filtered:
-        # Base score from sentiment (negative = higher)
-        sentiment_score = 0
-        if post.get('sentiment_label') == 'negative':
-            sentiment_score = 50
-        elif post.get('sentiment_label') == 'neutral':
-            sentiment_score = 20
-        else:
-            sentiment_score = 10
+        content_lower = (post.get('content', '') or '').lower()
         
-        # Recency score (last 7 days = higher)
+        # 1. Sentiment score (0-1): negative = 1.0, neutral = 0.5, positive = 0.2
+        sentiment_value = 0.0
+        if post.get('sentiment_label') == 'negative':
+            sentiment_value = 1.0
+        elif post.get('sentiment_label') == 'neutral':
+            sentiment_value = 0.5
+        else:
+            sentiment_value = 0.2
+        
+        # 2. Keyword relevance (0-1): based on pain point keywords found
+        keyword_matches = sum(1 for keyword in pain_point_keywords if keyword in content_lower)
+        # Normalize: 1+ matches = 1.0, 0 matches = 0.1 (minimum relevance)
+        keyword_relevance = min(1.0, 0.1 + (keyword_matches * 0.3))
+        
+        # 3. Recency score (0-1): exponential decay based on days ago
         post_time = post.get('created_at_timestamp', 0) or 0
         days_ago = (now - post_time) / (24 * 3600)
         if days_ago <= 7:
-            recency_score = 30
+            recency_value = 1.0
         elif days_ago <= 30:
-            recency_score = 20
+            recency_value = 0.7
+        elif days_ago <= 90:
+            recency_value = 0.4
         else:
-            recency_score = 10
+            recency_value = 0.1
         
-        # Engagement score
-        engagement = (post.get('views', 0) or 0) + (post.get('comments', 0) or 0) * 2 + (post.get('reactions', 0) or 0) * 1.5
-        engagement_score = min(engagement / 100, 20)  # Cap at 20
-        
-        opportunity_score = int(sentiment_score + recency_score + engagement_score)
+        # Priority score = sentiment * keyword_relevance * recency (0-1, scaled to 0-100)
+        priority_score = sentiment_value * keyword_relevance * recency_value
+        priority_score_scaled = int(priority_score * 100)
         
         posts_with_scores.append({
             **post,
-            'opportunity_score': opportunity_score
+            'opportunity_score': priority_score_scaled,
+            'priority_score': priority_score_scaled  # Alias for consistency
         })
     
     # Sort by opportunity score
