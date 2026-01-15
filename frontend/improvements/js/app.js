@@ -79,14 +79,14 @@ async function loadImprovementsSummary() {
             const data = await response.json();
             const summaryEl = document.getElementById('improvementsSummary');
             if (summaryEl) {
-                summaryEl.textContent = data.summary || "Analyse des opportunités d'amélioration en cours...";
+                summaryEl.textContent = data.summary || "Analyzing improvement opportunities...";
             }
         }
     } catch (error) {
         console.error('Error loading improvements summary:', error);
         const summaryEl = document.getElementById('improvementsSummary');
         if (summaryEl) {
-            summaryEl.textContent = "💡 Opportunités d'amélioration basées sur les retours clients";
+            summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
         }
     }
 }

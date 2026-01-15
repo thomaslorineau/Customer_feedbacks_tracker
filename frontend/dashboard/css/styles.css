@@ -51,21 +51,21 @@ body {
     transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Prominent Search Section - Ultra Visible */
+/* Prominent Search Section - Centered and Balanced */
 .search-section {
     background: var(--bg-card);
-    border-radius: 20px;
-    padding: 40px 48px;
-    margin: 32px auto;
-    max-width: 1000px;
+    border-radius: 16px;
+    padding: 28px 36px;
+    margin: 24px auto;
+    max-width: 700px;
     box-shadow: 
-        0 8px 32px rgba(0, 0, 0, 0.12),
-        0 4px 16px rgba(0, 153, 255, 0.1),
+        0 6px 24px rgba(0, 0, 0, 0.1),
+        0 2px 8px rgba(0, 153, 255, 0.08),
         inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    border: 2px solid var(--accent-primary);
+    border: 1px solid var(--accent-primary);
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 16px;
     align-items: center;
     position: relative;
     overflow: hidden;
@@ -92,19 +92,19 @@ body {
 .search-container-prominent {
     position: relative;
     width: 100%;
-    max-width: 900px;
+    max-width: 650px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 
 .search-icon-large {
     position: absolute;
-    left: 24px;
+    left: 18px;
     top: 50%;
     transform: translateY(-50%);
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     color: var(--accent-primary);
     pointer-events: none;
     z-index: 2;
@@ -113,17 +113,17 @@ body {
 
 .search-input-prominent {
     width: 100%;
-    padding: 22px 28px 22px 72px;
-    border: 3px solid var(--accent-primary);
-    border-radius: 16px;
+    padding: 14px 20px 14px 52px;
+    border: 2px solid var(--accent-primary);
+    border-radius: 12px;
     background: var(--input-bg);
     color: var(--text-primary);
-    font-size: 1.2em;
+    font-size: 1em;
     font-weight: 500;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     box-shadow: 
-        0 4px 20px rgba(0, 153, 255, 0.15),
-        0 2px 8px rgba(0, 0, 0, 0.08);
+        0 2px 12px rgba(0, 153, 255, 0.12),
+        0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .search-input-prominent::placeholder {

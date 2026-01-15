@@ -49,7 +49,14 @@ except locale.Error:
         pass  # Locale not available, use system default
 
 
-app = FastAPI(title="ovh-complaints-tracker")
+app = FastAPI(
+    title="OVH Customer Feedbacks Tracker API",
+    description="API for tracking and analyzing customer feedback from multiple sources (X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, etc.)",
+    version="1.0.1",
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json"
+)
 
 # Mount static files for dashboard frontend
 frontend_dashboard_path = Path(__file__).resolve().parents[2] / "frontend" / "dashboard"
@@ -1631,7 +1638,7 @@ async def get_improvements_summary():
         pain_points = pain_points_response.pain_points if hasattr(pain_points_response, 'pain_points') else []
         
         if not pain_points:
-            return {"summary": "Aucune opportunité d'amélioration identifiée pour le moment."}
+            return {"summary": "No improvement opportunities identified at this time."}
         
         # Prepare summary for LLM
         pain_points_text = "\n".join([
@@ -1639,12 +1646,12 @@ async def get_improvements_summary():
             for pp in pain_points[:5]
         ])
         
-        prompt = f"""Analyse les opportunités d'amélioration suivantes basées sur les retours clients OVH et génère UNE SEULE phrase concise (maximum 120 caractères) qui résume les principales idées d'amélioration.
+        prompt = f"""Analyze the following improvement opportunities based on OVH customer feedback and generate ONE concise sentence (maximum 120 characters) that summarizes the main improvement ideas.
 
-Opportunités identifiées:
+Identified opportunities:
 {pain_points_text}
 
-Génère une phrase en français qui résume les top idées d'amélioration de manière claire et actionnable. Ne génère QUE la phrase, sans formatage JSON ni guillemets."""
+Generate a sentence in English that summarizes the top improvement ideas in a clear and actionable way. Generate ONLY the sentence, without JSON formatting or quotes."""
         
         # Try LLM API
         api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
@@ -1663,7 +1670,7 @@ Génère une phrase en français qui résume les top idées d'amélioration de m
                             json={
                                 'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
                                 'messages': [
-                                    {'role': 'system', 'content': 'Tu es un analyste produit. Génère des résumés concis et actionnables.'},
+                                    {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
                                     {'role': 'user', 'content': prompt}
                                 ],
                                 'temperature': 0.7,
@@ -1706,17 +1713,17 @@ Génère une phrase en français qui résume les top idées d'amélioration de m
         top_3 = pain_points[:3]
         themes = [pp.title for pp in top_3]
         if len(themes) == 1:
-            summary = f"Amélioration prioritaire: {themes[0]}"
+            summary = f"Priority improvement: {themes[0]}"
         elif len(themes) == 2:
-            summary = f"Améliorations prioritaires: {themes[0]} et {themes[1]}"
+            summary = f"Priority improvements: {themes[0]} and {themes[1]}"
         else:
-            summary = f"Top améliorations: {', '.join(themes[:2])} et {themes[2] if len(themes) > 2 else 'autres'}"
+            summary = f"Top improvements: {', '.join(themes[:2])} and {themes[2] if len(themes) > 2 else 'others'}"
         
         return {"summary": summary}
         
     except Exception as e:
         logger.error(f"Error generating improvements summary: {e}")
-        return {"summary": "Analyse des opportunités d'amélioration en cours..."}
+        return {"summary": "Analyzing improvement opportunities..."}
 
 
 @app.get("/api/pain-points", response_model=PainPointsResponse)

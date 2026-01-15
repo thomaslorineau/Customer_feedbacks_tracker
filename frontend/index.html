@@ -2539,10 +2539,22 @@
 
             // Add load more button if there are more posts
             if (currentOffset + postsPerPage < totalPosts) {
+                // Remove existing load more button if any
+                const existingLoadMore = gallery.querySelector('.load-more-container');
+                if (existingLoadMore) {
+                    existingLoadMore.remove();
+                }
+                
                 const loadMoreDiv = document.createElement('div');
+                loadMoreDiv.className = 'load-more-container';
                 loadMoreDiv.style.textAlign = 'center';
                 loadMoreDiv.style.marginTop = '30px';
                 loadMoreDiv.style.gridColumn = '1 / -1';
+                loadMoreDiv.style.minHeight = '60px'; // Fixed height to prevent layout shift
+                loadMoreDiv.style.display = 'flex';
+                loadMoreDiv.style.alignItems = 'center';
+                loadMoreDiv.style.justifyContent = 'center';
+                
                 const loadMoreBtn = document.createElement('button');
                 loadMoreBtn.onclick = loadMorePosts;
                 loadMoreBtn.style.padding = '12px 30px';
@@ -2553,9 +2565,16 @@
                 loadMoreBtn.style.cursor = 'pointer';
                 loadMoreBtn.style.fontWeight = 'bold';
                 loadMoreBtn.style.fontSize = '1em';
+                loadMoreBtn.style.minWidth = '200px'; // Fixed width to prevent size changes
                 loadMoreBtn.textContent = `📥 Load More (${currentOffset + postsPerPage}/${totalPosts})`;
                 loadMoreDiv.appendChild(loadMoreBtn);
                 gallery.appendChild(loadMoreDiv);
+            } else {
+                // Remove load more button if no more posts
+                const existingLoadMore = gallery.querySelector('.load-more-container');
+                if (existingLoadMore) {
+                    existingLoadMore.remove();
+                }
             }
         }
 

@@ -787,22 +787,14 @@ function clearTimelineFilter() {
 function resetFilters() {
     if (!state) return;
     
-    // Reset to default: last 12 months
-    const now = new Date();
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(now.getMonth() - 12);
-    
-    const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-    const dateToStr = now.toISOString().split('T')[0];
-    
-    // Reset all filters
+    // Reset all filters (including dates to empty)
     state.setFilter('search', '');
     state.setFilter('sentiment', 'all');
     state.setFilter('language', 'all');
     state.setFilter('product', 'all');
     state.setFilter('source', '');
-    state.setFilter('dateFrom', dateFromStr);
-    state.setFilter('dateTo', dateToStr);
+    state.setFilter('dateFrom', ''); // Clear dates
+    state.setFilter('dateTo', ''); // Clear dates
     
     // Reset UI elements
     const globalSearch = document.getElementById('globalSearch');
@@ -817,17 +809,17 @@ function resetFilters() {
     const productFilter = document.getElementById('productFilter');
     if (productFilter) productFilter.value = 'all';
     
-    // Reset global date slicer to 12 months
+    // Reset global date slicer to empty
     const globalDateFrom = document.getElementById('globalDateFrom');
     const globalDateTo = document.getElementById('globalDateTo');
-    if (globalDateFrom) globalDateFrom.value = dateFromStr;
-    if (globalDateTo) globalDateTo.value = dateToStr;
+    if (globalDateFrom) globalDateFrom.value = '';
+    if (globalDateTo) globalDateTo.value = '';
     
-    // Reset local date inputs to 12 months
+    // Reset local date inputs to empty
     const dateFromInput = document.getElementById('dateFrom');
     const dateToInput = document.getElementById('dateTo');
-    if (dateFromInput) dateFromInput.value = dateFromStr;
-    if (dateToInput) dateToInput.value = dateToStr;
+    if (dateFromInput) dateFromInput.value = '';
+    if (dateToInput) dateToInput.value = '';
     
     // Clear critical filter flag
     state.criticalFilterActive = false;
