@@ -7,18 +7,35 @@
 │                            Frontend (Browser)                               │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  index.html (Complaint Dashboard)                                    │   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐    │   │
-│  │  │ Complaint  │  │ Complaint  │  │ Complaint  │  │ Complaint  │    │   │
-│  │  │    Card    │  │    Card    │  │    Card    │  │    Card    │    │   │
-│  │  │(Real Data) │  │(Real Data) │  │(Real Data) │  │(Real Data) │    │   │
-│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘    │   │
+│  │  Multi-Page Frontend Application                                      │   │
 │  │                                                                      │   │
-│  │  Filters: Source | Sentiment | Date | Product | Keyword            │   │
-│  │  Scrapers: Trustpilot | X | GitHub | Stack Overflow | Reddit | News│   │
-│  │  Backlog Sidebar: Card/List view | Comments | Export                │   │
-│  │  Charts: Timeline & Histogram | Product Distribution Pie Chart      │   │
-│  │  AI Ideas: LLM-powered improvement idea generation                 │   │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
+│  │  │  /scraping (Scraping & Configuration)                         │ │   │
+│  │  │  ├─ Keywords configuration                                     │ │   │
+│  │  │  ├─ LLM configuration (OpenAI/Anthropic)                       │ │   │
+│  │  │  ├─ Scraping controls & job management                         │ │   │
+│  │  │  ├─ Statistics dashboard                                       │ │   │
+│  │  │  ├─ Filters & Search                                           │ │   │
+│  │  │  └─ Posts Gallery                                              │ │   │
+│  │  └────────────────────────────────────────────────────────────────┘ │   │
+│  │                                                                      │   │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
+│  │  │  /dashboard (Dashboard Analytics)                              │ │   │
+│  │  │  ├─ What's Happening (alerts, insights, recommended actions)  │ │   │
+│  │  │  ├─ Timeline & Histogram (interactive charts)                  │ │   │
+│  │  │  ├─ Distribution per Product                                   │ │   │
+│  │  │  ├─ Posts to Address (critical & recent)                       │ │   │
+│  │  │  └─ Advanced filtering (search, sentiment, product, date)      │ │   │
+│  │  └────────────────────────────────────────────────────────────────┘ │   │
+│  │                                                                      │   │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
+│  │  │  /improvements (Improvements Opportunities)                    │ │   │
+│  │  │  ├─ Recurring Pain Points (top 5, last 30 days)               │ │   │
+│  │  │  ├─ Product Distribution (opportunity scores)                 │ │   │
+│  │  │  └─ Posts to Review (ranked by opportunity score)              │ │   │
+│  │  └────────────────────────────────────────────────────────────────┘ │   │
+│  │                                                                      │   │
+│  │  Navigation: Menu with theme toggle, consistent across all pages    │   │
 │  └──────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                         │
 │                                    │ HTTP GET /posts                         │
@@ -48,10 +65,24 @@
 │  │  ├─ POST /scrape/github             ──┤    (Real data only)         │   │
 │  │  ├─ POST /scrape/stackoverflow      ──┤                             │   │
 │  │  ├─ POST /scrape/reddit             ──┤                             │   │
-│  │  ├─ POST /scrape/news               ──┘                             │   │
+│  │  ├─ POST /scrape/news               ──┤                             │   │
+│  │  ├─ POST /scrape/ovh-forum          ──┤                             │   │
+│  │  ├─ POST /scrape/mastodon           ──┤                             │   │
+│  │  ├─ POST /scrape/g2-crowd           ──┘                             │   │
+│  │  ├─ POST /scrape/keywords           ──► Background Job System       │   │
+│  │  ├─ GET  /scrape/jobs/{job_id}     ──► Job Status                   │   │
+│  │  ├─ POST /api/recommended-actions   ──► LLM Recommended Actions      │   │
 │  │  ├─ POST /generate-improvement-ideas─► LLM Idea Generation          │   │
+│  │  ├─ GET  /api/pain-points          ──► Pain Points Analysis        │   │
+│  │  ├─ GET  /api/product-opportunities─► Opportunity Scoring           │   │
+│  │  ├─ GET  /api/posts-for-improvement─► Posts by Opportunity Score    │   │
+│  │  ├─ GET  /api/llm-config           ──► LLM Configuration            │   │
+│  │  ├─ POST /api/llm-config           ──► Save LLM Config              │   │
 │  │  ├─ POST /admin/cleanup-duplicates ──► Database Cleanup             │   │
-│  │  └─ GET /posts                      ──► Database Fetch               │   │
+│  │  ├─ GET  /posts                     ──► Database Fetch               │   │
+│  │  ├─ GET  /scraping                  ──► Serve Scraping Page          │   │
+│  │  ├─ GET  /dashboard                 ──► Serve Dashboard Page         │   │
+│  │  └─ GET  /improvements              ──► Serve Improvements Page      │   │
 │  │                                                                      │   │
 │  │  APScheduler:                                                       │   │
 │  │  └─ auto_scrape_job() runs every 3 hours                            │   │
@@ -295,7 +326,27 @@ ovh-complaints-tracker/
 │   └── test_scrapers_qa.py              # QA test for all scrapers
 │
 ├── frontend/
-│   └── index.html                        # Single-page dashboard (vanilla JS)
+│   ├── index.html                        # Scraping & Configuration page
+│   ├── css/
+│   │   └── shared-theme.css              # Shared dark/light theme
+│   ├── v2/
+│   │   ├── index.html                    # Dashboard Analytics page
+│   │   ├── css/
+│   │   │   ├── styles.css                # Dashboard styles
+│   │   │   └── navigation.css             # Navigation menu styles
+│   │   └── js/
+│   │       ├── app.js                     # Main app initialization
+│   │       ├── api.js                     # API communication
+│   │       ├── state.js                   # State management
+│   │       ├── dashboard.js               # Dashboard UI logic
+│   │       ├── charts.js                  # Chart.js visualizations
+│   │       ├── whats-happening.js         # What's Happening analysis
+│   │       ├── product-detection.js       # Product categorization
+│   │       └── version-switch.js          # Version switching logic
+│   └── improvements/
+│       ├── index.html                    # Improvements Opportunities page
+│       └── js/
+│           └── app.js                     # Improvements page logic
 │
 ├── data.db                               # SQLite database (created at runtime)
 ├── README.md                             # Project documentation
@@ -307,12 +358,14 @@ ovh-complaints-tracker/
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| **Frontend** | HTML5, CSS3, Vanilla JS | Real-time complaint dashboard, filters, backlog |
-| **Backend API** | FastAPI (Python 3.13) | HTTP endpoints, async request handling |
+| **Frontend** | HTML5, CSS3, Vanilla JS (ES6 Modules) | Multi-page application: Scraping, Dashboard, Improvements |
+| **Backend API** | FastAPI (Python 3.11/3.12) | HTTP endpoints, async request handling, static file serving |
 | **Scheduler** | APScheduler | Auto-scraping every 3 hours |
-| **Scrapers** | httpx, feedparser, snscrape | Real data from Trustpilot, X, GitHub, etc. |
+| **Scrapers** | httpx, feedparser, BeautifulSoup | Real data from Trustpilot, X (Nitter), GitHub, etc. |
 | **Sentiment** | VADER (vaderSentiment) | Classify customer sentiment in complaints |
 | **Database** | SQLite (sqlite3) | Persistent storage of real posts only |
+| **Charts** | Chart.js | Interactive timeline, histogram, and product distribution charts |
+| **LLM** | OpenAI GPT-4o-mini / Anthropic Claude 3 Haiku | AI-powered recommended actions and improvement ideas |
 
 ## Key Design Decisions
 
@@ -321,12 +374,17 @@ ovh-complaints-tracker/
 3. **SQLite**: Zero-config, file-based, good for small/medium datasets. Indexed for performance.
 4. **Duplicate Detection**: URL-based duplicate prevention to avoid data redundancy.
 5. **VADER Sentiment**: Fast, rule-based, tuned for social media language.
-6. **Vanilla JS Frontend**: No build step, easy to extend, uses localStorage for backlog persistence.
-7. **Modular Scrapers**: Each source (Trustpilot, X, GitHub, etc.) is isolated for independent development.
-8. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
-9. **APScheduler**: Background auto-scraping without external job queue.
-10. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
-11. **Fallback Strategies**: Scrapers use multiple strategies (HTML → API → empty list) for resilience.
+6. **Multi-Page Frontend**: Three dedicated pages (Scraping, Dashboard, Improvements) with shared navigation and theme.
+7. **ES6 Modules**: Frontend uses ES6 modules for better code organization and maintainability.
+8. **Modular Scrapers**: Each source (Trustpilot, X, GitHub, etc.) is isolated for independent development.
+9. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
+10. **APScheduler**: Background auto-scraping without external job queue.
+11. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
+12. **Fallback Strategies**: Scrapers use multiple strategies (HTML → API → empty list) for resilience.
+13. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters.
+14. **Opportunity Scoring**: Custom algorithm combining sentiment, recency, and engagement for prioritization.
+15. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
+16. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
 
 ## API Contract
 

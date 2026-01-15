@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OVH Feedback Tracker - Improvements Opportunities</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
+    <link rel="stylesheet" href="/v2/css/styles.css">
+    <link rel="stylesheet" href="/v2/css/navigation.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        .improvements-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px 40px;
+        }
+
+        .improvements-header {
+            margin-bottom: 30px;
+            padding: 30px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .improvements-header h1 {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0 0 10px 0;
+        }
+
+        .improvements-header p {
+            font-size: 1.1em;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .improvements-header .highlight {
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .improvements-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .pain-points-section, .product-distribution-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .pain-points-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .pain-point-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .pain-point-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .pain-point-icon {
+            font-size: 2em;
+            flex-shrink: 0;
+        }
+
+        .pain-point-content {
+            flex: 1;
+        }
+
+        .pain-point-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 6px 0;
+        }
+
+        .pain-point-description {
+            font-size: 0.95em;
+            color: var(--text-secondary);
+            margin: 0 0 8px 0;
+        }
+
+        .pain-point-posts {
+            font-size: 0.9em;
+            color: #f59e0b;
+            font-weight: 600;
+        }
+
+        .view-all-link {
+            display: inline-block;
+            margin-top: 16px;
+            color: var(--accent-primary);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95em;
+            transition: color 0.3s ease;
+        }
+
+        .view-all-link:hover {
+            color: var(--accent-secondary);
+        }
+
+        .product-distribution-chart {
+            margin-top: 20px;
+        }
+
+        .product-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .product-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .product-bar-container {
+            flex: 1;
+            height: 24px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .product-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .product-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 200px;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            min-width: 100px;
+        }
+
+        .product-score {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: var(--text-primary);
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .info-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent-primary);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            cursor: help;
+            margin-left: 6px;
+        }
+
+        .posts-review-section {
+            margin-top: 30px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .posts-review-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .posts-review-header h2 {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .search-filters-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input-wrapper {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.95em;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .results-count {
+            font-size: 0.95em;
+            color: var(--text-secondary);
+        }
+
+        .posts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .post-review-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        .post-review-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-primary);
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .post-source-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+
+        .post-content-wrapper {
+            flex: 1;
+        }
+
+        .post-meta-top {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .post-source-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .post-time {
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+
+        .post-content-text {
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .post-engagement {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .engagement-metric {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .engagement-tag {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .tag-new {
+            background: rgba(52, 211, 153, 0.2);
+            color: #34d399;
+        }
+
+        .tag-negative {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .post-score {
+            font-size: 2em;
+            font-weight: 700;
+            color: #f59e0b;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .post-action-btn {
+            padding: 10px 20px;
+            background: #f59e0b;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .post-action-btn:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+    </style>
+</head>
+<body class="has-nav-menu">
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/dashboard" class="nav-logo">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
+                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
+                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
+                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>OVH Feedback Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Scraping & Configuration</span>
+                </a>
+                <a href="/dashboard" class="nav-tab">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab active">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
+        </div>
+    </nav>
+
+    <div class="improvements-container">
+        <!-- Header -->
+        <div class="improvements-header">
+            <h1>Identify customer pain points and <span class="highlight">improvement opportunities</span> by analyzing persistent feedback across OVH products.</h1>
+        </div>
+
+        <!-- Main Grid: Pain Points & Product Distribution -->
+        <div class="improvements-grid">
+            <!-- Left: Recurring Pain Points -->
+            <div class="pain-points-section">
+                <div class="section-header">
+                    <h2>Recurring Pain Points (last 30d)</h2>
+                </div>
+                <div id="painPointsList" class="pain-points-list">
+                    <!-- Will be populated by JavaScript -->
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 16px;">Loading pain points...</p>
+                    </div>
+                </div>
+                <a href="#" id="viewAllPainPoints" class="view-all-link" style="display: none;">View All 7 Pain Points ></a>
+            </div>
+
+            <!-- Right: Distribution by Product -->
+            <div class="product-distribution-section">
+                <div class="section-header">
+                    <h2>
+                        Distribution by Product (Ranked by Opportunity Score)
+                        <span class="info-icon" title="Opportunity Score combines frequency, sentiment, and recency of feedback">i</span>
+                    </h2>
+                </div>
+                <div id="productDistribution" class="product-distribution-chart">
+                    <!-- Will be populated by JavaScript -->
+                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                        <div class="spinner" style="margin: 0 auto;"></div>
+                        <p style="margin-top: 16px;">Loading product distribution...</p>
+                    </div>
+                </div>
+                <div id="moreProductsIndicator" style="margin-top: 16px; color: #8b5cf6; font-weight: 600; cursor: pointer; display: none;">
+                    +7 Other Products
+                </div>
+            </div>
+        </div>
+
+        <!-- Posts to Review Section -->
+        <div class="posts-review-section">
+            <div class="posts-review-header">
+                <h2>Posts to Review for Improvement</h2>
+            </div>
+
+            <!-- Search and Filters -->
+            <div class="search-filters-bar">
+                <div class="search-input-wrapper">
+                    <input type="text" id="improvementsSearch" class="search-input" placeholder="Search by keyword, keyword, renewal, response...">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </div>
+                <input type="date" id="improvementsDateFrom" class="filter-select" title="From Date">
+                <select id="improvementsLanguage" class="filter-select">
+                    <option value="all">All Languages</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="en">🇬🇧 English</option>
+                </select>
+                <select id="improvementsSource" class="filter-select">
+                    <option value="all">All Sources</option>
+                    <option value="X/Twitter">🐦 Twitter/X</option>
+                    <option value="Reddit">🔴 Reddit</option>
+                    <option value="Trustpilot">⭐ Trustpilot</option>
+                    <option value="OVH Forum">💬 OVH Forum</option>
+                    <option value="News">📰 News</option>
+                </select>
+                <select id="improvementsSort" class="filter-select">
+                    <option value="opportunity_score">Sort by Opportunity Score</option>
+                    <option value="recent">Sort by Recent</option>
+                    <option value="engagement">Sort by Engagement</option>
+                </select>
+            </div>
+
+            <!-- Results Header -->
+            <div class="results-header">
+                <div class="results-count">
+                    Filters | <span id="resultsCount">0</span> Results
+                </div>
+                <select id="secondarySort" class="filter-select" style="width: auto;">
+                    <option value="opportunity_score">Sort by Opportunity Score</option>
+                </select>
+            </div>
+
+            <!-- Posts List -->
+            <div id="postsToReviewList" class="posts-list">
+                <!-- Will be populated by JavaScript -->
+                <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+                    <div class="spinner" style="margin: 0 auto;"></div>
+                    <p style="margin-top: 16px;">Loading posts...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Menu -->
+    <div class="help-menu" id="helpMenu">
+        <div class="help-menu-header">
+            <h2>📖 Help & Information</h2>
+            <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
+        </div>
+        <div class="help-menu-content">
+            <h3>💡 Improvements Opportunities</h3>
+            <p>
+                This page helps you <strong>identify customer pain points</strong> and <strong>prioritize improvement opportunities</strong> by analyzing persistent feedback patterns across OVH products.
+            </p>
+
+            <h3>📊 Page Sections</h3>
+            <ul>
+                <li><strong>💸 Recurring Pain Points:</strong> Top 5 most frequent customer issues from the last 30 days, with post counts and descriptions</li>
+                <li><strong>📈 Distribution by Product:</strong> Opportunity scores for each product, ranked by improvement potential</li>
+                <li><strong>📝 Posts to Review for Improvement:</strong> Posts ranked by opportunity score, ready for action</li>
+            </ul>
+
+            <h3>🎯 Recurring Pain Points</h3>
+            <p>
+                Automatically detected pain points based on keyword analysis of negative feedback:
+            </p>
+            <ul>
+                <li><strong>Refund Delays:</strong> Late or pending refunds</li>
+                <li><strong>Billing Clarity:</strong> Confusing invoices and charges</li>
+                <li><strong>HTTPS/SSL Renewal:</strong> SSL certificate renewal issues</li>
+                <li><strong>Support Response Time:</strong> Slow or unresponsive support</li>
+                <li><strong>VPS Backups:</strong> Backup errors and failures</li>
+                <li><strong>Domain Issues:</strong> Domain registration and DNS problems</li>
+                <li><strong>Email Problems:</strong> Email delivery and configuration issues</li>
+            </ul>
+            <p style="margin-top: 10px;">
+                <strong>💡 Tip:</strong> Click "View All X Pain Points" to see the complete list.
+            </p>
+
+            <h3>📊 Opportunity Score Explained</h3>
+            <p>
+                The <strong>Opportunity Score (0-100)</strong> indicates the priority for product improvement. Higher scores mean higher priority.
+            </p>
+            <p>
+                <strong>Score Calculation:</strong>
+            </p>
+            <ul>
+                <li><strong>Negative Feedback Frequency (40%):</strong> Ratio of negative posts to total posts for the product</li>
+                <li><strong>Recency (30%):</strong> Weight given to recent negative feedback (last 30 days)</li>
+                <li><strong>Engagement Level (30%):</strong> Views, comments, and reactions indicate issue visibility</li>
+            </ul>
+            <p style="margin-top: 10px;">
+                <strong>Example:</strong> A product with 80% negative posts, many from the last week, and high engagement = High Opportunity Score (80-100)
+            </p>
+
+            <h3>📈 Product Distribution Chart</h3>
+            <ul>
+                <li><strong>Horizontal Bars:</strong> Visual representation of opportunity scores</li>
+                <li><strong>Color Coding:</strong> Each product has a unique color for easy identification</li>
+                <li><strong>Bar Segments:</strong> Shows ratio of negative (colored) vs positive/neutral (gray) feedback</li>
+                <li><strong>Show More:</strong> Click "+X Other Products" to expand and see all products</li>
+            </ul>
+
+            <h3>📝 Posts to Review</h3>
+            <p>
+                Posts are automatically ranked by their individual opportunity score:
+            </p>
+            <ul>
+                <li><strong>Post Opportunity Score:</strong> Combines sentiment (50%), recency (30%), and engagement (20%)</li>
+                <li><strong>Critical Posts:</strong> High-scoring negative posts from recent dates</li>
+                <li><strong>Engagement Metrics:</strong> Views, comments, and reactions displayed for each post</li>
+                <li><strong>Tags:</strong> "New" for recent posts, "Negative" for negative sentiment</li>
+            </ul>
+
+            <h3>🔍 Filtering & Search</h3>
+            <ul>
+                <li><strong>Search Bar:</strong> Search for specific keywords in post content</li>
+                <li><strong>Date Filter:</strong> Filter posts by creation date</li>
+                <li><strong>Language Filter:</strong> Filter by French or English</li>
+                <li><strong>Source Filter:</strong> Filter by data source (X, Reddit, Trustpilot, etc.)</li>
+                <li><strong>Sort Options:</strong> Sort by Opportunity Score, Recent, or Engagement</li>
+            </ul>
+
+            <h3>🎫 Create Improvement Tickets</h3>
+            <p>
+                Click <strong>"+ Create Improvement Ticket"</strong> on any post to:
+            </p>
+            <ul>
+                <li>Track the post for product improvement</li>
+                <li>Prioritize actions based on opportunity score</li>
+                <li>Link feedback to specific product areas</li>
+            </ul>
+            <p style="margin-top: 10px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-left: 4px solid var(--accent-primary); border-radius: 4px;">
+                <strong>💡 Note:</strong> Ticket creation functionality can be integrated with your project management system (Jira, GitHub Issues, etc.)
+            </p>
+
+            <h3>📊 Understanding the Data</h3>
+            <ul>
+                <li><strong>Pain Points:</strong> Based on keyword matching in negative posts from the last 30 days</li>
+                <li><strong>Product Detection:</strong> Automatic categorization based on content keywords (billing, domain, vps, etc.)</li>
+                <li><strong>Recency Weight:</strong> Recent issues are prioritized over older ones</li>
+                <li><strong>Engagement Metrics:</strong> Posts with more visibility indicate broader impact</li>
+            </ul>
+
+            <h3>🎨 Navigation</h3>
+            <ul>
+                <li><strong>⚙️ Scraping & Configuration:</strong> Manage keywords, LLM settings, and launch scrapers</li>
+                <li><strong>📊 Dashboard Analytics:</strong> Visual analytics with charts and insights</li>
+                <li><strong>💡 Improvements Opportunities:</strong> Current page - pain points and opportunity analysis</li>
+                <li><strong>❓ Help:</strong> This menu - access help and documentation</li>
+                <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
+            </ul>
+
+            <h3>💡 Pro Tips</h3>
+            <ul>
+                <li>Focus on products with opportunity scores above 70 for maximum impact</li>
+                <li>Review pain points with high post counts (>50) as they affect many customers</li>
+                <li>Use date filters to identify recent trends and emerging issues</li>
+                <li>Combine product filter with date range to analyze specific time periods</li>
+                <li>Export high-priority posts to CSV for detailed analysis</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/improvements/js/app.js"></script>
+    <script>
+        // Close help menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const helpMenu = document.getElementById('helpMenu');
+            const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
+            if (helpMenu && helpTab && 
+                !helpMenu.contains(e.target) && 
+                !helpTab.contains(e.target) &&
+                helpMenu.classList.contains('active')) {
+                helpMenu.classList.remove('active');
+            }
+        });
+    </script>
+</body>
+</html>
+

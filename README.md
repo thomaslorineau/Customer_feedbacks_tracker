@@ -58,6 +58,10 @@ The application includes advanced anti-bot techniques:
   - Support quality issues
 
 ### Management & Analysis
+- **Three Main Pages**:
+  - **Scraping & Configuration**: Manage keywords, LLM settings, launch scrapers
+  - **Dashboard Analytics**: Visual analytics with charts, insights, and recommended actions
+  - **Improvements Opportunities**: Pain points analysis and opportunity scoring
 - **Backlog Sidebar**: Dedicated side panel for managing posts to review
   - Card view and compact list view
   - Comments/notes for each post
@@ -65,19 +69,30 @@ The application includes advanced anti-bot techniques:
 - **Product Labeling**: Automatic detection of OVH products (Domain, VPS, Hosting, etc.)
   - Manual override for incorrect labels
   - Persistent storage in localStorage
-- **AI-Powered Idea Generation**: Generate product improvement ideas using LLM
-  - Supports OpenAI and Anthropic APIs
+- **AI-Powered Features**:
+  - **Recommended Actions**: Dynamic, context-aware actions based on filtered posts (LLM-powered)
+  - **Improvement Ideas**: Generate product improvement ideas using LLM
+  - Supports OpenAI (GPT-4o-mini) and Anthropic (Claude 3 Haiku) APIs
   - Rule-based fallback when LLM unavailable
-  - Validation modal to accept/reject ideas
+- **Dashboard Analytics**:
+  - **What's Happening**: Real-time alerts, insights, and AI-generated recommended actions
+  - **Timeline & Histogram**: Interactive charts with click/double-click filtering
+  - **Distribution per Product**: Visual breakdown by product category
+  - **Posts to Address**: Critical and recent posts requiring attention
 - **Statistics & Analysis**: Visual analysis of posts over time
   - Timeline & Histogram with sentiment filtering
-  - Filter by sentiment, product, and date range
-  - Group by day/week/month
-  - Pie chart showing distribution by product
+  - Filter by sentiment, product, date range, language, and source
+  - Interactive chart filtering (click on bars to filter by date/product)
+  - Product distribution charts
+- **Improvements Opportunities**:
+  - **Recurring Pain Points**: Top 5 most frequent customer issues (last 30 days)
+  - **Product Distribution**: Opportunity scores ranked by improvement potential
+  - **Posts to Review**: Posts ranked by opportunity score for action prioritization
 - **Post Preview Modal**: View full post content without leaving the page
-- **Light/Dark Mode**: Toggle between themes with improved contrast
+- **Light/Dark Mode**: Toggle between themes with improved contrast (synchronized across all pages)
 - **CSV Export**: Export filtered results and backlog with comments
 - **Real-time Logs**: See scraping progress and errors in real-time
+- **Navigation Menu**: Easy navigation between all pages with consistent theme
 
 ## 🏗️ Architecture
 
@@ -107,15 +122,35 @@ backend/
     └── test_scrapers_qa.py
 ```
 
-### Frontend (Vanilla JS)
+### Frontend (Multi-Page Application)
 ```
 frontend/
-└── index.html               # Single-page dashboard
-    ├── Controls (filters, scraping buttons)
-    ├── Stats cards (total posts, sentiment distribution)
-    ├── Gallery (card-based post display)
-    ├── Backlog (saved items)
-    └── Info panel (documentation)
+├── index.html               # Scraping & Configuration page
+│   ├── Keywords configuration
+│   ├── LLM configuration (OpenAI/Anthropic)
+│   ├── Scraping controls
+│   ├── Statistics
+│   ├── Filters & Search
+│   └── Posts Gallery
+├── v2/
+│   ├── index.html           # Dashboard Analytics page
+│   ├── css/
+│   │   ├── styles.css       # Dashboard styles
+│   │   └── navigation.css   # Navigation menu styles
+│   └── js/
+│       ├── app.js           # Main app initialization
+│       ├── api.js           # API communication
+│       ├── state.js         # State management
+│       ├── dashboard.js     # Dashboard UI logic
+│       ├── charts.js        # Chart.js visualizations
+│       ├── whats-happening.js  # What's Happening analysis
+│       └── product-detection.js  # Product categorization
+├── improvements/
+│   ├── index.html           # Improvements Opportunities page
+│   └── js/
+│       └── app.js           # Improvements page logic
+└── css/
+    └── shared-theme.css     # Shared dark/light theme
 ```
 
 ### Database
@@ -222,20 +257,50 @@ Open browser: `http://localhost:3000/index.html`
 
 ## 📋 API Endpoints
 
+### Scraping Endpoints
 ```
 POST /scrape/trustpilot              # Scrape Trustpilot reviews
 POST /scrape/x                       # Scrape X/Twitter (complaint keywords)
 POST /scrape/github                  # Scrape GitHub Issues
-POST /scrape/stackoverflow            # Scrape Stack Overflow
+POST /scrape/stackoverflow           # Scrape Stack Overflow
 POST /scrape/reddit                  # Scrape Reddit RSS feeds
 POST /scrape/news                    # Scrape Google News
 POST /scrape/ovh-forum               # Scrape OVH Community Forum
 POST /scrape/mastodon                # Scrape Mastodon posts
 POST /scrape/g2-crowd                # Scrape G2 Crowd reviews
+POST /scrape/keywords                # Scrape all sources with custom keywords (background job)
+GET  /scrape/jobs/{job_id}           # Get scraping job status
+POST /scrape/jobs/{job_id}/cancel    # Cancel a scraping job
+```
+
+### Data Endpoints
+```
+GET  /posts?limit=100                # Get all posts from database
+GET  /api/pain-points?days=30&limit=5  # Get recurring pain points
+GET  /api/product-opportunities      # Get product opportunity scores
+GET  /api/posts-for-improvement      # Get posts ranked by opportunity score
+```
+
+### AI/LLM Endpoints
+```
+POST /api/recommended-actions        # Generate recommended actions (LLM-powered)
 POST /generate-improvement-ideas     # Generate product improvement ideas (LLM)
+GET  /api/llm-config                 # Get LLM configuration status
+POST /api/llm-config                 # Save LLM API keys and provider
+```
+
+### Admin Endpoints
+```
 POST /admin/cleanup-duplicates       # Remove duplicate posts
 POST /admin/cleanup-hackernews-posts # Remove Hacker News posts
-GET  /posts?limit=100                # Get all posts from database
+```
+
+### Frontend Routes
+```
+GET  /                               # Redirects to /dashboard
+GET  /scraping                       # Scraping & Configuration page
+GET  /dashboard                      # Dashboard Analytics page
+GET  /improvements                   # Improvements Opportunities page
 ```
 
 ## 🔍 Search Keywords
@@ -386,15 +451,6 @@ Backend logs are printed to console in real-time. Frontend logs appear in browse
 ## 📝 License
 
 MIT License - feel free to use, modify, and distribute
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
 
 ## 📚 Additional Resources
 

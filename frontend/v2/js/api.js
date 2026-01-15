@@ -67,6 +67,25 @@ export class API {
     }
     
     async getRecommendedActions(posts, recentPosts, stats, maxActions = 5) {
+        // Prepare posts data - include more context for LLM
+        const postsForAnalysis = posts.slice(0, 30).map(p => ({
+            content: (p.content || '').substring(0, 400),
+            sentiment: p.sentiment_label,
+            source: p.source,
+            created_at: p.created_at,
+            language: p.language,
+            product: p.product || null
+        }));
+        
+        const recentPostsForAnalysis = recentPosts.slice(0, 20).map(p => ({
+            content: (p.content || '').substring(0, 400),
+            sentiment: p.sentiment_label,
+            source: p.source,
+            created_at: p.created_at,
+            language: p.language,
+            product: p.product || null
+        }));
+        
         const response = await fetch(`${this.baseURL}/api/recommended-actions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

@@ -29,11 +29,11 @@ async function switchToVersion(version) {
         initAPI();
         const response = await api.setUIVersion(version);
         console.log('Version switched:', response);
-        // Redirect to the appropriate version URL
+        // Redirect to the appropriate page URL
         if (version === 'v1') {
-            window.location.href = '/v1';
+            window.location.href = '/scraping';
         } else {
-            window.location.href = '/';
+            window.location.href = '/dashboard';
         }
     } catch (error) {
         console.error('Failed to switch version:', error);

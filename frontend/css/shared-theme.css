@@ -1,0 +1,146 @@
+/* Shared Theme CSS - Applied to all pages */
+:root {
+    /* Light Mode (default) */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f0f4f8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --border-color: #e2e8f0;
+    --shadow: rgba(0, 0, 0, 0.08);
+    --accent-primary: #0099ff;
+    --accent-secondary: #00d4ff;
+    --accent-ovh: #123f6d;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --input-bg: #ffffff;
+    --modal-bg: rgba(255, 255, 255, 0.98);
+}
+
+body.dark-mode {
+    /* Dark Mode */
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-card: #0f3460;
+    --bg-card-hover: #1a4d7a;
+    --text-primary: #ffffff;
+    --text-secondary: #aaa;
+    --text-muted: #666;
+    --border-color: #333;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --accent-primary: #00d4ff;
+    --accent-secondary: #0099ff;
+    --accent-ovh: #4a9eff;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --input-bg: #0f3460;
+    --modal-bg: rgba(15, 52, 96, 0.98);
+}
+
+/* Help Menu Styles */
+.help-menu {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px var(--shadow);
+    z-index: 10001;
+    min-width: 300px;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: none;
+    padding: 20px;
+}
+
+.help-menu.active {
+    display: block;
+}
+
+.help-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.help-menu-header h2 {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.help-menu-close {
+    background: var(--error);
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    color: white;
+    cursor: pointer;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.help-menu-close:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+.help-menu-content {
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.help-menu-content h3 {
+    color: var(--accent-primary);
+    font-size: 1.1em;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.help-menu-content p,
+.help-menu-content li {
+    margin-bottom: 8px;
+}
+
+.help-menu-content ul,
+.help-menu-content ol {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.help-menu-content strong {
+    color: var(--text-primary);
+}
+
+
+/* Spinner for loading states */
+.spinner {
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+

@@ -4,10 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OVH Feedback Tracker - Analyst View</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
     <link rel="stylesheet" href="/v2/css/styles.css">
+    <link rel="stylesheet" href="/v2/css/navigation.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-<body>
+<body class="has-nav-menu">
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/dashboard" class="nav-logo">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
+                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
+                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
+                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>OVH Feedback Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Scraping & Configuration</span>
+                </a>
+                <a href="/dashboard" class="nav-tab active">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
+        </div>
+    </nav>
+
     <!-- Header -->
     <header class="dashboard-header">
         <div class="header-left">
@@ -147,15 +185,6 @@
         </section>
     </main>
 
-    <!-- Version Toggle Button -->
-    <button class="version-toggle" id="versionToggleBtn" title="Switch UI Version">
-        🔄 V2
-    </button>
-
-    <!-- Theme Toggle -->
-    <button class="theme-toggle" id="themeToggleBtn" title="Toggle Theme">
-        🌓
-    </button>
 
     <!-- Version Switch Modal -->
     <div id="versionModal" class="modal-overlay" style="display: none;">
@@ -194,7 +223,100 @@
         window.toggleTheme = function() {
             console.log('toggleTheme called - waiting for module to load...');
         };
+        window.toggleHelpMenu = function() {
+            const menu = document.getElementById('helpMenu');
+            if (menu) {
+                menu.classList.toggle('active');
+            }
+        };
     </script>
+    
+    <!-- Help Menu -->
+    <div class="help-menu" id="helpMenu">
+        <div class="help-menu-header">
+            <h2>📖 Help & Information</h2>
+            <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
+        </div>
+        <div class="help-menu-content">
+            <h3>💬 OVH Customer Feedback Tracker</h3>
+            <p>
+                <strong>Dashboard Analytics</strong> provides visual insights and real-time analysis of customer feedback across all OVH products and services.
+            </p>
+
+                <h3>📊 Dashboard Sections</h3>
+                <ul>
+                    <li><strong>📈 Statistics Banner:</strong> Overview of total posts, positive, negative, and neutral feedback</li>
+                    <li><strong>⚠️ What's Happening:</strong> Real-time alerts, insights, and AI-generated recommended actions</li>
+                    <li><strong>📅 Timeline & Histogram:</strong> Visual timeline of feedback over time with interactive filtering</li>
+                    <li><strong>📊 Distribution per Product:</strong> Breakdown of feedback by OVH product category</li>
+                    <li><strong>📝 Posts to Address:</strong> Critical and recent posts requiring attention</li>
+                </ul>
+
+                <h3>🎯 Interactive Features</h3>
+                <ul>
+                    <li><strong>Timeline Click:</strong> Click on a bar to filter posts by that date</li>
+                    <li><strong>Timeline Double-Click:</strong> Double-click a bar to filter by date AND the most frequent product for that date</li>
+                    <li><strong>Product Click:</strong> Click on a product in "Distribution per Product" to filter all posts by that product</li>
+                    <li><strong>Clear Filters:</strong> Use the "Clear Product Filter" button or reset filters to remove active filters</li>
+                    <li><strong>Critical Posts:</strong> Click "Open critical posts (X)" to filter and scroll to critical posts</li>
+                </ul>
+
+                <h3>🔍 Filtering Options</h3>
+                <ul>
+                    <li><strong>Global Search:</strong> Search across all post content (supports multiple keywords separated by spaces)</li>
+                    <li><strong>Sentiment Filter:</strong> Filter by positive, negative, or neutral sentiment</li>
+                    <li><strong>Language Filter:</strong> Filter by French, English, or other languages</li>
+                    <li><strong>Product Filter:</strong> Filter by specific OVH product categories</li>
+                    <li><strong>Date Range:</strong> Use timeline interaction or date inputs to filter by date</li>
+                    <li><strong>Sort Options:</strong> Sort posts by date, sentiment, or source</li>
+                </ul>
+
+                <h3>🤖 AI-Powered Features</h3>
+                <p>
+                    If LLM API keys are configured (in Scraping & Configuration page):
+                </p>
+                <ul>
+                    <li><strong>Recommended Actions:</strong> AI-generated actionable recommendations based on recent feedback patterns</li>
+                    <li><strong>Priority Levels:</strong> Actions are prioritized as High, Medium, or Low based on impact</li>
+                    <li><strong>Dynamic Insights:</strong> Real-time analysis of feedback trends and spikes</li>
+                </ul>
+
+                <h3>📊 What's Happening Section</h3>
+                <ul>
+                    <li><strong>Alerts:</strong> Automatic detection of negative feedback spikes (230%+ increase)</li>
+                    <li><strong>Insights:</strong> Identification of top impacted products and most frequent issues</li>
+                    <li><strong>Recommended Actions:</strong> AI-generated or rule-based improvement suggestions</li>
+                    <li><strong>Critical Posts Button:</strong> Quick access to filter and view critical posts</li>
+                </ul>
+
+                <h3>📈 Charts & Visualizations</h3>
+                <ul>
+                    <li><strong>Timeline Chart:</strong> Bar chart showing post distribution over time</li>
+                    <li><strong>Product Distribution:</strong> Pie/bar chart showing feedback distribution across products</li>
+                    <li><strong>Interactive Tooltips:</strong> Hover over chart elements for detailed information</li>
+                    <li><strong>Show More Products:</strong> Expand to see all products beyond the top 5</li>
+                </ul>
+
+                <h3>🎨 Navigation</h3>
+                <ul>
+                    <li><strong>⚙️ Scraping & Configuration:</strong> Manage keywords, LLM settings, and launch scrapers</li>
+                    <li><strong>📊 Dashboard Analytics:</strong> Current page - visual analytics and insights</li>
+                    <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis and opportunity scoring</li>
+                    <li><strong>❓ Help:</strong> This menu - access help and documentation</li>
+                    <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
+                </ul>
+
+                <h3>💡 Pro Tips</h3>
+                <ul>
+                    <li>Use the timeline to identify feedback trends and spikes</li>
+                    <li>Double-click timeline bars to quickly filter by product and date</li>
+                    <li>Configure LLM keys to unlock AI-powered recommended actions</li>
+                    <li>Click on products to focus analysis on specific areas</li>
+                    <li>Use the critical posts button to prioritize urgent issues</li>
+                </ul>
+            </div>
+        </div>
+    </div>
     
     <!-- Modules -->
     <script type="module" src="/v2/js/api.js"></script>
@@ -203,6 +325,19 @@
     <script type="module" src="/v2/js/charts.js"></script>
     <script type="module" src="/v2/js/version-switch.js"></script>
     <script type="module" src="/v2/js/app.js"></script>
+    <script>
+        // Close help menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const helpMenu = document.getElementById('helpMenu');
+            const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
+            if (helpMenu && helpTab && 
+                !helpMenu.contains(e.target) && 
+                !helpTab.contains(e.target) &&
+                helpMenu.classList.contains('active')) {
+                helpMenu.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>
 

@@ -98,13 +98,17 @@ export class State {
             
             // Date filters
             if (this.filters.dateFrom) {
-                const postDate = new Date(post.created_at).toISOString().split('T')[0];
-                if (postDate < this.filters.dateFrom) return false;
+                const postDateStr = new Date(post.created_at).toISOString().split('T')[0];
+                const filterDateFromStr = this.filters.dateFrom;
+                // Compare date strings (YYYY-MM-DD format)
+                if (postDateStr < filterDateFromStr) return false;
             }
             
             if (this.filters.dateTo) {
-                const postDate = new Date(post.created_at).toISOString().split('T')[0];
-                if (postDate > this.filters.dateTo) return false;
+                const postDateStr = new Date(post.created_at).toISOString().split('T')[0];
+                const filterDateToStr = this.filters.dateTo;
+                // Compare date strings (YYYY-MM-DD format)
+                if (postDateStr > filterDateToStr) return false;
             }
             
             return true;

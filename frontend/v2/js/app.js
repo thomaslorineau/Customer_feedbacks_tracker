@@ -8,7 +8,29 @@ function initializeTheme() {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
         document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
     }
+    
+    // Listen for theme changes from other pages
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'theme') {
+            if (e.newValue === 'dark') {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+        }
+    });
+    
+    // Listen for theme change events
+    window.addEventListener('themeChanged', (e) => {
+        if (e.detail.theme === 'dark') {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    });
 }
 
 function toggleTheme() {
@@ -22,10 +44,20 @@ function toggleTheme() {
         body.classList.add('dark-mode');
         localStorage.setItem('theme', 'dark');
     }
+    
+    // Dispatch event to notify other pages
+    window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: isDark ? 'light' : 'dark' } }));
 }
 
-// Setup theme toggle button
+// Setup theme toggle button (can be in nav menu or standalone)
 function setupThemeToggle() {
+    // Try to find theme toggle in nav menu first
+    const navThemeToggle = document.querySelector('.nav-menu-right .theme-toggle');
+    if (navThemeToggle) {
+        navThemeToggle.addEventListener('click', toggleTheme);
+    }
+    
+    // Fallback to standalone button if exists
     const themeToggleBtn = document.getElementById('themeToggleBtn');
     if (themeToggleBtn) {
         themeToggleBtn.addEventListener('click', toggleTheme);

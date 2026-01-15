@@ -9,16 +9,17 @@ export function updateWhatsHappening(state) {
     if (posts.length === 0) {
         document.getElementById('statsCards').innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No data available</div>';
         document.getElementById('whatsHappeningContent').innerHTML = '';
+        document.getElementById('recommendedActions').innerHTML = '';
         return;
     }
     
-    // Calculate statistics
+    // Calculate statistics based on filtered posts
     const total = posts.length;
     const positive = posts.filter(p => p.sentiment_label === 'positive').length;
     const negative = posts.filter(p => p.sentiment_label === 'negative').length;
     const neutral = posts.filter(p => p.sentiment_label === 'neutral' || !p.sentiment_label).length;
     
-    // Calculate recent posts (last 48 hours)
+    // Calculate recent posts (last 48 hours) from filtered posts
     const now = new Date();
     const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
     const recentPosts = posts.filter(p => {
@@ -27,14 +28,15 @@ export function updateWhatsHappening(state) {
     });
     const recentNegative = recentPosts.filter(p => p.sentiment_label === 'negative').length;
     
-    // Calculate average negative posts per 48h (from all posts, last 7 days)
+    // Calculate average negative posts per 48h (from filtered posts, last 7 days)
+    // This makes the spike detection relative to the current filter context
     const last7days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const allRecentPosts = allPosts.filter(p => {
+    const filteredRecentPosts = posts.filter(p => {
         const postDate = new Date(p.created_at);
         return postDate >= last7days;
     });
-    const avgNegativePer48h = allRecentPosts.length > 0 
-        ? Math.round((allRecentPosts.filter(p => p.sentiment_label === 'negative').length / 7) * 2)
+    const avgNegativePer48h = filteredRecentPosts.length > 0 
+        ? Math.round((filteredRecentPosts.filter(p => p.sentiment_label === 'negative').length / 7) * 2)
         : 0;
     
     // Detect spike
@@ -143,11 +145,41 @@ export function updateWhatsHappening(state) {
     
     content.innerHTML = contentHTML;
     
-    // Update Recommended Actions
-    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue);
+    // Get active filters for context
+    const activeFilters = getActiveFilters(state);
+    
+    // Update Recommended Actions with full context
+    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters);
 }
 
-async function updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue) {
+function getActiveFilters(state) {
+    const filters = {
+        search: state.filters?.search || '',
+        sentiment: state.filters?.sentiment || 'all',
+        language: state.filters?.language || 'all',
+        product: state.filters?.product || 'all',
+        dateFrom: state.filters?.dateFrom || null,
+        dateTo: state.filters?.dateTo || null,
+        source: state.filters?.source || 'all'
+    };
+    
+    // Build filter description
+    const activeFilterList = [];
+    if (filters.search) activeFilterList.push(`Search: "${filters.search}"`);
+    if (filters.sentiment !== 'all') activeFilterList.push(`Sentiment: ${filters.sentiment}`);
+    if (filters.language !== 'all') activeFilterList.push(`Language: ${filters.language}`);
+    if (filters.product !== 'all') activeFilterList.push(`Product: ${filters.product}`);
+    if (filters.dateFrom) activeFilterList.push(`From: ${filters.dateFrom}`);
+    if (filters.dateTo) activeFilterList.push(`To: ${filters.dateTo}`);
+    if (filters.source !== 'all') activeFilterList.push(`Source: ${filters.source}`);
+    
+    return {
+        ...filters,
+        description: activeFilterList.length > 0 ? activeFilterList.join(', ') : 'All posts (no filters)'
+    };
+}
+
+async function updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters) {
     const actionsContainer = document.getElementById('recommendedActions');
     if (!actionsContainer) return;
     
@@ -159,22 +191,30 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
         <div class="recommended-actions-list">
             <div class="action-item" style="opacity: 0.6;">
                 <span class="action-icon">⏳</span>
-                <span class="action-text">Generating recommendations...</span>
+                <span class="action-text">Analyzing ${posts.length} posts...</span>
             </div>
         </div>
     `;
     
     try {
-        // Prepare stats for LLM
+        // Prepare comprehensive stats for LLM
         const stats = {
             total: posts.length,
+            positive: posts.filter(p => p.sentiment_label === 'positive').length,
+            negative: posts.filter(p => p.sentiment_label === 'negative').length,
+            neutral: posts.filter(p => p.sentiment_label === 'neutral' || !p.sentiment_label).length,
             recent_negative: recentNegative,
+            recent_total: recentPosts.length,
             spike_detected: spikeDetected,
             top_product: topProduct ? topProduct[0] : 'N/A',
-            top_issue: topIssue ? topIssue[0] : 'N/A'
+            top_product_count: topProduct ? topProduct[1] : 0,
+            top_issue: topIssue ? topIssue[0] : 'N/A',
+            top_issue_count: topIssue ? topIssue[1] : 0,
+            active_filters: activeFilters.description,
+            filtered_context: activeFilters.description !== 'All posts (no filters)'
         };
         
-        // Call LLM API
+        // Call LLM API with full context
         const api = new API();
         const response = await api.getRecommendedActions(posts, recentPosts, stats, 5);
         const actions = response.actions || [];

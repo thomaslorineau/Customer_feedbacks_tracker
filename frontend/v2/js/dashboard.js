@@ -56,6 +56,23 @@ function setupEventListeners() {
         });
     }
     
+    // Date filters
+    const dateFromInput = document.getElementById('dateFrom');
+    if (dateFromInput) {
+        dateFromInput.addEventListener('change', (e) => {
+            state.setFilter('dateFrom', e.target.value);
+            updateDashboard();
+        });
+    }
+    
+    const dateToInput = document.getElementById('dateTo');
+    if (dateToInput) {
+        dateToInput.addEventListener('change', (e) => {
+            state.setFilter('dateTo', e.target.value);
+            updateDashboard();
+        });
+    }
+    
     // Open critical posts button
     const openCriticalPostsBtn = document.getElementById('openCriticalPostsBtn');
     if (openCriticalPostsBtn) {
@@ -115,6 +132,8 @@ function setupEventListeners() {
     window.addEventListener('filterByDate', (event) => {
         const clickedDate = event.detail.date;
         if (clickedDate && state) {
+            console.log('Filtering by date:', clickedDate);
+            
             // Set date filter to the clicked date (show posts from that day)
             const dateFrom = clickedDate;
             const dateTo = clickedDate;
@@ -123,14 +142,56 @@ function setupEventListeners() {
             const dateFromInput = document.getElementById('dateFrom');
             const dateToInput = document.getElementById('dateTo');
             
-            if (dateFromInput) dateFromInput.value = dateFrom;
-            if (dateToInput) dateToInput.value = dateTo;
+            if (dateFromInput) {
+                dateFromInput.value = dateFrom;
+                console.log('Set dateFrom input to:', dateFrom);
+            }
+            if (dateToInput) {
+                dateToInput.value = dateTo;
+                console.log('Set dateTo input to:', dateTo);
+            }
             
             // Update state filters
             state.setFilter('dateFrom', dateFrom);
             state.setFilter('dateTo', dateTo);
             
+            console.log('State filters updated:', state.filters);
+            
             // Update dashboard to show filtered posts
+            updateDashboard();
+            
+            // Scroll to posts section
+            const postsSection = document.querySelector('.panel-bottom');
+            if (postsSection) {
+                postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
+    
+    // Listen for product filter events from timeline chart (double-click)
+    window.addEventListener('filterByProductFromTimeline', (event) => {
+        const { product, date } = event.detail;
+        if (product && state) {
+            console.log('Filtering by product from timeline:', product, 'on date:', date);
+            
+            // Set product filter
+            const productFilter = document.getElementById('productFilter');
+            if (productFilter) {
+                productFilter.value = product;
+            }
+            state.setFilter('product', product);
+            
+            // Also set date filter if provided
+            if (date) {
+                const dateFromInput = document.getElementById('dateFrom');
+                const dateToInput = document.getElementById('dateTo');
+                if (dateFromInput) dateFromInput.value = date;
+                if (dateToInput) dateToInput.value = date;
+                state.setFilter('dateFrom', date);
+                state.setFilter('dateTo', date);
+            }
+            
+            // Update dashboard
             updateDashboard();
             
             // Scroll to posts section

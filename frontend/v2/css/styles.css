@@ -748,10 +748,10 @@ body {
     transform: translateY(-2px);
 }
 
-/* Theme Toggle */
-.theme-toggle {
+/* Theme Toggle - Only show if not in nav menu */
+.theme-toggle:not(.nav-menu-right .theme-toggle) {
     position: fixed;
-    top: 20px;
+    top: 80px;
     right: 20px;
     background: var(--bg-card);
     border: 2px solid var(--border-color);
@@ -762,6 +762,11 @@ body {
     z-index: 9999;
     transition: all 0.3s ease;
     box-shadow: 0 4px 12px var(--shadow);
+}
+
+/* Hide version toggle in V2 since we have nav menu */
+.version-toggle {
+    display: none !important;
 }
 
 .theme-toggle:hover {

@@ -2,6 +2,7 @@ import locale
 from pathlib import Path
 import os
 import json
+import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -15,6 +16,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from apscheduler.schedulers.background import BackgroundScheduler
 import httpx
+from collections import defaultdict
 
 from . import db
 from .scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd
@@ -98,6 +100,35 @@ class RecommendedAction(BaseModel):
 class RecommendedActionsResponse(BaseModel):
     """Response model for recommended actions."""
     actions: List[RecommendedAction] = Field(..., description="List of generated recommended actions")
+
+
+class PainPoint(BaseModel):
+    """Model for a recurring pain point."""
+    title: str = Field(..., description="Title of the pain point")
+    description: str = Field(..., description="Brief description")
+    icon: str = Field(..., description="Emoji icon")
+    posts_count: int = Field(..., description="Number of posts mentioning this pain point")
+    posts: List[dict] = Field(default=[], description="Sample posts related to this pain point")
+
+
+class ProductOpportunity(BaseModel):
+    """Model for product opportunity score."""
+    product: str = Field(..., description="Product name")
+    opportunity_score: int = Field(..., description="Opportunity score (0-100)")
+    negative_posts: int = Field(..., description="Number of negative posts")
+    total_posts: int = Field(..., description="Total posts for this product")
+    color: str = Field(..., description="Color for visualization")
+
+
+class PainPointsResponse(BaseModel):
+    """Response model for recurring pain points."""
+    pain_points: List[PainPoint] = Field(..., description="List of recurring pain points")
+    total_pain_points: int = Field(..., description="Total number of pain points found")
+
+
+class ProductDistributionResponse(BaseModel):
+    """Response model for product distribution."""
+    products: List[ProductOpportunity] = Field(..., description="List of products with opportunity scores")
 
 
 class ScrapeResult(BaseModel):
@@ -945,7 +976,7 @@ async def cleanup_non_ovh_posts():
 async def get_posts(limit: int = 20, offset: int = 0, language: str = None):
     """Get posts from database, excluding sample data."""
     posts = db.get_posts(limit=limit, offset=offset, language=language)
-    # Filter out sample posts
+    # Filter out sample posts and add timestamp
     filtered = []
     for post in posts:
         url = post.get('url', '')
@@ -956,6 +987,22 @@ async def get_posts(limit: int = 20, offset: int = 0, language: str = None):
             url == 'https://trustpilot.com/sample'
         )
         if not is_sample:
+            # Add timestamp for date calculations
+            try:
+                created_at = post.get('created_at', '')
+                if created_at:
+                    dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    post['created_at_timestamp'] = dt.timestamp()
+                else:
+                    post['created_at_timestamp'] = 0
+            except:
+                post['created_at_timestamp'] = 0
+            
+            # Add default engagement metrics (can be enhanced later)
+            post['views'] = post.get('views', 0)
+            post['comments'] = post.get('comments', 0)
+            post['reactions'] = post.get('reactions', 0)
+            
             filtered.append(post)
     return filtered
 
@@ -1117,6 +1164,313 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
 
 
+def calculate_opportunity_score(product_posts: List[dict], all_posts: List[dict]) -> int:
+    """
+    Calculate opportunity score for a product based on:
+    - Frequency of negative feedback (40%)
+    - Recency of issues (30%)
+    - Engagement level (views, comments, reactions) (30%)
+    """
+    if not product_posts:
+        return 0
+    
+    negative_count = sum(1 for p in product_posts if p.get('sentiment_label') == 'negative')
+    negative_ratio = negative_count / len(product_posts) if product_posts else 0
+    
+    # Recency: weight recent posts (last 30 days) more
+    now = time.time()
+    recent_negative = sum(1 for p in product_posts 
+                         if p.get('sentiment_label') == 'negative' 
+                         and (p.get('created_at_timestamp', 0) or 0) >= (now - 30 * 24 * 3600))
+    recency_score = min(recent_negative / max(len(product_posts) * 0.3, 1), 1.0)
+    
+    # Engagement: average views, comments, reactions
+    total_engagement = sum(
+        (p.get('views', 0) or 0) + 
+        (p.get('comments', 0) or 0) * 2 + 
+        (p.get('reactions', 0) or 0) * 1.5
+        for p in product_posts
+    )
+    avg_engagement = total_engagement / len(product_posts) if product_posts else 0
+    engagement_score = min(avg_engagement / 1000, 1.0)  # Normalize to 0-1
+    
+    # Calculate final score (0-100)
+    score = int((negative_ratio * 0.4 + recency_score * 0.3 + engagement_score * 0.3) * 100)
+    return min(score, 100)
+
+
+@app.get("/api/pain-points", response_model=PainPointsResponse)
+async def get_pain_points(days: int = 30, limit: int = 5):
+    """
+    Analyze recurring pain points from customer feedback over the last N days.
+    Uses keyword clustering and frequency analysis.
+    """
+    # Get posts from last N days
+    now = time.time()
+    cutoff_time = now - (days * 24 * 3600)
+    
+    all_posts = db.get_posts(limit=10000, offset=0)
+    
+    # Add timestamps
+    for post in all_posts:
+        try:
+            created_at = post.get('created_at', '')
+            if created_at:
+                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                post['created_at_timestamp'] = dt.timestamp()
+            else:
+                post['created_at_timestamp'] = 0
+        except:
+            post['created_at_timestamp'] = 0
+    
+    recent_posts = [
+        p for p in all_posts 
+        if p.get('sentiment_label') == 'negative' 
+        and (p.get('created_at_timestamp', 0) or 0) >= cutoff_time
+    ]
+    
+    # Define pain point patterns
+    pain_point_patterns = {
+        'Refund Delays': {
+            'keywords': ['refund', 'rembours', 'remboursement', 'pending refund', 'delayed refund'],
+            'icon': '💸',
+            'description': 'Late or pending refunds'
+        },
+        'Billing Clarity': {
+            'keywords': ['billing', 'invoice', 'facture', 'charge', 'confusing', 'unclear'],
+            'icon': '📄',
+            'description': 'Confusing invoices & charges'
+        },
+        'HTTPS/SSL Renewal': {
+            'keywords': ['ssl', 'https', 'certificate', 'renewal', 'expired', 'certificat'],
+            'icon': '🔒',
+            'description': 'SSL renewal reminders'
+        },
+        'Support Response Time': {
+            'keywords': ['support', 'response', 'slow', 'unresponsive', 'waiting', 'ticket'],
+            'icon': '⏱️',
+            'description': 'Slow or unresponsive support'
+        },
+        'VPS Backups': {
+            'keywords': ['backup', 'vps backup', 'backup error', 'backup fail', 'sauvegarde'],
+            'icon': '💾',
+            'description': 'Backup errors & failures'
+        },
+        'Domain Issues': {
+            'keywords': ['domain', 'dns', 'nameserver', 'domaine', 'expired domain'],
+            'icon': '🌐',
+            'description': 'Domain registration and DNS issues'
+        },
+        'Email Problems': {
+            'keywords': ['email', 'mail', 'mx record', 'smtp', 'imap', 'exchange'],
+            'icon': '📧',
+            'description': 'Email delivery and configuration issues'
+        }
+    }
+    
+    pain_points = []
+    for title, pattern in pain_point_patterns.items():
+        matching_posts = []
+        keywords_lower = [k.lower() for k in pattern['keywords']]
+        
+        for post in recent_posts:
+            content_lower = (post.get('content', '') or '').lower()
+            if any(keyword in content_lower for keyword in keywords_lower):
+                matching_posts.append(post)
+        
+        if matching_posts:
+            pain_points.append(PainPoint(
+                title=title,
+                description=pattern['description'],
+                icon=pattern['icon'],
+                posts_count=len(matching_posts),
+                posts=matching_posts[:5]  # Sample posts
+            ))
+    
+    # Sort by posts count (most frequent first)
+    pain_points.sort(key=lambda x: x.posts_count, reverse=True)
+    
+    return PainPointsResponse(
+        pain_points=pain_points[:limit],
+        total_pain_points=len(pain_points)
+    )
+
+
+@app.get("/api/product-opportunities", response_model=ProductDistributionResponse)
+async def get_product_opportunities():
+    """
+    Calculate opportunity scores for each OVH product based on negative feedback.
+    """
+    all_posts = db.get_posts(limit=10000, offset=0)
+    
+    # Add timestamps and default engagement metrics
+    for post in all_posts:
+        try:
+            created_at = post.get('created_at', '')
+            if created_at:
+                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                post['created_at_timestamp'] = dt.timestamp()
+            else:
+                post['created_at_timestamp'] = 0
+        except:
+            post['created_at_timestamp'] = 0
+        post['views'] = post.get('views', 0)
+        post['comments'] = post.get('comments', 0)
+        post['reactions'] = post.get('reactions', 0)
+    
+    # Group posts by product
+    product_posts = defaultdict(list)
+    for post in all_posts:
+        # Try to detect product from content
+        content = post.get('content', '') or ''
+        product = None
+        
+        # Simple product detection (can be improved)
+        content_lower = content.lower()
+        if any(kw in content_lower for kw in ['billing', 'invoice', 'facture', 'charge']):
+            product = 'Billing'
+        elif any(kw in content_lower for kw in ['domain', 'dns', 'domaine', 'nameserver']):
+            product = 'Domain'
+        elif any(kw in content_lower for kw in ['vps', 'virtual private server']):
+            product = 'VPS'
+        elif any(kw in content_lower for kw in ['hosting', 'hébergement', 'web host']):
+            product = 'Hosting'
+        elif any(kw in content_lower for kw in ['api', 'sdk', 'integration']):
+            product = 'API'
+        elif any(kw in content_lower for kw in ['email', 'mail', 'exchange', 'mx']):
+            product = 'Email'
+        elif any(kw in content_lower for kw in ['cdn', 'content delivery']):
+            product = 'CDN'
+        elif any(kw in content_lower for kw in ['dedicated', 'dédié', 'server']):
+            product = 'Dedicated'
+        elif any(kw in content_lower for kw in ['cloud', 'public cloud', 'instance']):
+            product = 'Public Cloud'
+        elif any(kw in content_lower for kw in ['storage', 'object storage', 'swift']):
+            product = 'Storage'
+        
+        if product:
+            product_posts[product].append(post)
+    
+    # Calculate opportunity scores
+    products = []
+    colors = ['#0099ff', '#34d399', '#60a5fa', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+    
+    for idx, (product, posts) in enumerate(product_posts.items()):
+        score = calculate_opportunity_score(posts, all_posts)
+        negative_count = sum(1 for p in posts if p.get('sentiment_label') == 'negative')
+        
+        products.append(ProductOpportunity(
+            product=product,
+            opportunity_score=score,
+            negative_posts=negative_count,
+            total_posts=len(posts),
+            color=colors[idx % len(colors)]
+        ))
+    
+    # Sort by opportunity score (highest first)
+    products.sort(key=lambda x: x.opportunity_score, reverse=True)
+    
+    return ProductDistributionResponse(products=products)
+
+
+@app.get("/api/posts-for-improvement")
+async def get_posts_for_improvement(
+    limit: int = 20,
+    offset: int = 0,
+    search: Optional[str] = None,
+    language: Optional[str] = None,
+    source: Optional[str] = None,
+    sort_by: str = "opportunity_score"
+):
+    """
+    Get posts ranked by opportunity score for improvement review.
+    Opportunity score combines sentiment, recency, and engagement.
+    """
+    all_posts = db.get_posts(limit=10000, offset=0)
+    
+    # Add timestamps and default engagement metrics
+    for post in all_posts:
+        try:
+            created_at = post.get('created_at', '')
+            if created_at:
+                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                post['created_at_timestamp'] = dt.timestamp()
+            else:
+                post['created_at_timestamp'] = 0
+        except:
+            post['created_at_timestamp'] = 0
+        post['views'] = post.get('views', 0)
+        post['comments'] = post.get('comments', 0)
+        post['reactions'] = post.get('reactions', 0)
+    
+    # Filter posts
+    filtered = all_posts
+    
+    if search:
+        search_lower = search.lower()
+        filtered = [p for p in filtered if search_lower in (p.get('content', '') or '').lower()]
+    
+    if language and language != 'all':
+        filtered = [p for p in filtered if p.get('language') == language]
+    
+    if source and source != 'all':
+        filtered = [p for p in filtered if p.get('source') == source]
+    
+    # Calculate opportunity score for each post
+    now = time.time()
+    posts_with_scores = []
+    for post in filtered:
+        # Base score from sentiment (negative = higher)
+        sentiment_score = 0
+        if post.get('sentiment_label') == 'negative':
+            sentiment_score = 50
+        elif post.get('sentiment_label') == 'neutral':
+            sentiment_score = 20
+        else:
+            sentiment_score = 10
+        
+        # Recency score (last 7 days = higher)
+        post_time = post.get('created_at_timestamp', 0) or 0
+        days_ago = (now - post_time) / (24 * 3600)
+        if days_ago <= 7:
+            recency_score = 30
+        elif days_ago <= 30:
+            recency_score = 20
+        else:
+            recency_score = 10
+        
+        # Engagement score
+        engagement = (post.get('views', 0) or 0) + (post.get('comments', 0) or 0) * 2 + (post.get('reactions', 0) or 0) * 1.5
+        engagement_score = min(engagement / 100, 20)  # Cap at 20
+        
+        opportunity_score = int(sentiment_score + recency_score + engagement_score)
+        
+        posts_with_scores.append({
+            **post,
+            'opportunity_score': opportunity_score
+        })
+    
+    # Sort by opportunity score
+    if sort_by == 'opportunity_score':
+        posts_with_scores.sort(key=lambda x: x.get('opportunity_score', 0), reverse=True)
+    elif sort_by == 'recent':
+        posts_with_scores.sort(key=lambda x: x.get('created_at_timestamp', 0) or 0, reverse=True)
+    elif sort_by == 'engagement':
+        posts_with_scores.sort(key=lambda x: 
+            (x.get('views', 0) or 0) + (x.get('comments', 0) or 0) + (x.get('reactions', 0) or 0), 
+            reverse=True)
+    
+    # Paginate
+    paginated = posts_with_scores[offset:offset + limit]
+    
+    return {
+        'posts': paginated,
+        'total': len(posts_with_scores),
+        'offset': offset,
+        'limit': limit
+    }
+
+
 async def generate_recommended_actions_with_llm(
     posts: List[dict], 
     recent_posts: List[dict], 
@@ -1138,45 +1492,70 @@ async def generate_recommended_actions_with_llm(
             'created_at': post.get('created_at', '')
         })
     
-    # Create prompt
+    # Get filter context
+    active_filters = stats.get('active_filters', 'All posts')
+    filtered_context = stats.get('filtered_context', False)
+    
+    # Create comprehensive prompt with context
     prompt = f"""You are an OVHcloud customer support analyst. Analyze the following customer feedback posts and generate {max_actions} specific, actionable recommended actions.
 
-Statistics:
-- Total posts: {stats.get('total', 0)}
-- Negative posts (last 48h): {stats.get('recent_negative', 0)}
-- Spike detected: {stats.get('spike_detected', False)}
-- Top product impacted: {stats.get('top_product', 'N/A')}
-- Top issue: {stats.get('top_issue', 'N/A')}
+CONTEXT:
+- Active filters: {active_filters}
+- Analysis is based on {'filtered posts' if filtered_context else 'all posts'} in the database
+- Total posts analyzed: {stats.get('total', 0)} (Positive: {stats.get('positive', 0)}, Negative: {stats.get('negative', 0)}, Neutral: {stats.get('neutral', 0)})
+- Recent posts (last 48h): {stats.get('recent_total', 0)} total, {stats.get('recent_negative', 0)} negative
+- Spike detected: {stats.get('spike_detected', False)} {'⚠️ Significant increase in negative feedback!' if stats.get('spike_detected', False) else ''}
+- Top product impacted: {stats.get('top_product', 'N/A')} ({stats.get('top_product_count', 0)} negative posts)
+- Top issue keyword: "{stats.get('top_issue', 'N/A')}" (mentioned {stats.get('top_issue_count', 0)} times)
 
-Recent negative posts to analyze:
+POSTS TO ANALYZE:
 {json.dumps(posts_summary, indent=2, ensure_ascii=False)}
 
-Generate specific, actionable recommended actions that an OVHcloud support team should take. Each action should:
-1. Be specific and actionable (not generic)
-2. Address the actual issues found in the posts
+IMPORTANT: The recommendations must be SPECIFIC to the actual issues found in these posts. 
+- If a specific product is mentioned frequently, reference it
+- If specific errors or problems appear, mention them
+- If the analysis is filtered (e.g., by product, date, or source), acknowledge this context
+- Base priorities on the actual data: high for urgent spikes or critical issues, medium for recurring problems, low for minor improvements
+
+Generate {max_actions} recommended actions. Each action should:
+1. Be SPECIFIC and ACTIONABLE (not generic like "improve support")
+2. Reference actual issues, products, or patterns found in the posts
 3. Include an appropriate emoji icon
-4. Have a priority level (high/medium/low) based on urgency and impact
+4. Have a priority level (high/medium/low) based on:
+   - High: Spike detected, critical issues, urgent problems
+   - Medium: Recurring issues, moderate impact
+   - Low: Minor improvements, nice-to-have features
 
 Format your response as a JSON array with this structure:
 [
   {{
     "icon": "🔍",
-    "text": "Investigate: [specific issue] (last 48h)",
+    "text": "Investigate: [specific issue/product] - [specific detail from posts]",
     "priority": "high"
   }},
   {{
     "icon": "📣",
-    "text": "Check: [specific thing to check]",
+    "text": "Check: [specific thing to verify] related to [product/issue]",
     "priority": "medium"
   }},
   {{
     "icon": "💬",
-    "text": "Prepare: [specific response/macro]",
+    "text": "Prepare: [specific response/macro/documentation] for [specific issue]",
     "priority": "medium"
   }}
 ]
 
-Focus on actions that directly address the issues found in the posts. Be specific - mention actual products, errors, or issues mentioned in the posts. Use appropriate emojis (🔍 for investigate, 📣 for check/announce, 💬 for communication, ⚠️ for alerts, etc.)."""
+Use appropriate emojis:
+- 🔍 for investigate/research
+- 📣 for check/announce/verify
+- 💬 for communication/prepare responses
+- ⚠️ for alerts/urgent issues
+- 🔧 for technical fixes
+- 📊 for analysis/reporting
+- 🎯 for focus areas
+- ⚡ for urgent actions
+
+Be specific and reference actual content from the posts when possible."""
 
     # Try to use LLM API (OpenAI, Anthropic, or local)
     api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
@@ -1262,47 +1641,71 @@ def generate_recommended_actions_fallback(
     stats: dict,
     max_actions: int = 5
 ) -> List[RecommendedAction]:
-    """Fallback rule-based action generation when LLM is not available."""
+    """
+    Fallback rule-based recommended actions generator.
+    Uses context-aware logic based on filtered posts and active filters.
+    """
     actions = []
+    active_filters = stats.get('active_filters', 'All posts')
+    filtered_context = stats.get('filtered_context', False)
     
-    # Action 1: Investigate if spike detected
-    if stats.get('spike_detected') and stats.get('recent_negative', 0) > 0:
-        top_product = stats.get('top_product', '')
-        if top_product and top_product != 'N/A':
-            actions.append(RecommendedAction(
-                icon='🔍',
-                text=f'Investigate: {top_product} issues (last 48h)',
-                priority='high'
-            ))
-        else:
-            actions.append(RecommendedAction(
-                icon='🔍',
-                text='Investigate: Negative feedback spike (last 48h)',
-                priority='high'
-            ))
+    # Build context-aware actions based on actual data
+    recent_negative = stats.get('recent_negative', 0)
+    total_negative = stats.get('negative', 0)
+    top_product = stats.get('top_product', 'N/A')
+    top_product_count = stats.get('top_product_count', 0)
+    top_issue = stats.get('top_issue', 'N/A')
+    top_issue_count = stats.get('top_issue_count', 0)
     
-    # Action 2: Check status page if spike detected
-    if stats.get('spike_detected'):
+    # If spike detected, add urgent action
+    if stats.get('spike_detected', False):
+        context_note = f" (filtered: {active_filters})" if filtered_context else ""
         actions.append(RecommendedAction(
-            icon='📣',
-            text='Check: Status page or ongoing incident',
+            icon='⚠️',
+            text=f'Investigate: Spike in negative feedback - {recent_negative} posts in last 48h{context_note}',
             priority='high'
         ))
     
-    # Action 3: Prepare support response
-    top_product = stats.get('top_product', '')
-    if top_product and top_product != 'N/A' and stats.get('recent_negative', 0) > 0:
+    # If top product identified with significant count, add product-specific action
+    if top_product != 'N/A' and top_product_count > 0:
+        context_note = f" (in {active_filters})" if filtered_context else ""
+        actions.append(RecommendedAction(
+            icon='🎁',
+            text=f'Review: {top_product} issues - {top_product_count} negative posts{context_note}',
+            priority='high' if stats.get('spike_detected', False) or top_product_count > 5 else 'medium'
+        ))
+    
+    # If top issue identified with significant mentions, add issue-specific action
+    if top_issue != 'N/A' and top_issue_count > 2:
+        context_note = f" (filtered context)" if filtered_context else ""
         actions.append(RecommendedAction(
             icon='💬',
-            text=f'Prepare: Support macro / canned response for {top_product}',
+            text=f'Address: "{top_issue}" related complaints ({top_issue_count} mentions){context_note}',
             priority='medium'
         ))
-    elif stats.get('recent_negative', 0) > 0:
-        actions.append(RecommendedAction(
-            icon='💬',
-            text='Prepare: Support macro / canned response',
-            priority='medium'
-        ))
+    
+    # Add context-aware generic actions
+    if len(actions) < max_actions:
+        if recent_negative > 0:
+            actions.append(RecommendedAction(
+                icon='📣',
+                text=f'Check: Status page or ongoing incident ({recent_negative} recent negative posts)',
+                priority='high' if recent_negative > 5 else 'medium'
+            ))
+        
+        if total_negative > 10:
+            actions.append(RecommendedAction(
+                icon='💬',
+                text='Prepare: Support macro / canned response for common issues',
+                priority='medium'
+            ))
+        
+        if filtered_context and len(actions) < max_actions:
+            actions.append(RecommendedAction(
+                icon='🔍',
+                text=f'Note: Analysis filtered to {active_filters}',
+                priority='low'
+            ))
     
     # Limit to max_actions
     return actions[:max_actions]
@@ -1325,71 +1728,143 @@ async def get_recommended_actions(request: RecommendedActionRequest):
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_frontend():
-    """Serve the frontend HTML file based on UI_VERSION config."""
-    # Check for UI version in .app_config or environment variable
-    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
-    ui_version = "v2"  # default to v2 now
-    
-    if app_config_path.exists():
-        with open(app_config_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("UI_VERSION="):
-                    ui_version = line.split("=", 1)[1].strip()
-                    break
-    
-    # Also check environment variable (takes precedence)
-    ui_version = os.getenv('UI_VERSION', ui_version)
-    
-    if ui_version == "v2":
-        frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
-        if frontend_path.exists():
-            content = open(frontend_path, "r", encoding="utf-8").read()
-            # Replace relative paths with /v2/ paths for static files
-            content = content.replace('href="css/', 'href="/v2/css/')
-            content = content.replace('src="js/', 'src="/v2/js/')
-            return content
-        else:
-            raise HTTPException(status_code=404, detail="Frontend v2 not found")
-    else:
-        frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
-        if frontend_path.exists():
-            return open(frontend_path, "r", encoding="utf-8").read()
-        else:
-            raise HTTPException(status_code=404, detail="Frontend v1 not found")
+    """Serve the frontend HTML file - redirects to dashboard by default."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/dashboard", status_code=302)
 
 
-@app.get("/v1", response_class=HTMLResponse)
-async def serve_frontend_v1():
-    """Serve the v1 frontend HTML file."""
+@app.get("/scraping", response_class=HTMLResponse)
+@app.get("/scraping-configuration", response_class=HTMLResponse)
+async def serve_frontend_scraping():
+    """Serve the scraping & configuration page."""
     frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "index.html"
     if frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
-        raise HTTPException(status_code=404, detail="Frontend v1 not found")
+        raise HTTPException(status_code=404, detail="Scraping page not found")
 
 
-@app.get("/v2", response_class=HTMLResponse)
-async def serve_frontend_v2():
-    """Serve the v2 frontend HTML file."""
+@app.get("/dashboard", response_class=HTMLResponse)
+@app.get("/dashboard-analytics", response_class=HTMLResponse)
+async def serve_frontend_dashboard():
+    """Serve the dashboard analytics page."""
     frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
     if frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
-        raise HTTPException(status_code=404, detail="Frontend v2 not found")
+        raise HTTPException(status_code=404, detail="Dashboard page not found")
+
+
+@app.get("/improvements", response_class=HTMLResponse)
+async def serve_improvements():
+    """Serve the improvements opportunities HTML file."""
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "improvements" / "index.html"
+    if frontend_path.exists():
+        content = open(frontend_path, "r", encoding="utf-8").read()
+        # Replace relative paths with absolute paths for static files
+        content = content.replace('href="/v2/css/', 'href="/v2/css/')
+        content = content.replace('src="/improvements/js/', 'src="/improvements/js/')
+        return content
+    else:
+        raise HTTPException(status_code=404, detail="Improvements page not found")
 
 
 # Mount static files for v2 frontend
 frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
+frontend_path = Path(__file__).resolve().parents[2] / "frontend"
+
 if frontend_v2_path.exists():
     app.mount("/v2", StaticFiles(directory=str(frontend_v2_path), html=False), name="v2-static")
-    
-    # Also mount at root level for CSS/JS files when v2 is default
-    app.mount("/css", StaticFiles(directory=str(frontend_v2_path / "css"), html=False), name="v2-css")
-    app.mount("/js", StaticFiles(directory=str(frontend_v2_path / "js"), html=False), name="v2-js")
+    app.mount("/v2/css", StaticFiles(directory=str(frontend_v2_path / "css"), html=False), name="v2-css")
+    app.mount("/v2/js", StaticFiles(directory=str(frontend_v2_path / "js"), html=False), name="v2-js")
+
+# Mount shared CSS files (must be after v2/css to avoid conflicts)
+if (frontend_path / "css").exists():
+    # Use a different path to avoid conflicts
+    app.mount("/css", StaticFiles(directory=str(frontend_path / "css"), html=False), name="shared-css")
 
 
 class UIVersionPayload(BaseModel):
     version: str = Field(..., pattern="^(v1|v2)$")
+
+class LLMConfigPayload(BaseModel):
+    """Request model for LLM configuration."""
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
+    anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic)$", description="LLM provider")
+
+class LLMConfigResponse(BaseModel):
+    """Response model for LLM configuration."""
+    openai_api_key_set: bool = Field(..., description="Whether OpenAI API key is set")
+    anthropic_api_key_set: bool = Field(..., description="Whether Anthropic API key is set")
+    llm_provider: str = Field(..., description="Current LLM provider")
+    status: str = Field(..., description="Configuration status")
+
+@app.get("/api/llm-config", response_model=LLMConfigResponse)
+async def get_llm_config():
+    """Get current LLM configuration status (without exposing keys)."""
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    
+    return LLMConfigResponse(
+        openai_api_key_set=bool(openai_key),
+        anthropic_api_key_set=bool(anthropic_key),
+        llm_provider=provider,
+        status="configured" if (openai_key or anthropic_key) else "not_configured"
+    )
+
+@app.post("/api/llm-config", response_model=LLMConfigResponse)
+async def set_llm_config(payload: LLMConfigPayload):
+    """Set LLM configuration (save to .env file)."""
+    backend_path = Path(__file__).resolve().parents[1]
+    env_path = backend_path / ".env"
+    
+    # Read existing .env if it exists
+    env_vars = {}
+    if env_path.exists():
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    env_vars[key.strip()] = value.strip()
+    
+    # Update with new values
+    if payload.openai_api_key is not None:
+        if payload.openai_api_key:
+            env_vars['OPENAI_API_KEY'] = payload.openai_api_key
+        elif 'OPENAI_API_KEY' in env_vars:
+            del env_vars['OPENAI_API_KEY']
+    
+    if payload.anthropic_api_key is not None:
+        if payload.anthropic_api_key:
+            env_vars['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+        elif 'ANTHROPIC_API_KEY' in env_vars:
+            del env_vars['ANTHROPIC_API_KEY']
+    
+    if payload.llm_provider:
+        env_vars['LLM_PROVIDER'] = payload.llm_provider
+    
+    # Write back to .env
+    with open(env_path, "w", encoding="utf-8") as f:
+        for key, value in env_vars.items():
+            f.write(f"{key}={value}\n")
+    
+    # Update environment variables for current session
+    if payload.openai_api_key:
+        os.environ['OPENAI_API_KEY'] = payload.openai_api_key
+    if payload.anthropic_api_key:
+        os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+    if payload.llm_provider:
+        os.environ['LLM_PROVIDER'] = payload.llm_provider
+    
+    return LLMConfigResponse(
+        openai_api_key_set=bool(env_vars.get('OPENAI_API_KEY')),
+        anthropic_api_key_set=bool(env_vars.get('ANTHROPIC_API_KEY')),
+        llm_provider=env_vars.get('LLM_PROVIDER', 'openai'),
+        status="configured"
+    )
 
 @app.post("/admin/set-ui-version")
 async def set_ui_version(payload: UIVersionPayload):
