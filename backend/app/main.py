@@ -1619,6 +1619,106 @@ def calculate_opportunity_score(product_posts: List[dict], all_posts: List[dict]
     return min(score, 100)
 
 
+@app.get("/api/improvements-summary")
+async def get_improvements_summary():
+    """
+    Generate a concise LLM summary of top improvement opportunities.
+    Returns a single sentence summarizing the main improvement areas.
+    """
+    try:
+        # Get top pain points
+        pain_points_response = await get_pain_points(days=30, limit=5)
+        pain_points = pain_points_response.pain_points if hasattr(pain_points_response, 'pain_points') else []
+        
+        if not pain_points:
+            return {"summary": "Aucune opportunité d'amélioration identifiée pour le moment."}
+        
+        # Prepare summary for LLM
+        pain_points_text = "\n".join([
+            f"- {pp.title}: {pp.description} ({pp.post_count} posts)"
+            for pp in pain_points[:5]
+        ])
+        
+        prompt = f"""Analyse les opportunités d'amélioration suivantes basées sur les retours clients OVH et génère UNE SEULE phrase concise (maximum 120 caractères) qui résume les principales idées d'amélioration.
+
+Opportunités identifiées:
+{pain_points_text}
+
+Génère une phrase en français qui résume les top idées d'amélioration de manière claire et actionnable. Ne génère QUE la phrase, sans formatage JSON ni guillemets."""
+        
+        # Try LLM API
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        
+        if api_key:
+            try:
+                if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post(
+                            'https://api.openai.com/v1/chat/completions',
+                            headers={
+                                'Authorization': f'Bearer {api_key}',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                'messages': [
+                                    {'role': 'system', 'content': 'Tu es un analyste produit. Génère des résumés concis et actionnables.'},
+                                    {'role': 'user', 'content': prompt}
+                                ],
+                                'temperature': 0.7,
+                                'max_tokens': 150
+                            }
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        summary = result['choices'][0]['message']['content'].strip()
+                        # Remove quotes if present
+                        summary = summary.strip('"').strip("'")
+                        return {"summary": summary}
+                
+                elif llm_provider == 'anthropic':
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post(
+                            'https://api.anthropic.com/v1/messages',
+                            headers={
+                                'x-api-key': api_key,
+                                'anthropic-version': '2023-06-01',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                                'max_tokens': 150,
+                                'messages': [
+                                    {'role': 'user', 'content': prompt}
+                                ]
+                            }
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        summary = result['content'][0]['text'].strip()
+                        summary = summary.strip('"').strip("'")
+                        return {"summary": summary}
+            except Exception as e:
+                logger.warning(f"LLM summary generation failed: {e}, using fallback")
+        
+        # Fallback: Generate simple summary
+        top_3 = pain_points[:3]
+        themes = [pp.title for pp in top_3]
+        if len(themes) == 1:
+            summary = f"Amélioration prioritaire: {themes[0]}"
+        elif len(themes) == 2:
+            summary = f"Améliorations prioritaires: {themes[0]} et {themes[1]}"
+        else:
+            summary = f"Top améliorations: {', '.join(themes[:2])} et {themes[2] if len(themes) > 2 else 'autres'}"
+        
+        return {"summary": summary}
+        
+    except Exception as e:
+        logger.error(f"Error generating improvements summary: {e}")
+        return {"summary": "Analyse des opportunités d'amélioration en cours..."}
+
+
 @app.get("/api/pain-points", response_model=PainPointsResponse)
 async def get_pain_points(days: int = 30, limit: int = 5):
     """

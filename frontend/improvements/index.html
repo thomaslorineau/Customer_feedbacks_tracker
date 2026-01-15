@@ -17,29 +17,20 @@
 
         .improvements-header {
             margin-bottom: 30px;
-            padding: 30px;
-            background: var(--bg-card);
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 2px 8px var(--shadow);
+            padding: 24px 32px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 16px;
+            box-shadow: 0 4px 16px rgba(0, 153, 255, 0.2);
+            text-align: center;
         }
 
-        .improvements-header h1 {
-            font-size: 2em;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin: 0 0 10px 0;
-        }
-
-        .improvements-header p {
-            font-size: 1.1em;
-            color: var(--text-secondary);
-            margin: 0;
-        }
-
-        .improvements-header .highlight {
-            color: var(--accent-primary);
+        .improvements-summary {
+            font-size: 1.4em;
             font-weight: 600;
+            color: white;
+            margin: 0;
+            line-height: 1.6;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .improvements-grid {
@@ -429,7 +420,7 @@
     <nav class="nav-menu">
         <div class="nav-menu-left">
             <a href="/dashboard" class="nav-logo">
-                <img src="/assets/logo/ovhcloud-logo.svg" alt="OVHcloud" class="ovh-logo" style="width: 32px; height: 32px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="/assets/logo/ovhcloud-logo.svg" alt="OVHcloud" class="ovh-logo" style="width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="display: none;">
                     <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
                     <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
@@ -475,7 +466,7 @@
     <div class="improvements-container">
         <!-- Header -->
         <div class="improvements-header">
-            <h1>Identify customer pain points and <span class="highlight">improvement opportunities</span> by analyzing persistent feedback across OVH products.</h1>
+            <p id="improvementsSummary" class="improvements-summary">Chargement de l'analyse des opportunités d'amélioration...</p>
         </div>
 
         <!-- Main Grid: Pain Points & Product Distribution -->

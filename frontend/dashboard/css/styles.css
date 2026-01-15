@@ -51,69 +51,64 @@ body {
     transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Header */
-.dashboard-header {
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-color);
-    padding: 20px 40px;
+/* Prominent Search Section */
+.search-section {
+    background: var(--bg-card);
+    border-radius: 16px;
+    padding: 32px 40px;
+    margin: 24px 40px;
+    box-shadow: 0 4px 16px var(--shadow);
+    border: 1px solid var(--border-color);
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 8px var(--shadow);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 20px;
+    align-items: center;
 }
 
-.logo-container {
+.search-container-prominent {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.ovh-logo {
-    width: 40px;
-    height: 40px;
-    color: var(--accent-ovh);
+.search-icon-large {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 1;
 }
 
-.ovh-logo img {
+.search-input-prominent {
     width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.logo-text {
+    padding: 18px 24px 18px 60px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--input-bg);
+    color: var(--text-primary);
     font-size: 1.1em;
-    font-weight: 600;
-    color: var(--text-primary);
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
-.main-title {
-    font-size: 1.8em;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0;
+.search-input-prominent:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
 }
 
-.header-right {
+.search-actions {
     display: flex;
+    gap: 12px;
     align-items: center;
-    gap: 20px;
-}
-
-.search-container {
-    position: relative;
-    width: 400px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
 }
 
 .search-icon {

@@ -71,6 +71,26 @@ async function loadVersion() {
     }
 }
 
+// Load improvements summary
+async function loadImprovementsSummary() {
+    try {
+        const response = await fetch('/api/improvements-summary');
+        if (response.ok) {
+            const data = await response.json();
+            const summaryEl = document.getElementById('improvementsSummary');
+            if (summaryEl) {
+                summaryEl.textContent = data.summary || "Analyse des opportunités d'amélioration en cours...";
+            }
+        }
+    } catch (error) {
+        console.error('Error loading improvements summary:', error);
+        const summaryEl = document.getElementById('improvementsSummary');
+        if (summaryEl) {
+            summaryEl.textContent = "💡 Opportunités d'amélioration basées sur les retours clients";
+        }
+    }
+}
+
 // Load pain points
 async function loadPainPoints() {
     try {
@@ -451,6 +471,7 @@ async function init() {
     try {
         console.log('Loading data...');
         await Promise.all([
+            loadImprovementsSummary(),
             loadPainPoints(),
             loadProductDistribution(),
             loadPostsForImprovement(true)

@@ -58,29 +58,16 @@
         </div>
     </nav>
 
-    <!-- Header -->
-    <header class="dashboard-header">
-        <div class="header-left">
-            <div class="logo-container">
-                <img src="/assets/logo/ovhcloud-logo.svg" alt="OVHcloud" class="ovh-logo" style="width: 48px; height: 48px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="display: none;">
-                    <!-- Fallback SVG if image fails to load -->
-                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
-                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
-                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
-                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
-                </svg>
-                <span class="logo-text">OVHcloud Analyst View</span>
-            </div>
-            <h1 class="main-title">Customer Feedbacks Tracker</h1>
-        </div>
-        <div class="header-right">
-            <div class="search-container">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <!-- Main Dashboard -->
+    <main class="dashboard-main">
+        <!-- Prominent Search Bar -->
+        <section class="search-section">
+            <div class="search-container-prominent">
+                <svg class="search-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/>
                     <path d="m21 21-4.35-4.35"/>
                 </svg>
-                <input type="text" id="globalSearch" placeholder="Search by product, keyword, review, post, sources..." class="search-input">
+                <input type="text" id="globalSearch" placeholder="Rechercher par produit, mot-clé, avis, post, source..." class="search-input-prominent">
                 <div class="search-info-tooltip" id="searchInfoTooltip">
                     <svg class="info-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -95,15 +82,11 @@
                     </div>
                 </div>
             </div>
-            <div class="header-actions">
+            <div class="search-actions">
                 <button class="btn-primary" id="scrapeAllBtn">🆕 Scrape New Data</button>
                 <button class="btn-secondary" id="resetFiltersBtn">Reset Filters</button>
             </div>
-        </div>
-    </header>
-
-    <!-- Main Dashboard -->
-    <main class="dashboard-main">
+        </section>
         <!-- Date Slicer - Common Date Filter for All Charts -->
         <section class="panel-date-slicer">
             <div class="date-slicer-content">
@@ -399,13 +382,21 @@
                     <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
                 </ul>
 
+                <h3>🔍 Recherche et Filtres</h3>
+                <ul>
+                    <li><strong>Barre de recherche centrale :</strong> Recherchez par produit, mot-clé, avis, post ou source</li>
+                    <li><strong>Filtres multiples :</strong> Combinez sentiment, langue, produit et dates pour une analyse précise</li>
+                    <li><strong>Timeline interactive :</strong> Cliquez ou glissez-déposez pour filtrer par période</li>
+                    <li><strong>Distribution par produit :</strong> Cliquez sur un produit pour filtrer automatiquement</li>
+                </ul>
+
                 <h3>💡 Pro Tips</h3>
                 <ul>
-                    <li>Use the timeline to identify feedback trends and spikes</li>
-                    <li>Double-click timeline bars to quickly filter by product and date</li>
-                    <li>Configure LLM keys to unlock AI-powered recommended actions</li>
-                    <li>Click on products to focus analysis on specific areas</li>
-                    <li>Use the critical posts button to prioritize urgent issues</li>
+                    <li>Utilisez la timeline pour identifier les tendances et pics de feedback</li>
+                    <li>Configurez les clés LLM pour débloquer les actions recommandées par IA</li>
+                    <li>Le bouton "Critical Posts" priorise les problèmes urgents</li>
+                    <li>Les filtres s'appliquent simultanément (logique ET)</li>
+                    <li>Explorez les opportunités d'amélioration dans la page dédiée</li>
                 </ul>
             </div>
         </div>
