@@ -2757,6 +2757,7 @@ async def generate_powerpoint_report_endpoint(request: PowerPointReportRequest):
     """
     Generate a PowerPoint report with key charts, insights, and recommendations.
     """
+    logger.info(f"[PowerPoint Report] Starting generation with filters: {request.filters}")
     try:
         from . import powerpoint_generator
         

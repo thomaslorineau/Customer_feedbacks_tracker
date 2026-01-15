@@ -1008,7 +1008,7 @@ async function generatePowerPointReport() {
     } finally {
         // Reset button state
         btn.disabled = false;
-        if (btnText) btnText.textContent = 'Generate PowerPoint Report';
+        if (btnText) btnText.textContent = '📊 PowerPoint';
         if (btnSpinner) btnSpinner.style.display = 'none';
     }
 }

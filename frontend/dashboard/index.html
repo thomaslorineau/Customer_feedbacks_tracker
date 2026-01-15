@@ -61,28 +61,61 @@
 
     <!-- Main Dashboard -->
     <main class="dashboard-main">
-        <!-- Centered Search Bar with Explanation -->
-        <section class="search-section" style="grid-column: 1 / 3;">
-            <div class="search-container-prominent">
-                <svg class="search-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/>
-                    <path d="m21 21-4.35-4.35"/>
-                </svg>
-                <input type="text" id="globalSearch" placeholder="Search by product, keyword, review, post, source..." class="search-input-prominent" autofocus>
-                <div class="search-info-tooltip" id="searchInfoTooltip">
-                    <svg class="info-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 16v-4M12 8h.01"/>
-                    </svg>
-                    <div class="tooltip-content">
-                        <strong>💡 Quick Tips</strong>
-                        <p>Searches content, author, URL & source • Filters combine automatically</p>
+        <!-- Search Section with KPI and Report Generator -->
+        <section class="search-section-with-kpi" style="grid-column: 1 / 3;">
+            <div class="search-kpi-container">
+                <!-- Left: Search Bar -->
+                <div class="search-wrapper">
+                    <div class="search-container-prominent">
+                        <svg class="search-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input type="text" id="globalSearch" placeholder="Search by product, keyword, review, post, source..." class="search-input-prominent" autofocus>
+                        <div class="search-info-tooltip" id="searchInfoTooltip">
+                            <svg class="info-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M12 16v-4M12 8h.01"/>
+                            </svg>
+                            <div class="tooltip-content">
+                                <strong>💡 Quick Tips</strong>
+                                <p>Searches content, author, URL & source • Filters combine automatically</p>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="search-hint" style="font-size: 0.85em; color: var(--text-muted); margin: 8px 0 0 0; text-align: center;">
+                        💡 Search across all feedback content, or use filters below to narrow down results
+                    </p>
+                </div>
+                
+                <!-- Right: KPI + Report Generator -->
+                <div class="kpi-report-wrapper">
+                    <!-- KPI: Positive Satisfaction -->
+                    <div class="kpi-card" id="positiveSatisfactionKPI">
+                        <div class="kpi-icon">😊</div>
+                        <div class="kpi-content">
+                            <div class="kpi-label">Positive Satisfaction</div>
+                            <div class="kpi-value" id="positiveSatisfactionValue">--%</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Report Generator -->
+                    <div class="report-generator-card">
+                        <div class="report-generator-header">
+                            <svg class="report-icon-header" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <span class="report-title">Generate Report</span>
+                        </div>
+                        <button class="btn-generate-report" id="generateReportBtn" title="Generate PowerPoint report with key insights">
+                            <span class="btn-text">📊 PowerPoint</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <p class="report-hint">4 charts + Key takeaways + AI analysis</p>
                     </div>
                 </div>
             </div>
-            <p class="search-hint" style="font-size: 0.85em; color: var(--text-muted); margin: 8px 0 0 0; text-align: center; max-width: 600px;">
-                💡 Search across all feedback content, or use filters below to narrow down results
-            </p>
             <div class="search-actions">
                 <button class="btn-primary" id="scrapeAllBtn">🆕 Scrape New Data</button>
                 <button class="btn-secondary" id="resetFiltersBtn">Reset Filters</button>
@@ -198,21 +231,6 @@
                     <button class="arrow-btn" id="navigateProductsPrevBtn">←</button>
                     <button class="arrow-btn" id="navigateProductsNextBtn">→</button>
                 </div>
-            </div>
-            <!-- PowerPoint Report Generator -->
-            <div class="report-generator-section">
-                <button class="btn-generate-report" id="generateReportBtn" title="Generate PowerPoint report with key insights">
-                    <svg class="report-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                        <polyline points="10 9 9 9 8 9"/>
-                    </svg>
-                    <span class="btn-text">Generate PowerPoint Report</span>
-                    <span class="btn-spinner" style="display:none;"></span>
-                </button>
-                <p class="report-hint">📊 Includes 4 key charts, key takeaways, and AI analysis</p>
             </div>
         </section>
 
