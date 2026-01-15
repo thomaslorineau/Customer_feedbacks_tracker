@@ -154,7 +154,7 @@ class App {
             this.state.setPosts(posts);
             console.log('App: Posts set in state. Filtered posts:', this.state.filteredPosts?.length || 0);
             
-            // Dashboard will update automatically via state subscription
+            // Dashboard will update automatically via state subscription in initDashboard
             // Also manually trigger dashboard update to ensure everything is displayed
             setTimeout(() => {
                 if (typeof updateDashboard === 'function') {
@@ -163,7 +163,7 @@ class App {
                 } else {
                     console.error('App: updateDashboard function not found');
                 }
-            }, 300);
+            }, 100);
         } catch (error) {
             console.error('App: Failed to load posts:', error);
             console.error('App: Error details:', error.message, error.stack);

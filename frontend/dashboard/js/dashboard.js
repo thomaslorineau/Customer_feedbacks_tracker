@@ -14,8 +14,14 @@ export function initDashboard(appState) {
     // Initialize event listeners
     setupEventListeners();
     
+    // Subscribe to state changes to update dashboard automatically
+    state.subscribe((updatedState) => {
+        console.log('Dashboard: State changed, updating dashboard...');
+        updateDashboard();
+    });
+    
     // Posts are loaded by app.js, so we just update the dashboard
-    // when state changes (via subscription in charts.js)
+    // when state changes (via subscription)
     // No need to load data here
 }
 
