@@ -906,12 +906,13 @@ function openCriticalPosts() {
     // Update dashboard
     updateDashboard();
     
-    // Scroll to posts section
-    const postsSection = document.querySelector('.panel-bottom');
-    if (postsSection) {
-        postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        
-        // Highlight the section briefly
+    // Don't scroll - keep user on current view
+    // const postsSection = document.querySelector('.panel-bottom');
+    // if (postsSection) {
+    //     postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // }
+    
+    // Highlight the section briefly (if needed)
         postsSection.style.transition = 'box-shadow 0.3s ease';
         postsSection.style.boxShadow = '0 0 20px rgba(0, 153, 255, 0.5)';
         setTimeout(() => {
