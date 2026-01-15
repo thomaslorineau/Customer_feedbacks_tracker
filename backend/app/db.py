@@ -258,3 +258,124 @@ def get_saved_queries():
     rows = c.fetchall()
     conn.close()
     return [r[0] for r in rows]
+
+
+def delete_duplicate_posts():
+    """
+    Delete duplicate posts from the database.
+    Duplicates are identified by same URL or same content+author+source.
+    Keeps the oldest post (lowest ID) and deletes the rest.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        # First, delete duplicates by URL (keep the one with lowest ID)
+        c.execute('''
+            DELETE FROM posts
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM posts
+                WHERE url IS NOT NULL AND url != ''
+                GROUP BY url
+            )
+            AND url IS NOT NULL AND url != ''
+        ''')
+        deleted_by_url = c.rowcount
+        
+        # Then, delete duplicates by content+author+source (keep the one with lowest ID)
+        c.execute('''
+            DELETE FROM posts
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM posts
+                GROUP BY content, author, source
+            )
+        ''')
+        deleted_by_content = c.rowcount
+        
+        conn.commit()
+        total_deleted = deleted_by_url + deleted_by_content
+    finally:
+        conn.close()
+    
+    return total_deleted
+
+
+def delete_non_ovh_posts():
+    """
+    Delete all posts from the database that do NOT mention OVH or its brands.
+    Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        # Check if posts table has country column (for migration compatibility)
+        c.execute("PRAGMA table_info(posts)")
+        columns = [row[1] for row in c.fetchall()]
+        has_country = 'country' in columns
+        
+        # Delete posts that don't contain OVH-related keywords
+        # Case-insensitive search for: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+        query = '''
+            DELETE FROM posts
+            WHERE LOWER(content) NOT LIKE '%ovh%'
+            AND LOWER(content) NOT LIKE '%ovhcloud%'
+            AND LOWER(content) NOT LIKE '%ovh cloud%'
+            AND LOWER(content) NOT LIKE '%kimsufi%'
+            AND LOWER(content) NOT LIKE '%soyoustart%'
+            AND LOWER(author) NOT LIKE '%ovh%'
+            AND (url IS NULL OR (LOWER(url) NOT LIKE '%ovh%' AND LOWER(url) NOT LIKE '%kimsufi%' AND LOWER(url) NOT LIKE '%soyoustart%'))
+        '''
+        
+        c.execute(query)
+        deleted_count = c.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    
+    return deleted_count
+
+
+def delete_sample_posts():
+    """
+    Delete sample/fake posts used for testing.
+    Identifies sample posts by checking for test keywords in content or author.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            DELETE FROM posts
+            WHERE LOWER(content) LIKE '%test%'
+            OR LOWER(content) LIKE '%sample%'
+            OR LOWER(content) LIKE '%example%'
+            OR LOWER(author) LIKE '%test%'
+            OR LOWER(author) LIKE '%sample%'
+            OR source = 'test'
+        ''')
+        deleted_count = c.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    
+    return deleted_count
+
+
+def delete_hackernews_posts():
+    """
+    Delete all posts from Hacker News source.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        c.execute('DELETE FROM posts WHERE source = ?', ('hackernews',))
+        deleted_count = c.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    
+    return deleted_count
