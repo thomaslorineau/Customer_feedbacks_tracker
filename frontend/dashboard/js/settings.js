@@ -33,19 +33,47 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Theme Management
-function initializeTheme() {
-    const themeToggle = document.getElementById('themeToggleBtn');
-    const currentTheme = localStorage.getItem('theme') || 'light';
-    document.body.setAttribute('data-theme', currentTheme);
+function toggleTheme() {
+    const body = document.body;
+    const isDark = body.classList.contains('dark-mode');
     
-    if (themeToggle) {
-        themeToggle.addEventListener('click', () => {
-            const theme = document.body.getAttribute('data-theme');
-            const newTheme = theme === 'dark' ? 'light' : 'dark';
-            document.body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
+    if (isDark) {
+        body.classList.remove('dark-mode');
+        localStorage.setItem('theme', 'light');
+    } else {
+        body.classList.add('dark-mode');
+        localStorage.setItem('theme', 'dark');
     }
+    
+    // Dispatch event to notify other pages
+    window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: isDark ? 'light' : 'dark' } }));
+}
+
+function initializeTheme() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+    } else {
+        document.body.classList.remove('dark-mode');
+    }
+    
+    // Listen for theme changes from other pages
+    window.addEventListener('themeChanged', (e) => {
+        if (e.detail.theme === 'dark') {
+            document.body.classList.add('dark-mode');
+        } else {
+            document.body.classList.remove('dark-mode');
+        }
+    });
+    
+    // Setup theme toggle button
+    const themeToggle = document.querySelector('.theme-toggle');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
+    
+    // Make toggleTheme available globally
+    window.toggleTheme = toggleTheme;
 }
 
 // Load Configuration

@@ -590,7 +590,7 @@
     <nav class="nav-menu">
         <div class="nav-menu-left">
             <a href="/dashboard" class="nav-logo">
-                <img src="/assets/logo/ovhcloud-logo.svg" alt="OVHcloud" class="ovh-logo" style="width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="" alt="OVHcloud" class="ovh-logo" style="width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)); display: none;" onerror="this.style.display='none';">
                 <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="display: none;">
                     <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
                     <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
@@ -665,8 +665,8 @@
             <div class="logo-upload-container">
                 <div class="logo-preview-section">
                     <div class="logo-preview">
-                        <img id="logoPreview" src="/assets/logo/ovhcloud-logo.svg" alt="OVHcloud Logo" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='block';">
-                        <div id="logoPlaceholder" class="logo-placeholder" style="display: none;">
+                        <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+                        <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
                                 <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -830,7 +830,7 @@
                 } else {
                     logoInfo.innerHTML = `
                         <p class="logo-status">
-                            ℹ️ Aucun logo uploadé. Le logo par défaut sera utilisé.
+                            ℹ️ Aucun logo uploadé.
                         </p>
                     `;
                     if (logoPreview) logoPreview.style.display = 'none';
@@ -898,14 +898,14 @@
                     
                     const data = await response.json();
                     
-                    if (response.ok) {
+                    if (response.ok && data.success) {
                         // Show success message
                         const logoInfo = document.getElementById('logoInfo');
                         if (logoInfo) {
                             logoInfo.innerHTML = `
                                 <p class="logo-status success">
                                     ✅ ${data.message}<br>
-                                    <small>Le logo sera visible après rechargement de la page</small>
+                                    <small>Le logo est maintenant actif</small>
                                 </p>
                             `;
                         }
@@ -915,6 +915,11 @@
                         if (logoPreview) {
                             logoPreview.src = data.path + '?t=' + Date.now();
                             logoPreview.style.display = 'block';
+                            logoPreview.onerror = function() {
+                                this.style.display = 'none';
+                                const placeholder = document.getElementById('logoPlaceholder');
+                                if (placeholder) placeholder.style.display = 'flex';
+                            };
                         }
                         const logoPlaceholder = document.getElementById('logoPlaceholder');
                         if (logoPlaceholder) logoPlaceholder.style.display = 'none';
@@ -926,6 +931,9 @@
                         // Store in localStorage for other pages
                         localStorage.setItem('logoPath', data.path);
                         localStorage.setItem('logoUpdated', Date.now().toString());
+                        
+                        // Re-check logo status to ensure it's saved
+                        setTimeout(checkLogoStatus, 500);
                         
                         // Reset form
                         if (logoFileInput) logoFileInput.value = '';
