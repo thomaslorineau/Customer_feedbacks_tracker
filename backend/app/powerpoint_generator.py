@@ -16,8 +16,24 @@ try:
     import matplotlib.patches as mpatches
     from PIL import Image
     PPTX_AVAILABLE = True
-except ImportError:
+    MISSING_DEPENDENCIES = []
+except ImportError as e:
     PPTX_AVAILABLE = False
+    # Determine which dependency is missing
+    missing = []
+    try:
+        import pptx
+    except ImportError:
+        missing.append("python-pptx")
+    try:
+        import matplotlib
+    except ImportError:
+        missing.append("matplotlib")
+    try:
+        from PIL import Image
+    except ImportError:
+        missing.append("Pillow")
+    MISSING_DEPENDENCIES = missing if missing else ["python-pptx", "matplotlib", "Pillow"]
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +59,12 @@ def generate_powerpoint_report(
         bytes: PowerPoint file as bytes
     """
     if not PPTX_AVAILABLE:
-        raise RuntimeError("python-pptx, matplotlib, or Pillow not installed. Install with: pip install python-pptx matplotlib Pillow")
+        deps = ", ".join(MISSING_DEPENDENCIES)
+        raise RuntimeError(
+            f"PowerPoint generation requires {deps}. "
+            f"Install with: pip install {' '.join(MISSING_DEPENDENCIES)} "
+            f"or install all dependencies: pip install -r requirements.txt"
+        )
     
     # Create presentation
     prs = Presentation()

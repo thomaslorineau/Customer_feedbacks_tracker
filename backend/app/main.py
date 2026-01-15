@@ -2762,9 +2762,15 @@ async def generate_powerpoint_report_endpoint(request: PowerPointReportRequest):
         from . import powerpoint_generator
         
         if not powerpoint_generator.PPTX_AVAILABLE:
+            missing_deps = getattr(powerpoint_generator, 'MISSING_DEPENDENCIES', ['python-pptx', 'matplotlib', 'Pillow'])
+            deps_str = ", ".join(missing_deps)
             raise HTTPException(
                 status_code=503,
-                detail="PowerPoint generation requires python-pptx, matplotlib, and Pillow. Install with: pip install python-pptx matplotlib Pillow"
+                detail=(
+                    f"PowerPoint generation requires {deps_str}. "
+                    f"Install with: pip install {' '.join(missing_deps)} "
+                    f"or install all dependencies: pip install -r requirements.txt"
+                )
             )
         
         # Get filtered posts based on request filters
