@@ -387,13 +387,18 @@ function updateProductDistribution() {
     const total = posts.length;
     const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
     
+    // Calculate max count for relative scaling (makes bars longer)
+    const maxCount = sortedProducts.length > 0 ? sortedProducts[0][1] : 1;
+    
     productList.innerHTML = sortedProducts.map(([product, count], index) => {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(0) : 0;
+        // Use relative scaling based on max count for longer bars
+        const relativeWidth = maxCount > 0 ? ((count / maxCount) * 100).toFixed(0) : 0;
         return `
             <div class="product-item" data-product="${product}">
                 <div class="product-color" style="background: ${colors[index % colors.length]}"></div>
                 <div class="product-bar-container">
-                    <div class="product-bar" style="width: ${percentage}%; background: ${colors[index % colors.length]}"></div>
+                    <div class="product-bar" style="width: ${relativeWidth}%; background: ${colors[index % colors.length]}"></div>
                 </div>
                 <div class="product-info">
                     <span class="product-name">${product}</span>
