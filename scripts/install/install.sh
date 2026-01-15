@@ -190,7 +190,9 @@ info "Configuration des scripts de gestion..."
 cd ..
 # Rendre tous les scripts exécutables
 info "Configuration des permissions des scripts..."
-chmod +x start.sh stop.sh status.sh backup.sh check_access.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
+chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
+chmod +x scripts/install/check_access.sh 2>/dev/null || true
+chmod +x scripts/start/*.sh 2>/dev/null || true
 
 # Rendre aussi exécutables tous les scripts .sh dans le répertoire
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
@@ -492,7 +494,7 @@ if [ -n "$URL_TO_SHARE" ]; then
     fi
 else
     echo "⚠️  Impossible de déterminer l'URL d'accès réseau"
-    echo "   Utilisez : ./check_access.sh pour plus d'informations"
+    echo "   Utilisez : bash scripts/install/check_access.sh pour plus d'informations"
 fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -504,7 +506,7 @@ echo "   cd $INSTALL_DIR"
 echo "   ./start.sh"
 echo ""
 echo "2. Vérifier l'accessibilité :"
-echo "   ./check_access.sh"
+echo "   bash scripts/install/check_access.sh"
 echo ""
 echo "3. Vérifier le statut :"
 echo "   ./status.sh"
@@ -515,7 +517,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 info "Lancement du diagnostic d'accessibilité..."
 echo ""
-if [ -f "check_access.sh" ]; then
+if [ -f "scripts/install/check_access.sh" ]; then
+    bash scripts/install/check_access.sh
+elif [ -f "check_access.sh" ]; then
     ./check_access.sh
 else
     warning "Script check_access.sh non trouvé"

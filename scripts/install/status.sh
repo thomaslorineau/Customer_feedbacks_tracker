@@ -100,6 +100,6 @@ echo "   Arrêt:         ./stop.sh"
 echo "   Statut:        ./status.sh"
 echo "   Mise à jour:   ./update.sh"
 echo "   Config CORS:   ./configure_cors.sh"
-echo "   Diagnostic:    ./check_access.sh"
+echo "   Diagnostic:    bash scripts/install/check_access.sh"
 echo "   Logs:          tail -f $APP_DIR/backend/server.log"
 

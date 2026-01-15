@@ -247,7 +247,7 @@ if ps -p $PID > /dev/null 2>&1; then
         echo "⚠️  Si l'accès ne fonctionne pas depuis un autre ordinateur :"
         echo "   1. Vérifiez que les deux machines sont sur le même réseau"
         echo "   2. Vérifiez le firewall de la VM"
-        echo "   3. Exécutez le diagnostic: ./check_access.sh"
+        echo "   3. Exécutez le diagnostic: bash scripts/install/check_access.sh"
         echo "   4. Vérifiez les logs: tail -f $APP_DIR/backend/server.log"
     else
         echo "❌ Le processus s'est arrêté immédiatement"
