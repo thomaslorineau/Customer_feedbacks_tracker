@@ -654,6 +654,174 @@
 
     <script src="/dashboard/js/settings.js"></script>
     <script>
+        // Logo Upload Functionality
+        const API_BASE = window.location.origin;
+        let selectedFile = null;
+
+        // Check logo status on page load
+        async function checkLogoStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/logo-status`);
+                const data = await response.json();
+                
+                const logoInfo = document.getElementById('logoInfo');
+                const logoPreview = document.getElementById('logoPreview');
+                const logoPlaceholder = document.getElementById('logoPlaceholder');
+                
+                if (data.exists) {
+                    logoInfo.innerHTML = `
+                        <p class="logo-status success">
+                            ✅ Logo actuel : ${data.filename}<br>
+                            <small>Taille : ${(data.size / 1024).toFixed(2)} KB</small>
+                        </p>
+                    `;
+                    if (logoPreview) {
+                        logoPreview.src = data.path + '?t=' + Date.now(); // Cache bust
+                        logoPreview.style.display = 'block';
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                    }
+                } else {
+                    logoInfo.innerHTML = `
+                        <p class="logo-status">
+                            ℹ️ Aucun logo uploadé. Le logo par défaut sera utilisé.
+                        </p>
+                    `;
+                    if (logoPreview) logoPreview.style.display = 'none';
+                    if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
+                }
+            } catch (error) {
+                console.error('Error checking logo status:', error);
+                const logoInfoEl = document.getElementById('logoInfo');
+                if (logoInfoEl) {
+                    logoInfoEl.innerHTML = `
+                        <p class="logo-status error">❌ Erreur lors de la vérification du logo</p>
+                    `;
+                }
+            }
+        }
+
+        // File input change handler
+        const logoFileInput = document.getElementById('logoFileInput');
+        if (logoFileInput) {
+            logoFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    selectedFile = file;
+                    const uploadBtn = document.getElementById('uploadLogoBtn');
+                    if (uploadBtn) uploadBtn.disabled = false;
+                    
+                    // Preview image
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const logoPreview = document.getElementById('logoPreview');
+                        const logoPlaceholder = document.getElementById('logoPlaceholder');
+                        if (logoPreview) {
+                            logoPreview.src = e.target.result;
+                            logoPreview.style.display = 'block';
+                        }
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Upload button click handler
+        const uploadLogoBtn = document.getElementById('uploadLogoBtn');
+        if (uploadLogoBtn) {
+            uploadLogoBtn.addEventListener('click', async function() {
+                if (!selectedFile) return;
+                
+                const btn = this;
+                const btnText = btn.querySelector('.btn-text');
+                const btnSpinner = btn.querySelector('.btn-spinner');
+                
+                btn.disabled = true;
+                if (btnText) btnText.textContent = 'Upload en cours...';
+                if (btnSpinner) btnSpinner.style.display = 'inline-block';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    
+                    const response = await fetch(`${API_BASE}/api/upload-logo`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        // Show success message
+                        const logoInfo = document.getElementById('logoInfo');
+                        if (logoInfo) {
+                            logoInfo.innerHTML = `
+                                <p class="logo-status success">
+                                    ✅ ${data.message}<br>
+                                    <small>Le logo sera visible après rechargement de la page</small>
+                                </p>
+                            `;
+                        }
+                        
+                        // Update preview
+                        const logoPreview = document.getElementById('logoPreview');
+                        if (logoPreview) {
+                            logoPreview.src = data.path + '?t=' + Date.now();
+                            logoPreview.style.display = 'block';
+                        }
+                        const logoPlaceholder = document.getElementById('logoPlaceholder');
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                        
+                        // Reset form
+                        if (logoFileInput) logoFileInput.value = '';
+                        selectedFile = null;
+                        btn.disabled = true;
+                        
+                        // Show toast notification
+                        showToast('Logo uploadé avec succès !', 'success');
+                    } else {
+                        throw new Error(data.detail || 'Erreur lors de l\'upload');
+                    }
+                } catch (error) {
+                    console.error('Error uploading logo:', error);
+                    const logoInfo = document.getElementById('logoInfo');
+                    if (logoInfo) {
+                        logoInfo.innerHTML = `
+                            <p class="logo-status error">❌ Erreur : ${error.message}</p>
+                        `;
+                    }
+                    showToast('Erreur lors de l\'upload du logo', 'error');
+                } finally {
+                    if (btnText) btnText.textContent = 'Uploader le logo';
+                    if (btnSpinner) btnSpinner.style.display = 'none';
+                }
+            });
+        }
+
+        // Simple toast notification function
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `copy-feedback ${type}`;
+            toast.textContent = message;
+            toast.style.background = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff';
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkLogoStatus();
+        });
+
         // Define toggleHelpMenu function for settings page
         window.toggleHelpMenu = function() {
             const menu = document.getElementById('helpMenu');
