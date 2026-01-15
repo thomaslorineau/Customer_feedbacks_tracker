@@ -509,10 +509,10 @@ tail -f server.log
 
 ```bash
 cd ~/apps/complaints_tracker
-./start.sh    # Démarrer l'application
+bash scripts/start/start.sh    # Démarrer l'application
 bash scripts/start/stop.sh     # Arrêter l'application
-./status.sh   # Vérifier le statut
-./backup.sh   # Sauvegarder la base de données
+bash scripts/install/status.sh # Vérifier le statut
+bash scripts/install/backup.sh # Sauvegarder la base de données
 ```
 
 #### Étape 11 : Automatiser le démarrage (optionnel)

@@ -166,8 +166,11 @@ scripts/
 │   ├── check_access.sh  # Vérification accès
 │   ├── backup.sh        # Sauvegarde
 │   ├── update.sh        # Mise à jour
-│   ├── status.sh        # Statut
-│   └── stop.sh          # Arrêt (déplacé avec start.sh)
+│   └── status.sh        # Statut
+│
+├── start/               # Scripts de démarrage/arrêt
+│   ├── start.sh         # Démarrage
+│   └── stop.sh          # Arrêt
 │
 └── utils/               # Utilitaires
     └── bump-version.ps1 # Incrémenter version
