@@ -1,13 +1,24 @@
-fastapi
-uvicorn[standard]
-snscrape
-vaderSentiment
-httpx
-feedparser
-apscheduler
-requests
-urllib3
-beautifulsoup4
-lxml
-textblob
-python-dotenv
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Scraping and HTTP
+httpx==0.25.2
+requests==2.31.0
+urllib3==2.1.0
+beautifulsoup4==4.12.2
+lxml==4.9.3
+feedparser==6.0.10
+
+# Social media scraping
+snscrape==0.7.0.20230622
+
+# Sentiment analysis
+vaderSentiment==3.3.2
+textblob==0.17.1
+
+# Scheduling
+apscheduler==3.10.4
+
+# Configuration
+python-dotenv==1.0.0

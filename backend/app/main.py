@@ -81,6 +81,20 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    """Add security headers to all responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Only add HSTS if using HTTPS in production
+    if os.getenv("ENVIRONMENT") == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
 
 class ScrapeRequest(BaseModel):
     """Validated scrape request with input validation."""
@@ -528,13 +542,38 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
 JOBS = {}
 
 
+# Security: Sanitize log messages to prevent leaking sensitive data
+import re
+
+def sanitize_log_message(message: str) -> str:
+    """Remove sensitive data from log messages (API keys, tokens, etc.)."""
+    if not message:
+        return message
+    
+    # Mask API keys (OpenAI, Anthropic, GitHub, etc.)
+    message = re.sub(r'sk-[a-zA-Z0-9]{20,}', 'sk-***REDACTED***', message)
+    message = re.sub(r'sk-ant-[a-zA-Z0-9-]{20,}', 'sk-ant-***REDACTED***', message)
+    message = re.sub(r'ghp_[a-zA-Z0-9]{20,}', 'ghp_***REDACTED***', message)
+    message = re.sub(r'github_pat_[a-zA-Z0-9_]{20,}', 'github_pat_***REDACTED***', message)
+    
+    # Mask tokens in URLs
+    message = re.sub(r'(token|api_key|apikey|password|secret)=[a-zA-Z0-9_-]+', r'\1=***REDACTED***', message, flags=re.IGNORECASE)
+    
+    # Mask email addresses (optional - can be removed if needed for debugging)
+    # message = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '***@***.***', message)
+    
+    return message
+
+
 # Helper function to log scraping events
 def log_scraping(source: str, level: str, message: str, details: dict = None):
     """Helper function to log scraping events to database and console."""
-    db.add_scraping_log(source, level, message, details)
+    # Sanitize message before logging
+    sanitized_message = sanitize_log_message(message)
+    db.add_scraping_log(source, level, sanitized_message, details)
     # Also print to console for immediate visibility
     level_emoji = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}.get(level, "📝")
-    print(f"{level_emoji} [{source}] {message}")
+    print(f"{level_emoji} [{source}] {sanitized_message}")
 
 
 def _run_scrape_for_source(source: str, query: str, limit: int):

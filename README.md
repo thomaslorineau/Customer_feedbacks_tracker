@@ -1,260 +1,201 @@
-# OVH Complaints Tracker
+# 🎯 OVH Customer Feedbacks Tracker
 
-Real-time monitoring platform that collects and analyzes **customer complaints** and **feedback** about OVH domain services from multiple sources.
+> Plateforme de monitoring en temps réel qui collecte et analyse les **retours clients** et **feedback** sur les services OVH depuis plusieurs sources.
+
+[![Version](https://img.shields.io/badge/version-1.0.8-blue.svg)](VERSION)
+[![Status](https://img.shields.io/badge/status-beta-orange.svg)](docs/changelog/STATUS.md)
 
 ---
 
-## 🎉 PHASE 2 SÉCURITÉ - TERMINÉE!
+## 🚀 Démarrage rapide
 
-**Score de sécurité:** 55/100 → **93/100** (+38 points)
+```bash
+# Windows (PowerShell)
+.\scripts\start\start_server.ps1
 
-✅ **Audit de sécurité global complet avec 7 nouveaux correctifs!**
+# Linux/Mac
+./scripts/start/start.sh
 
-### 🚨 ACTION URGENTE:
-⚠️ **Clé API OpenAI exposée - À révoquer immédiatement**  
-📖 Voir [URGENT_API_KEY.md](URGENT_API_KEY.md) pour les étapes détaillées
-
-### 🚀 Démarrage rapide:
-
-```powershell
-# PowerShell
-.\start_server.ps1
-
-# Ou Batch
-run_server.bat
-
-# Ou Manuel
+# Ou manuellement
 cd backend
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Puis ouvrir: `http://localhost:8000` ou `test_api.html`
+Puis ouvrir: **http://localhost:8000**
 
-📖 **Voir [QUICK_START.md](QUICK_START.md) pour le guide complet**
-
----
-
-## 🛡️ Nouvelles protections (Phase 2)
-
-- ✅ **Rate Limiting** - 100 requêtes/minute par IP
-- ✅ **Headers HTTP** - 7 headers de sécurité (CSP, XSS, Clickjacking)
-- ✅ **Validation stricte** - Tous les paramètres validés
-- ✅ **Protection DB** - try-finally sur toutes les connexions
-- ✅ **Limites de taille** - Protection contre saturation
-- ✅ **Clé API masquée** - Secrets protégés
+📖 **Guide complet:** [docs/guides/QUICK_START.md](docs/guides/QUICK_START.md)
 
 ---
 
-## 🎯 Objective
+## 📁 Structure du projet
 
-Track genuine customer complaints and feedback about OVH domain services (pricing, support quality, interface usability, renewal issues, etc.) across multiple platforms to identify patterns and pain points.
-
-## 📊 Data Sources
-
-The application collects **real customer feedback** from the following sources:
-
-### ✅ Currently Supported
-
-| Source | Type | Focus | Status |
-|--------|------|-------|--------|
-| **Trustpilot** | ⭐ Customer Reviews | Real customer ratings and reviews on OVH | Real data |
-| **X/Twitter** | 💬 Social Media | Tweets with complaint keywords (bad support, expensive, etc.) | Real data (when available) |
-| **GitHub Issues** | 📋 Issue Tracker | Customer experience issues and feature requests | Real data |
-| **Stack Overflow** | ❓ Q&A Platform | Customer technical support questions about OVH domains | Real data |
-| **Hacker News** | 🔗 Tech Community | Technical discussions from tech community | Real data |
-| **Google News** | 📰 News Aggregator | News articles and press coverage about OVH | Real data |
-
-### ❌ Not Supported
-
-- **Reddit**: Anti-scraping measures (403 Forbidden) - would require OAuth2
-- **LinkedIn**: Strictly prohibits automated data extraction in ToS
-- **Facebook**: No public API - would violate platform terms
-
-## ⚡ Key Features
-
-### Data Collection
-- **Manual Scraping**: Click buttons to fetch customer feedback immediately
-- **Auto Scraping**: Every 3 hours, automatically collects feedback from all sources
-- **Complaint-Focused**: Searches specifically for customer complaints, not generic mentions
-- **Real Data Only**: No mock data - if a scraper fails, returns error instead
-
-### Analysis & Filtering
-- **Sentiment Analysis**: VADER sentiment analysis (negative/neutral/positive)
-- **Multi-Filter Search**: Filter by date, source, sentiment, and keywords
-- **Keyword Patterns**: Pre-configured patterns for domain-related issues
-  - Domain creation/renewal issues
-  - Transfer problems
-  - DNS complications
-  - Price complaints
-  - Support quality issues
-
-### Management
-- **Backlog Feature**: Save important complaints for follow-up (localStorage)
-- **CSV Export**: Export filtered results for analysis
-- **Real-time Logs**: See scraping progress and errors in real-time
-
-## 🏗️ Architecture
-
-### Backend (FastAPI)
 ```
-backend/
-├── app/
-│   ├── main.py              # FastAPI app, endpoints, scheduler
-│   ├── db.py                # SQLite database operations
-│   ├── scraper/
-│   │   ├── trustpilot.py    # ⭐ Trustpilot reviews (NEW)
-│   │   ├── x_scraper.py     # X/Twitter (complaint keywords)
-│   │   ├── github.py        # GitHub Issues (customer experience)
-│   │   ├── stackoverflow.py  # Stack Overflow Q&A
-│   │   ├── hackernews.py    # Hacker News discussions
-│   │   └── news.py          # Google News
-│   └── analysis/
-│       └── sentiment.py      # VADER sentiment analysis
-├── requirements.txt         # Python dependencies
-└── tests/
-    ├── test_complaint_scrapers.py
-    └── test_scrapers_qa.py
+ovh-complaints-tracker/
+│
+├── 🎨 frontend/              # Interface utilisateur (HTML/CSS/JS)
+│   ├── index.html            # Page principale (Scraping & Configuration)
+│   ├── logs.html             # Page des logs
+│   ├── v2/                   # Dashboard Analytics
+│   └── improvements/         # Page d'améliorations
+│
+├── ⚙️ backend/               # API Backend (Python/FastAPI)
+│   ├── app/
+│   │   ├── main.py           # Point d'entrée FastAPI
+│   │   ├── scraper/          # Modules de scraping (X, Reddit, GitHub...)
+│   │   ├── analysis/         # Analyse de sentiment
+│   │   └── db.py             # Gestion base de données
+│   └── requirements.txt      # Dépendances Python
+│
+├── 📚 docs/                  # Documentation complète
+│   ├── guides/               # Guides d'utilisation
+│   ├── architecture/          # Documentation technique
+│   ├── audits/               # Rapports d'audit
+│   └── changelog/            # Historique des changements
+│
+└── 🔧 scripts/               # Scripts d'administration
+    ├── start/                # Scripts de démarrage
+    ├── install/              # Scripts d'installation
+    └── utils/                # Utilitaires
 ```
 
-### Frontend (Vanilla JS)
+---
+
+## 🏗️ Architecture en 30 secondes
+
 ```
-frontend/
-└── index.html               # Single-page dashboard
-    ├── Controls (filters, scraping buttons)
-    ├── Stats cards (total posts, sentiment distribution)
-    ├── Gallery (card-based post display)
-    ├── Backlog (saved items)
-    └── Info panel (documentation)
+┌─────────────┐
+│  Frontend   │  →  Pages HTML/JS (Scraping, Dashboard, Logs)
+└──────┬──────┘
+       │ HTTP
+┌──────▼──────┐
+│   Backend   │  →  FastAPI + Scrapers + SQLite
+│  (FastAPI)  │
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│  Scrapers   │  →  X/Twitter, Reddit, GitHub, Stack Overflow...
+└──────┬──────┘
+       │
+┌──────▼──────┐
+│  Database   │  →  SQLite (posts, logs, queries)
+└─────────────┘
 ```
 
-### Database
-- **SQLite** with post schema: source, author, content, url, created_at, sentiment_score, sentiment_label
-- Persistent storage for all collected posts
+**Flux de données:**
+1. **Scrapers** collectent les posts depuis différentes sources
+2. **Analyse de sentiment** (VADER) classe chaque post
+3. **Base de données** stocke les posts avec métadonnées
+4. **API REST** expose les données au frontend
+5. **Dashboard** visualise les données avec Chart.js
 
-## 🚀 Quick Start
+📖 **Architecture détaillée:** [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)
 
-### 1. Setup Environment
+---
+
+## 🎯 Fonctionnalités
+
+- ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, Google News
+- ✅ **Analyse de sentiment** : Classification automatique (positif/négatif/neutre)
+- ✅ **Dashboard interactif** : Graphiques, filtres, timeline
+- ✅ **Logs persistants** : Suivi détaillé des opérations de scraping
+- ✅ **Détection de pays** : Identification du pays depuis le contenu
+- ✅ **Actions recommandées** : Suggestions basées sur l'IA (OpenAI/Anthropic)
+
+---
+
+## 📚 Documentation
+
+### Guides
+- 🚀 [Démarrage rapide](docs/guides/QUICK_START.md)
+- 🔑 [Configuration des clés API](docs/guides/GUIDE_API_KEYS.md)
+- 🧪 [Guide de test](docs/guides/GUIDE_TEST.md)
+- 🤖 [Configuration LLM](docs/guides/QUICK_START_LLM.md)
+
+### Architecture
+- 🏗️ [Architecture détaillée](docs/architecture/ARCHITECTURE.md)
+- 🔒 [Vue d'ensemble sécurité](docs/architecture/SECURITY_OVERVIEW.md)
+- 📝 [Implémentation](docs/architecture/IMPLEMENTATION.md)
+
+### Audits
+- 🔍 [Audit de sécurité](docs/audits/SECURITY_AUDIT.md)
+- 📊 [Audit des scrapers](docs/audits/AUDIT_SCRAPERS.md)
+
+---
+
+## 🛠️ Technologies
+
+| Composant | Technologie |
+|-----------|------------|
+| **Frontend** | HTML5, CSS3, Vanilla JS (ES6 Modules) |
+| **Backend** | FastAPI (Python 3.11+) |
+| **Base de données** | SQLite |
+| **Scraping** | httpx, BeautifulSoup, feedparser |
+| **Analyse** | VADER Sentiment |
+| **Visualisation** | Chart.js |
+| **IA** | OpenAI GPT-4o-mini / Anthropic Claude |
+
+---
+
+## 🔧 Configuration
+
+### Variables d'environnement
+
+Créer `backend/.env` :
+
+```env
+# LLM Provider (openai, anthropic)
+LLM_PROVIDER=openai
+
+# API Keys
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Optionnel
+GITHUB_TOKEN=ghp_...
+TRUSTPILOT_API_KEY=...
+
+# Configuration
+ENVIRONMENT=development
+CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+```
+
+📖 **Guide complet:** [docs/guides/GUIDE_API_KEYS.md](docs/guides/GUIDE_API_KEYS.md)
+
+---
+
+## 🧪 Tests
 
 ```bash
-cd ovh-complaints-tracker
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\Activate.ps1 # Windows PowerShell
-```
-
-### 2. Install Dependencies
-
-```bash
-pip install -r backend/requirements.txt
-```
-
-### 3. Run Backend
-
-```bash
+# Tests E2E
 cd backend
-python -c "from app.main import app; import uvicorn; uvicorn.run(app, host='127.0.0.1', port=8000)"
+python scripts/e2e_test_real_server.py
 ```
 
-### 4. Run Frontend
+📖 **Guide de test:** [docs/guides/GUIDE_TEST.md](docs/guides/GUIDE_TEST.md)
 
-```bash
-cd frontend
-python -m http.server 3000
-```
+---
 
-### 5. Access Application
+## 📊 Statut du projet
 
-Open browser: `http://127.0.0.1:3000/index.html`
+- ✅ **Phase 1** : Sécurité critique - Terminée
+- ✅ **Phase 2** : Sécurité avancée - Terminée
+- ✅ **Nettoyage** : Projet professionnel - Terminé
+- 🚧 **Version** : 1.0.8 (Beta)
 
-## 📋 API Endpoints
+📖 **Statut détaillé:** [docs/changelog/STATUS.md](docs/changelog/STATUS.md)
 
-```
-POST /scrape/trustpilot        # Scrape Trustpilot reviews
-POST /scrape/x                 # Scrape X/Twitter (complaint keywords)
-POST /scrape/github            # Scrape GitHub Issues
-POST /scrape/stackoverflow     # Scrape Stack Overflow
-POST /scrape/hackernews        # Scrape Hacker News
-POST /scrape/news              # Scrape Google News
-GET  /posts?limit=100          # Get all posts from database
-```
+---
 
-## 🔍 Search Keywords
+## 🤝 Contribution
 
-Scrapers search for **customer complaint-related keywords**:
+Ce projet est en version **beta**. Pour toute question ou suggestion, voir la [documentation](docs/).
 
-### X/Twitter
-- "OVH support bad"
-- "OVH domain expensive"
-- "OVH customer service"
-- "OVH renewal overpriced"
-- "OVH interface confusing"
+---
 
-### GitHub
-- "OVH domain" (customer experience)
-- "OVH customer"
-- "OVH support"
-- "OVH renewal"
-- "OVH experience"
+## 📄 Licence
 
-### Frontend Keyword Filters
-- Domain creation/registration issues
-- Domain renewal problems
-- Domain transfer complications
-- Domain trading/selling
-- Domain restoration
-- DNS-related issues
+Projet interne OVH.
 
-## 📊 Sentiment Analysis
+---
 
-Posts are classified using VADER sentiment analysis:
-- 🔴 **NEGATIVE** (score < -0.05): Complaints, issues, dissatisfaction
-- ⚪ **NEUTRAL** (-0.05 to 0.05): Factual statements, no clear sentiment
-- 🟢 **POSITIVE** (score > 0.05): Positive feedback, good experiences
-
-## ⚙️ Technical Stack
-
-- **Backend**: FastAPI, Python 3.13, uvicorn
-- **Scrapers**: httpx, snscrape (X), feedparser (RSS)
-- **Analysis**: VADER sentiment analysis
-- **Database**: SQLite
-- **Scheduling**: APScheduler (3-hour auto-scrape)
-- **Frontend**: Vanilla JavaScript, localStorage, CSS Grid
-- **Sentiment**: VADER (Valence Aware Dictionary and sEntiment Reasoner)
-
-## ⚠️ Important Notes
-
-### Only Real Data
-- **No mock data in results** - if a scraper fails, returns 503 error instead
-- **Trustpilot, GitHub, Stack Overflow** provide real customer feedback
-- **X/Twitter** searches complaint keywords, but snscrape incompatibility with Python 3.13 may cause unavailability
-- **Google News** via RSS feeds (subject to rate limiting)
-
-### Rate Limiting
-Some APIs have rate limiting:
-- GitHub API: 60 requests/hour (unauthenticated)
-- Google News: May be rate-limited by Google
-- Trustpilot: Rate limiting may apply
-
-### Legal & Ethics
-- All scraped data is **publicly available** on social platforms
-- Users are responsible for complying with platform Terms of Service
-- This tool monitors public feedback only
-- No personal data collection - only public posts/reviews
-
-## 🔧 Development
-
-### Test Scrapers
-
-```bash
-cd backend
-python test_complaint_scrapers.py
-python test_scrapers_qa.py
-```
-
-### View Logs
-
-Backend logs are printed to console in real-time. Frontend logs appear in browser console.
-
-## 📝 License
-
-MIT License - feel free to use, modify, and distribute
+**Dernière mise à jour:** 2026-01-XX
