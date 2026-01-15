@@ -1,7 +1,10 @@
 #!/bin/bash
 # Script de démarrage de l'application
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Obtenir le répertoire du script (scripts/start/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Remonter à la racine du projet (2 niveaux: scripts/start -> scripts -> racine)
+APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$APP_DIR"
 
 # S'assurer que tous les scripts sont exécutables
@@ -46,7 +49,9 @@ fi
 # Vérifier la configuration CORS
 if [ ! -f "backend/.env" ]; then
     echo "⚠️  Fichier .env introuvable. Configuration CORS automatique..."
-    if [ -f "configure_cors.sh" ]; then
+    if [ -f "scripts/install/configure_cors.sh" ]; then
+        bash scripts/install/configure_cors.sh
+    elif [ -f "configure_cors.sh" ]; then
         ./configure_cors.sh
     else
         echo "⚠️  Script configure_cors.sh non trouvé"
