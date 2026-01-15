@@ -57,7 +57,7 @@ def generate_powerpoint_report(
     subtitle = slide.placeholders[1]
     
     title.text = "OVH Customer Feedback Report"
-    subtitle.text = f"Generated on {datetime.now().strftime('%B %d, %Y')}\nBased on {len(posts)} feedback posts"
+    subtitle.text = f"Generated on {datetime.datetime.now().strftime('%B %d, %Y')}\nBased on {len(posts)} feedback posts"
     
     # Slide 2: Executive Summary
     bullet_slide_layout = prs.slide_layouts[1]
