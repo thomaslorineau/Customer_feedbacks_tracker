@@ -41,3 +41,4 @@ python backend/scripts/ci_test_endpoints.py
 
 **Utiliser `e2e_full_test.py`** pour une validation complète avant la démo.
 
+

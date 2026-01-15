@@ -77,3 +77,4 @@
     window.updateLogoInNavigation = updateLogoInNavigation;
 })();
 
+

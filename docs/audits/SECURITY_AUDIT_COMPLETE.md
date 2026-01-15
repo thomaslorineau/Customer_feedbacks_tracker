@@ -365,3 +365,4 @@ Cependant, **deux vulnérabilités critiques** doivent être corrigées avant to
 **Dernière mise à jour:** 2026-01-XX  
 **Prochain audit recommandé:** Après correction des vulnérabilités critiques
 
+
