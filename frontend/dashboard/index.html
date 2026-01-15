@@ -64,8 +64,17 @@
         <!-- Search Section with KPI and Report Generator -->
         <section class="search-section-with-kpi" style="grid-column: 1 / 3;">
             <div class="search-kpi-container">
-                <!-- Left: Search Bar -->
-                <div class="search-wrapper">
+                <!-- Left: KPI Satisfaction -->
+                <div class="kpi-card-left">
+                    <div class="kpi-icon">😊</div>
+                    <div class="kpi-content">
+                        <div class="kpi-label">Positive Satisfaction</div>
+                        <div class="kpi-value" id="positiveSatisfactionValue">--%</div>
+                    </div>
+                </div>
+                
+                <!-- Center: Search Bar -->
+                <div class="search-wrapper-center">
                     <div class="search-container-prominent">
                         <svg class="search-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"/>
@@ -88,32 +97,20 @@
                     </p>
                 </div>
                 
-                <!-- Right: KPI + Report Generator -->
-                <div class="kpi-report-wrapper">
-                    <!-- KPI: Positive Satisfaction -->
-                    <div class="kpi-card" id="positiveSatisfactionKPI">
-                        <div class="kpi-icon">😊</div>
-                        <div class="kpi-content">
-                            <div class="kpi-label">Positive Satisfaction</div>
-                            <div class="kpi-value" id="positiveSatisfactionValue">--%</div>
-                        </div>
+                <!-- Right: Report Generator -->
+                <div class="report-generator-card-right">
+                    <div class="report-generator-header">
+                        <svg class="report-icon-header" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        <span class="report-title">Generate Report</span>
                     </div>
-                    
-                    <!-- Report Generator -->
-                    <div class="report-generator-card">
-                        <div class="report-generator-header">
-                            <svg class="report-icon-header" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                <polyline points="14 2 14 8 20 8"/>
-                            </svg>
-                            <span class="report-title">Generate Report</span>
-                        </div>
-                        <button class="btn-generate-report" id="generateReportBtn" title="Generate PowerPoint report with key insights">
-                            <span class="btn-text">📊 PowerPoint</span>
-                            <span class="btn-spinner" style="display:none;"></span>
-                        </button>
-                        <p class="report-hint">4 charts + Key takeaways + AI analysis</p>
-                    </div>
+                    <button class="btn-generate-report" id="generateReportBtn" title="Generate PowerPoint report with key insights">
+                        <span class="btn-text">📊 PowerPoint</span>
+                        <span class="btn-spinner" style="display:none;"></span>
+                    </button>
+                    <p class="report-hint">4 charts + Key takeaways + AI analysis</p>
                 </div>
             </div>
             <div class="search-actions">
