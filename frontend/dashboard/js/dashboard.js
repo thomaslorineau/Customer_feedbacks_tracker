@@ -382,9 +382,17 @@ async function loadDashboardData() {
 
 function updateDashboard() {
     console.log('Updating dashboard...');
+    console.log('State:', state ? 'initialized' : 'NOT initialized');
+    console.log('Total posts:', state?.posts?.length || 0);
     console.log('State filtered posts:', state?.filteredPosts?.length || 0);
     if (!state) {
         console.error('State is not initialized');
+        return;
+    }
+    if (!state.posts || state.posts.length === 0) {
+        console.warn('No posts in state, trying to load...');
+        // Try to load posts if state is empty
+        loadDashboardData();
         return;
     }
     updateStatsBanner();

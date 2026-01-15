@@ -151,12 +151,12 @@ class App {
             // Also manually trigger dashboard update to ensure everything is displayed
             setTimeout(() => {
                 if (typeof updateDashboard === 'function') {
-                    console.log('App: Calling updateDashboard()');
+                    console.log('App: Calling updateDashboard() with', this.state.filteredPosts?.length || 0, 'filtered posts');
                     updateDashboard();
                 } else {
                     console.error('App: updateDashboard function not found');
                 }
-            }, 200);
+            }, 300);
         } catch (error) {
             console.error('App: Failed to load posts:', error);
         }
