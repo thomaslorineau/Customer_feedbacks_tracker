@@ -32,7 +32,7 @@
 │  │  │  /improvements (Improvements Opportunities)                    │ │   │
 │  │  │  ├─ Recurring Pain Points (top 5, last 30 days)               │ │   │
 │  │  │  ├─ Product Distribution (opportunity scores)                 │ │   │
-│  │  │  └─ Posts to Review (ranked by opportunity score)              │ │   │
+│  │  │  └─ Posts to Review (ranked by priority score)                 │ │   │
 │  │  └────────────────────────────────────────────────────────────────┘ │   │
 │  │                                                                      │   │
 │  │  Navigation: Menu with theme toggle, consistent across all pages    │   │
