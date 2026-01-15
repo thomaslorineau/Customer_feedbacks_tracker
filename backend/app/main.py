@@ -445,7 +445,7 @@ def startup_event():
         if deleted_count > 0:
             print(f"[CLEANUP] Removed {deleted_count} non-OVH posts from database")
         else:
-            print("[CLEANUP] All posts are OVH-related ✓")
+            print("[CLEANUP] All posts are OVH-related [OK]")
     except Exception as e:
         print(f"[CLEANUP] Warning: Could not clean non-OVH posts: {e}")
     
