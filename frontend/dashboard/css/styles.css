@@ -202,24 +202,31 @@ body {
 }
 
 .btn-primary, .btn-secondary {
-    padding: 10px 20px;
+    padding: 12px 24px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-weight: 600;
     font-size: 0.95em;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
 }
 
 .btn-primary {
+    /* Fallback */
     background: var(--accent-primary);
     color: white;
+    box-shadow: 0 4px 12px rgba(0, 153, 255, 0.3);
+    
+    /* Enhanced by modern-enhancements.css */
 }
 
 .btn-primary:hover {
-    background: var(--accent-secondary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 153, 255, 0.3);
+    /* Enhanced by modern-enhancements.css */
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
 }
 
 .btn-secondary {
@@ -238,25 +245,27 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto auto auto 1fr;
-    gap: 16px;
-    padding: 20px 40px;
+    gap: 24px;
+    padding: 32px 48px;
     max-width: 1800px;
     margin: 0 auto;
+    /* Enhanced spacing by modern-enhancements.css */
 }
 
 .stats-banner {
     grid-column: 1 / 3;
     grid-row: 1;
     background: var(--bg-card);
-    border-radius: 12px;
-    padding: 20px 24px;
-    box-shadow: 0 2px 8px var(--shadow);
+    border-radius: 16px;
+    padding: 24px 32px;
+    box-shadow: 0 4px 16px var(--shadow);
     border: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 24px;
+    /* Enhanced by modern-enhancements.css */
 }
 
 .stats-banner-title {
@@ -311,11 +320,12 @@ body {
     grid-column: 1 / 3;
     grid-row: 1;
     background: var(--bg-card);
-    border-radius: 12px;
-    padding: 16px 24px;
-    box-shadow: 0 2px 8px var(--shadow);
+    border-radius: 16px;
+    padding: 20px 28px;
+    box-shadow: 0 4px 12px var(--shadow);
     border: 1px solid var(--border-color);
     margin-bottom: 0;
+    /* Enhanced by modern-enhancements.css */
 }
 
 .date-slicer-content {
