@@ -164,12 +164,13 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
 fi
 
 # Forcer la résolution des fichiers de config AVANT le pull
-# On sauvegarde, puis on supprime temporairement ou on reset pour permettre le pull
+# On sauvegarde, puis on supprime temporairement ces fichiers pour permettre le pull
 CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
 for file in $CONFIG_FILES; do
     if [ ! -f "$file" ]; then
         continue
     fi
+    
     # Vérifier s'il y a des modifications locales (staged ou unstaged)
     HAS_MODS=false
     if ! git diff --quiet "$file" 2>/dev/null; then
@@ -179,7 +180,13 @@ for file in $CONFIG_FILES; do
         HAS_MODS=true
     fi
     
-    if [ "$HAS_MODS" = true ]; then
+    # Vérifier aussi si le fichier est suivi par Git
+    IS_TRACKED=false
+    if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+        IS_TRACKED=true
+    fi
+    
+    if [ "$HAS_MODS" = true ] || [ "$IS_TRACKED" = true ]; then
         info "Mise en pause temporaire des modifications locales de $file (pour permettre le pull)..."
         # S'assurer qu'on a bien sauvegardé la version locale
         local_backup="$BACKUP_DIR/$(basename $file).local"
@@ -187,24 +194,20 @@ for file in $CONFIG_FILES; do
             cp "$file" "$local_backup" 2>/dev/null || true
         fi
         
-        # Essayer plusieurs méthodes pour permettre le pull
-        # Méthode 1: Reset si le fichier est staged
-        git reset HEAD -- "$file" 2>/dev/null || true
-        
-        # Méthode 2: Restore si disponible (Git 2.23+)
-        git restore --staged --worktree "$file" 2>/dev/null || true
-        
-        # Méthode 3: Checkout HEAD si le fichier est suivi
-        git checkout HEAD -- "$file" 2>/dev/null || true
-        
-        # Méthode 4: Si le fichier n'est plus suivi, le supprimer temporairement
-        if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
-            # Fichier suivi, on peut le checkout
+        # Supprimer temporairement le fichier pour permettre le pull
+        # (on le restaurera après)
+        if [ "$IS_TRACKED" = true ]; then
+            # Fichier suivi : reset et checkout HEAD
+            git reset HEAD -- "$file" 2>/dev/null || true
             git checkout HEAD -- "$file" 2>/dev/null || true
-            git add "$file" 2>/dev/null || true
+            # Si ça ne fonctionne toujours pas, supprimer le fichier
+            if ! git diff --quiet "$file" 2>/dev/null || ! git diff --cached --quiet "$file" 2>/dev/null; then
+                info "Suppression temporaire de $file (sera restauré après le pull)..."
+                rm -f "$file"
+            fi
         else
-            # Fichier non suivi, on le supprime temporairement
-            info "Fichier $file non suivi, suppression temporaire..."
+            # Fichier non suivi : simplement le supprimer temporairement
+            info "Suppression temporaire de $file (sera restauré après le pull)..."
             rm -f "$file"
         fi
     fi
