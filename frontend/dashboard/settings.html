@@ -919,7 +919,12 @@
                         if (logoPlaceholder) logoPlaceholder.style.display = 'none';
                         
                         // Update logo in navigation across all pages
-                        updateLogoInNavigation(data.path);
+                        if (window.updateLogoInNavigation) {
+                            window.updateLogoInNavigation(data.path);
+                        }
+                        // Store in localStorage for other pages
+                        localStorage.setItem('logoPath', data.path);
+                        localStorage.setItem('logoUpdated', Date.now().toString());
                         
                         // Reset form
                         if (logoFileInput) logoFileInput.value = '';
@@ -947,44 +952,8 @@
             });
         }
 
-        // Update logo in navigation menu
-        function updateLogoInNavigation(logoPath) {
-            // Update current page navigation
-            const navLogos = document.querySelectorAll('.nav-logo img, .nav-logo .ovh-logo');
-            navLogos.forEach(img => {
-                if (img.tagName === 'IMG') {
-                    img.src = logoPath + '?t=' + Date.now();
-                    img.style.display = 'block';
-                    // Hide fallback SVG if exists
-                    const fallbackSvg = img.nextElementSibling;
-                    if (fallbackSvg && fallbackSvg.classList.contains('ovh-logo')) {
-                        fallbackSvg.style.display = 'none';
-                    }
-                }
-            });
-            
-            // Store in localStorage to update other pages
-            localStorage.setItem('logoPath', logoPath);
-            localStorage.setItem('logoUpdated', Date.now().toString());
-        }
-
-        // Check for logo updates from other pages
-        function checkLogoUpdate() {
-            const logoPath = localStorage.getItem('logoPath');
-            const logoUpdated = localStorage.getItem('logoUpdated');
-            
-            if (logoPath && logoUpdated) {
-                const updateTime = parseInt(logoUpdated);
-                const now = Date.now();
-                // Only update if less than 5 seconds ago (recent update)
-                if (now - updateTime < 5000) {
-                    updateLogoInNavigation(logoPath);
-                }
-            }
-        }
-
-        // Check for logo updates periodically
-        setInterval(checkLogoUpdate, 1000);
+        // Logo updater is handled by /js/logo-updater.js
+        // The function window.updateLogoInNavigation is available globally
 
         // Simple toast notification function
         function showToast(message, type = 'info') {
