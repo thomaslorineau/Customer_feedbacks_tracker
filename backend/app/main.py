@@ -469,17 +469,19 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
 
     For backward compatibility the endpoint returns the same `ScrapeResult`.
     """
+    source_name = "X/Twitter"
     try:
         query_val = query if query and query != "OVH" else None
-        print(f"[X SCRAPER] Starting with query={query_val}, limit={limit}")
+        log_scraping(source_name, "info", f"Starting scrape with query='{query_val}', limit={limit}")
         if query_val:
             items = x_scraper.scrape_x(query_val, limit=limit)
         else:
             items = x_scraper.scrape_x_multi_queries(limit=limit)
 
-        print(f"[X SCRAPER] Got {len(items)} items")
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
-        print(f"[X SCRAPER ERROR] {type(e).__name__}: {str(e)}")
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
         import traceback
         traceback.print_exc()
         return ScrapeResult(added=0)
@@ -515,12 +517,24 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
     
     if skipped_duplicates > 0:
         print(f"[X SCRAPER] Skipped {skipped_duplicates} duplicate posts")
-
+        db.add_scraping_log(source_name, "info", f"Skipped {skipped_duplicates} duplicate posts")
+    
+    db.add_scraping_log(source_name, "success" if added > 0 else "warning", 
+                       f"Scraping completed: {added} posts added, {skipped_duplicates} duplicates skipped")
     return ScrapeResult(added=added)
 
 
 # In-memory job store for background keyword scraping
 JOBS = {}
+
+
+# Helper function to log scraping events
+def log_scraping(source: str, level: str, message: str, details: dict = None):
+    """Helper function to log scraping events to database and console."""
+    db.add_scraping_log(source, level, message, details)
+    # Also print to console for immediate visibility
+    level_emoji = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}.get(level, "📝")
+    print(f"{level_emoji} [{source}] {message}")
 
 
 def _run_scrape_for_source(source: str, query: str, limit: int):
@@ -723,77 +737,156 @@ async def cancel_job(job_id: str):
 @app.post("/scrape/stackoverflow", response_model=ScrapeResult)
 async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Stack Overflow questions about OVH."""
-    items = stackoverflow.scrape_stackoverflow(query, limit=limit)
+    print(f"[STACKOVERFLOW SCRAPER] Starting with query='{query}', limit={limit}")
+    try:
+        items = stackoverflow.scrape_stackoverflow(query, limit=limit)
+        print(f"[STACKOVERFLOW SCRAPER] Got {len(items)} items")
+    except Exception as e:
+        print(f"[STACKOVERFLOW SCRAPER ERROR] {type(e).__name__}: {str(e)}")
+        logger.error(f"Error scraping Stack Overflow: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
 
     added = 0
-    for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        if db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-        }):
-            added += 1
+    skipped_duplicates = 0
+    errors = 0
+    try:
+        for it in items:
+            try:
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                print(f"[STACKOVERFLOW SCRAPER] Error processing item: {e}")
+                logger.warning(f"Error processing Stack Overflow item: {e}")
+    except Exception as e:
+        print(f"[STACKOVERFLOW SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return {'added': added}
 
 
 @app.post("/scrape/github", response_model=ScrapeResult)
 async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape GitHub issues mentioning OVH."""
-    items = github.scrape_github_issues(query, limit=limit)
+    source_name = "GitHub"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    try:
+        items = github.scrape_github_issues(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping GitHub: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
 
     added = 0
-    for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        country = country_detection.detect_country_from_post(it)
-        db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-            'country': country,
-        })
-        added += 1
+    skipped_duplicates = 0
+    errors = 0
+    try:
+        for it in items:
+            try:
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                country = country_detection.detect_country_from_post(it)
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                print(f"[GITHUB SCRAPER] Error processing item: {e}")
+                logger.warning(f"Error processing GitHub item: {e}")
+    except Exception as e:
+        print(f"[GITHUB SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+    
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return {'added': added}
 
 
 @app.post("/scrape/reddit", response_model=ScrapeResult)
 async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Reddit posts and discussions about OVH using RSS feeds."""
-    # Reddit scraper using RSS
-    items = reddit.scrape_reddit(query, limit=limit)
+    source_name = "Reddit"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    try:
+        items = reddit.scrape_reddit(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping Reddit: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
 
     added = 0
-    for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        if db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-        }):
-            added += 1
+    skipped_duplicates = 0
+    errors = 0
+    try:
+        for it in items:
+            try:
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                print(f"[REDDIT SCRAPER] Error processing item: {e}")
+                logger.warning(f"Error processing Reddit item: {e}")
+    except Exception as e:
+        print(f"[REDDIT SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
-    # Return success even if no items were added
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return {'added': added}
 
 
@@ -868,50 +961,29 @@ async def scrape_mastodon_endpoint(query: str = "OVH", limit: int = 50):
 @app.post("/scrape/g2-crowd", response_model=ScrapeResult)
 async def scrape_g2_crowd_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape G2 Crowd for OVH product reviews."""
+    source_name = "G2 Crowd"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
         items = g2_crowd.scrape_g2_crowd(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
+        error_msg = f"{type(e).__name__}: {e}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
         logger.error(f"Error scraping G2 Crowd: {e}")
+        import traceback
+        traceback.print_exc()
         return ScrapeResult(added=0)
     
     added = 0
     skipped_duplicates = 0
-    for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        if db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-        }):
-            added += 1
-        else:
-            skipped_duplicates += 1
+    errors = 0
     
-    if skipped_duplicates > 0:
-        logger.info(f"✓ Added {added} reviews from G2 Crowd (skipped {skipped_duplicates} duplicates)")
-    return {'added': added}
-
-
-@app.post("/scrape/news", response_model=ScrapeResult)
-async def scrape_news_endpoint(query: str, limit: int = 50):
-    print(f"[NEWS SCRAPER] Starting with query={query}, limit={limit}")
-    items = news.scrape_google_news(query, limit=limit)
-    print(f"[NEWS SCRAPER] Got {len(items)} items")
-
-    added = 0
-    try:
-        for it in items:
+    print(f"[G2 CROWD ENDPOINT] Processing {len(items)} items for database insertion...")
+    for it in items:
+        try:
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
-            country = country_detection.detect_country_from_post(it)
             if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
@@ -921,51 +993,127 @@ async def scrape_news_endpoint(query: str, limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
-                'country': country,
             }):
                 added += 1
+            else:
+                skipped_duplicates += 1
+        except Exception as e:
+            errors += 1
+            print(f"[G2 CROWD ENDPOINT] Error processing item: {e}")
+            logger.warning(f"Error processing G2 Crowd item: {e}")
+    
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
+    return {'added': added}
+
+
+@app.post("/scrape/news", response_model=ScrapeResult)
+async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
+    source_name = "Google News"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    try:
+        items = news.scrape_google_news(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping Google News: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
+
+    added = 0
+    skipped_duplicates = 0
+    errors = 0
+    try:
+        for it in items:
+            try:
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                country = country_detection.detect_country_from_post(it)
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                print(f"[NEWS SCRAPER] Error processing item: {e}")
+                logger.warning(f"Error processing News item: {e}")
     except Exception as e:
         print(f"[NEWS SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
     
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return ScrapeResult(added=added)
 
 
 @app.post("/scrape/trustpilot", response_model=ScrapeResult)
 async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50):
     """Scrape Trustpilot customer reviews about OVH."""
-    print(f"[TRUSTPILOT SCRAPER] Starting with query={query}, limit={limit}")
-    items = trustpilot.scrape_trustpilot_reviews(query, limit=limit)
-    print(f"[TRUSTPILOT SCRAPER] Got {len(items)} reviews")
+    source_name = "Trustpilot"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    try:
+        items = trustpilot.scrape_trustpilot_reviews(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} reviews")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping Trustpilot: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
 
     added = 0
+    skipped_duplicates = 0
+    errors = 0
     try:
         for it in items:
-            # Skip sentiment analysis if already provided by scraper
-            if not it.get('sentiment_score'):
-                an = sentiment.analyze(it.get('content') or '')
-                it['sentiment_score'] = an['score']
-                it['sentiment_label'] = an['label']
-            
-            country = country_detection.detect_country_from_post(it)
-            if db.insert_post({
-                'source': it.get('source'),
-                'author': it.get('author'),
-                'content': it.get('content'),
-                'url': it.get('url'),
-                'created_at': it.get('created_at'),
-                'sentiment_score': it.get('sentiment_score'),
-                'sentiment_label': it.get('sentiment_label'),
-                'language': it.get('language', 'unknown'),
-                'country': country,
-            }):
-                added += 1
+            try:
+                # Skip sentiment analysis if already provided by scraper
+                if not it.get('sentiment_score'):
+                    an = sentiment.analyze(it.get('content') or '')
+                    it['sentiment_score'] = an['score']
+                    it['sentiment_label'] = an['label']
+                
+                country = country_detection.detect_country_from_post(it)
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                print(f"[TRUSTPILOT SCRAPER] Error processing item: {e}")
+                logger.warning(f"Error processing Trustpilot item: {e}")
     except Exception as e:
         print(f"[TRUSTPILOT SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
         import traceback
         traceback.print_exc()
     
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return ScrapeResult(added=added)
 
 
@@ -1866,6 +2014,44 @@ async def serve_frontend_dashboard():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
         raise HTTPException(status_code=404, detail="Dashboard page not found")
+
+
+@app.get("/logs", response_class=HTMLResponse)
+async def serve_logs_page():
+    """Serve the scraping logs page."""
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "logs.html"
+    if frontend_path.exists():
+        return open(frontend_path, "r", encoding="utf-8").read()
+    else:
+        # Create a simple logs page if it doesn't exist
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Scraping Logs</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body>
+            <h1>Scraping Logs</h1>
+            <p>Logs page will be created here.</p>
+        </body>
+        </html>
+        """
+
+
+@app.get("/api/logs")
+async def get_logs_api(source: Optional[str] = None, level: Optional[str] = None, limit: int = 1000, offset: int = 0):
+    """Get scraping logs from the database."""
+    logs = db.get_scraping_logs(source=source, level=level, limit=limit, offset=offset)
+    return {"logs": logs, "count": len(logs)}
+
+
+@app.delete("/api/logs")
+async def clear_logs_api(source: Optional[str] = None, older_than_days: Optional[int] = None):
+    """Clear scraping logs."""
+    deleted = db.clear_scraping_logs(source=source, older_than_days=older_than_days)
+    return {"deleted": deleted, "message": f"Deleted {deleted} log entries"}
 
 
 @app.get("/improvements", response_class=HTMLResponse)

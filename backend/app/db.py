@@ -58,6 +58,34 @@ def init_db():
             created_at TEXT
         )
     ''')
+    
+    # Scraping logs table for persistent logging
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS scraping_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            source TEXT,
+            level TEXT,
+            message TEXT,
+            details TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Index for faster queries on logs
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_logs_timestamp 
+        ON scraping_logs(timestamp DESC)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_logs_source 
+        ON scraping_logs(source)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_logs_level 
+        ON scraping_logs(level)
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -383,3 +411,126 @@ def delete_hackernews_posts():
         conn.close()
     
     return deleted_count
+
+
+# ===== SCRAPING LOGS FUNCTIONS =====
+
+def add_scraping_log(source: str, level: str, message: str, details: str = None):
+    """Add a log entry to the scraping_logs table.
+    
+    Args:
+        source: Source of the log (e.g., 'X/Twitter', 'GitHub', 'Reddit')
+        level: Log level ('info', 'warning', 'error', 'success')
+        message: Log message
+        details: Optional additional details (JSON string or dict)
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        timestamp = datetime.datetime.now().isoformat()
+        
+        # Convert details to JSON string if it's a dict
+        if details is not None and isinstance(details, dict):
+            details = json.dumps(details)
+        elif details is None:
+            details = None
+        else:
+            details = str(details)
+        
+        c.execute(
+            '''INSERT INTO scraping_logs (timestamp, source, level, message, details)
+               VALUES (?, ?, ?, ?, ?)''',
+            (timestamp, source, level, message, details)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_scraping_logs(source: str = None, level: str = None, limit: int = 1000, offset: int = 0):
+    """Get scraping logs from the database.
+    
+    Args:
+        source: Filter by source (optional)
+        level: Filter by level (optional)
+        limit: Maximum number of logs to return
+        offset: Offset for pagination
+    
+    Returns:
+        List of log dictionaries
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        query = "SELECT id, timestamp, source, level, message, details FROM scraping_logs WHERE 1=1"
+        params = []
+        
+        if source:
+            query += " AND source = ?"
+            params.append(source)
+        
+        if level:
+            query += " AND level = ?"
+            params.append(level)
+        
+        query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        c.execute(query, params)
+        rows = c.fetchall()
+        
+        logs = []
+        for row in rows:
+            log = {
+                'id': row[0],
+                'timestamp': row[1],
+                'source': row[2],
+                'level': row[3],
+                'message': row[4],
+                'details': row[5]
+            }
+            # Try to parse details as JSON if it exists
+            if log['details']:
+                try:
+                    log['details'] = json.loads(log['details'])
+                except (json.JSONDecodeError, TypeError):
+                    pass  # Keep as string if not valid JSON
+            logs.append(log)
+        
+        return logs
+    finally:
+        conn.close()
+
+
+def clear_scraping_logs(source: str = None, older_than_days: int = None):
+    """Clear scraping logs from the database.
+    
+    Args:
+        source: Clear logs for specific source only (optional)
+        older_than_days: Clear logs older than N days (optional)
+    
+    Returns:
+        Number of logs deleted
+    """
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    
+    try:
+        if older_than_days:
+            cutoff_date = (datetime.datetime.now() - datetime.timedelta(days=older_than_days)).isoformat()
+            if source:
+                c.execute('DELETE FROM scraping_logs WHERE source = ? AND timestamp < ?', (source, cutoff_date))
+            else:
+                c.execute('DELETE FROM scraping_logs WHERE timestamp < ?', (cutoff_date,))
+        elif source:
+            c.execute('DELETE FROM scraping_logs WHERE source = ?', (source,))
+        else:
+            c.execute('DELETE FROM scraping_logs')
+        
+        deleted_count = c.rowcount
+        conn.commit()
+        return deleted_count
+    finally:
+        conn.close()

@@ -4,6 +4,7 @@ export class State {
         this.posts = [];
         this.filteredPosts = [];
         this.listeners = [];
+        this.postsPage = 1; // Pagination for posts list
         this.filters = {
             search: '',
             sentiment: 'all',
@@ -22,12 +23,21 @@ export class State {
     }
     
     setFilter(key, value) {
-        this.filters[key] = value;
+        // Don't apply filter if value is empty string and it's a date filter (allow showing all dates)
+        if ((key === 'dateFrom' || key === 'dateTo') && value === '') {
+            this.filters[key] = '';
+        } else {
+            this.filters[key] = value;
+        }
+        // Reset pagination when filters change
+        this.postsPage = 1;
         this.applyFilters();
         this.notifyListeners();
     }
     
     applyFilters() {
+        console.log('Applying filters:', this.filters);
+        console.log('Total posts before filtering:', this.posts.length);
         this.filteredPosts = this.posts.filter(post => {
             // Filter out sample posts
             const url = post.url || '';
@@ -113,6 +123,7 @@ export class State {
             
             return true;
         });
+        console.log('Filtered posts count:', this.filteredPosts.length);
     }
     
     subscribe(listener) {

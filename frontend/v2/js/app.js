@@ -1,7 +1,7 @@
 // Main application entry point
 import { API } from './api.js';
 import { State } from './state.js';
-import { initDashboard } from './dashboard.js';
+import { initDashboard, updateDashboard } from './dashboard.js';
 import { initCharts } from './charts.js';
 import { initWorldMap } from './world-map.js';
 import { initSourceChart } from './source-chart.js';
@@ -122,15 +122,44 @@ class App {
         // Load initial data
         try {
             await this.loadPosts();
+            // Manually trigger dashboard update after posts are loaded
+            setTimeout(() => {
+                if (typeof updateDashboard === 'function') {
+                    updateDashboard();
+                }
+            }, 100);
         } catch (error) {
             console.error('Failed to load posts:', error);
         }
     }
     
     async loadPosts() {
-        const posts = await this.api.getPosts(1000, 0);
-        this.state.setPosts(posts);
-        // Dashboard will update automatically via state subscription
+        try {
+            console.log('App: Loading posts...');
+            const posts = await this.api.getPosts(1000, 0);
+            console.log('App: Posts loaded:', posts?.length || 0, 'posts');
+            
+            if (!posts || posts.length === 0) {
+                console.warn('App: No posts found in database');
+                return;
+            }
+            
+            this.state.setPosts(posts);
+            console.log('App: Posts set in state. Filtered posts:', this.state.filteredPosts?.length || 0);
+            
+            // Dashboard will update automatically via state subscription
+            // Also manually trigger dashboard update to ensure everything is displayed
+            setTimeout(() => {
+                if (typeof updateDashboard === 'function') {
+                    console.log('App: Calling updateDashboard()');
+                    updateDashboard();
+                } else {
+                    console.error('App: updateDashboard function not found');
+                }
+            }, 200);
+        } catch (error) {
+            console.error('App: Failed to load posts:', error);
+        }
     }
 }
 

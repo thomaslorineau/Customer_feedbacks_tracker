@@ -43,7 +43,9 @@ def scrape_stackoverflow(query="OVH", limit=30):
             data = response.json()
             
             if not data.get("items"):
-                raise RuntimeError(f"No Stack Overflow questions found for: {query}")
+                logger.warning(f"[STACKOVERFLOW] No questions found for query: {query}")
+                logger.info(f"[STACKOVERFLOW] API response: {data}")
+                return []  # Return empty list instead of raising exception
             
             posts = []
             for item in data["items"][:limit]:
@@ -65,8 +67,10 @@ def scrape_stackoverflow(query="OVH", limit=30):
                     continue
             
             if not posts:
-                raise RuntimeError("No valid Stack Overflow questions could be parsed")
+                logger.warning("[STACKOVERFLOW] No valid questions could be parsed from API response")
+                return []
             
+            logger.info(f"[STACKOVERFLOW] Successfully scraped {len(posts)} questions")
             return posts
         
         except (httpx.TimeoutError, httpx.ConnectError, httpx.NetworkError) as e:
@@ -77,14 +81,17 @@ def scrape_stackoverflow(query="OVH", limit=30):
                 time.sleep(wait_time)
             else:
                 logger.error(f"Stack Overflow scraper failed after {MAX_RETRIES} attempts: {e}")
+                return []  # Return empty list instead of raising exception
         except httpx.HTTPError as e:
             last_error = e
             logger.error(f"Stack Overflow API error: {str(e)}")
-            break
+            logger.error(f"Response status: {e.response.status_code if hasattr(e, 'response') else 'N/A'}")
+            return []  # Return empty list instead of raising exception
         except Exception as e:
             logger.error(f"Error scraping Stack Overflow: {str(e)}")
             last_error = e
-            break
+            return []  # Return empty list instead of raising exception
     
     # All retries failed
-    raise RuntimeError(f"Could not fetch Stack Overflow questions after {MAX_RETRIES} attempts: {last_error}")
+    logger.error(f"Stack Overflow scraper failed after {MAX_RETRIES} attempts: {last_error}")
+    return []

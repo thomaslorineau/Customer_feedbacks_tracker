@@ -32,3 +32,4 @@ Write-Host "Version incremented: $CURRENT_VERSION -> $NEW_VERSION" -ForegroundCo
 
 exit 0
 
+

@@ -58,16 +58,21 @@ def scrape_g2_crowd(query: str = "OVH", limit: int = 50):
             
             # Try direct reviews page first
             try:
+                logger.info(f"[G2 Crowd] Fetching URL: {search_url}")
                 response = session.get(search_url, headers=headers, timeout=15)
+                logger.info(f"[G2 Crowd] Response status: {response.status_code}")
+                logger.info(f"[G2 Crowd] Response size: {len(response.content)} bytes")
                 response.raise_for_status()
                 # Small delay after request (reduced to avoid long waits)
                 time.sleep(0.5)
             except requests.exceptions.HTTPError as e:
+                logger.error(f"[G2 Crowd] HTTP Error: {e.response.status_code} - {e}")
                 if e.response.status_code == 403:
                     logger.warning(f"[G2 Crowd] Server returned 403 Forbidden - trying browser automation...")
                     # Try with browser automation as fallback
                     html = _try_browser_automation(search_url)
                     if html:
+                        logger.info(f"[G2 Crowd] Browser automation succeeded, HTML size: {len(html)} bytes")
                         soup = BeautifulSoup(html, 'html.parser')
                     else:
                         logger.warning("[G2 Crowd] Browser automation also failed")
@@ -79,31 +84,60 @@ def scrape_g2_crowd(query: str = "OVH", limit: int = 50):
                         return []
                 else:
                     raise
+            except Exception as e:
+                logger.error(f"[G2 Crowd] Error fetching page: {type(e).__name__}: {e}")
+                raise
             
             # Parse HTML
             soup = BeautifulSoup(response.content, 'html.parser')
+            logger.info(f"[G2 Crowd] HTML parsed successfully")
             
             posts = []
             
             # G2 reviews are typically in specific containers
             # Look for review elements (structure may vary)
+            logger.info("[G2 Crowd] Searching for review elements with class 'review|rating|feedback|comment'...")
             review_elements = soup.find_all(['div', 'article', 'section'], 
                                           class_=re.compile(r'review|rating|feedback|comment', re.I))
+            logger.info(f"[G2 Crowd] Found {len(review_elements)} elements with review/rating/feedback/comment classes")
             
             if not review_elements:
                 # Try alternative selectors
+                logger.info("[G2 Crowd] Trying alternative selector: data-testid='review'...")
                 review_elements = soup.find_all('div', {'data-testid': re.compile(r'review', re.I)})
+                logger.info(f"[G2 Crowd] Found {len(review_elements)} elements with data-testid='review'")
             
             if not review_elements:
                 # Try finding review cards
+                logger.info("[G2 Crowd] Trying alternative selector: class='card|item|entry'...")
                 review_elements = soup.find_all('div', class_=re.compile(r'card|item|entry', re.I))
+                logger.info(f"[G2 Crowd] Found {len(review_elements)} elements with card/item/entry classes")
+            
+            if not review_elements:
+                # Debug: Save HTML structure for analysis
+                logger.warning("[G2 Crowd] No review elements found with any selector")
+                logger.info("[G2 Crowd] Debug: Checking page structure...")
+                # Try to find any divs with text content
+                all_divs = soup.find_all('div', limit=50)
+                logger.info(f"[G2 Crowd] Total divs on page: {len(soup.find_all('div'))}")
+                logger.info(f"[G2 Crowd] Sample div classes (first 10): {[d.get('class', []) for d in all_divs[:10]]}")
+                # Check for common G2 patterns
+                if soup.find('body'):
+                    body_text = soup.find('body').get_text()[:200]
+                    logger.info(f"[G2 Crowd] Body text preview: {body_text}...")
             
             seen_urls = set()
             
             # Limit the number of reviews to process to avoid long waits
             max_reviews_to_process = min(limit * 2, 15)  # Cap at 15 reviews max
             
+            logger.info(f"[G2 Crowd] Processing up to {max_reviews_to_process} review elements...")
+            processed_count = 0
+            skipped_no_content = 0
+            skipped_short = 0
+            
             for review_elem in review_elements[:max_reviews_to_process]:
+                processed_count += 1
                 try:
                     # Extract review content
                     content_elem = review_elem.find(['p', 'div', 'span'], 
@@ -112,11 +146,17 @@ def scrape_g2_crowd(query: str = "OVH", limit: int = 50):
                         content_elem = review_elem.find('p')
                     
                     if not content_elem:
+                        skipped_no_content += 1
+                        logger.debug(f"[G2 Crowd] Review element {processed_count}: No content element found")
                         continue
                     
                     content = content_elem.get_text(strip=True)
                     if len(content) < 20:  # Skip very short reviews
+                        skipped_short += 1
+                        logger.debug(f"[G2 Crowd] Review element {processed_count}: Content too short ({len(content)} chars)")
                         continue
+                    
+                    logger.info(f"[G2 Crowd] Review element {processed_count}: Found content ({len(content)} chars)")
                     
                     # Extract author
                     author_elem = review_elem.find(['a', 'span', 'div'], 
@@ -191,22 +231,30 @@ def scrape_g2_crowd(query: str = "OVH", limit: int = 50):
                         break
                         
                 except Exception as e:
-                    logger.debug(f"Error processing G2 review: {e}")
+                    logger.warning(f"[G2 Crowd] Error processing review element {processed_count}: {type(e).__name__}: {e}")
                     continue
+            
+            logger.info(f"[G2 Crowd] Processing summary: {processed_count} processed, {skipped_no_content} skipped (no content), {skipped_short} skipped (too short), {len(posts)} posts extracted")
             
             # If no reviews found, try search page
             if not posts:
                 logger.info("[G2 Crowd] No reviews found on product page, trying search...")
                 search_url = f"{G2_BASE_URL}/search"
                 params = {'query': query}
-                response = session.get(search_url, params=params, headers=headers, timeout=15)
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    # Similar parsing logic for search results
-                    # (implementation similar to above)
+                try:
+                    response = session.get(search_url, params=params, headers=headers, timeout=15)
+                    logger.info(f"[G2 Crowd] Search page response: {response.status_code}")
+                    if response.status_code == 200:
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        logger.info(f"[G2 Crowd] Search page HTML size: {len(response.content)} bytes")
+                        # Similar parsing logic for search results
+                        # (implementation similar to above)
+                except Exception as e:
+                    logger.warning(f"[G2 Crowd] Error fetching search page: {e}")
             
             if not posts:
                 logger.warning(f"[G2 Crowd] No reviews found for query: {query}")
+                logger.info(f"[G2 Crowd] Debug info: URL={search_url}, Status={response.status_code if 'response' in locals() else 'N/A'}, Elements found={len(review_elements) if 'review_elements' in locals() else 0}")
                 return []
             
             logger.info(f"[G2 Crowd] Successfully scraped {len(posts)} reviews")

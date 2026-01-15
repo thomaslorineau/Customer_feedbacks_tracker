@@ -51,9 +51,9 @@ def scrape_trustpilot_reviews(query="OVH", limit=20):
         except Exception as e:
             logger.warning(f"[Trustpilot] API scraping failed: {e}")
     
-    # Final fallback to sample data
-    logger.warning("[Trustpilot] All methods failed, returning sample complaint data")
-    return _get_sample_trustpilot_reviews(limit)
+    # All methods failed - return empty list (no sample data allowed)
+    logger.warning("[Trustpilot] All scraping methods failed, returning empty list")
+    return []
 
 
 def _scrape_trustpilot_html(limit=20):

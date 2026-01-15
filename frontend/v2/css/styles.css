@@ -647,7 +647,8 @@ body {
 /* Chart Container */
 .chart-container {
     flex: 1;
-    min-height: 0;
+    min-height: 280px;
+    height: 280px;
     position: relative;
     overflow: visible;
     max-height: 280px;
@@ -657,7 +658,7 @@ body {
 .chart-container canvas {
     max-height: 100%;
     width: 100% !important;
-    height: auto !important;
+    height: 100% !important;
 }
 
 /* Product List */

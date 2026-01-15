@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scraping Logs - OVH Complaints Tracker</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
+    <link rel="stylesheet" href="/v2/css/navigation.css">
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --text-primary: #ffffff;
+            --text-secondary: #aaa;
+            --accent-primary: #00d4ff;
+            --success: #34d399;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #00d4ff;
+        }
+
+        body.light-mode {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f7fa;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #4a5568;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 1.8em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        select, input, button {
+            padding: 8px 15px;
+            border: 1px solid var(--accent-primary);
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        button {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+            border: none;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #0099ff;
+            transform: translateY(-2px);
+        }
+
+        button.danger {
+            background: var(--error);
+            color: white;
+        }
+
+        button.danger:hover {
+            background: #dc2626;
+        }
+
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 15px 20px;
+            border-radius: 8px;
+            flex: 1;
+            min-width: 150px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--accent-primary);
+        }
+
+        .logs-container {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .log-entry {
+            padding: 15px 20px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            border-left: 5px solid;
+            background: var(--bg-secondary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 0.95em;
+            line-height: 1.8;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .log-entry:hover {
+            background: var(--bg-primary);
+            transform: translateX(4px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .log-entry.info {
+            border-left-color: var(--info);
+        }
+
+        .log-entry.success {
+            border-left-color: var(--success);
+        }
+
+        .log-entry.warning {
+            border-left-color: var(--warning);
+        }
+
+        .log-entry.error {
+            border-left-color: var(--error);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .log-timestamp {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+
+        .log-source {
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        /* Color coding for different sources */
+        .log-source.source-x {
+            background: #1da1f2;
+            color: white;
+        }
+
+        .log-source.source-reddit {
+            background: #ff4500;
+            color: white;
+        }
+
+        .log-source.source-github {
+            background: #24292e;
+            color: white;
+        }
+
+        .log-source.source-stackoverflow {
+            background: #f48024;
+            color: white;
+        }
+
+        .log-source.source-news {
+            background: #4285f4;
+            color: white;
+        }
+
+        .log-source.source-trustpilot {
+            background: #00b67a;
+            color: white;
+        }
+
+        .log-source.source-ovhforum {
+            background: #123f6d;
+            color: white;
+        }
+
+        .log-source.source-mastodon {
+            background: #6364ff;
+            color: white;
+        }
+
+        .log-source.source-g2 {
+            background: #ff6b35;
+            color: white;
+        }
+
+        /* Default color for unknown sources */
+        .log-source.source-default {
+            background: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .log-message {
+            color: var(--text-primary);
+            word-wrap: break-word;
+            font-size: 1em;
+            line-height: 1.8;
+        }
+
+        .log-details {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        body.has-nav-menu {
+            padding-top: 80px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auto-refresh input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .help-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .help-modal.active {
+            display: flex;
+        }
+
+        .help-modal-content {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .help-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .help-modal-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .help-modal-close {
+            background: var(--error);
+            border: none;
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .help-modal-body {
+            color: var(--text-primary);
+            line-height: 1.8;
+        }
+
+        .help-modal-body h3 {
+            color: var(--accent-primary);
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .help-modal-body ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .help-modal-body li {
+            margin-bottom: 8px;
+        }
+
+        .log-entry {
+            font-size: 0.95em;
+            padding: 15px 18px;
+            margin-bottom: 10px;
+        }
+
+        .log-message {
+            font-size: 1em;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body class="has-nav-menu">
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/scraping" class="nav-logo">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
+                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
+                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
+                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>Customer Feedbacks Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Feedbacks Collection</span>
+                </a>
+                <a href="/dashboard" class="nav-tab">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="/settings" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+                <a href="/logs" class="nav-tab active">
+                    <span class="nav-tab-icon">📋</span>
+                    <span>Scraping Logs</span>
+                </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); alert('Help menu coming soon'); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>📋 Scraping Logs</h1>
+            <div class="controls">
+                <div class="auto-refresh">
+                    <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
+                    <label for="autoRefresh">Auto-refresh (5s)</label>
+                </div>
+                <select id="sourceFilter" onchange="loadLogs()">
+                    <option value="">Toutes les sources</option>
+                </select>
+                <select id="levelFilter" onchange="loadLogs()">
+                    <option value="">Tous les niveaux</option>
+                    <option value="info">Info</option>
+                    <option value="success">Success</option>
+                    <option value="warning">Warning</option>
+                    <option value="error">Error</option>
+                </select>
+                <input type="number" id="limitInput" value="500" min="10" max="5000" step="10" onchange="loadLogs()" style="width: 80px;">
+                <button onclick="loadLogs()">🔄 Refresh</button>
+                <button class="danger" onclick="clearLogs()">🗑️ Clear</button>
+            </div>
+        </header>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Logs</div>
+                <div class="stat-value" id="totalLogs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Errors</div>
+                <div class="stat-value" id="errorCount" style="color: var(--error);">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Warnings</div>
+                <div class="stat-value" id="warningCount" style="color: var(--warning);">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Success</div>
+                <div class="stat-value" id="successCount" style="color: var(--success);">0</div>
+            </div>
+        </div>
+
+        <div class="logs-container" id="logsContainer">
+            <div class="loading">Chargement des logs...</div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="help-modal" id="helpModal">
+        <div class="help-modal-content">
+            <div class="help-modal-header">
+                <h2>❓ Aide - Bouton Refresh</h2>
+                <button class="help-modal-close" onclick="hideRefreshHelp()">×</button>
+            </div>
+            <div class="help-modal-body">
+                <h3>🔄 Que fait le bouton "Refresh" ?</h3>
+                <p>
+                    Le bouton <strong>Refresh</strong> permet de <strong>rafraîchir l'affichage des logs</strong> déjà enregistrés dans la base de données.
+                </p>
+                <p>
+                    <strong>⚠️ Important :</strong> Ce bouton <strong>NE relance PAS les scrapers</strong>. Il met simplement à jour l'affichage pour voir les nouveaux logs qui ont été enregistrés depuis le dernier chargement.
+                </p>
+
+                <h3>📋 Comment ça fonctionne ?</h3>
+                <ul>
+                    <li>Les logs sont <strong>automatiquement enregistrés</strong> dans la base de données à chaque scraping</li>
+                    <li>Le bouton Refresh <strong>récupère les logs</strong> depuis la base de données</li>
+                    <li>Il <strong>affiche les nouveaux logs</strong> qui ont été créés depuis votre dernière visite</li>
+                </ul>
+
+                <h3>🔄 Auto-refresh</h3>
+                <p>
+                    Si vous activez l'option <strong>"Auto-refresh (5s)"</strong>, la page se rafraîchira automatiquement toutes les 5 secondes pour afficher les nouveaux logs en temps réel.
+                </p>
+                <p>
+                    C'est utile si vous avez lancé un scraping depuis une autre page et que vous voulez voir les logs apparaître automatiquement.
+                </p>
+
+                <h3>🚀 Pour lancer un scraping</h3>
+                <p>
+                    Pour lancer un scraping, vous devez aller sur la page <strong>"Feedbacks Collection"</strong> et utiliser les boutons de scraping (X/Twitter, Reddit, GitHub, etc.).
+                </p>
+                <p>
+                    Les logs de ces scrapings seront automatiquement enregistrés et apparaîtront ici après un refresh.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-detect API base URL
+        const API_BASE = window.location.origin;
+        let autoRefreshInterval = null;
+
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+        }
+
+        // Load saved theme
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-mode');
+        }
+
+        async function loadLogs() {
+            const source = document.getElementById('sourceFilter').value;
+            const level = document.getElementById('levelFilter').value;
+            const limit = parseInt(document.getElementById('limitInput').value) || 500;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/logs?source=${encodeURIComponent(source || '')}&level=${encodeURIComponent(level || '')}&limit=${limit}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                // API returns a list directly, not an object with 'logs' property
+                const logs = Array.isArray(data) ? data : (data.logs || []);
+                displayLogs(logs);
+                updateStats(logs);
+                updateSourceFilter(logs);
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                document.getElementById('logsContainer').innerHTML = `<div class="error">Erreur lors du chargement des logs: ${error.message}<br><small>Vérifiez que le serveur backend est démarré sur ${API_BASE}</small></div>`;
+            }
+        }
+
+        function displayLogs(logs) {
+            const container = document.getElementById('logsContainer');
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty">Aucun log disponible</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const timestamp = new Date(log.timestamp).toLocaleString('fr-FR');
+                const details = log.details ? `<div class="log-details">${typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : log.details}</div>` : '';
+                const sourceName = log.source || 'Unknown';
+                
+                // Determine color class based on source name
+                let sourceClass = 'source-default';
+                if (sourceName.includes('X/Twitter') || sourceName.includes('Twitter')) {
+                    sourceClass = 'source-x';
+                } else if (sourceName.includes('Reddit')) {
+                    sourceClass = 'source-reddit';
+                } else if (sourceName.includes('GitHub')) {
+                    sourceClass = 'source-github';
+                } else if (sourceName.includes('Stack Overflow')) {
+                    sourceClass = 'source-stackoverflow';
+                } else if (sourceName.includes('Google News') || sourceName.includes('News')) {
+                    sourceClass = 'source-news';
+                } else if (sourceName.includes('Trustpilot')) {
+                    sourceClass = 'source-trustpilot';
+                } else if (sourceName.includes('OVH Forum') || sourceName.includes('Forum')) {
+                    sourceClass = 'source-ovhforum';
+                } else if (sourceName.includes('Mastodon')) {
+                    sourceClass = 'source-mastodon';
+                } else if (sourceName.includes('G2 Crowd') || sourceName.includes('G2')) {
+                    sourceClass = 'source-g2';
+                }
+                
+                return `
+                    <div class="log-entry ${log.level}">
+                        <div class="log-header">
+                            <span class="log-timestamp">${timestamp}</span>
+                            <span class="log-source ${sourceClass}">${sourceName}</span>
+                        </div>
+                        <div class="log-message">${escapeHtml(log.message)}</div>
+                        ${details}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateStats(logs) {
+            document.getElementById('totalLogs').textContent = logs.length;
+            document.getElementById('errorCount').textContent = logs.filter(l => l.level === 'error').length;
+            document.getElementById('warningCount').textContent = logs.filter(l => l.level === 'warning').length;
+            document.getElementById('successCount').textContent = logs.filter(l => l.level === 'success').length;
+        }
+
+        function updateSourceFilter(logs) {
+            const sources = [...new Set(logs.map(l => l.source).filter(Boolean))].sort();
+            const select = document.getElementById('sourceFilter');
+            const currentValue = select.value;
+            
+            // Keep "Toutes les sources" option
+            select.innerHTML = '<option value="">Toutes les sources</option>';
+            
+            sources.forEach(source => {
+                const option = document.createElement('option');
+                option.value = source;
+                option.textContent = source;
+                select.appendChild(option);
+            });
+            
+            // Restore previous selection
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(loadLogs, 5000);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        }
+
+        async function clearLogs() {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer tous les logs ?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/logs`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                alert(`${data.deleted} logs supprimés`);
+                loadLogs();
+            } catch (error) {
+                alert(`Erreur: ${error.message}`);
+            }
+        }
+
+        function showRefreshHelp() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+
+        function hideRefreshHelp() {
+            document.getElementById('helpModal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('helpModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideRefreshHelp();
+            }
+        });
+
+        // Load logs on page load
+        loadLogs();
+    </script>
+</body>
+</html>
+

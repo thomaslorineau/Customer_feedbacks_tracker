@@ -3,6 +3,7 @@ import { API } from './api.js';
 import { State } from './state.js';
 import { getProductLabel } from './product-detection.js';
 import { updateWhatsHappening } from './whats-happening.js';
+import { updateTimelineChart } from './charts.js';
 
 const api = new API();
 let state = null;
@@ -13,8 +14,9 @@ export function initDashboard(appState) {
     // Initialize event listeners
     setupEventListeners();
     
-    // Load initial data
-    loadDashboardData();
+    // Posts are loaded by app.js, so we just update the dashboard
+    // when state changes (via subscription in charts.js)
+    // No need to load data here
 }
 
 function setupEventListeners() {
@@ -147,6 +149,14 @@ function setupEventListeners() {
         });
     }
     
+    // Clear Timeline Filter button
+    const clearTimelineFilterBtn = document.getElementById('clearTimelineFilterBtn');
+    if (clearTimelineFilterBtn) {
+        clearTimelineFilterBtn.addEventListener('click', () => {
+            clearTimelineFilter();
+        });
+    }
+    
     // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -232,6 +242,38 @@ function setupEventListeners() {
         }
     });
     
+    // Listen for date range selection from timeline chart (mouse drag)
+    window.addEventListener('filterByDateRange', (event) => {
+        const { dateFrom, dateTo } = event.detail;
+        if (dateFrom && dateTo && state) {
+            console.log('Filtering by date range:', dateFrom, 'to', dateTo);
+            
+            // Update date filters (both global and local)
+            const dateFromInput = document.getElementById('dateFrom');
+            const dateToInput = document.getElementById('dateTo');
+            const globalDateFrom = document.getElementById('globalDateFrom');
+            const globalDateTo = document.getElementById('globalDateTo');
+            
+            if (dateFromInput) dateFromInput.value = dateFrom;
+            if (dateToInput) dateToInput.value = dateTo;
+            if (globalDateFrom) globalDateFrom.value = dateFrom;
+            if (globalDateTo) globalDateTo.value = dateTo;
+            
+            // Update state filters
+            state.setFilter('dateFrom', dateFrom);
+            state.setFilter('dateTo', dateTo);
+            
+            // Update dashboard to show filtered posts
+            updateDashboard();
+            
+            // Scroll to posts section
+            const postsSection = document.querySelector('.panel-bottom');
+            if (postsSection) {
+                postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    });
+    
     // Listen for product filter events from timeline chart (double-click)
     window.addEventListener('filterByProductFromTimeline', (event) => {
         const { product, date } = event.detail;
@@ -301,15 +343,43 @@ function setupEventListeners() {
 
 async function loadDashboardData() {
     try {
+        console.log('Loading dashboard data...');
         const posts = await api.getPosts(1000, 0);
+        console.log('Posts loaded:', posts?.length || 0, 'posts');
+        
+        if (!posts || posts.length === 0) {
+            console.warn('No posts found in database');
+            // Show empty state message
+            const postsList = document.getElementById('postsList');
+            if (postsList) {
+                postsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No posts found. Go to Feedbacks Collection to scrape some data.</div>';
+            }
+            return;
+        }
+        
+        // Load posts first - don't apply date filter on initial load
+        // The default 12 months filter will only be applied when clicking "Clear Filter"
         state.setPosts(posts);
+        console.log('Posts set in state. Filtered posts:', state.filteredPosts?.length || 0);
         updateDashboard();
     } catch (error) {
         console.error('Failed to load dashboard data:', error);
+        // Show error message
+        const postsList = document.getElementById('postsList');
+        if (postsList) {
+            postsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--error);">Error loading data: ${error.message}</div>`;
+        }
     }
 }
 
 function updateDashboard() {
+    console.log('Updating dashboard...');
+    console.log('State filtered posts:', state?.filteredPosts?.length || 0);
+    if (!state) {
+        console.error('State is not initialized');
+        return;
+    }
+    updateStatsBanner();
     updateWhatsHappening(state);
     updateProductDistribution();
     updatePostsList();
@@ -318,8 +388,16 @@ function updateDashboard() {
 }
 
 function updateStatsBanner() {
+    // Stats banner might not exist in v2, so we skip it if not found
     const statsBanner = document.getElementById('statsBanner');
-    if (!statsBanner || !state) return;
+    if (!statsBanner) {
+        // Element doesn't exist, skip silently
+        return;
+    }
+    if (!state) {
+        console.warn('State not initialized in updateStatsBanner');
+        return;
+    }
     
     const posts = state.filteredPosts || [];
     const allPosts = state.posts || [];
@@ -502,14 +580,19 @@ function updatePostsList() {
         });
     }
     
-    // Show top 10
-    sortedPosts = sortedPosts.slice(0, 10);
+    // Pagination: show posts in batches
+    const POSTS_PER_PAGE = 10;
+    const currentPage = state.postsPage || 1;
+    const startIndex = 0;
+    const endIndex = currentPage * POSTS_PER_PAGE;
+    const postsToShow = sortedPosts.slice(startIndex, endIndex);
+    const hasMore = sortedPosts.length > endIndex;
     
     // Clear existing content first
     postsList.innerHTML = '';
     
     // Create and append each post item separately to avoid nesting issues
-    sortedPosts.forEach(post => {
+    postsToShow.forEach(post => {
         const timeAgo = getTimeAgo(post.created_at);
         const sourceIcon = getSourceIcon(post.source);
         const category = getProductLabelSimple(post) || 'General';
@@ -548,6 +631,30 @@ function updatePostsList() {
             }
         });
     });
+    
+    // Add "Load More" button if there are more posts
+    if (hasMore) {
+        const loadMoreBtn = document.createElement('button');
+        loadMoreBtn.className = 'load-more-btn';
+        loadMoreBtn.style.cssText = 'width: 100%; padding: 12px; margin-top: 20px; background: var(--accent-primary); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: all 0.3s ease;';
+        loadMoreBtn.textContent = `Load More (${sortedPosts.length - endIndex} remaining)`;
+        loadMoreBtn.addEventListener('click', () => {
+            state.postsPage = (state.postsPage || 1) + 1;
+            updatePostsList();
+        });
+        loadMoreBtn.addEventListener('mouseenter', () => {
+            loadMoreBtn.style.transform = 'translateY(-2px)';
+            loadMoreBtn.style.boxShadow = '0 4px 12px rgba(0, 212, 255, 0.4)';
+        });
+        loadMoreBtn.addEventListener('mouseleave', () => {
+            loadMoreBtn.style.transform = 'translateY(0)';
+            loadMoreBtn.style.boxShadow = 'none';
+        });
+        postsList.appendChild(loadMoreBtn);
+    } else if (state.postsPage > 1) {
+        // Reset page when filters change and no more posts
+        state.postsPage = 1;
+    }
 }
 
 function getProductLabelSimple(post) {
@@ -635,8 +742,58 @@ function navigateProducts(direction) {
     console.log('Navigate products', direction);
 }
 
+function clearTimelineFilter() {
+    if (!state) return;
+    
+    // Reset to default: last 12 months
+    const now = new Date();
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(now.getMonth() - 12);
+    
+    const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+    const dateToStr = now.toISOString().split('T')[0];
+    
+    // Update date filters
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    const globalDateFrom = document.getElementById('globalDateFrom');
+    const globalDateTo = document.getElementById('globalDateTo');
+    
+    if (dateFromInput) dateFromInput.value = dateFromStr;
+    if (dateToInput) dateToInput.value = dateToStr;
+    if (globalDateFrom) globalDateFrom.value = dateFromStr;
+    if (globalDateTo) globalDateTo.value = dateToStr;
+    
+    // Reset other timeline filters
+    const sentimentFilter = document.getElementById('sentimentFilter');
+    const languageFilter = document.getElementById('languageFilter');
+    const productFilter = document.getElementById('productFilter');
+    
+    if (sentimentFilter) sentimentFilter.value = 'all';
+    if (languageFilter) languageFilter.value = 'all';
+    if (productFilter) productFilter.value = 'all';
+    
+    // Update state
+    state.setFilter('dateFrom', dateFromStr);
+    state.setFilter('dateTo', dateToStr);
+    state.setFilter('sentiment', 'all');
+    state.setFilter('language', 'all');
+    state.setFilter('product', 'all');
+    
+    // Update dashboard
+    updateDashboard();
+}
+
 function resetFilters() {
     if (!state) return;
+    
+    // Reset to default: last 12 months
+    const now = new Date();
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(now.getMonth() - 12);
+    
+    const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+    const dateToStr = now.toISOString().split('T')[0];
     
     // Reset all filters
     state.setFilter('search', '');
@@ -644,8 +801,8 @@ function resetFilters() {
     state.setFilter('language', 'all');
     state.setFilter('product', 'all');
     state.setFilter('source', '');
-    state.setFilter('dateFrom', '');
-    state.setFilter('dateTo', '');
+    state.setFilter('dateFrom', dateFromStr);
+    state.setFilter('dateTo', dateToStr);
     
     // Reset UI elements
     const globalSearch = document.getElementById('globalSearch');
@@ -660,23 +817,29 @@ function resetFilters() {
     const productFilter = document.getElementById('productFilter');
     if (productFilter) productFilter.value = 'all';
     
-    // Reset global date slicer
+    // Reset global date slicer to 12 months
     const globalDateFrom = document.getElementById('globalDateFrom');
     const globalDateTo = document.getElementById('globalDateTo');
-    if (globalDateFrom) globalDateFrom.value = '';
-    if (globalDateTo) globalDateTo.value = '';
+    if (globalDateFrom) globalDateFrom.value = dateFromStr;
+    if (globalDateTo) globalDateTo.value = dateToStr;
     
-    // Reset local date inputs
+    // Reset local date inputs to 12 months
     const dateFromInput = document.getElementById('dateFrom');
     const dateToInput = document.getElementById('dateTo');
-    if (dateFromInput) dateFromInput.value = '';
-    if (dateToInput) dateToInput.value = '';
+    if (dateFromInput) dateFromInput.value = dateFromStr;
+    if (dateToInput) dateToInput.value = dateToStr;
     
     // Clear critical filter flag
     state.criticalFilterActive = false;
     
-    // Update dashboard
+    // Update dashboard (this will trigger state subscription which updates timeline)
     updateDashboard();
+    
+    // Force timeline chart update to ensure it refreshes
+    // The state subscription should handle this, but we ensure it happens
+    setTimeout(() => {
+        updateTimelineChart(state);
+    }, 150);
 }
 
 function scrapeAll() {

@@ -27,7 +27,7 @@
             <div class="nav-tabs">
                 <a href="/scraping" class="nav-tab">
                     <span class="nav-tab-icon">⚙️</span>
-                    <span>Scraping & Configuration</span>
+                    <span>Feedbacks Collection</span>
                 </a>
                 <a href="/dashboard" class="nav-tab active">
                     <span class="nav-tab-icon">📊</span>
@@ -41,6 +41,10 @@
                     <span class="nav-tab-icon">⚙️</span>
                     <span>Settings</span>
                 </a>
+                <a href="/logs" class="nav-tab">
+                    <span class="nav-tab-icon">📋</span>
+                    <span>Scraping Logs</span>
+                </a>
                 <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
                     <span class="nav-tab-icon">❓</span>
                     <span>Help</span>
@@ -48,7 +52,7 @@
             </div>
         </div>
         <div class="nav-menu-right">
-            <span class="version-badge" id="versionBadge" title="Application version">v1.0.0</span>
+            <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
         </div>
     </nav>
@@ -149,7 +153,12 @@
         <!-- Left Panel: Timeline & Histogram -->
         <section class="panel-left">
             <div class="panel-header">
-                <h2>Timeline & Histogram</h2>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2>Timeline & Histogram</h2>
+                    <span style="font-size: 0.85em; color: var(--text-secondary); font-style: italic;" title="Cliquez sur une barre pour filtrer par date. Glissez-déposez pour sélectionner une plage de dates.">
+                        💡 Cliquez ou glissez pour filtrer
+                    </span>
+                </div>
                 <div class="panel-filters">
                     <button class="filter-btn active" data-filter="all">All Posts</button>
                     <select class="filter-select" id="sentimentFilter">
@@ -168,6 +177,7 @@
                     </select>
                     <input type="date" id="dateFrom" class="filter-select" title="From Date" placeholder="From" style="min-width: 140px;">
                     <input type="date" id="dateTo" class="filter-select" title="To Date" placeholder="To" style="min-width: 140px;">
+                    <button id="clearTimelineFilterBtn" class="filter-btn" style="background: #ef4444; color: white; margin-left: 8px;" title="Reset timeline to default (last 12 months)">Clear Filter</button>
                 </div>
             </div>
             <div class="chart-container">
@@ -355,7 +365,7 @@
 
                 <h3>🤖 AI-Powered Features</h3>
                 <p>
-                    If LLM API keys are configured (in Scraping & Configuration page):
+                    If LLM API keys are configured (in Feedbacks Collection page):
                 </p>
                 <ul>
                     <li><strong>Recommended Actions:</strong> AI-generated actionable recommendations based on recent feedback patterns</li>
@@ -381,7 +391,7 @@
 
                 <h3>🎨 Navigation</h3>
                 <ul>
-                    <li><strong>⚙️ Scraping & Configuration:</strong> Manage keywords, LLM settings, and launch scrapers</li>
+                    <li><strong>📥 Feedbacks Collection:</strong> Manage keywords, LLM settings, and launch scrapers</li>
                     <li><strong>📊 Dashboard Analytics:</strong> Current page - visual analytics and insights</li>
                     <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis and opportunity scoring</li>
                     <li><strong>❓ Help:</strong> This menu - access help and documentation</li>

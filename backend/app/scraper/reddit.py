@@ -54,7 +54,9 @@ def scrape_reddit(query: str, limit: int = 50):
             # Check if feed has entries
             if not feed.entries:
                 logger.warning(f"[REDDIT] No results found for query: {query}")
-                raise RuntimeError(f"Reddit RSS returned no results for: {query}")
+                logger.info(f"[REDDIT] RSS feed parsed but empty. Status: {response.status_code}, URL: {url}")
+                # Return empty list instead of raising exception
+                return []
             
             logger.info(f"[REDDIT] Found {len(feed.entries)} posts")
             
@@ -98,7 +100,8 @@ def scrape_reddit(query: str, limit: int = 50):
                     continue
             
             if not posts:
-                raise RuntimeError("No valid Reddit posts could be parsed")
+                logger.warning("[REDDIT] No valid Reddit posts could be parsed from RSS feed")
+                return []
             
             logger.info(f"[REDDIT] Successfully scraped {len(posts)} posts")
             return posts
@@ -111,14 +114,17 @@ def scrape_reddit(query: str, limit: int = 50):
                 time.sleep(wait_time)
             else:
                 logger.error(f"Reddit scraper failed after {MAX_RETRIES} attempts: {e}")
-                raise RuntimeError(f"Could not fetch Reddit RSS after {MAX_RETRIES} attempts: {e}")
+                return []  # Return empty list instead of raising exception
         
         except Exception as e:
             logger.error(f"Error scraping Reddit: {str(e)}")
-            raise RuntimeError(f"Reddit scraping failed: {str(e)}")
+            if attempt < MAX_RETRIES - 1:
+                continue
+            return []  # Return empty list instead of raising exception
     
     # All retries failed
-    raise RuntimeError(f"Could not fetch Reddit posts after {MAX_RETRIES} attempts")
+    logger.error(f"Reddit scraper failed after {MAX_RETRIES} attempts")
+    return []
 
 
 def scrape_reddit_subreddit(subreddit: str, limit: int = 50):
@@ -157,7 +163,7 @@ def scrape_reddit_subreddit(subreddit: str, limit: int = 50):
             
             if not feed.entries:
                 logger.warning(f"[REDDIT] No posts found in r/{subreddit}")
-                raise RuntimeError(f"Subreddit r/{subreddit} returned no results")
+                return []  # Return empty list instead of raising exception
             
             logger.info(f"[REDDIT] Found {len(feed.entries)} posts in r/{subreddit}")
             
@@ -192,7 +198,8 @@ def scrape_reddit_subreddit(subreddit: str, limit: int = 50):
                     continue
             
             if not posts:
-                raise RuntimeError(f"No valid posts found in r/{subreddit}")
+                logger.warning(f"[REDDIT] No valid posts found in r/{subreddit}")
+                return []
             
             logger.info(f"[REDDIT] Successfully scraped {len(posts)} posts from r/{subreddit}")
             return posts
@@ -205,10 +212,13 @@ def scrape_reddit_subreddit(subreddit: str, limit: int = 50):
                 time.sleep(wait_time)
             else:
                 logger.error(f"Reddit scraper failed after {MAX_RETRIES} attempts: {e}")
-                raise RuntimeError(f"Could not fetch r/{subreddit} after {MAX_RETRIES} attempts: {e}")
+                return []  # Return empty list instead of raising exception
         
         except Exception as e:
             logger.error(f"Error scraping r/{subreddit}: {str(e)}")
-            raise RuntimeError(f"Reddit scraping failed: {str(e)}")
+            if attempt < MAX_RETRIES - 1:
+                continue
+            return []  # Return empty list instead of raising exception
     
-    raise RuntimeError(f"Could not fetch Reddit posts after {MAX_RETRIES} attempts")
+    logger.error(f"Reddit scraper failed after {MAX_RETRIES} attempts")
+    return []

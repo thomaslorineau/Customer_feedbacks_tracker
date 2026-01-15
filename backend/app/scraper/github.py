@@ -57,14 +57,28 @@ def _search_github_issues(query: str, limit: int) -> list:
             "per_page": min(100, limit),
         }
         
+        logger.info(f"[GitHub Issues] Searching with query: {search_query}")
         response = httpx.get(
             f"{GITHUB_API_BASE}/search/issues",
             params=params,
             headers=GITHUB_HEADERS,
             timeout=Timeout(10.0, connect=5.0)
         )
+        
+        logger.info(f"[GitHub Issues] Response status: {response.status_code}")
+        
+        # Check for rate limiting
+        if response.status_code == 403:
+            rate_limit_remaining = response.headers.get('X-RateLimit-Remaining', 'unknown')
+            logger.warning(f"[GitHub Issues] Rate limit hit! Remaining: {rate_limit_remaining}")
+            logger.warning("[GitHub Issues] Consider using a GitHub token to increase rate limits")
+            return []
+        
         response.raise_for_status()
         data = response.json()
+        
+        total_count = data.get("total_count", 0)
+        logger.info(f"[GitHub Issues] API returned {total_count} total results, {len(data.get('items', []))} items in response")
         
         posts = []
         for issue in data.get("items", []):
@@ -84,9 +98,15 @@ def _search_github_issues(query: str, limit: int) -> list:
                 logger.warning(f"Could not parse GitHub issue: {e}")
                 continue
         
+        logger.info(f"[GitHub Issues] Successfully parsed {len(posts)} issues")
         return posts
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[GitHub Issues] HTTP error: {e.response.status_code} - {e}")
+        if e.response.status_code == 403:
+            logger.error("[GitHub Issues] Rate limit exceeded. Consider using a GitHub token.")
+        return []
     except Exception as e:
-        logger.warning(f"Error searching GitHub issues: {e}")
+        logger.warning(f"Error searching GitHub issues: {type(e).__name__}: {e}")
         return []
 
 
@@ -102,14 +122,27 @@ def _search_github_discussions(query: str, limit: int) -> list:
             "per_page": min(100, limit),
         }
         
+        logger.info(f"[GitHub Discussions] Searching with query: {search_query}")
         response = httpx.get(
             f"{GITHUB_API_BASE}/search/issues",  # Yes, discussions are searchable via /search/issues
             params=params,
             headers=GITHUB_HEADERS,
             timeout=Timeout(10.0, connect=5.0)
         )
+        
+        logger.info(f"[GitHub Discussions] Response status: {response.status_code}")
+        
+        # Check for rate limiting
+        if response.status_code == 403:
+            rate_limit_remaining = response.headers.get('X-RateLimit-Remaining', 'unknown')
+            logger.warning(f"[GitHub Discussions] Rate limit hit! Remaining: {rate_limit_remaining}")
+            return []
+        
         response.raise_for_status()
         data = response.json()
+        
+        total_count = data.get("total_count", 0)
+        logger.info(f"[GitHub Discussions] API returned {total_count} total results, {len(data.get('items', []))} items in response")
         
         posts = []
         for discussion in data.get("items", []):
@@ -129,9 +162,15 @@ def _search_github_discussions(query: str, limit: int) -> list:
                 logger.warning(f"Could not parse GitHub discussion: {e}")
                 continue
         
+        logger.info(f"[GitHub Discussions] Successfully parsed {len(posts)} discussions")
         return posts
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[GitHub Discussions] HTTP error: {e.response.status_code} - {e}")
+        if e.response.status_code == 403:
+            logger.error("[GitHub Discussions] Rate limit exceeded. Consider using a GitHub token.")
+        return []
     except Exception as e:
-        logger.warning(f"Error searching GitHub discussions: {e}")
+        logger.warning(f"Error searching GitHub discussions: {type(e).__name__}: {e}")
         return []
 
 

@@ -454,7 +454,7 @@
             <div class="nav-tabs">
                 <a href="/scraping" class="nav-tab">
                     <span class="nav-tab-icon">⚙️</span>
-                    <span>Scraping & Configuration</span>
+                    <span>Feedbacks Collection</span>
                 </a>
                 <a href="/dashboard" class="nav-tab">
                     <span class="nav-tab-icon">📊</span>
@@ -468,10 +468,18 @@
                     <span class="nav-tab-icon">⚙️</span>
                     <span>Settings</span>
                 </a>
+                <a href="/logs" class="nav-tab">
+                    <span class="nav-tab-icon">📋</span>
+                    <span>Scraping Logs</span>
+                </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
             </div>
         </div>
         <div class="nav-menu-right">
-            <span class="version-badge" id="versionBadge" title="Application version">v1.0.0</span>
+            <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
         </div>
     </nav>
@@ -544,6 +552,74 @@
         <span>API key copied to clipboard!</span>
     </div>
 
+    <!-- Help Menu -->
+    <div class="help-menu" id="helpMenu">
+        <div class="help-menu-header">
+            <h2>📖 Help & Information</h2>
+            <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
+        </div>
+        <div class="help-menu-content">
+            <h3>💬 Customer Feedbacks Tracker</h3>
+            <p>
+                <strong>Settings</strong> allows you to configure API keys and manage application settings securely.
+            </p>
+
+            <h3>🔐 API Configuration</h3>
+            <ul>
+                <li><strong>OpenAI API Key:</strong> Required for AI-powered features like recommended actions and insights</li>
+                <li><strong>Anthropic API Key:</strong> Alternative LLM provider for AI features</li>
+                <li><strong>Google API Key:</strong> Used for Google News scraping</li>
+                <li><strong>GitHub API Key:</strong> Required for GitHub issues and discussions scraping</li>
+                <li><strong>Trustpilot API Key:</strong> Used for Trustpilot reviews scraping</li>
+            </ul>
+
+            <h3>🔒 Security</h3>
+            <ul>
+                <li><strong>Never share API keys:</strong> Keep your keys private and secure</li>
+                <li><strong>Reveal button:</strong> Temporarily shows the full key for copying - use carefully</li>
+                <li><strong>Keys are stored:</strong> Securely in the backend database</li>
+            </ul>
+
+            <h3>⚙️ Rate Limiting</h3>
+            <ul>
+                <li><strong>Configure limits:</strong> Set maximum requests per minute for each API</li>
+                <li><strong>Prevent abuse:</strong> Rate limiting protects against excessive API usage</li>
+                <li><strong>Window duration:</strong> Time window for rate limit calculations</li>
+            </ul>
+
+            <h3>📥 Feedbacks Collection</h3>
+            <p>
+                After configuring API keys, go to <strong>Feedbacks Collection</strong> to:
+            </p>
+            <ul>
+                <li>Configure keywords for scraping</li>
+                <li>Launch scrapers to collect feedback</li>
+                <li>View scraping logs</li>
+            </ul>
+        </div>
+    </div>
+
     <script src="/v2/js/settings.js"></script>
+    <script>
+        // Define toggleHelpMenu function for settings page
+        window.toggleHelpMenu = function() {
+            const menu = document.getElementById('helpMenu');
+            if (menu) {
+                menu.classList.toggle('active');
+            }
+        };
+
+        // Close help menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const helpMenu = document.getElementById('helpMenu');
+            const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
+            if (helpMenu && helpTab && 
+                !helpMenu.contains(e.target) && 
+                !helpTab.contains(e.target) &&
+                helpMenu.classList.contains('active')) {
+                helpMenu.classList.remove('active');
+            }
+        });
+    </script>
 </body>
 </html>
