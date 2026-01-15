@@ -1,7 +1,10 @@
 #!/bin/bash
 # Script de diagnostic pour vérifier l'accessibilité de l'application
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Obtenir le répertoire du script (scripts/install/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Remonter à la racine du projet (2 niveaux: scripts/install -> scripts -> racine)
+APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$APP_DIR"
 
 # Fonction pour obtenir le hostname depuis une IP (reverse DNS)
