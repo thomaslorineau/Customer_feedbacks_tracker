@@ -1911,6 +1911,26 @@ class LLMConfigResponse(BaseModel):
     llm_provider: str = Field(..., description="Current LLM provider")
     status: str = Field(..., description="Configuration status")
 
+def get_version():
+    """Read version from VERSION file."""
+    version_path = Path(__file__).resolve().parents[2] / "VERSION"
+    try:
+        if version_path.exists():
+            with open(version_path, "r", encoding="utf-8") as f:
+                version = f.read().strip()
+                return version if version else "1.0.0"
+        return "1.0.0"
+    except Exception:
+        return "1.0.0"
+
+@app.get("/api/version")
+async def get_app_version():
+    """Get application version."""
+    return {
+        "version": get_version(),
+        "build_date": datetime.datetime.now().isoformat()
+    }
+
 @app.get("/api/config")
 async def get_config():
     """Get full configuration including API keys status, rate limiting, and environment."""

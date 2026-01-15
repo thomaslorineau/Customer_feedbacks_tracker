@@ -8,9 +8,27 @@ console.log('API_BASE_URL:', API_BASE_URL);
 let configData = null;
 let revealedKeys = new Set();
 
+// Load and display version
+async function loadVersion() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/version`);
+        if (response.ok) {
+            const data = await response.json();
+            const versionBadge = document.getElementById('versionBadge');
+            if (versionBadge) {
+                versionBadge.textContent = `v${data.version}`;
+                versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to load version:', error);
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
+    loadVersion();
     loadConfiguration();
 });
 

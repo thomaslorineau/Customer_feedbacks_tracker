@@ -93,6 +93,24 @@ body.v1-page {
     margin-top: 0;
 }
 
+/* Version badge in nav */
+.version-badge {
+    padding: 4px 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: default;
+    user-select: none;
+}
+
+.version-badge:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
 /* Theme toggle in nav */
 .nav-menu-right .theme-toggle {
     background: var(--bg-secondary);
