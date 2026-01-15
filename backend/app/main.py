@@ -72,6 +72,10 @@ if assets_path.exists():
 if (frontend_path / "css").exists():
     app.mount("/css", StaticFiles(directory=str(frontend_path / "css"), html=False), name="shared-css")
 
+# Mount shared JS files
+if (frontend_path / "js").exists():
+    app.mount("/js", StaticFiles(directory=str(frontend_path / "js"), html=False), name="shared-js")
+
 # Mount improvements static files (must be before /improvements route)
 improvements_path = frontend_path / "improvements"
 if improvements_path.exists():

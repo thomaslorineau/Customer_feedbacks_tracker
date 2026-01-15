@@ -144,3 +144,61 @@ body.dark-mode {
     100% { transform: rotate(360deg); }
 }
 
+/* Modern Navigation Styles - Applied to all pages */
+.nav-menu {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.nav-logo {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-logo:hover {
+    transform: translateY(-1px);
+}
+
+.nav-logo img.ovh-logo,
+.nav-logo .ovh-logo {
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.nav-logo:hover img.ovh-logo,
+.nav-logo:hover .ovh-logo {
+    transform: scale(1.05);
+    filter: drop-shadow(0 4px 8px rgba(0, 212, 255, 0.3));
+}
+
+/* Modern tab styles */
+.nav-tab {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.nav-tab::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 80%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    transition: transform 0.3s ease;
+    border-radius: 2px 2px 0 0;
+}
+
+.nav-tab:hover::before {
+    transform: translateX(-50%) scaleX(1);
+}
+
+.nav-tab.active {
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.nav-tab.active::before {
+    display: none;
+}
+
