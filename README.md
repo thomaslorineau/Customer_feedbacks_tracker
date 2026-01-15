@@ -1,6 +1,8 @@
-# OVH Customer Feedback Tracker
+# Customer Feedbacks Tracker
 
 Real-time monitoring platform that collects and analyzes **customer feedback** and **complaints** about all OVH products from multiple sources. Track sentiment, identify improvement opportunities, and generate actionable product enhancement ideas using AI.
+
+> **Note**: This project has been entirely vibe coded by **Thomas Lorineau**.
 
 ## 🎯 Objective
 
