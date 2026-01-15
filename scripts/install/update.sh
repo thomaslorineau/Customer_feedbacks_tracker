@@ -2,7 +2,10 @@
 # Script de mise à jour de l'application via git
 # Usage: ./update.sh
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Obtenir le répertoire du script (scripts/install/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Remonter à la racine du projet (2 niveaux: scripts/install -> scripts -> racine)
+APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$APP_DIR"
 
 # Couleurs
@@ -45,7 +48,9 @@ info "Arrêt de l'application..."
 if [ -f "backend/server.pid" ]; then
     PID=$(cat backend/server.pid)
     if ps -p $PID > /dev/null 2>&1; then
-        if [ -f "stop.sh" ]; then
+        if [ -f "scripts/start/stop.sh" ]; then
+            bash scripts/start/stop.sh > /dev/null 2>&1
+        elif [ -f "stop.sh" ]; then
             ./stop.sh > /dev/null 2>&1
         else
             kill $PID 2>/dev/null || true
@@ -349,7 +354,9 @@ echo ""
 
 # 6. Redémarrer l'application
 info "Redémarrage de l'application..."
-if [ -f "start.sh" ]; then
+if [ -f "scripts/start/start.sh" ]; then
+    bash scripts/start/start.sh
+elif [ -f "start.sh" ]; then
     ./start.sh
 else
     warning "Script start.sh introuvable"
@@ -361,6 +368,6 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 success "Mise à jour terminée !"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-info "Vérifiez le statut avec : ./status.sh"
+info "Vérifiez le statut avec : bash scripts/install/status.sh ou ./status.sh"
 echo ""
 
