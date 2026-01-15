@@ -329,7 +329,7 @@ ovh-complaints-tracker/
 │   ├── index.html                        # Scraping & Configuration page
 │   ├── css/
 │   │   └── shared-theme.css              # Shared dark/light theme
-│   ├── v2/
+│   ├── dashboard/
 │   │   ├── index.html                    # Dashboard Analytics page
 │   │   ├── css/
 │   │   │   ├── styles.css                # Dashboard styles

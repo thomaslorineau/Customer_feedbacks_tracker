@@ -78,8 +78,10 @@ ovh-complaints-tracker/
 ├── 🎨 frontend/              # Interface utilisateur (HTML/CSS/JS)
 │   ├── index.html            # Page principale (Scraping & Configuration)
 │   ├── logs.html             # Page des logs
-│   ├── v2/                   # Dashboard Analytics
-│   └── improvements/         # Page d'améliorations
+│   ├── dashboard/            # Dashboard Analytics
+│   ├── improvements/         # Page d'améliorations
+│   └── assets/                # Assets statiques (logos, images)
+│       └── logo/             # Logos OVHcloud
 │
 ├── ⚙️ backend/               # API Backend (Python/FastAPI)
 │   ├── app/

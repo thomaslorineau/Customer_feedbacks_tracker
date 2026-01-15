@@ -51,17 +51,22 @@ except locale.Error:
 
 app = FastAPI(title="ovh-complaints-tracker")
 
-# Mount static files for v2 frontend (mount subdirectories to avoid conflict with /v2 route)
-frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
+# Mount static files for dashboard frontend
+frontend_dashboard_path = Path(__file__).resolve().parents[2] / "frontend" / "dashboard"
 frontend_path = Path(__file__).resolve().parents[2] / "frontend"
-if frontend_v2_path.exists():
+if frontend_dashboard_path.exists():
     # Mount CSS and JS directories separately
-    css_path = frontend_v2_path / "css"
-    js_path = frontend_v2_path / "js"
+    css_path = frontend_dashboard_path / "css"
+    js_path = frontend_dashboard_path / "js"
     if css_path.exists():
-        app.mount("/v2/css", StaticFiles(directory=str(css_path), html=False), name="v2-css")
+        app.mount("/dashboard/css", StaticFiles(directory=str(css_path), html=False), name="dashboard-css")
     if js_path.exists():
-        app.mount("/v2/js", StaticFiles(directory=str(js_path), html=False), name="v2-js")
+        app.mount("/dashboard/js", StaticFiles(directory=str(js_path), html=False), name="dashboard-js")
+
+# Mount assets (logos, images)
+assets_path = frontend_path / "assets"
+if assets_path.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_path), html=False), name="assets")
 
 # Mount shared CSS files
 if (frontend_path / "css").exists():
@@ -2159,7 +2164,7 @@ async def serve_frontend_scraping():
 @app.get("/dashboard-analytics", response_class=HTMLResponse)
 async def serve_frontend_dashboard():
     """Serve the dashboard analytics page."""
-    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "index.html"
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "index.html"
     if frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
@@ -2211,7 +2216,7 @@ async def serve_improvements():
     if frontend_path.exists():
         content = open(frontend_path, "r", encoding="utf-8").read()
         # Replace relative paths with absolute paths for static files
-        content = content.replace('href="/v2/css/', 'href="/v2/css/')
+        content = content.replace('href="/dashboard/css/', 'href="/dashboard/css/')
         content = content.replace('src="/improvements/js/', 'src="/improvements/js/')
         return content
     else:
@@ -2221,7 +2226,7 @@ async def serve_improvements():
 @app.get("/settings", response_class=HTMLResponse)
 async def serve_settings():
     """Serve the settings page."""
-    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "settings.html"
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "settings.html"
     if frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:

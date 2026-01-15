@@ -23,14 +23,14 @@
 
 ### Statut : **FICHIERS PRÉSENTS** ✅
 
-- **Frontend v2** : ✅ `frontend/v2/index.html` existe
+- **Frontend Dashboard** : ✅ `frontend/dashboard/index.html` existe
 - **Fichiers CSS** : ✅ Présents
 - **Fichiers JavaScript** : ✅ Présents
 - **API Client** : ✅ Configuré pour se connecter au port 8000
 
 **Note :** Le frontend nécessite un serveur HTTP pour fonctionner. Il peut être servi via :
 - Le serveur FastAPI (si fonctionnel)
-- Un serveur HTTP simple : `python -m http.server 8080` dans le dossier `frontend/v2`
+- Un serveur HTTP simple : `python -m http.server 8080` dans le dossier `frontend/dashboard`
 
 ---
 

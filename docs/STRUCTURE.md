@@ -28,11 +28,13 @@ frontend/
 ├── test_api.html          # Page de test de l'API
 ├── css/
 │   └── shared-theme.css   # Thème partagé (dark/light mode)
-├── v2/                     # Dashboard Analytics (version 2)
+├── dashboard/             # Dashboard Analytics
 │   ├── index.html         # Page dashboard principale
 │   ├── settings.html      # Page de configuration
 │   ├── css/               # Styles du dashboard
 │   └── js/                # Modules JavaScript
+├── assets/                # Assets statiques
+│   └── logo/             # Logos OVHcloud
 └── improvements/           # Page d'améliorations
     ├── index.html
     └── js/
@@ -40,10 +42,10 @@ frontend/
 
 **Pages principales:**
 - `/scraping` → `index.html` - Configuration et déclenchement des scrapers
-- `/dashboard` → `v2/index.html` - Visualisation des données
+- `/dashboard` → `dashboard/index.html` - Visualisation des données
 - `/logs` → `logs.html` - Logs de scraping
 - `/improvements` → `improvements/index.html` - Opportunités d'amélioration
-- `/settings` → `v2/settings.html` - Paramètres
+- `/settings` → `dashboard/settings.html` - Paramètres
 
 ---
 
