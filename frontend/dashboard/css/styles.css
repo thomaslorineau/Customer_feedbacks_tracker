@@ -58,6 +58,9 @@ body {
     padding: 28px 36px;
     margin: 24px auto;
     max-width: 700px;
+    width: 100%;
+    box-sizing: border-box;
+    width: 100%;
     box-shadow: 
         0 6px 24px rgba(0, 0, 0, 0.1),
         0 2px 8px rgba(0, 153, 255, 0.08),
@@ -69,6 +72,8 @@ body {
     align-items: center;
     position: relative;
     overflow: hidden;
+    grid-column: 1 / -1; /* Span full width of grid */
+    justify-self: center; /* Center within grid */
 }
 
 /* Subtle gradient background for search section */

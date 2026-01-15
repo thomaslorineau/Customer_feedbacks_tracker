@@ -61,28 +61,31 @@
 
     <!-- Main Dashboard -->
     <main class="dashboard-main">
-        <!-- Prominent Search Bar -->
-        <section class="search-section">
+        <!-- Centered Search Bar with Explanation -->
+        <section class="search-section" style="grid-column: 1 / 3;">
             <div class="search-container-prominent">
                 <svg class="search-icon-large" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/>
                     <path d="m21 21-4.35-4.35"/>
                 </svg>
-                <input type="text" id="globalSearch" placeholder="Search by product, keyword, review, post, source..." class="search-input-prominent">
+                <input type="text" id="globalSearch" placeholder="Search by product, keyword, review, post, source..." class="search-input-prominent" autofocus>
                 <div class="search-info-tooltip" id="searchInfoTooltip">
                     <svg class="info-icon-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="10"/>
                         <path d="M12 16v-4M12 8h.01"/>
                     </svg>
                     <div class="tooltip-content">
-                        <strong>Recherche et filtres multiples</strong>
-                        <p>• La recherche fonctionne sur le contenu, l'auteur, l'URL et la source</p>
-                        <p>• Vous pouvez combiner plusieurs filtres : sentiment, langue, produit, dates</p>
-                        <p>• Les filtres s'appliquent simultanément (ET logique)</p>
-                        <p>• Cliquez sur un produit dans "Distribution per Product" pour filtrer</p>
+                        <strong>Search & Filters</strong>
+                        <p>• Search works on content, author, URL, and source</p>
+                        <p>• Combine multiple filters: sentiment, language, product, dates</p>
+                        <p>• Filters apply simultaneously (AND logic)</p>
+                        <p>• Click on a product in "Distribution per Product" to filter</p>
                     </div>
                 </div>
             </div>
+            <p class="search-hint" style="font-size: 0.85em; color: var(--text-muted); margin: 8px 0 0 0; text-align: center; max-width: 600px;">
+                💡 Search across all feedback content, or use filters below to narrow down results
+            </p>
             <div class="search-actions">
                 <button class="btn-primary" id="scrapeAllBtn">🆕 Scrape New Data</button>
                 <button class="btn-secondary" id="resetFiltersBtn">Reset Filters</button>

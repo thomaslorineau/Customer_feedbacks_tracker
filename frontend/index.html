@@ -2565,8 +2565,16 @@
                 loadMoreBtn.style.cursor = 'pointer';
                 loadMoreBtn.style.fontWeight = 'bold';
                 loadMoreBtn.style.fontSize = '1em';
-                loadMoreBtn.style.minWidth = '200px'; // Fixed width to prevent size changes
-                loadMoreBtn.textContent = `📥 Load More (${currentOffset + postsPerPage}/${totalPosts})`;
+                loadMoreBtn.style.minWidth = '220px'; // Fixed width to prevent size changes
+                loadMoreBtn.style.width = '220px'; // Explicit width
+                loadMoreBtn.style.textAlign = 'center'; // Center text
+                loadMoreBtn.style.whiteSpace = 'nowrap'; // Prevent text wrapping
+                loadMoreBtn.style.overflow = 'hidden'; // Hide overflow
+                loadMoreBtn.style.textOverflow = 'ellipsis'; // Add ellipsis if needed
+                
+                // Use fixed text format to prevent size changes
+                const remaining = totalPosts - (currentOffset + postsPerPage);
+                loadMoreBtn.textContent = `📥 Load More (${remaining} remaining)`;
                 loadMoreDiv.appendChild(loadMoreBtn);
                 gallery.appendChild(loadMoreDiv);
             } else {
