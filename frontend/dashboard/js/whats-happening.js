@@ -181,7 +181,12 @@ function getActiveFilters(state) {
 
 async function updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters) {
     const actionsContainer = document.getElementById('recommendedActions');
-    if (!actionsContainer) return;
+    if (!actionsContainer) {
+        console.warn('[Recommended Actions] Container not found');
+        return;
+    }
+    
+    console.log('[Recommended Actions] Updating with', posts.length, 'posts');
     
     // Show loading state
     actionsContainer.innerHTML = `

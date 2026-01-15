@@ -214,33 +214,38 @@ body {
     bottom: calc(100% + 10px);
     right: 0;
     margin-bottom: 0;
-    background: var(--bg-card);
+    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(var(--accent-primary-rgb, 0, 153, 255), 0.05) 100%);
     color: var(--text-primary);
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    border: 1px solid var(--border-color);
-    width: 320px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(var(--accent-primary-rgb, 0, 153, 255), 0.1);
+    border: 1px solid rgba(var(--accent-primary-rgb, 0, 153, 255), 0.2);
+    width: 280px;
     z-index: 10000;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.25s ease, transform 0.25s ease;
     pointer-events: none;
+    transform: translateY(4px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 }
 
 .search-info-tooltip:hover .tooltip-content {
     visibility: visible;
     opacity: 1;
+    transform: translateY(0);
 }
 
 .tooltip-content strong {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     color: var(--accent-primary);
-    font-size: 1em;
+    font-size: 0.95em;
+    font-weight: 600;
 }
 
 .tooltip-content p {
-    margin: 6px 0;
-    font-size: 0.9em;
+    margin: 0;
+    font-size: 0.88em;
     line-height: 1.5;
     color: var(--text-secondary);
 }
@@ -379,9 +384,8 @@ body {
 
 .date-slicer-content {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 16px;
-    flex-wrap: wrap;
 }
 
 .date-slicer-label {
@@ -390,7 +394,17 @@ body {
     gap: 8px;
     font-weight: 600;
     color: var(--text-primary);
+    margin-bottom: 16px;
+    flex-wrap: wrap;
     font-size: 0.95em;
+}
+
+.date-slicer-hint {
+    font-size: 0.8em;
+    font-weight: 400;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-left: 4px;
 }
 
 .date-icon {
@@ -402,52 +416,98 @@ body {
 .date-slicer-inputs {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex: 1;
+    flex-wrap: wrap;
+}
+
+.date-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 160px;
+    max-width: 200px;
+}
+
+.date-input-icon {
+    position: absolute;
+    left: 12px;
+    width: 18px;
+    height: 18px;
+    color: var(--text-muted);
+    pointer-events: none;
+    z-index: 1;
+    transition: color 0.3s ease;
 }
 
 .date-input {
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    padding: 10px 12px 10px 40px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
     background: var(--input-bg);
     color: var(--text-primary);
     font-size: 0.9em;
-    min-width: 150px;
-    transition: border-color 0.3s ease;
+    width: 100%;
+    transition: all 0.3s ease;
+    font-weight: 500;
 }
 
 .date-input:focus {
     outline: none;
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+    box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.1);
+    background: var(--bg-card);
 }
 
-.date-separator {
+.date-input:focus + .date-input-icon,
+.date-input-wrapper:focus-within .date-input-icon {
+    color: var(--accent-primary);
+}
+
+.date-arrow-icon {
+    width: 20px;
+    height: 20px;
     color: var(--text-muted);
-    font-size: 0.9em;
+    flex-shrink: 0;
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.date-slicer-inputs:hover .date-arrow-icon {
+    color: var(--accent-primary);
+    transform: translateX(2px);
 }
 
 .btn-clear-dates {
-    padding: 6px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    padding: 0;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
     background: var(--bg-secondary);
-    color: var(--text-secondary);
+    color: var(--text-muted);
     cursor: pointer;
-    font-size: 0.9em;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    height: 36px;
+    min-width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.btn-clear-dates svg {
+    width: 18px;
+    height: 18px;
 }
 
 .btn-clear-dates:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--accent-primary);
-    color: var(--accent-primary);
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+    transform: scale(1.05);
+}
+
+.btn-clear-dates:active {
+    transform: scale(0.95);
 }
 
 .btn-clear-all-filters {
