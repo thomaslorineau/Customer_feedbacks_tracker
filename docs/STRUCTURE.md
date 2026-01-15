@@ -167,7 +167,7 @@ scripts/
 │   ├── backup.sh        # Sauvegarde
 │   ├── update.sh        # Mise à jour
 │   ├── status.sh        # Statut
-│   └── stop.sh          # Arrêt
+│   └── stop.sh          # Arrêt (déplacé avec start.sh)
 │
 └── utils/               # Utilitaires
     └── bump-version.ps1 # Incrémenter version

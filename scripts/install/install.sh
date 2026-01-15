@@ -190,9 +190,10 @@ info "Configuration des scripts de gestion..."
 cd ..
 # Rendre tous les scripts exécutables
 info "Configuration des permissions des scripts..."
-chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
-chmod +x scripts/install/check_access.sh 2>/dev/null || true
 chmod +x scripts/start/*.sh 2>/dev/null || true
+chmod +x scripts/install/*.sh 2>/dev/null || true
+# Support anciennes installations avec scripts à la racine
+chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
 
 # Rendre aussi exécutables tous les scripts .sh dans le répertoire
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
@@ -228,7 +229,7 @@ if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null || [[ "$HOSTN
         success "Configuration sauvegardée dans backend/.app_config"
         echo ""
         info "L'application écoutera sur le port $EXTERNAL_PORT"
-        echo "Redémarrez avec : ./stop.sh && ./start.sh"
+        echo "Redémarrez avec : bash scripts/start/stop.sh && bash scripts/start/start.sh"
     else
         info "Port par défaut 8000 conservé (pour développement local)"
         echo "APP_PORT=8000" > backend/.app_config

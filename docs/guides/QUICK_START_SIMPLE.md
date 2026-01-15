@@ -80,6 +80,24 @@ pip install -r requirements.txt
 ./scripts/start/start.sh
 ```
 
+**Vous devriez voir :**
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
+INFO:     Application startup complete.
+```
+
+### 🛑 Arrêter l'application
+
+**Windows :**
+```powershell
+.\scripts\start\stop.sh
+```
+
+**Linux/Mac :**
+```bash
+./scripts/start/stop.sh
+```
+
 ### Option 2 : Commande manuelle
 
 ```bash

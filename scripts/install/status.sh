@@ -96,7 +96,7 @@ fi
 echo ""
 echo "📋 Commandes utiles:"
 echo "   Démarrage:     ./start.sh"
-echo "   Arrêt:         ./stop.sh"
+echo "   Arrêt:         bash scripts/start/stop.sh ou ./stop.sh"
 echo "   Statut:        ./status.sh"
 echo "   Mise à jour:   ./update.sh"
 echo "   Config CORS:   ./configure_cors.sh"

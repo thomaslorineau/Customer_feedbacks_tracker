@@ -64,7 +64,7 @@ if [ -f server.pid ]; then
     PID=$(cat server.pid)
     if ps -p $PID > /dev/null 2>&1; then
         echo "⚠️  Le serveur tourne déjà (PID: $PID)"
-        echo "Pour redémarrer, exécutez d'abord: ./stop.sh"
+        echo "Pour redémarrer, exécutez d'abord: bash scripts/start/stop.sh ou ./stop.sh"
         exit 1
     else
         # Nettoyer le fichier PID obsolète

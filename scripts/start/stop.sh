@@ -1,11 +1,11 @@
 #!/bin/bash
 # Script d'arrêt de l'application
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Obtenir le répertoire du script (scripts/start/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Remonter à la racine du projet (2 niveaux: scripts/start -> scripts -> racine)
+APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$APP_DIR"
-
-# S'assurer que tous les scripts sont exécutables
-find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 # Fonction pour lire le port configuré
 get_app_port() {
@@ -132,4 +132,3 @@ fi
 rm -f backend/server.pid
 
 echo "✅ Serveur arrêté"
-

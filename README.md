@@ -44,6 +44,18 @@ pip install -r requirements.txt
 2. **Aller à :** http://localhost:8000
 3. **C'est prêt !** 🎉
 
+### 🛑 Arrêter l'application
+
+**Windows :**
+```powershell
+.\scripts\start\stop.sh
+```
+
+**Linux/Mac :**
+```bash
+./scripts/start/stop.sh
+```
+
 ### 🧪 Tester rapidement
 
 1. Cliquer sur **"Feedbacks Collection"** dans le menu

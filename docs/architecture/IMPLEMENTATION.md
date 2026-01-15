@@ -270,7 +270,7 @@ APP_PORT=11840
 
 L'application écoutera directement sur ce port. Redémarrez avec :
 ```bash
-./stop.sh && ./start.sh
+bash scripts/start/stop.sh && bash scripts/start/start.sh
 ```
 
 **Configuration d'un alias host (optionnel) :**
@@ -487,13 +487,13 @@ cd ~/apps/complaints_tracker
 **Arrêter l'application :**
 ```bash
 cd ~/apps/complaints_tracker
-./stop.sh
+bash scripts/start/stop.sh
 ```
 
 **Redémarrer l'application :**
 ```bash
 cd ~/apps/complaints_tracker
-./stop.sh
+bash scripts/start/stop.sh
 ./start.sh
 ```
 
@@ -510,7 +510,7 @@ tail -f server.log
 ```bash
 cd ~/apps/complaints_tracker
 ./start.sh    # Démarrer l'application
-./stop.sh     # Arrêter l'application
+bash scripts/start/stop.sh     # Arrêter l'application
 ./status.sh   # Vérifier le statut
 ./backup.sh   # Sauvegarder la base de données
 ```
@@ -550,7 +550,7 @@ Voici un résumé des commandes les plus utiles :
 ```bash
 cd ~/apps/complaints_tracker
 ./start.sh      # Démarrer l'application
-./stop.sh       # Arrêter l'application
+bash scripts/start/stop.sh       # Arrêter l'application
 ./status.sh     # Vérifier le statut
 ./backup.sh     # Sauvegarder la base de données
 ```
@@ -569,7 +569,7 @@ hostname -I
 ```bash
 cd ~/apps/complaints_tracker
 ./configure_cors.sh
-./stop.sh
+bash scripts/start/stop.sh
 ./start.sh
 ```
 
@@ -581,7 +581,7 @@ curl http://localhost:8000/docs
 **Redémarrer l'application :**
 ```bash
 cd ~/apps/complaints_tracker
-./stop.sh
+bash scripts/start/stop.sh
 ./start.sh
 ```
 
@@ -594,7 +594,7 @@ cd ~/apps/complaints_tracker
 lsof -i :8000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 8000
 
 # Si c'est votre processus, l'arrêter
-~/apps/complaints_tracker/stop.sh
+~/apps/complaints_tracker/scripts/start/stop.sh
 
 # Si c'est un autre processus, utiliser un autre port
 # Modifier start.sh pour utiliser --port 8001
@@ -938,7 +938,7 @@ Le script `update.sh` fait automatiquement :
 ssh user@votre-vm
 
 # Arrêter l'application
-~/apps/complaints_tracker/stop.sh
+~/apps/complaints_tracker/scripts/start/stop.sh
 
 # Mettre à jour le code (gère automatiquement les modifications locales)
 cd ~/apps/complaints_tracker
