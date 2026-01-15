@@ -56,11 +56,64 @@ function setupEventListeners() {
         });
     }
     
-    // Date filters
+    // Global date slicer (common for all charts)
+    const globalDateFrom = document.getElementById('globalDateFrom');
+    const globalDateTo = document.getElementById('globalDateTo');
+    const clearDatesBtn = document.getElementById('clearDatesBtn');
+    
+    if (globalDateFrom) {
+        globalDateFrom.addEventListener('change', (e) => {
+            const dateValue = e.target.value;
+            state.setFilter('dateFrom', dateValue);
+            // Sync with local date inputs
+            const dateFromInput = document.getElementById('dateFrom');
+            if (dateFromInput) dateFromInput.value = dateValue;
+            updateDashboard();
+        });
+    }
+    
+    if (globalDateTo) {
+        globalDateTo.addEventListener('change', (e) => {
+            const dateValue = e.target.value;
+            state.setFilter('dateTo', dateValue);
+            // Sync with local date inputs
+            const dateToInput = document.getElementById('dateTo');
+            if (dateToInput) dateToInput.value = dateValue;
+            updateDashboard();
+        });
+    }
+    
+    if (clearDatesBtn) {
+        clearDatesBtn.addEventListener('click', () => {
+            state.setFilter('dateFrom', '');
+            state.setFilter('dateTo', '');
+            if (globalDateFrom) globalDateFrom.value = '';
+            if (globalDateTo) globalDateTo.value = '';
+            // Sync with local date inputs
+            const dateFromInput = document.getElementById('dateFrom');
+            const dateToInput = document.getElementById('dateTo');
+            if (dateFromInput) dateFromInput.value = '';
+            if (dateToInput) dateToInput.value = '';
+            updateDashboard();
+        });
+    }
+    
+    // Clear All Filters button
+    const clearAllFiltersBtn = document.getElementById('clearAllFiltersBtn');
+    if (clearAllFiltersBtn) {
+        clearAllFiltersBtn.addEventListener('click', () => {
+            resetFilters();
+        });
+    }
+    
+    // Local date filters (in timeline panel - sync with global)
     const dateFromInput = document.getElementById('dateFrom');
     if (dateFromInput) {
         dateFromInput.addEventListener('change', (e) => {
-            state.setFilter('dateFrom', e.target.value);
+            const dateValue = e.target.value;
+            state.setFilter('dateFrom', dateValue);
+            // Sync with global date slicer
+            if (globalDateFrom) globalDateFrom.value = dateValue;
             updateDashboard();
         });
     }
@@ -68,7 +121,10 @@ function setupEventListeners() {
     const dateToInput = document.getElementById('dateTo');
     if (dateToInput) {
         dateToInput.addEventListener('change', (e) => {
-            state.setFilter('dateTo', e.target.value);
+            const dateValue = e.target.value;
+            state.setFilter('dateTo', dateValue);
+            // Sync with global date slicer
+            if (globalDateTo) globalDateTo.value = dateValue;
             updateDashboard();
         });
     }
@@ -138,9 +194,11 @@ function setupEventListeners() {
             const dateFrom = clickedDate;
             const dateTo = clickedDate;
             
-            // Update date filters
+            // Update date filters (both global and local)
             const dateFromInput = document.getElementById('dateFrom');
             const dateToInput = document.getElementById('dateTo');
+            const globalDateFrom = document.getElementById('globalDateFrom');
+            const globalDateTo = document.getElementById('globalDateTo');
             
             if (dateFromInput) {
                 dateFromInput.value = dateFrom;
@@ -149,6 +207,12 @@ function setupEventListeners() {
             if (dateToInput) {
                 dateToInput.value = dateTo;
                 console.log('Set dateTo input to:', dateTo);
+            }
+            if (globalDateFrom) {
+                globalDateFrom.value = dateFrom;
+            }
+            if (globalDateTo) {
+                globalDateTo.value = dateTo;
             }
             
             // Update state filters
@@ -199,6 +263,38 @@ function setupEventListeners() {
             if (postsSection) {
                 postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
+        }
+    });
+    
+    // Listen for source filter events from source chart
+    window.addEventListener('filterBySource', (event) => {
+        const { source } = event.detail;
+        if (state) {
+            console.log('Filtering by source:', source);
+            
+            // Set source filter
+            state.setFilter('source', source || '');
+            
+            // Update dashboard
+            updateDashboard();
+        }
+    });
+    
+    // Listen for sentiment filter events from sentiment chart
+    window.addEventListener('filterBySentiment', (event) => {
+        const { sentiment } = event.detail;
+        if (state) {
+            console.log('Filtering by sentiment:', sentiment);
+            
+            // Set sentiment filter
+            const sentimentFilter = document.getElementById('sentimentFilter');
+            if (sentimentFilter) {
+                sentimentFilter.value = sentiment;
+            }
+            state.setFilter('sentiment', sentiment);
+            
+            // Update dashboard
+            updateDashboard();
         }
     });
 }
@@ -536,16 +632,17 @@ function navigateProducts(direction) {
 
 function resetFilters() {
     if (!state) return;
-    state.filters = {
-        search: '',
-        sentiment: 'all',
-        source: '',
-        language: 'all',
-        product: 'all',
-        dateFrom: '',
-        dateTo: ''
-    };
     
+    // Reset all filters
+    state.setFilter('search', '');
+    state.setFilter('sentiment', 'all');
+    state.setFilter('language', 'all');
+    state.setFilter('product', 'all');
+    state.setFilter('source', '');
+    state.setFilter('dateFrom', '');
+    state.setFilter('dateTo', '');
+    
+    // Reset UI elements
     const globalSearch = document.getElementById('globalSearch');
     if (globalSearch) globalSearch.value = '';
     
@@ -558,7 +655,22 @@ function resetFilters() {
     const productFilter = document.getElementById('productFilter');
     if (productFilter) productFilter.value = 'all';
     
-    state.applyFilters();
+    // Reset global date slicer
+    const globalDateFrom = document.getElementById('globalDateFrom');
+    const globalDateTo = document.getElementById('globalDateTo');
+    if (globalDateFrom) globalDateFrom.value = '';
+    if (globalDateTo) globalDateTo.value = '';
+    
+    // Reset local date inputs
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    if (dateFromInput) dateFromInput.value = '';
+    if (dateToInput) dateToInput.value = '';
+    
+    // Clear critical filter flag
+    state.criticalFilterActive = false;
+    
+    // Update dashboard
     updateDashboard();
 }
 

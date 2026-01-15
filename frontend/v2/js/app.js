@@ -3,6 +3,9 @@ import { API } from './api.js';
 import { State } from './state.js';
 import { initDashboard } from './dashboard.js';
 import { initCharts } from './charts.js';
+import { initWorldMap } from './world-map.js';
+import { initSourceChart } from './source-chart.js';
+import { initSentimentChart } from './sentiment-chart.js';
 
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -86,6 +89,15 @@ class App {
         
         // Initialize dashboard
         initDashboard(this.state);
+        
+        // Initialize world map (hidden by default)
+        initWorldMap();
+        
+        // Initialize source chart (with state for filtering)
+        initSourceChart(this.state);
+        
+        // Initialize sentiment chart (with state for filtering)
+        initSentimentChart(this.state);
         
         // Load initial data
         try {

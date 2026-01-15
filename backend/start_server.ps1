@@ -2,3 +2,4 @@ Set-Location "C:\Users\tlorinea\Documents\Documents\Documents\Projets\VibeCoding
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 
+

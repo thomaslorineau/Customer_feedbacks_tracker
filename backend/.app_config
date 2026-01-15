@@ -3,3 +3,5 @@
 # 11840 = port pour VM Docker OVH (ou autre port selon votre configuration)
 APP_PORT=8000
 
+UI_VERSION=v2
+

@@ -7,7 +7,9 @@
     <link rel="stylesheet" href="/css/shared-theme.css">
     <link rel="stylesheet" href="/v2/css/styles.css">
     <link rel="stylesheet" href="/v2/css/navigation.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="has-nav-menu">
     <!-- Navigation Menu -->
@@ -92,6 +94,34 @@
 
     <!-- Main Dashboard -->
     <main class="dashboard-main">
+        <!-- Date Slicer - Common Date Filter for All Charts -->
+        <section class="panel-date-slicer">
+            <div class="date-slicer-content">
+                <div class="date-slicer-label">
+                    <svg class="date-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span>Date Range (applies to all charts)</span>
+                </div>
+                <div class="date-slicer-inputs">
+                    <input type="date" id="globalDateFrom" class="date-input" title="From Date">
+                    <span class="date-separator">to</span>
+                    <input type="date" id="globalDateTo" class="date-input" title="To Date">
+                    <button class="btn-clear-dates" id="clearDatesBtn" title="Clear date filters">✕</button>
+                </div>
+                <button class="btn-clear-all-filters" id="clearAllFiltersBtn" title="Clear all filters">
+                    <svg class="clear-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                    Clear All Filters
+                </button>
+            </div>
+        </section>
+
         <!-- What's Happening Section -->
         <section class="panel-whats-happening">
             <div class="whats-happening-header">
@@ -161,6 +191,53 @@
                     <button class="arrow-btn" id="navigateProductsPrevBtn">←</button>
                     <button class="arrow-btn" id="navigateProductsNextBtn">→</button>
                 </div>
+            </div>
+        </section>
+
+        <!-- Posts by Source Panel -->
+        <section class="panel-source">
+            <div class="panel-header">
+                <h2>📊 Posts by Source</h2>
+                <div class="panel-actions">
+                    <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="chart-container-source">
+                <canvas id="sourceChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Sentiment Distribution Panel -->
+        <section class="panel-sentiment">
+            <div class="panel-header">
+                <h2>💭 Sentiment Distribution</h2>
+                <div class="panel-actions">
+                    <svg class="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 16v-4M12 8h.01"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="chart-container-sentiment">
+                <canvas id="sentimentChart"></canvas>
+            </div>
+        </section>
+
+        <!-- World Map Panel (Hidden by default, can be toggled) -->
+        <section class="panel-map" style="display: none;">
+            <div class="panel-header">
+                <h2>🌍 Posts by Country</h2>
+                <div class="panel-actions">
+                    <div class="map-legend" id="mapLegend">
+                        <!-- Will be populated by JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="map-container" id="worldMap">
+                <!-- Leaflet map will be rendered here -->
             </div>
         </section>
 
@@ -323,6 +400,7 @@
     <script type="module" src="/v2/js/state.js"></script>
     <script type="module" src="/v2/js/dashboard.js"></script>
     <script type="module" src="/v2/js/charts.js"></script>
+    <script type="module" src="/v2/js/world-map.js"></script>
     <script type="module" src="/v2/js/version-switch.js"></script>
     <script type="module" src="/v2/js/app.js"></script>
     <script>

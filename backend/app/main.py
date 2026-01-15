@@ -21,6 +21,7 @@ from collections import defaultdict
 from . import db
 from .scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd
 from .analysis import sentiment
+from .analysis import country_detection
 
 # Configure locale for French support
 try:
@@ -36,6 +37,7 @@ app = FastAPI(title="ovh-complaints-tracker")
 
 # Mount static files for v2 frontend (mount subdirectories to avoid conflict with /v2 route)
 frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
+frontend_path = Path(__file__).resolve().parents[2] / "frontend"
 if frontend_v2_path.exists():
     # Mount CSS and JS directories separately
     css_path = frontend_v2_path / "css"
@@ -44,6 +46,17 @@ if frontend_v2_path.exists():
         app.mount("/v2/css", StaticFiles(directory=str(css_path), html=False), name="v2-css")
     if js_path.exists():
         app.mount("/v2/js", StaticFiles(directory=str(js_path), html=False), name="v2-js")
+
+# Mount shared CSS files
+if (frontend_path / "css").exists():
+    app.mount("/css", StaticFiles(directory=str(frontend_path / "css"), html=False), name="shared-css")
+
+# Mount improvements static files (must be before /improvements route)
+improvements_path = frontend_path / "improvements"
+if improvements_path.exists():
+    improvements_js_path = improvements_path / "js"
+    if improvements_js_path.exists():
+        app.mount("/improvements/js", StaticFiles(directory=str(improvements_js_path), html=False), name="improvements-js")
 
 # Enable CORS for frontend - restrict to specific ports for security
 import os
@@ -190,6 +203,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -198,6 +212,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -218,6 +234,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -226,6 +243,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -246,6 +265,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -254,6 +274,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -274,6 +296,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -282,6 +305,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -302,6 +327,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -310,6 +336,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -330,6 +358,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -338,6 +367,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -358,6 +389,7 @@ def auto_scrape_job():
             duplicate_count = 0
             for it in items:
                 an = sentiment.analyze(it.get('content') or '')
+                country = country_detection.detect_country_from_post(it)
                 if db.insert_post({
                     'source': it.get('source'),
                     'author': it.get('author'),
@@ -366,6 +398,8 @@ def auto_scrape_job():
                     'created_at': it.get('created_at'),
                     'sentiment_score': an['score'],
                     'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
                 }):
                     added_count += 1
                 else:
@@ -445,6 +479,8 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
+            # Detect country
+            country = country_detection.detect_country_from_post(it)
             inserted = db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
@@ -454,6 +490,7 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'country': country,
             })
             if inserted:
                 added += 1
@@ -502,6 +539,8 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
     for it in items:
         try:
             an = sentiment.analyze(it.get('content') or '')
+            # Detect country
+            country = country_detection.detect_country_from_post(it)
             if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
@@ -511,6 +550,7 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
                 'sentiment_score': an['score'],
                 'sentiment_label': an['label'],
                 'language': it.get('language', 'unknown'),
+                'country': country,
             }):
                 added += 1
             else:
@@ -702,6 +742,7 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
         an = sentiment.analyze(it.get('content') or '')
         it['sentiment_score'] = an['score']
         it['sentiment_label'] = an['label']
+        country = country_detection.detect_country_from_post(it)
         db.insert_post({
             'source': it.get('source'),
             'author': it.get('author'),
@@ -711,6 +752,7 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
             'sentiment_score': it.get('sentiment_score'),
             'sentiment_label': it.get('sentiment_label'),
             'language': it.get('language', 'unknown'),
+            'country': country,
         })
         added += 1
     return {'added': added}
@@ -857,6 +899,7 @@ async def scrape_news_endpoint(query: str, limit: int = 50):
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
+            country = country_detection.detect_country_from_post(it)
             if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
@@ -866,6 +909,7 @@ async def scrape_news_endpoint(query: str, limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'country': country,
             }):
                 added += 1
     except Exception as e:
@@ -892,6 +936,7 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
             
+            country = country_detection.detect_country_from_post(it)
             if db.insert_post({
                 'source': it.get('source'),
                 'author': it.get('author'),
@@ -901,6 +946,7 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'country': country,
             }):
                 added += 1
     except Exception as e:
@@ -970,6 +1016,61 @@ async def cleanup_non_ovh_posts():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+
+@app.get("/api/posts-by-country")
+async def get_posts_by_country():
+    """Retourne la répartition des posts par pays."""
+    # Récupérer tous les posts (ou un grand nombre)
+    posts = db.get_posts(limit=10000, offset=0)
+    
+    country_counts = {}
+    for post in posts:
+        country = post.get('country')
+        # Filter out invalid country codes (like 'EU' which is not a real country code)
+        if country and country != 'EU' and len(country) == 2:
+            country_counts[country] = country_counts.get(country, 0) + 1
+    
+    # Trier par nombre de posts décroissant
+    sorted_countries = sorted(country_counts.items(), key=lambda x: x[1], reverse=True)
+    
+    return {
+        "countries": dict(sorted_countries),
+        "total": len(posts),
+        "total_with_country": sum(country_counts.values()),
+        "country_names": {code: country_detection.get_country_name(code) for code in country_counts.keys()}
+    }
+
+
+@app.get("/api/posts-by-source")
+async def get_posts_by_source():
+    """Retourne la répartition des posts par source."""
+    # Récupérer tous les posts
+    posts = db.get_posts(limit=10000, offset=0)
+    
+    source_counts = {}
+    source_sentiment = {}  # Track sentiment per source
+    
+    for post in posts:
+        source = post.get('source', 'Unknown')
+        sentiment = post.get('sentiment_label', 'neutral')
+        
+        if source not in source_counts:
+            source_counts[source] = 0
+            source_sentiment[source] = {'positive': 0, 'negative': 0, 'neutral': 0}
+        
+        source_counts[source] += 1
+        if sentiment in source_sentiment[source]:
+            source_sentiment[source][sentiment] += 1
+    
+    # Trier par nombre de posts décroissant
+    sorted_sources = sorted(source_counts.items(), key=lambda x: x[1], reverse=True)
+    
+    return {
+        "sources": dict(sorted_sources),
+        "total": len(posts),
+        "sentiment_by_source": source_sentiment
+    }
 
 
 @app.get("/posts")
@@ -1769,19 +1870,7 @@ async def serve_improvements():
         raise HTTPException(status_code=404, detail="Improvements page not found")
 
 
-# Mount static files for v2 frontend
-frontend_v2_path = Path(__file__).resolve().parents[2] / "frontend" / "v2"
-frontend_path = Path(__file__).resolve().parents[2] / "frontend"
-
-if frontend_v2_path.exists():
-    app.mount("/v2", StaticFiles(directory=str(frontend_v2_path), html=False), name="v2-static")
-    app.mount("/v2/css", StaticFiles(directory=str(frontend_v2_path / "css"), html=False), name="v2-css")
-    app.mount("/v2/js", StaticFiles(directory=str(frontend_v2_path / "js"), html=False), name="v2-js")
-
-# Mount shared CSS files (must be after v2/css to avoid conflicts)
-if (frontend_path / "css").exists():
-    # Use a different path to avoid conflicts
-    app.mount("/css", StaticFiles(directory=str(frontend_path / "css"), html=False), name="shared-css")
+# Additional static file mounts (duplicates removed, already mounted above)
 
 
 class UIVersionPayload(BaseModel):

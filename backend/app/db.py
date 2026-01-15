@@ -20,9 +20,15 @@ def init_db():
             created_at TEXT,
             sentiment_score REAL,
             sentiment_label TEXT,
-            language TEXT DEFAULT 'unknown'
+            language TEXT DEFAULT 'unknown',
+            country TEXT DEFAULT NULL
         )
     ''')
+    # Add country column if it doesn't exist (migration)
+    try:
+        c.execute('ALTER TABLE posts ADD COLUMN country TEXT DEFAULT NULL')
+    except sqlite3.OperationalError:
+        pass  # Column already exists
     # Saved search queries / keywords
     c.execute('''
         CREATE TABLE IF NOT EXISTS saved_queries (
@@ -39,8 +45,8 @@ def insert_post(post: dict):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute(
-        '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+        '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language, country)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
         (
             post.get('source'),
             post.get('author'),
@@ -50,6 +56,7 @@ def insert_post(post: dict):
             post.get('sentiment_score'),
             post.get('sentiment_label'),
             post.get('language', 'unknown'),
+            post.get('country'),
         ),
     )
     conn.commit()
@@ -61,13 +68,13 @@ def get_posts(limit: int = 100, offset: int = 0, language: str = None):
     c = conn.cursor()
     
     if language and language != 'all':
-        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?', (language, limit, offset))
+        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, country FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?', (language, limit, offset))
     else:
-        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language FROM posts ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
+        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, country FROM posts ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
     
     rows = c.fetchall()
     conn.close()
-    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language']
+    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language', 'country']
     return [dict(zip(keys, row)) for row in rows]
 
 
