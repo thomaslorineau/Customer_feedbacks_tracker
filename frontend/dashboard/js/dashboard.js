@@ -997,6 +997,37 @@ function updatePositiveSatisfactionKPI() {
 }
 
 // Generate PowerPoint Report
+/**
+ * Capture a Chart.js canvas as base64 image
+ */
+function captureChartAsImage(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        console.warn(`Canvas ${canvasId} not found`);
+        return null;
+    }
+    
+    try {
+        // Get the Chart.js instance from the canvas
+        if (typeof Chart === 'undefined') {
+            console.warn('Chart.js not available');
+            return null;
+        }
+        
+        const chart = Chart.getChart(canvas);
+        if (!chart) {
+            console.warn(`Chart instance not found for ${canvasId}`);
+            return null;
+        }
+        
+        // Get the base64 image from the chart
+        return chart.toBase64Image('image/png', 1.0);
+    } catch (error) {
+        console.error(`Error capturing chart ${canvasId}:`, error);
+        return null;
+    }
+}
+
 async function generatePowerPointReport() {
     const btn = document.getElementById('generateReportBtn');
     if (!btn) return;
@@ -1021,18 +1052,38 @@ async function generatePowerPointReport() {
             dateTo: state.filters?.dateTo || ''
         };
         
+        // Capture chart images from the dashboard
+        const chartImages = {
+            timeline: captureChartAsImage('timelineChart'),
+            source: captureChartAsImage('sourceChart'),
+            sentiment: captureChartAsImage('sentimentChart')
+        };
+        
+        // Prepare FormData to send images
+        const formData = new FormData();
+        formData.append('filters', JSON.stringify(filters));
+        formData.append('include_recommendations', 'true');
+        formData.append('include_analysis', 'true');
+        
+        // Add chart images if available
+        if (chartImages.timeline) {
+            // Convert base64 to blob
+            const timelineBlob = await fetch(chartImages.timeline).then(r => r.blob());
+            formData.append('timeline_chart', timelineBlob, 'timeline.png');
+        }
+        if (chartImages.source) {
+            const sourceBlob = await fetch(chartImages.source).then(r => r.blob());
+            formData.append('source_chart', sourceBlob, 'source.png');
+        }
+        if (chartImages.sentiment) {
+            const sentimentBlob = await fetch(chartImages.sentiment).then(r => r.blob());
+            formData.append('sentiment_chart', sentimentBlob, 'sentiment.png');
+        }
+        
         // Call API to generate report
         const response = await fetch(`${api.baseURL}/api/generate-powerpoint-report`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                filters: filters,
-                include_charts: ['timeline', 'product', 'source', 'sentiment'],
-                include_recommendations: true,
-                include_analysis: true
-            })
+            body: formData
         });
         
         if (!response.ok) {
