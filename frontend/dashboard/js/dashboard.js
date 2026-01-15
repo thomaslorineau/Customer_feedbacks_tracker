@@ -386,7 +386,7 @@ async function loadDashboardData() {
     }
 }
 
-function updateDashboard() {
+export function updateDashboard() {
     console.log('Updating dashboard...');
     console.log('State:', state ? 'initialized' : 'NOT initialized');
     console.log('Total posts:', state?.posts?.length || 0);
