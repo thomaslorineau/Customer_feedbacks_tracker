@@ -54,6 +54,23 @@ function setupThemeToggle() {
     }
 }
 
+// Load and display version
+async function loadVersion() {
+    try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+            const data = await response.json();
+            const versionBadge = document.getElementById('versionBadge');
+            if (versionBadge) {
+                versionBadge.textContent = `v${data.version}`;
+                versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
+            }
+        }
+    } catch (error) {
+        console.warn('Failed to load version:', error);
+    }
+}
+
 // Load pain points
 async function loadPainPoints() {
     try {

@@ -767,6 +767,7 @@
             </div>
         </div>
         <div class="nav-menu-right">
+            <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
         </div>
     </nav>
@@ -814,52 +815,6 @@
             </div>
         </div>
 
-        <!-- 2. LLM Configuration Section -->
-        <div class="controls" style="margin-bottom:20px; gap:12px; align-items:flex-start; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
-            <div style="width: 100%;">
-                <h3 style="color: var(--accent-primary); margin: 0 0 15px 0; font-size: 1.2em; display: flex; align-items: center; gap: 8px;">
-                    <span>🤖</span>
-                    <span>LLM Configuration (OpenAI / Anthropic)</span>
-                </h3>
-                <p style="color: var(--text-secondary); font-size: 0.9em; margin: 0 0 15px 0;">
-                    Configure your LLM API keys to enable AI-powered features like Recommended Actions and Improvement Ideas generation.
-                </p>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                    <div>
-                        <label style="display: block; color: var(--text-primary); font-weight: 600; margin-bottom: 6px; font-size: 0.95em;">
-                            OpenAI API Key
-                        </label>
-                        <input type="password" id="openaiApiKey" placeholder="sk-..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-primary); font-size: 0.9em;">
-                        <small style="color: var(--text-muted); font-size: 0.85em;">Get your key at <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--accent-primary);">platform.openai.com</a></small>
-                    </div>
-                    <div>
-                        <label style="display: block; color: var(--text-primary); font-weight: 600; margin-bottom: 6px; font-size: 0.95em;">
-                            Anthropic API Key
-                        </label>
-                        <input type="password" id="anthropicApiKey" placeholder="sk-ant-..." style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-primary); font-size: 0.9em;">
-                        <small style="color: var(--text-muted); font-size: 0.85em;">Get your key at <a href="https://console.anthropic.com/" target="_blank" style="color: var(--accent-primary);">console.anthropic.com</a></small>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <label style="display: block; color: var(--text-primary); font-weight: 600; margin-bottom: 6px; font-size: 0.95em;">
-                            LLM Provider
-                        </label>
-                        <select id="llmProvider" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--input-bg); color: var(--text-primary); font-size: 0.9em;">
-                            <option value="openai">OpenAI (GPT-4o-mini)</option>
-                            <option value="anthropic">Anthropic (Claude 3 Haiku)</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: flex-end;">
-                        <button onclick="loadLLMConfig()" style="padding: 10px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-weight: 600;">🔄 Load</button>
-                        <button onclick="saveLLMConfig()" style="padding: 10px 20px; background: var(--accent-primary); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: 600;">💾 Save</button>
-                    </div>
-                </div>
-                <div id="llmConfigStatus" style="padding: 12px; border-radius: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color); font-size: 0.9em; display: none;">
-                    <span id="llmConfigStatusText"></span>
-                </div>
-            </div>
-        </div>
 
         <!-- 3. Primary action + Scraping buttons -->
         <div class="controls" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
@@ -1307,7 +1262,7 @@
                     You are currently on the <strong>Scraping & Configuration</strong> page. This application has three main sections:
                 </p>
                 <ul>
-                    <li><strong>⚙️ Scraping & Configuration:</strong> Configure keywords, LLM settings, launch scrapers, and manage your data</li>
+                    <li><strong>⚙️ Scraping & Configuration:</strong> Configure keywords, launch scrapers, and manage your data</li>
                     <li><strong>📊 Dashboard Analytics:</strong> Visual analytics with charts, trends, and real-time insights</li>
                     <li><strong>💡 Improvements Opportunities:</strong> Identify pain points and prioritize improvement actions</li>
                 </ul>
@@ -1315,7 +1270,6 @@
                 <h3>🚀 Quick Start Guide</h3>
                 <ol>
                     <li><strong>Configure Keywords:</strong> Add keywords related to OVH products (e.g., "ovh vps", "ovh hosting", "ovh billing")</li>
-                    <li><strong>LLM Configuration (Optional):</strong> Add your OpenAI or Anthropic API keys to enable AI-powered features like Recommended Actions</li>
                     <li><strong>Launch Scraping:</strong> Click "🆕 Scrape New Data" to collect feedback from all sources, or use individual scraper buttons</li>
                     <li><strong>View Results:</strong> Navigate to "Dashboard Analytics" or "Improvements Opportunities" to analyze the collected data</li>
                 </ol>
@@ -5197,6 +5151,7 @@
             }
         });
         // LLM Configuration Functions
+        // LLM Configuration functions removed - now in Settings page
         async function loadLLMConfig() {
             try {
                 const response = await fetch('/api/llm-config');
@@ -5310,9 +5265,6 @@
             if (versionToggleBtn) {
                 versionToggleBtn.addEventListener('click', openVersionSwitchModal);
             }
-            // Load LLM config on page load
-            loadLLMConfig();
-            
             // Load posts and stats on page load
             loadPostsFromDB().then(() => {
                 console.log('Posts and stats loaded successfully');
