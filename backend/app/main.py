@@ -1642,7 +1642,7 @@ async def get_improvements_summary():
         
         # Prepare summary for LLM
         pain_points_text = "\n".join([
-            f"- {pp.title}: {pp.description} ({pp.post_count} posts)"
+            f"- {pp.title}: {pp.description} ({pp.posts_count} posts)"
             for pp in pain_points[:5]
         ])
         

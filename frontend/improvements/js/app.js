@@ -78,8 +78,16 @@ async function loadImprovementsSummary() {
         if (response.ok) {
             const data = await response.json();
             const summaryEl = document.getElementById('improvementsSummary');
+            if (summaryEl && data.summary) {
+                summaryEl.textContent = data.summary;
+            } else if (summaryEl) {
+                summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
+            }
+        } else {
+            console.error('Failed to load improvements summary:', response.status, response.statusText);
+            const summaryEl = document.getElementById('improvementsSummary');
             if (summaryEl) {
-                summaryEl.textContent = data.summary || "Analyzing improvement opportunities...";
+                summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
             }
         }
     } catch (error) {
