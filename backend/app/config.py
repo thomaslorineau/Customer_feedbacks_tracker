@@ -45,6 +45,13 @@ class Config:
     _TRUSTPILOT_API_KEY: Optional[str] = os.getenv("TRUSTPILOT_API_KEY")
     _GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN")
     
+    # Third-party API credentials (optional - user provides their own)
+    _LINKEDIN_CLIENT_ID: Optional[str] = os.getenv("LINKEDIN_CLIENT_ID")
+    _LINKEDIN_CLIENT_SECRET: Optional[str] = os.getenv("LINKEDIN_CLIENT_SECRET")
+    _TWITTER_BEARER_TOKEN: Optional[str] = os.getenv("TWITTER_BEARER_TOKEN")
+    _TWITTER_API_KEY: Optional[str] = os.getenv("TWITTER_API_KEY")
+    _TWITTER_API_SECRET: Optional[str] = os.getenv("TWITTER_API_SECRET")
+    
     # Rate limiting
     RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
     RATE_LIMIT_WINDOW: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
@@ -61,7 +68,7 @@ class Config:
         Never log or expose the returned value.
         
         Args:
-            provider: Provider name (openai, anthropic, google, trustpilot, github)
+            provider: Provider name (openai, anthropic, google, trustpilot, github, linkedin_client_id, linkedin_client_secret, twitter_bearer, twitter_api_key, twitter_api_secret)
             
         Returns:
             API key if configured, None otherwise
@@ -73,6 +80,13 @@ class Config:
             "google": cls._GOOGLE_API_KEY,
             "trustpilot": cls._TRUSTPILOT_API_KEY,
             "github": cls._GITHUB_TOKEN,
+            # Third-party APIs (optional)
+            "linkedin_client_id": cls._LINKEDIN_CLIENT_ID,
+            "linkedin_client_secret": cls._LINKEDIN_CLIENT_SECRET,
+            "twitter_bearer": cls._TWITTER_BEARER_TOKEN,
+            "twitter_bearer_token": cls._TWITTER_BEARER_TOKEN,
+            "twitter_api_key": cls._TWITTER_API_KEY,
+            "twitter_api_secret": cls._TWITTER_API_SECRET,
         }
         
         key = key_map.get(provider)
@@ -158,6 +172,12 @@ class Config:
             "github": lambda k: (k.startswith("ghp_") or k.startswith("github_pat_")) and len(k) > 20,
             "trustpilot": lambda k: len(k) > 10,
             "google": lambda k: len(k) > 10,
+            "linkedin_client_id": lambda k: len(k) > 10,
+            "linkedin_client_secret": lambda k: len(k) > 10,
+            "twitter_bearer": lambda k: len(k) > 20,
+            "twitter_bearer_token": lambda k: len(k) > 20,
+            "twitter_api_key": lambda k: len(k) > 10,
+            "twitter_api_secret": lambda k: len(k) > 10,
         }
         
         validator = format_rules.get(provider.lower())
@@ -214,6 +234,23 @@ class Config:
                 summary.append(f"  {valid} {provider:12s}: {masked}")
             else:
                 summary.append(f"  ❌ {provider:12s}: Not configured")
+        
+        # Third-party APIs (optional)
+        summary.append("")
+        summary.append("🔗 Third-party APIs (optional - user credentials):")
+        third_party_providers = [
+            ("linkedin_client_id", "LinkedIn Client ID"),
+            ("linkedin_client_secret", "LinkedIn Client Secret"),
+            ("twitter_bearer", "Twitter Bearer Token"),
+        ]
+        for provider_key, provider_name in third_party_providers:
+            key = cls.get_api_key(provider_key)
+            if key:
+                masked = cls.mask_api_key(key)
+                valid = "✅" if cls.is_api_key_valid_format(provider_key) else "⚠️"
+                summary.append(f"  {valid} {provider_name:20s}: {masked}")
+            else:
+                summary.append(f"  ⚪ {provider_name:20s}: Not configured (optional)")
         
         summary.append("")
         summary.append(f"🛡️ Rate Limiting: {cls.RATE_LIMIT_REQUESTS} req/{cls.RATE_LIMIT_WINDOW}s")

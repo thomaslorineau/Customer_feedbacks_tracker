@@ -25,13 +25,17 @@ from typing import List, Optional
 import time
 import threading
 import uuid
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from apscheduler.schedulers.background import BackgroundScheduler
 import httpx
 from collections import defaultdict
 
+logger = logging.getLogger(__name__)
+
 from . import db
 from .scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd
+from .scraper import keyword_expander, linkedin
 from .analysis import sentiment
 from .analysis import country_detection
 
@@ -576,8 +580,16 @@ def log_scraping(source: str, level: str, message: str, details: dict = None):
     print(f"{level_emoji} [{source}] {sanitized_message}")
 
 
-def _run_scrape_for_source(source: str, query: str, limit: int):
-    """Call the appropriate scraper and insert results into DB; return count added."""
+def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
+    """
+    Call the appropriate scraper and insert results into DB; return count added.
+    
+    Args:
+        source: Source name (x, github, stackoverflow, etc.)
+        query: Search query
+        limit: Maximum number of posts to fetch
+        use_keyword_expansion: Whether to expand keywords for better coverage
+    """
     mapper = {
         'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
         'github': lambda q, l: github.scrape_github_issues(q, limit=l),
@@ -589,19 +601,65 @@ def _run_scrape_for_source(source: str, query: str, limit: int):
     func = mapper.get(source)
     if func is None:
         return 0
-    try:
-        items = func(query, limit)
-    except Exception as e:
+    
+    # Expand keywords if enabled
+    queries_to_try = [query]
+    if use_keyword_expansion:
         try:
-            for job_id, info in JOBS.items():
-                if info.get('status') == 'running':
-                    db.append_job_error(job_id, f"{source}: {str(e)}")
-        except Exception:
-            pass
-        return 0
+            # Generate keyword variants (limit to avoid too many requests)
+            expanded = keyword_expander.expand_keywords([query])
+            # Limit to first 5 variants to avoid excessive requests
+            # Prioritize original query + most relevant variants
+            if len(expanded) > 1:
+                # Keep original first, then add up to 4 more variants
+                queries_to_try = [query] + expanded[1:5]
+                logger.info(f"[Keyword Expansion] Using {len(queries_to_try)} query variants for {source}: {queries_to_try[:3]}...")
+        except Exception as e:
+            logger.warning(f"[Keyword Expansion] Failed to expand keywords: {e}, using original query only")
+            queries_to_try = [query]
+    
+    # Scrape with each query variant and combine results
+    all_items = []
+    seen_urls = set()  # Deduplicate by URL across queries
+    
+    for query_variant in queries_to_try:
+        try:
+            # Distribute limit across queries
+            per_query_limit = max(limit // len(queries_to_try), 10)  # At least 10 per query
+            
+            items = func(query_variant, per_query_limit)
+            
+            # Deduplicate by URL
+            for item in items:
+                url = item.get('url', '')
+                if url and url not in seen_urls:
+                    all_items.append(item)
+                    seen_urls.add(url)
+                elif not url:
+                    # If no URL, add anyway to avoid losing data
+                    all_items.append(item)
+            
+            # If we have enough items, stop early
+            if len(all_items) >= limit:
+                break
+                
+        except Exception as e:
+            try:
+                for job_id, info in JOBS.items():
+                    if info.get('status') == 'running':
+                        db.append_job_error(job_id, f"{source} (query: {query_variant}): {str(e)}")
+            except Exception:
+                pass
+            # Continue with next query variant
+            continue
+    
+    # Limit to requested amount
+    all_items = all_items[:limit]
+    
+    # Insert into database
     added = 0
     duplicates = 0
-    for it in items:
+    for it in all_items:
         try:
             an = sentiment.analyze(it.get('content') or '')
             # Detect country
@@ -994,6 +1052,59 @@ async def scrape_mastodon_endpoint(query: str = "OVH", limit: int = 50):
     
     if skipped_duplicates > 0:
         logger.info(f"✓ Added {added} posts from Mastodon (skipped {skipped_duplicates} duplicates)")
+    return {'added': added}
+
+
+@app.post("/scrape/linkedin", response_model=ScrapeResult)
+async def scrape_linkedin_endpoint(query: str = "OVH", limit: int = 50):
+    """Scrape LinkedIn for posts about OVH (requires user's API credentials)."""
+    source_name = "LinkedIn"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    try:
+        items = linkedin.scrape_linkedin(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping LinkedIn: {e}")
+        import traceback
+        traceback.print_exc()
+        return ScrapeResult(added=0)
+    
+    added = 0
+    skipped_duplicates = 0
+    errors = 0
+    try:
+        for it in items:
+            try:
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                country = country_detection.detect_country_from_post(it)
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                }):
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                logger.warning(f"Error processing LinkedIn item: {e}")
+    except Exception as e:
+        logger.error(f"Error processing LinkedIn posts: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    log_scraping(source_name, "success" if added > 0 else "warning",
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
     return {'added': added}
 
 
@@ -2164,6 +2275,9 @@ async def get_config():
     google_key = os.getenv('GOOGLE_API_KEY')
     github_token = os.getenv('GITHUB_TOKEN')
     trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
+    linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
+    linkedin_client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
+    twitter_bearer = os.getenv('TWITTER_BEARER_TOKEN')
     provider = os.getenv('LLM_PROVIDER', 'openai').lower()
     environment = os.getenv('ENVIRONMENT', 'development')
     
@@ -2174,6 +2288,11 @@ async def get_config():
         if len(key) <= 8:
             return '••••••••'
         return f"{key[:4]}••••{key[-4:]}"
+    
+    # For LinkedIn, check if both credentials are configured
+    linkedin_configured = bool(linkedin_client_id and linkedin_client_secret)
+    linkedin_masked = mask_key(linkedin_client_id) if linkedin_client_id else None
+    linkedin_length = len(linkedin_client_id) if linkedin_client_id else 0
     
     return {
         "environment": environment,
@@ -2203,6 +2322,16 @@ async def get_config():
                 "configured": bool(trustpilot_key),
                 "masked": mask_key(trustpilot_key),
                 "length": len(trustpilot_key) if trustpilot_key else 0
+            },
+            "linkedin": {
+                "configured": linkedin_configured,
+                "masked": linkedin_masked,
+                "length": linkedin_length
+            },
+            "twitter": {
+                "configured": bool(twitter_bearer),
+                "masked": mask_key(twitter_bearer),
+                "length": len(twitter_bearer) if twitter_bearer else 0
             }
         },
         "rate_limiting": {
@@ -2279,12 +2408,22 @@ async def set_llm_config(payload: LLMConfigPayload):
 
 @app.post("/api/config/set-key")
 async def set_api_key(payload: dict):
-    """Set a generic API key (for Google, GitHub, Trustpilot, etc.)."""
+    """Set a generic API key (for Google, GitHub, Trustpilot, LinkedIn, Twitter, etc.)."""
     provider = payload.get('provider')
-    key = payload.get('key')
+    keys = payload.get('keys')  # For providers with multiple keys (e.g., LinkedIn)
+    key = payload.get('key')  # For single key providers
     
-    if not provider or not key:
-        raise HTTPException(status_code=400, detail="Provider and key are required")
+    if not provider:
+        raise HTTPException(status_code=400, detail="Provider is required")
+    
+    # Handle multiple keys (e.g., LinkedIn has CLIENT_ID and CLIENT_SECRET)
+    if keys and isinstance(keys, dict):
+        if not keys:
+            raise HTTPException(status_code=400, detail="At least one key is required")
+    elif key:
+        keys = {provider: key}
+    else:
+        raise HTTPException(status_code=400, detail="Key(s) are required")
     
     backend_path = Path(__file__).resolve().parents[1]
     env_path = backend_path / ".env"
@@ -2299,16 +2438,17 @@ async def set_api_key(payload: dict):
                     key_name, value = line.split("=", 1)
                     env_vars[key_name.strip()] = value.strip()
     
-    # Update the key
-    env_vars[provider] = key
-    os.environ[provider] = key
+    # Update the keys
+    for key_name, key_value in keys.items():
+        env_vars[key_name] = key_value
+        os.environ[key_name] = key_value
     
     # Write back to .env
     with open(env_path, "w", encoding="utf-8") as f:
         for key_name, value in env_vars.items():
             f.write(f"{key_name}={value}\n")
     
-    return {"success": True, "message": f"{provider} API key saved successfully"}
+    return {"success": True, "message": f"{provider} API key(s) saved successfully"}
 
 @app.post("/admin/set-ui-version")
 async def set_ui_version(payload: UIVersionPayload):

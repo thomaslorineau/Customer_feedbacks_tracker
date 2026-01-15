@@ -927,6 +927,10 @@
                 <span class="btn-text">⭐ G2 Crowd</span>
                 <span class="btn-spinner" style="display:none;"></span>
             </button>
+            <button id="btnScrapeLinkedIn" onclick="scrapeLinkedIn()">
+                <span class="btn-text">💼 LinkedIn</span>
+                <span class="btn-spinner" style="display:none;"></span>
+            </button>
             
             <!-- UTILITY BUTTONS -->
             <button onclick="cleanupDuplicates()" style="background:#f59e0b;" title="Remove duplicate posts (same URL or same content+author+source)">🔄 Remove Duplicates</button>
@@ -3706,7 +3710,7 @@
             
             let totalAdded = 0;
             let completedScrapers = 0;
-            const totalScrapers = 9; // X, StackOverflow, News, Reddit, Trustpilot, GitHub, OVH Forum, Mastodon, G2 Crowd
+            const totalScrapers = 10; // X, StackOverflow, News, Reddit, Trustpilot, GitHub, OVH Forum, Mastodon, G2 Crowd, LinkedIn
             
             try {
                 // Run all scrapers in parallel
@@ -3990,6 +3994,43 @@
                     })()
                 );
                 
+                // 10. LinkedIn Scraper
+                scraperPromises.push(
+                    (async () => {
+                        try {
+                            addLog('🔄 Starting LinkedIn scraper...', 'info');
+                            addLog(`💼 Searching for: ${keywords.join(', ')}`, 'info');
+                            addLog('💡 Note: LinkedIn requires API credentials (Client ID & Secret) configured in Settings', 'info');
+                            for (const keyword of keywords) {
+                                const response = await fetch(`${API_BASE}/scrape/linkedin`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ query: keyword, limit: 50 }),
+                                    signal: localAbortController.signal
+                                });
+                                if (response.ok) {
+                                    const result = await response.json();
+                                    totalAdded += result.added || 0;
+                                    if (result.added > 0) {
+                                        addLog(`✅ Successfully scraped ${result.added} posts from LinkedIn (keyword: ${keyword})`, 'success');
+                                    } else {
+                                        addLog(`⚠️ No posts found from LinkedIn (keyword: ${keyword}) - Check API credentials in Settings`, 'warning');
+                                    }
+                                } else {
+                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+                                    addLog(`❌ Error scraping LinkedIn (keyword: ${keyword}): ${errorData.detail}`, 'error');
+                                }
+                            }
+                            completedScrapers++;
+                            addLog(`✅ LinkedIn scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
+                        } catch (e) {
+                            if (e.name !== 'AbortError') {
+                                addLog(`❌ LinkedIn scraping failed: ${e.message}`, 'error');
+                            }
+                        }
+                    })()
+                );
+                
                 // Wait for all scrapers to complete
                 await Promise.all(scraperPromises);
                 
@@ -4205,6 +4246,83 @@
                 const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
                 addLog(`⏱️ Total time: ${totalTime}s`, 'info');
                 setButtonLoading('btnScrapeG2', false);
+                showCancelBtn(false);
+                currentAbortController = null;
+            }
+        }
+
+        async function scrapeLinkedIn() {
+            setButtonLoading('btnScrapeLinkedIn', true);
+            const keywords = loadKeywords();
+            if (!keywords || keywords.length === 0) {
+                console.log('No keywords configured - using defaults');
+                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+            }
+            
+            const combinedQuery = keywords.join(' ');
+            
+            const gallery = document.getElementById('gallery');
+            gallery.innerHTML = '';
+            showCancelBtn(true);
+            currentAbortController = new AbortController();
+            
+            addLog('🔄 Starting LinkedIn scraper...', 'info');
+            addLog(`🔍 Query: "${combinedQuery}"`, 'info');
+            addLog(`📊 Limit: 50 posts`, 'info');
+            addLog('💡 Note: LinkedIn requires API credentials (Client ID & Secret) configured in Settings', 'info');
+            addLog('⏳ Fetching posts...', 'info');
+            
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch(`${API_BASE}/scrape/linkedin?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
+                    method: 'POST',
+                    signal: currentAbortController.signal
+                });
+                
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+                addLog(`⏱️ Request completed in ${elapsed}s`, 'info');
+                addLog(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`📦 Items returned by scraper: ${data.added}`, data.added > 0 ? 'success' : 'warning');
+                    
+                    if (data.added === 0) {
+                        addLog('⚠️ No posts found. Possible reasons:', 'warning');
+                        addLog('   • LinkedIn API credentials not configured (check Settings)', 'info');
+                        addLog('   • LinkedIn API v2 has limited search capabilities', 'info');
+                        addLog('   • No posts match the search criteria', 'info');
+                        addLog('   • Check backend logs for detailed error messages', 'info');
+                        addLog('   • See docs/guides/LINKEDIN_API_SETUP.md for setup instructions', 'info');
+                    } else {
+                        addLog(`✅ Successfully scraped ${data.added} posts from LinkedIn`, 'success');
+                    }
+                    
+                    showToast(`${data.added} new posts from LinkedIn`, data.added > 0 ? 'success' : 'warning');
+                    await loadPostsFromDB();
+                    renderGallery();
+                } else {
+                    addLog(`❌ API Error: ${data.detail || 'Unknown error'}`, 'error');
+                    addLog(`📋 Error details: ${JSON.stringify(data, null, 2)}`, 'error');
+                    showToast('Error scraping LinkedIn', 'error');
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') {
+                    addLog(`❌ Network/Request Error: ${e.message}`, 'error');
+                    addLog(`📋 Error type: ${e.name}`, 'error');
+                    if (e.stack) {
+                        addLog(`📋 Stack trace: ${e.stack.substring(0, 200)}...`, 'error');
+                    }
+                    showToast('Error scraping LinkedIn', 'error');
+                } else {
+                    addLog('⛔ Scraping cancelled by user', 'info');
+                }
+            } finally {
+                const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                addLog(`⏱️ Total time: ${totalTime}s`, 'info');
+                setButtonLoading('btnScrapeLinkedIn', false);
                 showCancelBtn(false);
                 currentAbortController = null;
             }

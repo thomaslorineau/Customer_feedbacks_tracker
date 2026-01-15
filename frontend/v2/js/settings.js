@@ -117,6 +117,29 @@ function renderAPIKeys() {
             icon: '⭐',
             description: 'API access for Trustpilot review scraping',
             docsUrl: 'https://developers.trustpilot.com/'
+        },
+        { 
+            id: 'linkedin', 
+            name: 'LinkedIn', 
+            icon: '💼',
+            description: 'Scrape LinkedIn posts (requires your own API credentials)',
+            docsUrl: 'https://www.linkedin.com/developers/apps',
+            requiresAuth: true,
+            fields: [
+                { name: 'LINKEDIN_CLIENT_ID', label: 'Client ID' },
+                { name: 'LINKEDIN_CLIENT_SECRET', label: 'Client Secret' }
+            ]
+        },
+        { 
+            id: 'twitter', 
+            name: 'Twitter/X API', 
+            icon: '🐦',
+            description: 'Official Twitter API (requires your own Bearer Token)',
+            docsUrl: 'https://developer.twitter.com/en/portal/dashboard',
+            requiresAuth: true,
+            fields: [
+                { name: 'TWITTER_BEARER_TOKEN', label: 'Bearer Token' }
+            ]
         }
     ];
     
@@ -190,24 +213,50 @@ function renderAPIKeys() {
                 ` : `
                     <div class="api-key-form-container">
                         <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider.id}');">
-                            <div class="form-group">
-                                <label for="key-input-${provider.id}">API Key</label>
-                                <div class="input-with-button">
-                                    <input 
-                                        type="password" 
-                                        id="key-input-${provider.id}"
-                                        class="api-key-input"
-                                        placeholder="Enter your ${provider.name} API key"
-                                        autocomplete="off"
-                                    />
-                                    <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}')">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                            <circle cx="12" cy="12" r="3"/>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
+                            ${provider.fields && provider.fields.length > 1 ? 
+                                // Multiple fields (e.g., LinkedIn)
+                                provider.fields.map(field => `
+                                    <div class="form-group">
+                                        <label for="key-input-${provider.id}-${field.name}">${field.label}</label>
+                                        <div class="input-with-button">
+                                            <input 
+                                                type="password" 
+                                                id="key-input-${provider.id}-${field.name}"
+                                                class="api-key-input"
+                                                placeholder="Enter your ${field.label}"
+                                                autocomplete="off"
+                                            />
+                                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}-${field.name}')">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('') :
+                                // Single field (default)
+                                `
+                                    <div class="form-group">
+                                        <label for="key-input-${provider.id}">API Key</label>
+                                        <div class="input-with-button">
+                                            <input 
+                                                type="password" 
+                                                id="key-input-${provider.id}"
+                                                class="api-key-input"
+                                                placeholder="Enter your ${provider.name} API key"
+                                                autocomplete="off"
+                                            />
+                                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}')">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `
+                            }
                             <div class="form-actions">
                                 <button type="submit" class="btn-save-key" id="save-btn-${provider.id}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -413,12 +462,47 @@ function toggleInputVisibility(inputId) {
 
 // Save API Key
 async function saveAPIKey(provider) {
-    const input = document.getElementById(`key-input-${provider}`);
     const saveBtn = document.getElementById(`save-btn-${provider}`);
-    const apiKey = input.value.trim();
     
-    if (!apiKey) {
-        showError('Please enter an API key');
+    // Find provider config
+    const providers = [
+        { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
+        { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
+        { id: 'google', fields: [{ name: 'GOOGLE_API_KEY' }] },
+        { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
+        { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
+        { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
+        { id: 'twitter', fields: [{ name: 'TWITTER_BEARER_TOKEN' }] }
+    ];
+    
+    const providerConfig = providers.find(p => p.id === provider);
+    if (!providerConfig) {
+        showError('Unknown provider');
+        return;
+    }
+    
+    // Collect values from all fields
+    const values = {};
+    let hasEmptyField = false;
+    
+    for (const field of providerConfig.fields) {
+        const inputId = providerConfig.fields.length > 1 
+            ? `key-input-${provider}-${field.name}`
+            : `key-input-${provider}`;
+        const input = document.getElementById(inputId);
+        if (!input) {
+            showError(`Input field not found for ${field.name}`);
+            return;
+        }
+        const value = input.value.trim();
+        if (!value) {
+            hasEmptyField = true;
+        }
+        values[field.name] = value;
+    }
+    
+    if (hasEmptyField) {
+        showError('Please fill in all required fields');
         return;
     }
     
@@ -427,39 +511,26 @@ async function saveAPIKey(provider) {
     saveBtn.innerHTML = '<span class="loading-spinner"></span> Saving...';
     
     try {
-        // Map provider IDs to API key names
-        const keyMapping = {
-            'openai': 'OPENAI_API_KEY',
-            'anthropic': 'ANTHROPIC_API_KEY',
-            'google': 'GOOGLE_API_KEY',
-            'github': 'GITHUB_TOKEN',
-            'trustpilot': 'TRUSTPILOT_API_KEY'
-        };
-        
-        const envKeyName = keyMapping[provider];
-        if (!envKeyName) {
-            throw new Error('Unknown provider');
-        }
-        
         // Prepare payload based on provider
         let payload = {};
         if (provider === 'openai') {
-            payload = { openai_api_key: apiKey };
+            payload = { openai_api_key: values.OPENAI_API_KEY };
         } else if (provider === 'anthropic') {
-            payload = { anthropic_api_key: apiKey };
+            payload = { anthropic_api_key: values.ANTHROPIC_API_KEY };
         } else {
             // For other providers, use a generic endpoint
+            // Send all fields as a single request
             const response = await fetch(`${API_BASE_URL}/api/config/set-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider: envKeyName, key: apiKey })
+                body: JSON.stringify({ provider: provider, keys: values })
             });
             
             if (!response.ok) throw new Error('Failed to save API key');
             
             // Reload configuration
             await loadConfiguration();
-            showSuccess(`${provider.toUpperCase()} API key saved successfully!`);
+            showSuccess(`${provider.toUpperCase()} API key(s) saved successfully!`);
             return;
         }
         

@@ -7,23 +7,54 @@
 
 ---
 
-## 🚀 Démarrage rapide
+## 🚀 Démarrage rapide (3 étapes simples)
 
+### ✅ Étape 1 : Vérifier Python
+Ouvrir un terminal et taper :
 ```bash
-# Windows (PowerShell)
-.\scripts\start\start_server.ps1
+python --version
+```
+**Doit afficher :** `Python 3.11.x` ou supérieur  
+**Si erreur :** Installer depuis [python.org](https://www.python.org/downloads/) (⚠️ cocher "Add Python to PATH")
 
-# Linux/Mac
-./scripts/start/start.sh
-
-# Ou manuellement
+### ✅ Étape 2 : Installer les dépendances
+```bash
 cd backend
-python -m uvicorn app.main:app --reload --port 8000
+pip install -r requirements.txt
+```
+⏱️ *Cela prend 2-5 minutes (téléchargement des bibliothèques)*
+
+### ✅ Étape 3 : Démarrer l'application
+
+**Windows :**
+```powershell
+.\scripts\start\start_server.ps1
 ```
 
-Puis ouvrir: **http://localhost:8000**
+**Linux/Mac :**
+```bash
+./scripts/start/start.sh
+```
 
-📖 **Guide complet:** [docs/guides/QUICK_START.md](docs/guides/QUICK_START.md)
+**Vous devriez voir :** `INFO: Uvicorn running on http://127.0.0.1:8000`
+
+### 🌐 Accéder à l'application
+
+1. **Ouvrir votre navigateur** (Chrome, Firefox, Edge...)
+2. **Aller à :** http://localhost:8000
+3. **C'est prêt !** 🎉
+
+### 🧪 Tester rapidement
+
+1. Cliquer sur **"Feedbacks Collection"** dans le menu
+2. Cliquer sur **"Scrape Reddit"** (ou un autre bouton)
+3. Attendre quelques secondes
+4. Voir le résultat dans les logs ou le dashboard
+
+---
+
+📖 **Guide détaillé pour débutants (avec dépannage) :** [docs/guides/QUICK_START_SIMPLE.md](docs/guides/QUICK_START_SIMPLE.md)  
+📖 **Guide complet avec tests avancés :** [docs/guides/QUICK_START.md](docs/guides/QUICK_START.md)
 
 ---
 

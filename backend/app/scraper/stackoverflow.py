@@ -17,6 +17,7 @@ def scrape_stackoverflow(query="OVH", limit=30):
     """
     Scrape Stack Overflow for questions about OVH.
     Uses official Stack Exchange API - free and no authentication needed.
+    Implements pagination to fetch multiple pages of results.
     Retries automatically on network errors.
     Returns a list of post dictionaries ready for insertion.
     """
@@ -24,54 +25,75 @@ def scrape_stackoverflow(query="OVH", limit=30):
     
     for attempt in range(MAX_RETRIES):
         try:
-            params = {
-                "site": "stackoverflow",
-                "intitle": query,
-                "sort": "creation",
-                "order": "desc",
-                "pagesize": limit,
-                "filter": "withbody",  # Includes body content
-            }
+            all_posts = []
+            page = 1
+            max_pages = (limit // 30) + 1  # 30 items per page max
+            pagesize = min(30, limit)  # Stack Exchange API max is 100, but we use 30 for better rate limit management
             
-            response = httpx.get(
-                f"{STACKOVERFLOW_API}/search/advanced",
-                params=params,
-                headers=DEFAULT_HEADERS,
-                timeout=Timeout(15.0, connect=5.0)
-            )
-            response.raise_for_status()
-            data = response.json()
+            while len(all_posts) < limit and page <= max_pages:
+                params = {
+                    "site": "stackoverflow",
+                    "intitle": query,
+                    "sort": "creation",
+                    "order": "desc",
+                    "pagesize": pagesize,
+                    "page": page,  # Pagination parameter
+                    "filter": "withbody",  # Includes body content
+                }
+                
+                logger.info(f"[STACKOVERFLOW] Fetching page {page} for query: {query}")
+                
+                response = httpx.get(
+                    f"{STACKOVERFLOW_API}/search/advanced",
+                    params=params,
+                    headers=DEFAULT_HEADERS,
+                    timeout=Timeout(15.0, connect=5.0)
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                if not data.get("items"):
+                    if page == 1:
+                        logger.warning(f"[STACKOVERFLOW] No questions found for query: {query}")
+                        logger.info(f"[STACKOVERFLOW] API response: {data}")
+                    break  # No more results
+                
+                for item in data["items"]:
+                    if len(all_posts) >= limit:
+                        break
+                    try:
+                        # Extract relevant info
+                        post = {
+                            "source": "Stack Overflow",
+                            "author": item.get("owner", {}).get("display_name", "Anonymous"),
+                            "content": (item.get("title", "") + "\n" + (item.get("body", "") or ""))[:500],
+                            "url": item.get("link", ""),
+                            "created_at": datetime.fromtimestamp(item.get("creation_date", 0)).isoformat() if item.get("creation_date") else datetime.now().isoformat(),
+                            "sentiment_score": 0.0,  # Will be analyzed in main.py
+                            "sentiment_label": "neutral",
+                        }
+                        all_posts.append(post)
+                        logger.debug(f"[OK] Stack Overflow: {post['author']} - {post['content'][:30]}")
+                    except Exception as e:
+                        logger.warning(f"Could not parse SO question: {e}")
+                        continue
+                
+                # Check if there are more pages
+                if not data.get("has_more", False):
+                    logger.info(f"[STACKOVERFLOW] No more pages available (has_more=False)")
+                    break
+                
+                page += 1
+                # Respect rate limits: 300 requests per day, so 1 second delay between pages
+                if len(all_posts) < limit:
+                    time.sleep(1)
             
-            if not data.get("items"):
-                logger.warning(f"[STACKOVERFLOW] No questions found for query: {query}")
-                logger.info(f"[STACKOVERFLOW] API response: {data}")
-                return []  # Return empty list instead of raising exception
-            
-            posts = []
-            for item in data["items"][:limit]:
-                try:
-                    # Extract relevant info
-                    post = {
-                        "source": "Stack Overflow",
-                        "author": item.get("owner", {}).get("display_name", "Anonymous"),
-                        "content": (item.get("title", "") + "\n" + (item.get("body", "") or ""))[:500],
-                        "url": item.get("link", ""),
-                        "created_at": datetime.fromtimestamp(item.get("creation_date", 0)).isoformat() if item.get("creation_date") else datetime.now().isoformat(),
-                        "sentiment_score": 0.0,  # Will be analyzed in main.py
-                        "sentiment_label": "neutral",
-                    }
-                    posts.append(post)
-                    logger.info(f"[OK] Stack Overflow: {post['author']} - {post['content'][:30]}")
-                except Exception as e:
-                    logger.warning(f"Could not parse SO question: {e}")
-                    continue
-            
-            if not posts:
+            if not all_posts:
                 logger.warning("[STACKOVERFLOW] No valid questions could be parsed from API response")
                 return []
             
-            logger.info(f"[STACKOVERFLOW] Successfully scraped {len(posts)} questions")
-            return posts
+            logger.info(f"[STACKOVERFLOW] Successfully scraped {len(all_posts)} questions from {page - 1} page(s)")
+            return all_posts
         
         except (httpx.TimeoutError, httpx.ConnectError, httpx.NetworkError) as e:
             last_error = e
