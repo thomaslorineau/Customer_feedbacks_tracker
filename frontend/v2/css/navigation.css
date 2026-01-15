@@ -30,9 +30,11 @@
     text-decoration: none;
 }
 
-.nav-logo svg {
+.nav-logo svg,
+.nav-logo img {
     width: 32px;
     height: 32px;
+    object-fit: contain;
 }
 
 .nav-tabs {
@@ -91,6 +93,22 @@ body.v1-page {
 /* For V2 */
 .dashboard-header {
     margin-top: 0;
+}
+
+/* Beta badge in nav */
+.beta-badge {
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: 1px solid #b45309;
+    border-radius: 6px;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: white;
+    cursor: default;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
 }
 
 /* Version badge in nav */

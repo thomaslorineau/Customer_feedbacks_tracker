@@ -792,7 +792,8 @@
     <nav class="nav-menu">
         <div class="nav-menu-left">
             <a href="/scraping" class="nav-logo">
-                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                <img src="https://www.ovh.com/fr/images/logo/ovhcloud/ovhcloud-logo.svg" alt="OVHcloud" class="ovh-logo" style="width: 32px; height: 32px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="display: none;">
                     <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
                     <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
                     <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
@@ -828,6 +829,7 @@
             </div>
         </div>
         <div class="nav-menu-right">
+            <span class="beta-badge" title="Application en version beta">BETA</span>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
         </div>
@@ -837,14 +839,12 @@
         <header>
             <div class="header-logo-container">
                 <div class="ovh-logo-main">
-                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Circle background -->
+                    <img src="https://www.ovh.com/fr/images/logo/ovhcloud/ovhcloud-logo.svg" alt="OVHcloud" style="width: 60px; height: 60px; object-fit: contain;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                        <!-- Fallback SVG if image fails to load -->
                         <circle cx="100" cy="100" r="90" fill="#0099ff"/>
-                        <!-- V shape / Checkmark (left part) -->
                         <path d="M 50 100 L 75 130 L 100 100" stroke="white" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                        <!-- H / Lightning bolt integrated (right part) -->
                         <path d="M 100 70 L 100 100 M 100 100 L 130 100 M 130 100 L 130 130" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                        <!-- Additional detail for H -->
                         <path d="M 100 100 L 130 100" stroke="white" stroke-width="14" stroke-linecap="round"/>
                     </svg>
                 </div>
