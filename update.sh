@@ -85,12 +85,19 @@ fi
 # Sauvegarder les scripts locaux qui peuvent être modifiés
 if [ -f "backup.sh" ]; then
     cp backup.sh "$BACKUP_DIR/backup.sh.backup"
+    cp backup.sh "$BACKUP_DIR/backup.sh.local"
     success "Script backup.sh sauvegardé"
 fi
 
 if [ -f "configure_cors.sh" ]; then
     cp configure_cors.sh "$BACKUP_DIR/configure_cors.sh.backup"
+    cp configure_cors.sh "$BACKUP_DIR/configure_cors.sh.local"
     success "Script configure_cors.sh sauvegardé"
+fi
+
+if [ -f "update.sh" ]; then
+    cp update.sh "$BACKUP_DIR/update.sh.local"
+    success "Script update.sh sauvegardé"
 fi
 
 # Sauvegarder aussi la base de données (juste pour sécurité, on ne la restaure pas)
@@ -156,17 +163,28 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
     echo ""
 fi
 
-# Résoudre les conflits avec data.db et fichiers de config avant le pull si nécessaire
-CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh"
+# Forcer la résolution des fichiers de config AVANT le pull
+# On remet ces fichiers à la version HEAD pour permettre le pull, puis on les restaurera après
+CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
 for file in $CONFIG_FILES; do
-    if git status --porcelain 2>/dev/null | grep -q "$file"; then
-        info "Résolution préventive des conflits avec $file (conservation de la version locale)..."
-        git checkout --ours "$file" 2>/dev/null || true
+    if [ ! -f "$file" ]; then
+        continue
+    fi
+    # Vérifier s'il y a des modifications locales
+    if ! git diff --quiet "$file" 2>/dev/null || ! git diff --cached --quiet "$file" 2>/dev/null; then
+        info "Mise en pause temporaire des modifications locales de $file (pour permettre le pull)..."
+        # S'assurer qu'on a bien sauvegardé la version locale
+        local_backup="$BACKUP_DIR/$(basename $file).local"
+        if [ ! -f "$local_backup" ]; then
+            cp "$file" "$local_backup" 2>/dev/null || true
+        fi
+        # Remettre à la version HEAD pour permettre le pull
+        git checkout HEAD -- "$file" 2>/dev/null || true
         git add "$file" 2>/dev/null || true
     fi
 done
 
-# Faire le pull en permettant les conflits avec nos fichiers de config
+# Faire le pull
 if git pull origin master; then
     success "Code mis à jour"
     
@@ -209,6 +227,13 @@ else
     if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
         cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
     fi
+    # Restaurer aussi les versions locales si elles existent
+    for file in backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh; do
+        local_backup="$BACKUP_DIR/$(basename $file).local"
+        if [ -f "$local_backup" ]; then
+            cp "$local_backup" "$file" 2>/dev/null || true
+        fi
+    done
     exit 1
 fi
 
@@ -249,6 +274,16 @@ if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
     cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
     success "Script configure_cors.sh restauré"
 fi
+
+# Restaurer les versions locales des fichiers de config (priorité sur les backups)
+CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
+for file in $CONFIG_FILES; do
+    local_backup="$BACKUP_DIR/$(basename $file).local"
+    if [ -f "$local_backup" ]; then
+        cp "$local_backup" "$file"
+        success "Version locale de $file restaurée"
+    fi
+done
 
 # Nettoyer la sauvegarde
 rm -rf "$BACKUP_DIR"
