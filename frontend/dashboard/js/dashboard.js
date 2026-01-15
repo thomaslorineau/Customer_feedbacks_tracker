@@ -392,6 +392,7 @@ function updateDashboard() {
     updateProductDistribution();
     updatePostsList();
     updateCriticalPostsButton();
+    updatePositiveSatisfactionKPI();
     // Charts will be updated by charts.js
 }
 
@@ -940,6 +941,37 @@ function clearCriticalFilter() {
     
     // Update dashboard
     updateDashboard();
+}
+
+// Update Positive Satisfaction KPI
+function updatePositiveSatisfactionKPI() {
+    if (!state) return;
+    
+    const posts = state.filteredPosts || [];
+    const total = posts.length;
+    
+    if (total === 0) {
+        const kpiValue = document.getElementById('positiveSatisfactionValue');
+        if (kpiValue) kpiValue.textContent = '--%';
+        return;
+    }
+    
+    const positive = posts.filter(p => p.sentiment_label === 'positive').length;
+    const percentage = Math.round((positive / total) * 100);
+    
+    const kpiValue = document.getElementById('positiveSatisfactionValue');
+    if (kpiValue) {
+        kpiValue.textContent = `${percentage}%`;
+        
+        // Update color based on percentage
+        if (percentage >= 70) {
+            kpiValue.style.color = '#10b981'; // Green
+        } else if (percentage >= 50) {
+            kpiValue.style.color = '#f59e0b'; // Orange
+        } else {
+            kpiValue.style.color = '#ef4444'; // Red
+        }
+    }
 }
 
 // Generate PowerPoint Report
