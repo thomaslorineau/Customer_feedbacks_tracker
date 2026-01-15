@@ -2810,11 +2810,21 @@ async def generate_powerpoint_report_endpoint(request: PowerPointReportRequest):
                     try:
                         created_at = p.get('created_at', '')
                         if created_at:
-                            dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                            if dt.timestamp() >= (now - 48 * 3600):
+                            # Handle different date formats
+                            try:
+                                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                            except:
+                                # Try parsing with strptime as fallback
+                                try:
+                                    dt = datetime.datetime.strptime(created_at.split('T')[0], '%Y-%m-%d')
+                                except:
+                                    continue
+                            post_timestamp = dt.timestamp()
+                            if post_timestamp >= (now - 48 * 3600):
                                 recent_posts.append(p)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.debug(f"Error parsing post date: {e}")
+                        continue
                 
                 # Call recommended actions endpoint logic
                 actions_response = await get_recommended_actions(RecommendedActionRequest(
