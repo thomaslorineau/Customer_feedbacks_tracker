@@ -172,6 +172,23 @@
             color: var(--bg-primary);
         }
 
+        .version-badge {
+            padding: 4px 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: default;
+            user-select: none;
+        }
+
+        .version-badge:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
         .version-btn {
             padding: 15px 30px;
             border: none;
@@ -1288,9 +1305,9 @@
                     <strong>💡 Tip:</strong> Use specific product names for better results. Keywords are saved automatically.
                 </p>
 
-                <h3>🤖 LLM Configuration</h3>
+                <h3>⚙️ Settings</h3>
                 <p>
-                    Configure your LLM API keys to enable AI-powered features:
+                    Configure your API keys and settings in the Settings page:
                 </p>
                 <ul>
                     <li><strong>OpenAI API Key:</strong> Get it from <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--accent-primary);">platform.openai.com</a></li>
@@ -1298,7 +1315,7 @@
                     <li><strong>Provider Selection:</strong> Choose between OpenAI (GPT-4o-mini) or Anthropic (Claude 3 Haiku)</li>
                 </ul>
                 <p style="margin-top: 10px;">
-                    <strong>Features enabled with LLM:</strong> Recommended Actions, Improvement Ideas generation, and intelligent insights.
+                    <strong>Features:</strong> API key configuration for OpenAI, Anthropic, Google, GitHub, and Trustpilot.
                 </p>
 
                 <h3>🔄 Scraping Operations</h3>
@@ -1360,7 +1377,7 @@
                     <ul style="margin: 0; padding-left: 20px;">
                         <li>Run scraping daily to build a comprehensive feedback history</li>
                         <li>Use the backlog feature to track critical issues</li>
-                        <li>Configure LLM keys to unlock AI-powered insights</li>
+                        <li>Configure API keys in Settings to unlock AI-powered insights</li>
                         <li>Filter by product to focus on specific areas</li>
                         <li>Export data to CSV for external analysis</li>
                     </ul>
@@ -1587,8 +1604,32 @@
             });
         }
         
+        // Load and display version
+        async function loadVersion() {
+            try {
+                const response = await fetch(`${API_BASE}/api/version`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const versionBadge = document.getElementById('versionBadge');
+                    if (versionBadge) {
+                        versionBadge.textContent = `v${data.version}`;
+                        versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load version:', error);
+            }
+        }
+        
         // Initialize theme on page load
         initializeTheme();
+        
+        // Load version on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadVersion);
+        } else {
+            loadVersion();
+        }
         
         // Make toggleTheme available globally
         window.toggleTheme = toggleTheme;
