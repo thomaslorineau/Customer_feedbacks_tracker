@@ -1,5 +1,8 @@
 # Script de démarrage du serveur OVH Complaints Tracker
-$BackendDir = Join-Path $PSScriptRoot ".." ".." "backend"
+
+# Répertoire du backend (2 niveaux au-dessus du dossier courant du script)
+$BackendDir = Resolve-Path "$PSScriptRoot/../../backend"
+
 Set-Location $BackendDir
 Write-Host "✅ Répertoire: $(Get-Location)" -ForegroundColor Green
 Write-Host "🚀 Démarrage du serveur sur http://localhost:8000..." -ForegroundColor Cyan

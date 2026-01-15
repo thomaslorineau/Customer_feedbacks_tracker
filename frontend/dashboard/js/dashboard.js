@@ -932,6 +932,8 @@ function openCriticalPosts() {
     // }
     
     // Highlight the section briefly (if needed)
+    const postsSection = document.querySelector('.panel-bottom');
+    if (postsSection) {
         postsSection.style.transition = 'box-shadow 0.3s ease';
         postsSection.style.boxShadow = '0 0 20px rgba(0, 153, 255, 0.5)';
         setTimeout(() => {
@@ -1100,5 +1102,5 @@ window.scrapeAll = scrapeAll;
 window.openPost = openPost;
 window.clearCriticalFilter = clearCriticalFilter;
 
-export { updateDashboard, updateProductDistribution, updatePostsList };
+export { updateProductDistribution, updatePostsList };
 
