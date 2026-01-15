@@ -51,58 +51,102 @@ body {
     transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Prominent Search Section */
+/* Prominent Search Section - Ultra Visible */
 .search-section {
     background: var(--bg-card);
-    border-radius: 16px;
-    padding: 32px 40px;
-    margin: 24px 40px;
-    box-shadow: 0 4px 16px var(--shadow);
-    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 40px 48px;
+    margin: 32px auto;
+    max-width: 1000px;
+    box-shadow: 
+        0 8px 32px rgba(0, 0, 0, 0.12),
+        0 4px 16px rgba(0, 153, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    border: 2px solid var(--accent-primary);
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
     align-items: center;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle gradient background for search section */
+.search-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary), var(--accent-primary));
+    background-size: 200% 100%;
+    animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0%, 100% { background-position: 0% 0%; }
+    50% { background-position: 100% 0%; }
 }
 
 .search-container-prominent {
     position: relative;
     width: 100%;
-    max-width: 800px;
+    max-width: 900px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
 }
 
 .search-icon-large {
     position: absolute;
-    left: 20px;
+    left: 24px;
     top: 50%;
     transform: translateY(-50%);
-    width: 24px;
-    height: 24px;
-    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    color: var(--accent-primary);
     pointer-events: none;
-    z-index: 1;
+    z-index: 2;
+    transition: all 0.3s ease;
 }
 
 .search-input-prominent {
     width: 100%;
-    padding: 18px 24px 18px 60px;
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
+    padding: 22px 28px 22px 72px;
+    border: 3px solid var(--accent-primary);
+    border-radius: 16px;
     background: var(--input-bg);
     color: var(--text-primary);
-    font-size: 1.1em;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    font-size: 1.2em;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 
+        0 4px 20px rgba(0, 153, 255, 0.15),
+        0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.search-input-prominent::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+    opacity: 0.7;
 }
 
 .search-input-prominent:focus {
     outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    border-color: var(--accent-secondary);
+    box-shadow: 
+        0 0 0 6px rgba(0, 153, 255, 0.2),
+        0 8px 32px rgba(0, 153, 255, 0.25),
+        0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-3px) scale(1.01);
+    background: var(--bg-primary);
+}
+
+.search-input-prominent:focus + .search-info-tooltip .search-icon-large,
+.search-input-prominent:focus ~ .search-icon-large {
+    color: var(--accent-secondary);
+    transform: translateY(-50%) scale(1.1);
 }
 
 .search-actions {
@@ -246,7 +290,7 @@ body {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto auto auto 1fr;
     gap: 24px;
-    padding: 32px 48px;
+    padding: 24px 48px 32px 48px;
     max-width: 1800px;
     margin: 0 auto;
     /* Enhanced spacing by modern-enhancements.css */
@@ -318,7 +362,7 @@ body {
 
 .panel-date-slicer {
     grid-column: 1 / 3;
-    grid-row: 1;
+    grid-row: 2;
     background: var(--bg-card);
     border-radius: 16px;
     padding: 20px 28px;
@@ -430,7 +474,7 @@ body {
 
 .panel-whats-happening {
     grid-column: 1 / 3;
-    grid-row: 2;
+    grid-row: 3;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 20px;
@@ -440,7 +484,7 @@ body {
 
 .panel-left {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 4;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
@@ -455,7 +499,7 @@ body {
 
 .panel-right {
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 4;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
@@ -469,7 +513,7 @@ body {
 
 .panel-sentiment {
     grid-column: 1;
-    grid-row: 4;
+    grid-row: 5;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
@@ -483,7 +527,7 @@ body {
 
 .panel-source {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 5;
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
