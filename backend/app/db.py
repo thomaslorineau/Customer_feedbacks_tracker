@@ -45,6 +45,10 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_posts_source_date 
         ON posts(source, created_at DESC)
     ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_url 
+        ON posts(url)
+    ''')
     
     # Saved search queries / keywords
     c.execute('''
