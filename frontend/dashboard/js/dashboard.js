@@ -714,11 +714,11 @@ function sortPosts(sortValue) {
     // Force update the posts list with the new sort
     updatePostsList();
     
-    // Scroll to posts section to show the change
-    const postsSection = document.querySelector('.panel-bottom');
-    if (postsSection) {
-        postsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    // Don't scroll - keep user on current view
+    // const postsSection = document.querySelector('.panel-bottom');
+    // if (postsSection) {
+    //     postsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // }
 }
 
 function filterByProduct(product) {
