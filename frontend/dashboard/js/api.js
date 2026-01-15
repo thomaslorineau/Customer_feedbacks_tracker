@@ -13,16 +13,20 @@ export class API {
         let baseURL = `${window.location.protocol}//${hostname}`;
         
         // If port is specified and not standard, use it
-        if (port && port !== '80' && port !== '443') {
+        if (port && port !== '80' && port !== '443' && port !== '') {
             baseURL += `:${port}`;
         } else if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
             // For external access, use port 11840
             baseURL += ':11840';
         } else {
-            // Local development
-            baseURL += ':8000';
+            // Local development - use same port as current page
+            // If no port specified, try 8000
+            if (!port || port === '') {
+                baseURL += ':8000';
+            }
         }
         
+        console.log('API Base URL:', baseURL);
         return baseURL;
     }
     

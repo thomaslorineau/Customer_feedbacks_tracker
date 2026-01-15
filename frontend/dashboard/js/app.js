@@ -135,12 +135,19 @@ class App {
     
     async loadPosts() {
         try {
-            console.log('App: Loading posts...');
+            console.log('App: Loading posts from API...');
+            console.log('App: API Base URL:', this.api.baseURL);
             const posts = await this.api.getPosts(1000, 0);
             console.log('App: Posts loaded:', posts?.length || 0, 'posts');
+            console.log('App: First post sample:', posts?.[0]);
             
             if (!posts || posts.length === 0) {
                 console.warn('App: No posts found in database');
+                // Show empty state message
+                const postsList = document.getElementById('postsList');
+                if (postsList) {
+                    postsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-secondary);">No posts found. Go to Feedbacks Collection to scrape some data.</div>';
+                }
                 return;
             }
             
@@ -159,6 +166,12 @@ class App {
             }, 300);
         } catch (error) {
             console.error('App: Failed to load posts:', error);
+            console.error('App: Error details:', error.message, error.stack);
+            // Show error message
+            const postsList = document.getElementById('postsList');
+            if (postsList) {
+                postsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--error);">Error loading data: ${error.message}<br>Check console for details.</div>`;
+            }
         }
     }
 }

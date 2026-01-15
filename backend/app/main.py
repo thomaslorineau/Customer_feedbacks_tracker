@@ -92,7 +92,7 @@ if improvements_path.exists():
 
 # Enable CORS for frontend - restrict to specific ports for security
 import os
-cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080').split(',')
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8080,http://127.0.0.1:8000').split(',')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
