@@ -2273,10 +2273,13 @@ def generate_recommended_actions_fallback(
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback posts using LLM."""
     try:
-        # Check if LLM is available
+        # Check if LLM is available (check BEFORE calling the function)
         api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
         llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-        llm_available = bool(api_key) or llm_provider not in ['openai', 'anthropic']
+        # LLM is available if we have an API key OR if provider is not openai/anthropic (local LLM)
+        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic'])
+        
+        logger.info(f"[Recommended Actions] LLM check: api_key={bool(api_key)}, provider={llm_provider}, llm_available={llm_available}")
         
         actions = await generate_recommended_actions_with_llm(
             request.posts, 
@@ -2284,6 +2287,11 @@ async def get_recommended_actions(request: RecommendedActionRequest):
             request.stats, 
             request.max_actions
         )
+        
+        # If we have API key but got empty actions, it might be an error - but still mark as available
+        if llm_available and not actions:
+            logger.warning(f"[Recommended Actions] LLM available but no actions generated. This might indicate an error or no relevant actions.")
+        
         return RecommendedActionsResponse(actions=actions, llm_available=llm_available)
     except Exception as e:
         logger.error(f"Error generating recommended actions: {e}", exc_info=True)

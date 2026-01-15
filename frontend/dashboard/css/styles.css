@@ -370,6 +370,161 @@ body {
     color: #6b7280;
 }
 
+/* Modern Compact Date Slicer */
+.panel-date-slicer-modern {
+    grid-column: 1 / 3;
+    grid-row: 2;
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid var(--border-color);
+    margin-bottom: 0;
+}
+
+.date-slicer-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.date-slicer-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.date-label-compact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.date-icon-compact {
+    width: 16px;
+    height: 16px;
+    color: var(--accent-primary);
+    flex-shrink: 0;
+}
+
+.date-label-text {
+    font-size: 0.9em;
+}
+
+.date-inputs-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.date-input-compact {
+    padding: 8px 12px;
+    border: 1.5px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-primary);
+    font-size: 0.875em;
+    min-width: 140px;
+    max-width: 160px;
+    transition: all 0.2s ease;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.date-input-compact:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-card);
+}
+
+.date-input-compact:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+    background: var(--bg-card);
+}
+
+.date-separator-compact {
+    color: var(--text-muted);
+    font-size: 1.1em;
+    font-weight: 500;
+    flex-shrink: 0;
+    padding: 0 2px;
+}
+
+.btn-clear-dates-compact {
+    padding: 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.btn-clear-dates-compact svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-clear-dates-compact:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.btn-clear-dates-compact:active {
+    transform: scale(0.9);
+}
+
+.btn-clear-all-compact {
+    padding: 8px 14px;
+    border: 1.5px solid rgba(239, 68, 68, 0.3);
+    border-radius: 6px;
+    background: transparent;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 0.875em;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.btn-clear-all-compact svg {
+    width: 14px;
+    height: 14px;
+}
+
+.btn-clear-all-compact:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    transform: translateY(-1px);
+}
+
+.btn-clear-all-compact:active {
+    transform: translateY(0);
+}
+
+/* Legacy styles for backward compatibility */
 .panel-date-slicer {
     grid-column: 1 / 3;
     grid-row: 2;
@@ -379,135 +534,7 @@ body {
     box-shadow: 0 4px 12px var(--shadow);
     border: 1px solid var(--border-color);
     margin-bottom: 0;
-    /* Enhanced by modern-enhancements.css */
-}
-
-.date-slicer-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.date-slicer-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    font-size: 0.95em;
-}
-
-.date-slicer-hint {
-    font-size: 0.8em;
-    font-weight: 400;
-    color: var(--text-muted);
-    font-style: italic;
-    margin-left: 4px;
-}
-
-.date-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--accent-primary);
-}
-
-.date-slicer-inputs {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-    flex-wrap: wrap;
-}
-
-.date-input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-    flex: 1;
-    min-width: 160px;
-    max-width: 200px;
-}
-
-.date-input-icon {
-    position: absolute;
-    left: 12px;
-    width: 18px;
-    height: 18px;
-    color: var(--text-muted);
-    pointer-events: none;
-    z-index: 1;
-    transition: color 0.3s ease;
-}
-
-.date-input {
-    padding: 10px 12px 10px 40px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--input-bg);
-    color: var(--text-primary);
-    font-size: 0.9em;
-    width: 100%;
-    transition: all 0.3s ease;
-    font-weight: 500;
-}
-
-.date-input:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 4px rgba(0, 153, 255, 0.1);
-    background: var(--bg-card);
-}
-
-.date-input:focus + .date-input-icon,
-.date-input-wrapper:focus-within .date-input-icon {
-    color: var(--accent-primary);
-}
-
-.date-arrow-icon {
-    width: 20px;
-    height: 20px;
-    color: var(--text-muted);
-    flex-shrink: 0;
-    transition: color 0.3s ease, transform 0.3s ease;
-}
-
-.date-slicer-inputs:hover .date-arrow-icon {
-    color: var(--accent-primary);
-    transform: translateX(2px);
-}
-
-.btn-clear-dates {
-    padding: 0;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-}
-
-.btn-clear-dates svg {
-    width: 18px;
-    height: 18px;
-}
-
-.btn-clear-dates:hover {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: #ef4444;
-    color: #ef4444;
-    transform: scale(1.05);
-}
-
-.btn-clear-dates:active {
-    transform: scale(0.95);
+    display: none; /* Hide old design */
 }
 
 .btn-clear-all-filters {
