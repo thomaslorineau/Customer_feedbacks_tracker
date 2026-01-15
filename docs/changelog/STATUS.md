@@ -80,7 +80,7 @@
 
 2. **Lancer le frontend (optionnel) :**
    ```powershell
-   cd ovh-complaints-tracker\frontend\v2
+   cd ovh-complaints-tracker\frontend\dashboard
    python -m http.server 8080
    ```
    Puis ouvrir http://localhost:8080
