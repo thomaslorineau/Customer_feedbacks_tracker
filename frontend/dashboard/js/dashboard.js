@@ -108,6 +108,14 @@ function setupEventListeners() {
         });
     }
     
+    // Generate PowerPoint Report button
+    const generateReportBtn = document.getElementById('generateReportBtn');
+    if (generateReportBtn) {
+        generateReportBtn.addEventListener('click', () => {
+            generatePowerPointReport();
+        });
+    }
+    
     // Local date filters (in timeline panel - sync with global)
     const dateFromInput = document.getElementById('dateFrom');
     if (dateFromInput) {
@@ -932,6 +940,102 @@ function clearCriticalFilter() {
     
     // Update dashboard
     updateDashboard();
+}
+
+// Generate PowerPoint Report
+async function generatePowerPointReport() {
+    const btn = document.getElementById('generateReportBtn');
+    if (!btn) return;
+    
+    const btnText = btn.querySelector('.btn-text');
+    const btnSpinner = btn.querySelector('.btn-spinner');
+    
+    // Show loading state
+    btn.disabled = true;
+    if (btnText) btnText.textContent = 'Generating...';
+    if (btnSpinner) btnSpinner.style.display = 'block';
+    
+    try {
+        // Get current filters and state
+        const filters = {
+            search: state.filters?.search || '',
+            sentiment: state.filters?.sentiment || 'all',
+            language: state.filters?.language || 'all',
+            product: state.filters?.product || 'all',
+            source: state.filters?.source || 'all',
+            dateFrom: state.filters?.dateFrom || '',
+            dateTo: state.filters?.dateTo || ''
+        };
+        
+        // Call API to generate report
+        const response = await fetch(`${api.baseURL}/api/generate-powerpoint-report`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                filters: filters,
+                include_charts: ['timeline', 'product', 'source', 'sentiment'],
+                include_recommendations: true,
+                include_analysis: true
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to generate report' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        // Get the file as blob
+        const blob = await response.blob();
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `OVH_Feedback_Report_${new Date().toISOString().split('T')[0]}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        // Show success message
+        showToast('PowerPoint report generated successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error generating PowerPoint report:', error);
+        showToast(`Failed to generate report: ${error.message}`, 'error');
+    } finally {
+        // Reset button state
+        btn.disabled = false;
+        if (btnText) btnText.textContent = 'Generate PowerPoint Report';
+        if (btnSpinner) btnSpinner.style.display = 'none';
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 20px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-weight: 500;
+        animation: slideIn 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => document.body.removeChild(toast), 300);
+    }, 3000);
 }
 
 // Make functions available globally
