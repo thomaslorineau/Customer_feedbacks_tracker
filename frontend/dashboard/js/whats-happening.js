@@ -186,7 +186,7 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
         return;
     }
     
-    console.log('[Recommended Actions] Updating with', posts.length, 'posts');
+    console.log('[Recommended Actions] Updating with', posts.length, 'posts, recent:', recentPosts.length);
     
     // Show loading state
     actionsContainer.innerHTML = `
@@ -258,8 +258,19 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
                 </div>
             `;
         } else {
-            // LLM available but no actions generated (shouldn't happen, but handle gracefully)
-            actionsContainer.innerHTML = '';
+            // LLM available but no actions generated - show a message
+            console.warn('[Recommended Actions] LLM available but no actions generated');
+            actionsContainer.innerHTML = `
+                <div class="recommended-actions-header">
+                    <h3>Recommended Actions</h3>
+                </div>
+                <div class="recommended-actions-list">
+                    <div class="action-item" style="opacity: 0.7;">
+                        <span class="action-icon">💡</span>
+                        <span class="action-text">No specific recommendations at this time. Try adjusting your filters or search terms.</span>
+                    </div>
+                </div>
+            `;
         }
     } catch (error) {
         console.error('Error generating recommended actions:', error);
