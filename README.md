@@ -139,8 +139,9 @@ ovh-complaints-tracker/
 
 ## 🎯 Fonctionnalités
 
-- ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, Google News
+- ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, Google News, LinkedIn
 - ✅ **Analyse de sentiment** : Classification automatique (positif/négatif/neutre)
+- ✅ **Priority Scoring** : Algorithme multiplicatif `sentiment * keyword_relevance * recency` pour prioriser les posts
 - ✅ **Dashboard interactif** : Graphiques, filtres, timeline
 - ✅ **Logs persistants** : Suivi détaillé des opérations de scraping
 - ✅ **Détection de pays** : Identification du pays depuis le contenu
