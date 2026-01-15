@@ -27,6 +27,8 @@ backend/.env
 # Configuration (local)
 backend/.app_config
 .host_alias
+backup.sh
+configure_cors.sh
 
 # IDE
 .vscode/
