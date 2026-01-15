@@ -252,7 +252,7 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
                         <span class="action-icon">🤖</span>
                         <div class="action-text-container">
                             <span class="action-text">AI-powered recommendations require an API key</span>
-                            <span class="action-hint">Configure your OpenAI or Anthropic API key in <a href="/dashboard/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent recommendations based on your feedback analysis.</span>
+                            <span class="action-hint">Configure your OpenAI or Anthropic API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent recommendations based on your feedback analysis.</span>
                         </div>
                     </div>
                 </div>
