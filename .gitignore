@@ -18,11 +18,17 @@ backend/ovh_posts.db
 *.log
 backend/*.log
 backend.log
+logs/
+*.log.*
 
-# Environment variables
+# Environment variables - CRITICAL: Never commit secrets!
 .env
+.env.local
+.env.*.local
 backend/.env
-*.env.local
+backend/.env.local
+*.env
+!.env.example
 
 # Configuration (local)
 backend/.app_config

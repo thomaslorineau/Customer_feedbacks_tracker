@@ -3,6 +3,18 @@ from pathlib import Path
 import os
 import json
 import datetime
+import sys
+
+# Fix encoding for Windows console (cp1252 can't handle emojis)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except (AttributeError, ValueError):
+        # Python < 3.7 or reconfigure not available
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -1870,6 +1882,16 @@ async def serve_improvements():
         raise HTTPException(status_code=404, detail="Improvements page not found")
 
 
+@app.get("/settings", response_class=HTMLResponse)
+async def serve_settings():
+    """Serve the settings page."""
+    frontend_path = Path(__file__).resolve().parents[2] / "frontend" / "v2" / "settings.html"
+    if frontend_path.exists():
+        return open(frontend_path, "r", encoding="utf-8").read()
+    else:
+        raise HTTPException(status_code=404, detail="Settings page not found")
+
+
 # Additional static file mounts (duplicates removed, already mounted above)
 
 
@@ -1888,6 +1910,61 @@ class LLMConfigResponse(BaseModel):
     anthropic_api_key_set: bool = Field(..., description="Whether Anthropic API key is set")
     llm_provider: str = Field(..., description="Current LLM provider")
     status: str = Field(..., description="Configuration status")
+
+@app.get("/api/config")
+async def get_config():
+    """Get full configuration including API keys status, rate limiting, and environment."""
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    google_key = os.getenv('GOOGLE_API_KEY')
+    github_token = os.getenv('GITHUB_TOKEN')
+    trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
+    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    environment = os.getenv('ENVIRONMENT', 'development')
+    
+    def mask_key(key):
+        """Mask API key for display."""
+        if not key:
+            return None
+        if len(key) <= 8:
+            return '••••••••'
+        return f"{key[:4]}••••{key[-4:]}"
+    
+    return {
+        "environment": environment,
+        "llm_provider": provider,
+        "api_keys": {
+            "openai": {
+                "configured": bool(openai_key),
+                "masked": mask_key(openai_key),
+                "length": len(openai_key) if openai_key else 0
+            },
+            "anthropic": {
+                "configured": bool(anthropic_key),
+                "masked": mask_key(anthropic_key),
+                "length": len(anthropic_key) if anthropic_key else 0
+            },
+            "google": {
+                "configured": bool(google_key),
+                "masked": mask_key(google_key),
+                "length": len(google_key) if google_key else 0
+            },
+            "github": {
+                "configured": bool(github_token),
+                "masked": mask_key(github_token),
+                "length": len(github_token) if github_token else 0
+            },
+            "trustpilot": {
+                "configured": bool(trustpilot_key),
+                "masked": mask_key(trustpilot_key),
+                "length": len(trustpilot_key) if trustpilot_key else 0
+            }
+        },
+        "rate_limiting": {
+            "requests_per_window": 100,
+            "window_seconds": 60
+        }
+    }
 
 @app.get("/api/llm-config", response_model=LLMConfigResponse)
 async def get_llm_config():
@@ -1954,6 +2031,39 @@ async def set_llm_config(payload: LLMConfigPayload):
         llm_provider=env_vars.get('LLM_PROVIDER', 'openai'),
         status="configured"
     )
+
+@app.post("/api/config/set-key")
+async def set_api_key(payload: dict):
+    """Set a generic API key (for Google, GitHub, Trustpilot, etc.)."""
+    provider = payload.get('provider')
+    key = payload.get('key')
+    
+    if not provider or not key:
+        raise HTTPException(status_code=400, detail="Provider and key are required")
+    
+    backend_path = Path(__file__).resolve().parents[1]
+    env_path = backend_path / ".env"
+    
+    # Read existing .env if it exists
+    env_vars = {}
+    if env_path.exists():
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key_name, value = line.split("=", 1)
+                    env_vars[key_name.strip()] = value.strip()
+    
+    # Update the key
+    env_vars[provider] = key
+    os.environ[provider] = key
+    
+    # Write back to .env
+    with open(env_path, "w", encoding="utf-8") as f:
+        for key_name, value in env_vars.items():
+            f.write(f"{key_name}={value}\n")
+    
+    return {"success": True, "message": f"{provider} API key saved successfully"}
 
 @app.post("/admin/set-ui-version")
 async def set_ui_version(payload: UIVersionPayload):

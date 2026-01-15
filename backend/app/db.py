@@ -20,15 +20,32 @@ def init_db():
             created_at TEXT,
             sentiment_score REAL,
             sentiment_label TEXT,
-            language TEXT DEFAULT 'unknown',
-            country TEXT DEFAULT NULL
+            language TEXT DEFAULT 'unknown'
         )
     ''')
-    # Add country column if it doesn't exist (migration)
-    try:
-        c.execute('ALTER TABLE posts ADD COLUMN country TEXT DEFAULT NULL')
-    except sqlite3.OperationalError:
-        pass  # Column already exists
+    
+    # Add indexes for faster queries (Performance optimization)
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_source 
+        ON posts(source)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_sentiment 
+        ON posts(sentiment_label)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_created 
+        ON posts(created_at DESC)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_language 
+        ON posts(language)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_posts_source_date 
+        ON posts(source, created_at DESC)
+    ''')
+    
     # Saved search queries / keywords
     c.execute('''
         CREATE TABLE IF NOT EXISTS saved_queries (
@@ -42,39 +59,72 @@ def init_db():
 
 
 def insert_post(post: dict):
+    """Insert post with validation and proper error handling."""
+    # SECURITY: Validate post data before insertion
+    if not isinstance(post, dict):
+        raise ValueError("post must be a dictionary")
+    
+    # SECURITY: Validate required fields exist
+    required_fields = ['source', 'content']
+    for field in required_fields:
+        if field not in post:
+            raise ValueError(f"Missing required field: {field}")
+    
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute(
-        '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language, country)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-        (
-            post.get('source'),
-            post.get('author'),
-            post.get('content'),
-            post.get('url'),
-            post.get('created_at'),
-            post.get('sentiment_score'),
-            post.get('sentiment_label'),
-            post.get('language', 'unknown'),
-            post.get('country'),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    
+    try:
+        # SECURITY: Use parameterized query to prevent SQL injection
+        c.execute(
+            '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+            (
+                str(post.get('source'))[:100],  # Limit length
+                str(post.get('author', 'unknown'))[:100],
+                str(post.get('content', ''))[:10000],  # Limit content length
+                str(post.get('url', ''))[:500],
+                post.get('created_at'),
+                float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+                str(post.get('sentiment_label', 'neutral'))[:20],
+                str(post.get('language', 'unknown'))[:20],
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_posts(limit: int = 100, offset: int = 0, language: str = None):
+    """Fetch posts with parameterized queries to prevent SQL injection."""
+    # SECURITY: Validate input types to prevent injection
+    if not isinstance(limit, int) or not isinstance(offset, int):
+        raise ValueError("limit and offset must be integers")
+    if language and not isinstance(language, str):
+        raise ValueError("language must be a string")
+    
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    if language and language != 'all':
-        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, country FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?', (language, limit, offset))
-    else:
-        c.execute('SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, country FROM posts ORDER BY id DESC LIMIT ? OFFSET ?', (limit, offset))
+    try:
+        # SECURITY: Always use parameterized queries
+        if language and language != 'all':
+            c.execute(
+                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language '
+                'FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?',
+                (language, limit, offset)
+            )
+        else:
+            c.execute(
+                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language '
+                'FROM posts ORDER BY id DESC LIMIT ? OFFSET ?',
+                (limit, offset)
+            )
+        
+        rows = c.fetchall()
+    finally:
+        conn.close()
     
-    rows = c.fetchall()
-    conn.close()
-    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language', 'country']
+    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language']
     return [dict(zip(keys, row)) for row in rows]
 
 
@@ -171,16 +221,34 @@ def get_job_record(job_id: str):
 
 def save_queries(keywords: list):
     """Replace saved queries with provided list (order preserved)."""
+    # SECURITY: Validate input
+    if not isinstance(keywords, list):
+        raise ValueError("keywords must be a list")
+    if len(keywords) > 100:
+        raise ValueError("Too many keywords (max 100)")
+    
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    # clear existing
-    c.execute('DELETE FROM saved_queries')
-    import datetime
-    now = datetime.datetime.utcnow().isoformat()
-    for kw in keywords:
-        c.execute('INSERT OR IGNORE INTO saved_queries (keyword, created_at) VALUES (?, ?)', (kw, now))
-    conn.commit()
-    conn.close()
+    
+    try:
+        # clear existing
+        c.execute('DELETE FROM saved_queries')
+        import datetime
+        now = datetime.datetime.utcnow().isoformat()
+        
+        for kw in keywords:
+            # SECURITY: Validate and sanitize each keyword
+            if not isinstance(kw, str):
+                continue
+            kw = str(kw).strip()[:100]  # Limit length
+            if not kw:
+                continue
+            # SECURITY: Use parameterized query
+            c.execute('INSERT OR IGNORE INTO saved_queries (keyword, created_at) VALUES (?, ?)', (kw, now))
+        
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_saved_queries():
@@ -190,73 +258,3 @@ def get_saved_queries():
     rows = c.fetchall()
     conn.close()
     return [r[0] for r in rows]
-
-
-def delete_duplicate_posts():
-    """
-    Delete duplicate posts from the database.
-    Duplicates are identified by:
-    1. Same URL (keep the oldest post with lowest ID)
-    2. Same content + author + source (keep the oldest post with lowest ID)
-    Returns the number of deleted posts.
-    """
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    deleted_count = 0
-    
-    # First, delete duplicates by URL (keep the oldest post)
-    c.execute('''
-        DELETE FROM posts
-        WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM posts
-            WHERE url IS NOT NULL AND url != ''
-            GROUP BY url
-        )
-        AND url IS NOT NULL AND url != ''
-    ''')
-    deleted_count += c.rowcount
-    
-    # Then, delete duplicates by content + author + source (keep the oldest post)
-    c.execute('''
-        DELETE FROM posts
-        WHERE id NOT IN (
-            SELECT MIN(id)
-            FROM posts
-            GROUP BY content, author, source
-        )
-    ''')
-    deleted_count += c.rowcount
-    
-    conn.commit()
-    conn.close()
-    return deleted_count
-
-
-def delete_non_ovh_posts():
-    """
-    Delete all posts that do NOT mention OVH or its brands.
-    Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
-    Returns the number of deleted posts.
-    """
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    
-    # Delete posts that don't contain OVH-related keywords
-    c.execute('''
-        DELETE FROM posts
-        WHERE (
-            LOWER(content) NOT LIKE '%ovh%'
-            AND LOWER(content) NOT LIKE '%ovhcloud%'
-            AND LOWER(content) NOT LIKE '%ovh cloud%'
-            AND LOWER(content) NOT LIKE '%kimsufi%'
-            AND LOWER(content) NOT LIKE '%soyoustart%'
-            AND LOWER(author) NOT LIKE '%ovh%'
-            AND LOWER(url) NOT LIKE '%ovh%'
-        )
-    ''')
-    
-    deleted_count = c.rowcount
-    conn.commit()
-    conn.close()
-    return deleted_count

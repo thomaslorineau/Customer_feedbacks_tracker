@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - API Configuration</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
+    <link rel="stylesheet" href="/v2/css/styles.css">
+    <link rel="stylesheet" href="/v2/css/navigation.css">
+    <style>
+        .settings-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .settings-header {
+            margin-bottom: 2rem;
+        }
+
+        .settings-header h1 {
+            font-size: 2rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .settings-header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .settings-section {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .api-key-card {
+            background: var(--card-bg, #f8f9fa);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .api-key-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .api-key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .api-key-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .api-key-title h3 {
+            margin: 0;
+            font-size: 1.125rem;
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-badge.configured {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.not-configured {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .api-key-value {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .key-display {
+            flex: 1;
+            background: var(--input-bg, #fff);
+            border: 1px solid var(--border-color, #ced4da);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .key-display.hidden {
+            letter-spacing: 0.2em;
+        }
+
+        .key-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-icon:active {
+            transform: translateY(0);
+        }
+
+        .btn-icon.secondary {
+            background: #6c757d;
+        }
+
+        .btn-icon.secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-icon.success {
+            background: #28a745;
+        }
+
+        .btn-icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .api-key-info {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+
+        .security-notice svg {
+            width: 20px;
+            height: 20px;
+            color: #856404;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        .security-notice-content {
+            flex: 1;
+        }
+
+        .security-notice-content strong {
+            display: block;
+            color: #856404;
+            margin-bottom: 0.35rem;
+        }
+
+        .security-notice-content p {
+            margin: 0;
+            color: #856404;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .copy-feedback {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #28a745;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .copy-feedback svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .rate-limit-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-card {
+            background: var(--card-bg, #f8f9fa);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .info-card-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-card-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .skeleton-loader {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+            height: 20px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .api-key-form-container {
+            padding: 1.5rem;
+            background: var(--bg-secondary, #f8f9fa);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .api-key-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .input-with-button {
+            display: flex;
+            gap: 0.5rem;
+            align-items: stretch;
+        }
+
+        .api-key-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+            background: var(--input-bg, #ffffff);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: var(--accent-primary, #0099ff);
+            box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+        }
+
+        .btn-toggle-visibility {
+            padding: 0.75rem;
+            background: var(--bg-card, #ffffff);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-toggle-visibility:hover {
+            background: var(--bg-card-hover, #f0f4f8);
+        }
+
+        .btn-toggle-visibility svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .btn-save-key {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent-primary, #0099ff);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save-key:hover {
+            background: var(--accent-hover, #0088ee);
+            transform: translateY(-1px);
+        }
+
+        .btn-save-key:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-save-key svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-get-key {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            color: var(--accent-primary, #0099ff);
+            border: 1px solid var(--accent-primary, #0099ff);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-get-key:hover {
+            background: var(--accent-primary, #0099ff);
+            color: white;
+        }
+
+        .btn-get-key svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body class="has-nav-menu">
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/dashboard" class="nav-logo">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
+                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
+                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
+                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>Customer Feedbacks Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Scraping & Configuration</span>
+                </a>
+                <a href="/dashboard" class="nav-tab">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="/settings" class="nav-tab active">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
+        </div>
+    </nav>
+
+    <div class="settings-container">
+        <!-- Header -->
+        <div class="settings-header">
+            <h1>🔐 API Configuration & Settings</h1>
+            <p>Manage your API keys and application configuration securely</p>
+        </div>
+
+        <!-- Security Notice -->
+        <div class="security-notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div class="security-notice-content">
+                <strong>⚠️ Security Notice</strong>
+                <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
+                   The "Reveal" button temporarily shows the full key for copying - use it carefully and only when needed.</p>
+            </div>
+        </div>
+
+        <!-- API Keys Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                API Keys
+            </h2>
+
+            <div id="apiKeysContainer">
+                <!-- Loading skeleton -->
+                <div class="api-key-card">
+                    <div class="skeleton-loader"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limiting Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                </svg>
+                Rate Limiting
+            </h2>
+
+            <div class="rate-limit-info" id="rateLimitInfo">
+                <div class="info-card">
+                    <div class="info-card-label">Requests per Window</div>
+                    <div class="info-card-value">--</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label">Window Duration</div>
+                    <div class="info-card-value">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Success Feedback -->
+    <div class="copy-feedback" id="copyFeedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>API key copied to clipboard!</span>
+    </div>
+
+    <script src="/v2/js/settings.js"></script>
+</body>
+</html>
