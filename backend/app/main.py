@@ -159,6 +159,7 @@ class RecommendedAction(BaseModel):
 class RecommendedActionsResponse(BaseModel):
     """Response model for recommended actions."""
     actions: List[RecommendedAction] = Field(..., description="List of generated recommended actions")
+    llm_available: bool = Field(default=True, description="Whether LLM was used to generate actions")
 
 
 class PainPoint(BaseModel):
@@ -2045,15 +2046,17 @@ async def generate_recommended_actions_with_llm(
             'created_at': post.get('created_at', '')
         })
     
-    # Get filter context
+    # Get filter context (including search term)
     active_filters = stats.get('active_filters', 'All posts')
     filtered_context = stats.get('filtered_context', False)
+    search_term = stats.get('search_term', '')
     
     # Create comprehensive prompt with context
     prompt = f"""You are an OVHcloud customer support analyst. Analyze the following customer feedback posts and generate {max_actions} specific, actionable recommended actions.
 
 CONTEXT:
 - Active filters: {active_filters}
+- Search term: "{search_term}" {'(user is specifically searching for this)' if search_term else '(no specific search term)'}
 - Analysis is based on {'filtered posts' if filtered_context else 'all posts'} in the database
 - Total posts analyzed: {stats.get('total', 0)} (Positive: {stats.get('positive', 0)}, Negative: {stats.get('negative', 0)}, Neutral: {stats.get('neutral', 0)})
 - Recent posts (last 48h): {stats.get('recent_total', 0)} total, {stats.get('recent_negative', 0)} negative
@@ -2065,6 +2068,7 @@ POSTS TO ANALYZE:
 {json.dumps(posts_summary, indent=2, ensure_ascii=False)}
 
 IMPORTANT: The recommendations must be SPECIFIC to the actual issues found in these posts. 
+- If a search term is provided, prioritize recommendations related to that search term
 - If a specific product is mentioned frequently, reference it
 - If specific errors or problems appear, mention them
 - If the analysis is filtered (e.g., by product, date, or source), acknowledge this context
@@ -2115,8 +2119,9 @@ Be specific and reference actual content from the posts when possible."""
     llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
     
     if not api_key and llm_provider in ['openai', 'anthropic']:
-        # Fallback: Generate actions using rule-based approach
-        return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
+        # No API key available - return empty list (frontend will show a nice message)
+        logger.info("[Recommended Actions] No LLM API key configured, returning empty list")
+        return []
     
     try:
         if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
@@ -2268,14 +2273,20 @@ def generate_recommended_actions_fallback(
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback posts using LLM."""
     try:
+        # Check if LLM is available
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        llm_available = bool(api_key) or llm_provider not in ['openai', 'anthropic']
+        
         actions = await generate_recommended_actions_with_llm(
             request.posts, 
             request.recent_posts, 
             request.stats, 
             request.max_actions
         )
-        return RecommendedActionsResponse(actions=actions)
+        return RecommendedActionsResponse(actions=actions, llm_available=llm_available)
     except Exception as e:
+        logger.error(f"Error generating recommended actions: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate recommended actions: {str(e)}")
 
 

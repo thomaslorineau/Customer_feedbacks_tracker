@@ -211,13 +211,15 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
             top_issue: topIssue ? topIssue[0] : 'N/A',
             top_issue_count: topIssue ? topIssue[1] : 0,
             active_filters: activeFilters.description,
-            filtered_context: activeFilters.description !== 'All posts (no filters)'
+            filtered_context: activeFilters.description !== 'All posts (no filters)',
+            search_term: activeFilters.search || ''  // Include search term explicitly
         };
         
         // Call LLM API with full context
         const api = new API();
         const response = await api.getRecommendedActions(posts, recentPosts, stats, 5);
         const actions = response.actions || [];
+        const llmAvailable = response.llm_available !== false; // Default to true if not specified
         
         // Render actions
         if (actions.length > 0) {
@@ -234,7 +236,24 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
                     `).join('')}
                 </div>
             `;
+        } else if (!llmAvailable) {
+            // No LLM API key configured - show nice message
+            actionsContainer.innerHTML = `
+                <div class="recommended-actions-header">
+                    <h3>Recommended Actions</h3>
+                </div>
+                <div class="recommended-actions-list">
+                    <div class="action-item action-no-llm">
+                        <span class="action-icon">🤖</span>
+                        <div class="action-text-container">
+                            <span class="action-text">AI-powered recommendations require an API key</span>
+                            <span class="action-hint">Configure your OpenAI or Anthropic API key in <a href="/dashboard/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent recommendations based on your feedback analysis.</span>
+                        </div>
+                    </div>
+                </div>
+            `;
         } else {
+            // LLM available but no actions generated (shouldn't happen, but handle gracefully)
             actionsContainer.innerHTML = '';
         }
     } catch (error) {
