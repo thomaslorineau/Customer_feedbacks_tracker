@@ -1910,8 +1910,11 @@ async def get_posts_for_improvement(
     sort_by: str = "opportunity_score"
 ):
     """
-    Get posts ranked by opportunity score for improvement review.
-    Opportunity score combines sentiment, recency, and engagement.
+    Get posts ranked by priority score for improvement review.
+    Priority score = sentiment * keyword_relevance * recency (0-100 scale).
+    - sentiment: negative=1.0, neutral=0.5, positive=0.2
+    - keyword_relevance: based on pain point keywords found (0.1-1.0)
+    - recency: exponential decay (last 7 days=1.0, 30 days=0.7, 90 days=0.4, older=0.1)
     """
     all_posts = db.get_posts(limit=10000, offset=0)
     

@@ -75,7 +75,7 @@
 │  │  ├─ POST /generate-improvement-ideas─► LLM Idea Generation          │   │
 │  │  ├─ GET  /api/pain-points          ──► Pain Points Analysis        │   │
 │  │  ├─ GET  /api/product-opportunities─► Opportunity Scoring           │   │
-│  │  ├─ GET  /api/posts-for-improvement─► Posts by Opportunity Score    │   │
+│  │  ├─ GET  /api/posts-for-improvement─► Posts by Priority Score       │   │
 │  │  ├─ GET  /api/llm-config           ──► LLM Configuration            │   │
 │  │  ├─ POST /api/llm-config           ──► Save LLM Config              │   │
 │  │  ├─ POST /admin/cleanup-duplicates ──► Database Cleanup             │   │
