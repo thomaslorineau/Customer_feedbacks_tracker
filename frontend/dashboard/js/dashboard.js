@@ -392,7 +392,12 @@ function updateDashboard() {
     if (!state.posts || state.posts.length === 0) {
         console.warn('No posts in state, trying to load...');
         // Try to load posts if state is empty
-        loadDashboardData();
+        loadDashboardData().then(() => {
+            // After loading, update again
+            setTimeout(() => {
+                updateDashboard();
+            }, 100);
+        });
         return;
     }
     updateStatsBanner();
