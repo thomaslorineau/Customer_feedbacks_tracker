@@ -2505,3 +2505,84 @@ async def get_ui_version():
                     break
     
     return {"version": ui_version}
+
+
+@app.post("/api/upload-logo")
+async def upload_logo(file: UploadFile = File(...)):
+    """Upload OVHcloud logo file."""
+    # Validate file type
+    if not file.filename or not file.filename.lower().endswith(('.svg', '.png', '.jpg', '.jpeg')):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only SVG, PNG, JPG, JPEG are allowed.")
+    
+    # Read file contents
+    contents = await file.read()
+    
+    # Validate file size (max 5MB)
+    if len(contents) > 5 * 1024 * 1024:  # 5MB
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 5MB.")
+    
+    # Determine file extension
+    file_ext = file.filename.split('.')[-1].lower()
+    
+    # Save to assets/logo directory
+    assets_logo_path = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "logo"
+    assets_logo_path.mkdir(parents=True, exist_ok=True)
+    
+    # If SVG or starts with SVG content, always save as .svg
+    if file_ext == 'svg' or contents.startswith(b'<svg') or contents.startswith(b'<?xml'):
+        logo_filename = "ovhcloud-logo.svg"
+    else:
+        logo_filename = f"ovhcloud-logo.{file_ext}"
+    
+    logo_path = assets_logo_path / logo_filename
+    
+    try:
+        with open(logo_path, "wb") as f:
+            f.write(contents)
+        
+        logger.info(f"Logo uploaded successfully: {logo_filename}")
+        return JSONResponse({
+            "success": True,
+            "message": f"Logo uploaded successfully as {logo_filename}",
+            "filename": logo_filename,
+            "path": f"/assets/logo/{logo_filename}"
+        })
+    except Exception as e:
+        logger.error(f"Error saving logo: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save logo: {str(e)}")
+
+
+@app.get("/api/logo-status")
+async def get_logo_status():
+    """Check if logo file exists."""
+    assets_logo_path = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "logo"
+    
+    # Check for SVG first (preferred)
+    svg_path = assets_logo_path / "ovhcloud-logo.svg"
+    if svg_path.exists():
+        file_size = svg_path.stat().st_size
+        return {
+            "exists": True,
+            "filename": "ovhcloud-logo.svg",
+            "path": "/assets/logo/ovhcloud-logo.svg",
+            "size": file_size,
+            "format": "svg"
+        }
+    
+    # Check for other formats
+    for ext in ['png', 'jpg', 'jpeg']:
+        logo_path = assets_logo_path / f"ovhcloud-logo.{ext}"
+        if logo_path.exists():
+            file_size = logo_path.stat().st_size
+            return {
+                "exists": True,
+                "filename": f"ovhcloud-logo.{ext}",
+                "path": f"/assets/logo/ovhcloud-logo.{ext}",
+                "size": file_size,
+                "format": ext
+            }
+    
+    return {
+        "exists": False,
+        "message": "No logo file found. Please upload one."
+    }
