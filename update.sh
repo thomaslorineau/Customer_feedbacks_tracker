@@ -82,6 +82,17 @@ if [ -f ".host_alias" ]; then
     success "Configuration alias sauvegardée"
 fi
 
+# Sauvegarder les scripts locaux qui peuvent être modifiés
+if [ -f "backup.sh" ]; then
+    cp backup.sh "$BACKUP_DIR/backup.sh.backup"
+    success "Script backup.sh sauvegardé"
+fi
+
+if [ -f "configure_cors.sh" ]; then
+    cp configure_cors.sh "$BACKUP_DIR/configure_cors.sh.backup"
+    success "Script configure_cors.sh sauvegardé"
+fi
+
 # Sauvegarder aussi la base de données (juste pour sécurité, on ne la restaure pas)
 if [ -f "backend/data.db" ]; then
     cp backend/data.db "$BACKUP_DIR/data.db.backup"
@@ -104,8 +115,8 @@ if git status --porcelain 2>/dev/null | grep -q "^UU.*backend/data.db\|^AA.*back
     git add backend/data.db 2>/dev/null || true
 fi
 
-# Exclure les fichiers de base de données et autres fichiers qui ne doivent pas être versionnés
-EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/*.db' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__'"
+# Exclure les fichiers de base de données, configuration locale et scripts locaux
+EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/*.db' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh'"
 
 # Vérifier les modifications (sans les fichiers exclus)
 if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --quiet $EXCLUDE_PATTERNS 2>/dev/null; then
@@ -145,14 +156,17 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
     echo ""
 fi
 
-# Résoudre les conflits avec data.db avant le pull si nécessaire
-if git status --porcelain 2>/dev/null | grep -q "backend/data.db"; then
-    info "Résolution préventive des conflits avec data.db..."
-    git checkout --ours backend/data.db 2>/dev/null || true
-    git add backend/data.db 2>/dev/null || true
-fi
+# Résoudre les conflits avec data.db et fichiers de config avant le pull si nécessaire
+CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh"
+for file in $CONFIG_FILES; do
+    if git status --porcelain 2>/dev/null | grep -q "$file"; then
+        info "Résolution préventive des conflits avec $file (conservation de la version locale)..."
+        git checkout --ours "$file" 2>/dev/null || true
+        git add "$file" 2>/dev/null || true
+    fi
+done
 
-# Faire le pull
+# Faire le pull en permettant les conflits avec nos fichiers de config
 if git pull origin master; then
     success "Code mis à jour"
     
@@ -189,8 +203,24 @@ else
     if [ -f "$BACKUP_DIR/.host_alias.backup" ]; then
         cp "$BACKUP_DIR/.host_alias.backup" .host_alias
     fi
+    if [ -f "$BACKUP_DIR/backup.sh.backup" ]; then
+        cp "$BACKUP_DIR/backup.sh.backup" backup.sh
+    fi
+    if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
+        cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
+    fi
     exit 1
 fi
+
+# Résoudre les conflits avec les fichiers de config après le pull si nécessaire
+for file in $CONFIG_FILES; do
+    if git status --porcelain 2>/dev/null | grep -q "^UU.*$file\|^AA.*$file"; then
+        warning "Conflit de merge détecté avec $file, résolution automatique..."
+        info "Conservation de la version locale de $file..."
+        git checkout --ours "$file" 2>/dev/null || true
+        git add "$file" 2>/dev/null || true
+    fi
+done
 echo ""
 
 # 4. Restaurer la configuration
@@ -208,6 +238,16 @@ fi
 if [ -f "$BACKUP_DIR/.host_alias.backup" ]; then
     cp "$BACKUP_DIR/.host_alias.backup" .host_alias
     success "Configuration alias restaurée"
+fi
+
+if [ -f "$BACKUP_DIR/backup.sh.backup" ]; then
+    cp "$BACKUP_DIR/backup.sh.backup" backup.sh
+    success "Script backup.sh restauré"
+fi
+
+if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
+    cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
+    success "Script configure_cors.sh restauré"
 fi
 
 # Nettoyer la sauvegarde
