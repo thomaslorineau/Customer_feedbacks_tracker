@@ -2883,7 +2883,7 @@ Provide key insights and trends in a professional, executive-friendly format."""
         )
         
         # Return as file download
-        filename = f"OVH_Feedback_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+        filename = f"OVH_Feedback_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
         return Response(
             content=pptx_bytes,
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
