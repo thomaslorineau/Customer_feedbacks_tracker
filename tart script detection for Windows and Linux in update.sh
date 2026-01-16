@@ -1,0 +1,71 @@
+[1mdiff --git a/backend/app/__pycache__/__init__.cpython-313.pyc b/backend/app/__pycache__/__init__.cpython-313.pyc[m
+[1mindex d54896c..59b90e5 100644[m
+Binary files a/backend/app/__pycache__/__init__.cpython-313.pyc and b/backend/app/__pycache__/__init__.cpython-313.pyc differ
+[1mdiff --git a/backend/app/__pycache__/db.cpython-313.pyc b/backend/app/__pycache__/db.cpython-313.pyc[m
+[1mindex 3044c40..02c6637 100644[m
+Binary files a/backend/app/__pycache__/db.cpython-313.pyc and b/backend/app/__pycache__/db.cpython-313.pyc differ
+[1mdiff --git a/backend/app/__pycache__/main.cpython-313.pyc b/backend/app/__pycache__/main.cpython-313.pyc[m
+[1mindex 10dab95..07180fb 100644[m
+Binary files a/backend/app/__pycache__/main.cpython-313.pyc and b/backend/app/__pycache__/main.cpython-313.pyc differ
+[1mdiff --git a/ovh-complaints-tracker b/ovh-complaints-tracker[m
+[1m--- a/ovh-complaints-tracker[m
+[1m+++ b/ovh-complaints-tracker[m
+[36m@@ -1 +1 @@[m
+[31m-Subproject commit 011dcbdf8a3adc24dc049e6fb424f40bef200395[m
+[32m+[m[32mSubproject commit 011dcbdf8a3adc24dc049e6fb424f40bef200395-dirty[m
+[1mdiff --git a/scripts/install/update.sh b/scripts/install/update.sh[m
+[1mindex 9b8de12..c2c3d44 100644[m
+[1m--- a/scripts/install/update.sh[m
+[1m+++ b/scripts/install/update.sh[m
+[36m@@ -354,13 +354,44 @@[m [mecho ""[m
+ [m
+ # 6. Redémarrer l'application[m
+ info "Redémarrage de l'application..."[m
+[31m-if [ -f "scripts/start/start.sh" ]; then[m
+[31m-    bash scripts/start/start.sh[m
+[31m-elif [ -f "start.sh" ]; then[m
+[31m-    ./start.sh[m
+[32m+[m
+[32m+[m[32m# Détecter le système d'exploitation[m
+[32m+[m[32mif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] || command -v powershell.exe > /dev/null 2>&1; then[m
+[32m+[m[32m    # Windows - utiliser PowerShell ou batch[m
+[32m+[m[32m    if [ -f "scripts/start/start_server.ps1" ]; then[m
+[32m+[m[32m        info "Démarrage avec PowerShell..."[m
+[32m+[m[32m        powershell.exe -ExecutionPolicy Bypass -File scripts/start/start_server.ps1[m
+[32m+[m[32m    elif [ -f "scripts/start/start.bat" ]; then[m
+[32m+[m[32m        info "Démarrage avec batch..."[m
+[32m+[m[32m        cmd.exe /c scripts/start/start.bat[m
+[32m+[m[32m    elif [ -f "scripts/start/start.sh" ]; then[m
+[32m+[m[32m        bash scripts/start/start.sh[m
+[32m+[m[32m    else[m
+[32m+[m[32m        warning "Script de démarrage introuvable pour Windows"[m
+[32m+[m[32m        echo "   Démarrez manuellement avec: powershell.exe scripts/start/start_server.ps1"[m
+[32m+[m[32m    fi[m
+ else[m
+[31m-    warning "Script start.sh introuvable"[m
+[31m-    echo "   Démarrez manuellement l'application"[m
+[32m+[m[32m    # Linux/Mac - utiliser bash[m
+[32m+[m[32m    if [ -f "$APP_DIR/scripts/start/start.sh" ]; then[m
+[32m+[m[32m        info "Démarrage avec scripts/start/start.sh..."[m
+[32m+[m[32m        bash "$APP_DIR/scripts/start/start.sh"[m
+[32m+[m[32m    elif [ -f "$APP_DIR/start.sh" ]; then[m
+[32m+[m[32m        info "Démarrage avec start.sh..."[m
+[32m+[m[32m        bash "$APP_DIR/start.sh"[m
+[32m+[m[32m    elif [ -f "scripts/start/start.sh" ]; then[m
+[32m+[m[32m        info "Démarrage avec scripts/start/start.sh (chemin relatif)..."[m
+[32m+[m[32m        bash scripts/start/start.sh[m
+[32m+[m[32m    elif [ -f "start.sh" ]; then[m
+[32m+[m[32m        info "Démarrage avec start.sh (chemin relatif)..."[m
+[32m+[m[32m        ./start.sh[m
+[32m+[m[32m    else[m
+[32m+[m[32m        warning "Script start.sh introuvable"[m
+[32m+[m[32m        echo "   Recherché dans: $APP_DIR/scripts/start/start.sh"[m
+[32m+[m[32m        echo "   Recherché dans: $APP_DIR/start.sh"[m
+[32m+[m[32m        echo "   Recherché dans: scripts/start/start.sh"[m
+[32m+[m[32m        echo "   Recherché dans: start.sh"[m
+[32m+[m[32m        echo "   Démarrez manuellement l'application avec: bash scripts/start/start.sh"[m
+[32m+[m[32m    fi[m
+ fi[m
+ [m
+ echo ""[m
+[1mdiff
