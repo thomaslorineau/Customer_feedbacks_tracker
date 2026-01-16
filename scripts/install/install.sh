@@ -128,14 +128,14 @@ echo ""
 
 # Étape 3 : Cloner le dépôt (si nécessaire)
 if [ ! -f "backend/requirements.txt" ]; then
-    info "Téléchargement de l'application depuis GitHub..."
+    info "Téléchargement de l'application depuis Stash..."
     
     if [ -d "$INSTALL_DIR" ]; then
         warning "Le répertoire $INSTALL_DIR existe déjà. Suppression..."
         rm -rf "$INSTALL_DIR"
     fi
     
-    git clone https://github.com/thomaslorineau/complaints_tracker.git "$INSTALL_DIR"
+    git clone ssh://git@stash.ovh.net:7999/~thomas.lorineau/customer_feedbacks_tracker.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
     success "Application téléchargée"
 else

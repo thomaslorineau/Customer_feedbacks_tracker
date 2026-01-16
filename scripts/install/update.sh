@@ -141,7 +141,7 @@ fi
 echo ""
 
 # 3. Mettre à jour le code
-info "Mise à jour du code depuis GitHub..."
+info "Mise à jour du code depuis Stash..."
 
 # Vérifier s'il y a des modifications locales (en excluant data.db et autres fichiers de DB)
 HAS_CHANGES=false
@@ -245,7 +245,7 @@ for file in $CONFIG_FILES; do
     fi
 done
 
-# Faire le pull
+# Faire le pull depuis master
 if git pull origin master; then
     success "Code mis à jour"
     
