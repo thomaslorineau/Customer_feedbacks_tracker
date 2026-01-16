@@ -390,11 +390,14 @@ cd "$APP_DIR" || {
 
 # Afficher le répertoire actuel pour debug
 CURRENT_DIR=$(pwd)
-info "Répertoire de travail: $CURRENT_DIR"
-info "Répertoire de l'application: $APP_DIR"
+echo "🔍 DEBUG: Répertoire de travail: $CURRENT_DIR"
+echo "🔍 DEBUG: Répertoire de l'application: $APP_DIR"
+echo "🔍 DEBUG: OSTYPE: $OSTYPE"
+echo "🔍 DEBUG: powershell.exe disponible: $(command -v powershell.exe > /dev/null 2>&1 && echo 'OUI' || echo 'NON')"
 
 # Détecter le système d'exploitation
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] || command -v powershell.exe > /dev/null 2>&1; then
+    echo "🔍 DEBUG: Détection: WINDOWS"
     # Windows - utiliser PowerShell ou batch
     if [ -f "$APP_DIR/scripts/start/start_server.ps1" ]; then
         info "Démarrage avec PowerShell..."
@@ -413,6 +416,7 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] ||
     fi
 else
     # Linux/Mac - utiliser bash
+    echo "🔍 DEBUG: Détection: LINUX/MAC"
     # S'assurer qu'on est dans le bon répertoire
     cd "$APP_DIR" || {
         error "Impossible de se déplacer dans: $APP_DIR"
