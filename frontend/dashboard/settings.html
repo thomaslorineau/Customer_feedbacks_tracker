@@ -924,16 +924,35 @@
                         const logoPlaceholder = document.getElementById('logoPlaceholder');
                         if (logoPlaceholder) logoPlaceholder.style.display = 'none';
                         
-                        // Update logo in navigation across all pages
-                        if (window.updateLogoInNavigation) {
-                            window.updateLogoInNavigation(data.path);
-                        }
-                        // Store in localStorage for other pages
+                        // Store in localStorage for other pages FIRST
                         localStorage.setItem('logoPath', data.path);
                         localStorage.setItem('logoUpdated', Date.now().toString());
                         
-                        // Re-check logo status to ensure it's saved
-                        setTimeout(checkLogoStatus, 500);
+                        // Update logo in navigation across all pages
+                        if (window.updateLogoInNavigation) {
+                            window.updateLogoInNavigation(data.path);
+                        } else {
+                            // If function not available, force reload logo-updater
+                            const logoUpdaterScript = document.createElement('script');
+                            logoUpdaterScript.src = '/js/logo-updater.js';
+                            logoUpdaterScript.onload = function() {
+                                if (window.updateLogoInNavigation) {
+                                    window.updateLogoInNavigation(data.path);
+                                }
+                            };
+                            document.head.appendChild(logoUpdaterScript);
+                        }
+                        
+                        // Re-check logo status to ensure it's saved and persisted
+                        setTimeout(() => {
+                            checkLogoStatus();
+                            // Force update again after a short delay to ensure persistence
+                            setTimeout(() => {
+                                if (window.updateLogoInNavigation) {
+                                    window.updateLogoInNavigation(data.path);
+                                }
+                            }, 500);
+                        }, 500);
                         
                         // Reset form
                         if (logoFileInput) logoFileInput.value = '';
@@ -1008,5 +1027,6 @@
             }
         });
     </script>
+    <script src="/js/logo-updater.js"></script>
 </body>
 </html>

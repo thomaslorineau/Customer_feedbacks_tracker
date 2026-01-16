@@ -23,8 +23,14 @@
 
     // Update logo in navigation menu
     function updateLogoInNavigation(logoPath) {
+        // Always hide SVG fallback first (no fake logo)
+        const allSvgFallbacks = document.querySelectorAll('.nav-logo svg.ovh-logo');
+        allSvgFallbacks.forEach(svg => {
+            svg.style.display = 'none';
+        });
+        
         if (!logoPath) {
-            // No logo path provided - hide all logos
+            // No logo path provided - hide all logos and ensure SVG fallback is hidden
             const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
             navLogos.forEach(img => {
                 if (img.tagName === 'IMG') {
@@ -45,11 +51,11 @@
                 img.style.objectFit = 'contain';
                 img.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))';
                 img.onerror = function() {
-                    // If logo fails to load, hide it
+                    // If logo fails to load, hide it (but never show SVG fallback)
                     this.style.display = 'none';
                 };
                 
-                // Hide fallback SVG if exists
+                // Hide fallback SVG if exists (no fake logo)
                 const fallbackSvg = img.nextElementSibling;
                 if (fallbackSvg && fallbackSvg.classList.contains('ovh-logo')) {
                     fallbackSvg.style.display = 'none';
@@ -69,37 +75,60 @@
                 // Store in localStorage
                 localStorage.setItem('logoPath', data.path);
             } else {
-                // No logo exists - hide all logo images and show placeholder
+                // No logo exists - hide all logo images and ensure SVG fallback is hidden (no fake logo)
                 const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
                 navLogos.forEach(img => {
                     if (img.tagName === 'IMG') {
                         img.style.display = 'none';
                     }
                 });
+                // Always hide SVG fallback (no fake logo)
+                const allSvgFallbacks = document.querySelectorAll('.nav-logo svg.ovh-logo');
+                allSvgFallbacks.forEach(svg => {
+                    svg.style.display = 'none';
+                });
                 // Remove from localStorage if no logo
                 localStorage.removeItem('logoPath');
             }
         } catch (error) {
             console.debug('Logo status check failed (this is OK if no logo uploaded):', error);
-            // On error, hide logos to be safe
+            // On error, hide logos to be safe and ensure SVG fallback is hidden (no fake logo)
             const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
             navLogos.forEach(img => {
                 if (img.tagName === 'IMG') {
                     img.style.display = 'none';
                 }
             });
+            // Always hide SVG fallback (no fake logo)
+            const allSvgFallbacks = document.querySelectorAll('.nav-logo svg.ovh-logo');
+            allSvgFallbacks.forEach(svg => {
+                svg.style.display = 'none';
+            });
         }
     }
 
+    // Immediately hide SVG fallback on page load (no fake logo)
+    function hideSvgFallback() {
+        const allSvgFallbacks = document.querySelectorAll('.nav-logo svg.ovh-logo');
+        allSvgFallbacks.forEach(svg => {
+            svg.style.display = 'none';
+        });
+    }
+    
+    // Hide SVG fallback immediately (before DOM is ready)
+    hideSvgFallback();
+    
     // Initialize on page load
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
+            hideSvgFallback(); // Hide again after DOM is ready
             checkLogoStatus();
             checkLogoUpdate();
             // Check for updates every 2 seconds
             setInterval(checkLogoUpdate, 2000);
         });
     } else {
+        hideSvgFallback(); // Hide immediately if DOM is already ready
         checkLogoStatus();
         checkLogoUpdate();
         setInterval(checkLogoUpdate, 2000);
@@ -108,6 +137,7 @@
     // Export function for manual updates (from settings page)
     window.updateLogoInNavigation = updateLogoInNavigation;
 })();
+
 
 
 
