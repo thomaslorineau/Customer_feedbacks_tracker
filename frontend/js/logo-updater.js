@@ -93,7 +93,8 @@
             const data = await response.json();
             
             if (data.exists) {
-                updateLogoInNavigation(data.path);
+                // Always use fresh timestamp when loading from API
+                updateLogoInNavigation(data.path, false);
                 // Store in localStorage
                 localStorage.setItem('logoPath', data.path);
             } else {
