@@ -4,9 +4,29 @@
 
 # Obtenir le répertoire du script (scripts/install/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Remonter à la racine du projet (2 niveaux: scripts/install -> scripts -> racine)
-APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-cd "$APP_DIR"
+# Mais aussi vérifier si on est déjà à la racine ou dans scripts/
+if [ -f "$SCRIPT_DIR/../../.git/config" ] || [ -d "$SCRIPT_DIR/../../.git" ]; then
+    # On est dans scripts/install/, remonter de 2 niveaux
+    APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+elif [ -f "$SCRIPT_DIR/../.git/config" ] || [ -d "$SCRIPT_DIR/../.git" ]; then
+    # On est dans scripts/, remonter d'1 niveau
+    APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+elif [ -f "$SCRIPT_DIR/.git/config" ] || [ -d "$SCRIPT_DIR/.git" ]; then
+    # On est déjà à la racine
+    APP_DIR="$SCRIPT_DIR"
+else
+    # Par défaut, essayer de remonter de 2 niveaux
+    APP_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+fi
+
+# S'assurer qu'on est dans le bon répertoire
+cd "$APP_DIR" || {
+    echo "Erreur: Impossible de se déplacer dans le répertoire: $APP_DIR" >&2
+    echo "SCRIPT_DIR: $SCRIPT_DIR" >&2
+    exit 1
+}
 
 # Couleurs
 GREEN='\033[0;32m'
@@ -417,13 +437,30 @@ else
     info "APP_DIR_ABS: $APP_DIR_ABS"
     
     # Liste des chemins à tester (ordre de priorité)
+    # Essayer aussi depuis le répertoire courant si différent de APP_DIR
+    CURRENT_DIR=$(pwd)
+    
     POSSIBLE_PATHS=(
         "$APP_DIR_ABS/scripts/start/start.sh"
         "$APP_DIR/scripts/start/start.sh"
+        "$CURRENT_DIR/scripts/start/start.sh"
         "scripts/start/start.sh"
         "./scripts/start/start.sh"
         "$(pwd)/scripts/start/start.sh"
     )
+    
+    # Si on est dans un sous-répertoire, essayer aussi de remonter
+    if [ "$CURRENT_DIR" != "$APP_DIR" ] && [ "$CURRENT_DIR" != "$APP_DIR_ABS" ]; then
+        # Essayer de trouver la racine en remontant
+        TEMP_DIR="$CURRENT_DIR"
+        while [ "$TEMP_DIR" != "/" ] && [ ${#TEMP_DIR} -gt 1 ]; do
+            if [ -f "$TEMP_DIR/scripts/start/start.sh" ]; then
+                POSSIBLE_PATHS+=("$TEMP_DIR/scripts/start/start.sh")
+                break
+            fi
+            TEMP_DIR=$(dirname "$TEMP_DIR")
+        done
+    fi
     
     # Tester chaque chemin et afficher le résultat
     START_SCRIPT=""
@@ -437,6 +474,16 @@ else
             info "   ❌ Non trouvé: $path"
         fi
     done
+    
+    # Si toujours pas trouvé, essayer avec find depuis APP_DIR
+    if [ -z "$START_SCRIPT" ] || [ ! -f "$START_SCRIPT" ]; then
+        info "Recherche avec find depuis $APP_DIR..."
+        FOUND_SCRIPT=$(find "$APP_DIR" -maxdepth 4 -name "start.sh" -path "*/scripts/start/start.sh" -type f 2>/dev/null | head -1)
+        if [ -n "$FOUND_SCRIPT" ] && [ -f "$FOUND_SCRIPT" ]; then
+            info "   ✅ Trouvé avec find: $FOUND_SCRIPT"
+            START_SCRIPT="$FOUND_SCRIPT"
+        fi
+    fi
     
     if [ -n "$START_SCRIPT" ] && [ -f "$START_SCRIPT" ]; then
         success "Script trouvé: $START_SCRIPT"
