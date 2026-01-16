@@ -6,28 +6,21 @@
 (function() {
     'use strict';
 
-    // Check for logo updates from localStorage
+    // Check for logo updates from localStorage (only for recent uploads)
     function checkLogoUpdate() {
         const logoPath = localStorage.getItem('logoPath');
         const logoUpdated = localStorage.getItem('logoUpdated');
         
+        // Only update if it's a very recent upload (< 10 seconds) to handle immediate updates
         if (logoPath && logoUpdated) {
             const updateTime = parseInt(logoUpdated);
             const now = Date.now();
             const timeSinceUpdate = now - updateTime;
             
-            // Always use localStorage logo if available (preserves user's uploaded logo)
-            // Force reload only for very recent updates (< 10 seconds)
+            // Only force reload for very recent uploads (< 10 seconds)
             if (timeSinceUpdate < 10000) {
-                updateLogoInNavigation(logoPath, true); // Force reload for recent uploads
-            } else if (timeSinceUpdate < 300000) { // Less than 5 minutes
-                // For updates less than 5 minutes old, update without force reload
-                updateLogoInNavigation(logoPath, false);
+                updateLogoInNavigation(logoPath, true);
             }
-            // For older updates (> 5 minutes), let checkLogoStatus handle it via API
-        } else if (logoPath) {
-            // We have a path but no timestamp - use it anyway
-            updateLogoInNavigation(logoPath, false);
         }
     }
 
@@ -93,37 +86,26 @@
         });
     }
 
-    // Check logo status on page load
+    // Check logo status on page load (ONLY ONCE - no periodic checks)
     async function checkLogoStatus(forceReload = false) {
         try {
-            // First, check localStorage - prioritize it over API to preserve user's uploaded logo
+            // First, check localStorage - if we have a logo path, use it directly
             const storedLogoPath = localStorage.getItem('logoPath');
-            const logoUpdated = localStorage.getItem('logoUpdated');
-            const isRecentUpload = logoUpdated && (Date.now() - parseInt(logoUpdated) < 30000); // 30 seconds
-            
-            // If we have a stored logo path and it's recent, use it instead of API
-            // This prevents API from overwriting a recently uploaded logo
-            if (storedLogoPath && isRecentUpload && !forceReload) {
-                console.debug('Using stored logo path from localStorage:', storedLogoPath);
+            if (storedLogoPath && !forceReload) {
+                // Use stored logo path - no API call needed
                 updateLogoInNavigation(storedLogoPath, false);
                 return;
             }
             
-            // Only check API if no stored path or if forceReload is requested
+            // Only check API if no stored path or if forceReload is explicitly requested
+            // This happens only once on initial page load
             const response = await fetch(`${window.location.origin}/api/logo-status`);
             const data = await response.json();
             
             if (data.exists) {
-                // Check if API path matches stored path
-                if (storedLogoPath && storedLogoPath === data.path && !forceReload) {
-                    // Paths match, use stored path (preserves any custom handling)
-                    updateLogoInNavigation(storedLogoPath, false);
-                } else {
-                    // Paths differ or force reload requested - use API path
-                    updateLogoInNavigation(data.path, forceReload);
-                    // Update localStorage with API path
-                    localStorage.setItem('logoPath', data.path);
-                }
+                updateLogoInNavigation(data.path, forceReload);
+                // Store in localStorage for future use
+                localStorage.setItem('logoPath', data.path);
             } else {
                 // No logo exists - hide all logo images and ensure SVG fallback is hidden (no fake logo)
                 const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
@@ -172,16 +154,17 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             hideSvgFallback(); // Hide again after DOM is ready
-            checkLogoStatus(false); // Don't force reload on initial load
+            // Check logo status ONCE on page load (checks API only if no localStorage)
+            checkLogoStatus(false);
+            // Check for very recent uploads (< 10 seconds) - only runs once, no interval
             checkLogoUpdate();
-            // Check for updates every 2 seconds
-            setInterval(checkLogoUpdate, 2000);
         });
     } else {
         hideSvgFallback(); // Hide immediately if DOM is already ready
-        checkLogoStatus(false); // Don't force reload on initial load
+        // Check logo status ONCE on page load (checks API only if no localStorage)
+        checkLogoStatus(false);
+        // Check for very recent uploads (< 10 seconds) - only runs once, no interval
         checkLogoUpdate();
-        setInterval(checkLogoUpdate, 2000);
     }
 
     // Export function for manual updates (from settings page)
