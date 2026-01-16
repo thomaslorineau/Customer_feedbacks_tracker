@@ -50,6 +50,20 @@ export class API {
         return response.json();
     }
     
+    async getVersion() {
+        try {
+            const response = await fetch(`${this.baseURL}/api/version`);
+            if (!response.ok) {
+                throw new Error(`Failed to get version: ${response.statusText}`);
+            }
+            return response.json();
+        } catch (error) {
+            console.warn('Failed to fetch version from API:', error);
+            // Return default version
+            return { version: '1.0.1' };
+        }
+    }
+    
     async getUIVersion() {
         const response = await fetch(`${this.baseURL}/admin/get-ui-version`);
         if (!response.ok) {

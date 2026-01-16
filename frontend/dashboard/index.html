@@ -54,6 +54,7 @@
             </div>
         </div>
         <div class="nav-menu-right">
+            <span class="beta-badge" title="Application en version beta">BETA</span>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
         </div>
@@ -444,11 +445,22 @@
     <script src="/js/logo-updater.js"></script>
     <script type="module" src="/dashboard/js/api.js"></script>
     <script type="module" src="/dashboard/js/state.js"></script>
+    <!-- Filtered Posts Drawer -->
+    <div id="filteredPostsDrawer" class="filtered-posts-drawer">
+        <div class="drawer-backdrop" onclick="closeFilteredPostsDrawer()"></div>
+        <div class="drawer-panel">
+            <div id="filteredPostsDrawerContent" class="drawer-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/dashboard/js/version-loader.js"></script>
     <script type="module" src="/dashboard/js/dashboard.js"></script>
-    <script type="module" src="/dashboard/js/charts.js"></script>
-    <script type="module" src="/dashboard/js/world-map.js"></script>
-    <script type="module" src="/dashboard/js/version-switch.js"></script>
-    <script type="module" src="/dashboard/js/app.js"></script>
+    <script type="module" src="/dashboard/js/charts.js?v=2.0"></script>
+    <script type="module" src="/dashboard/js/world-map.js?v=2.0"></script>
+    <script type="module" src="/dashboard/js/version-switch.js?v=2.0"></script>
+    <script type="module" src="/dashboard/js/app.js?v=2.0"></script>
     <script>
         // Close help menu when clicking outside
         document.addEventListener('click', (e) => {

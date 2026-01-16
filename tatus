@@ -1,0 +1,20 @@
+* [33m8610631[m[33m ([m[1;36mHEAD -> [m[1;32mdevelop[m[33m, [m[1;31morigin/develop[m[33m)[m chore: bump version to 1.0.64
+* [33m8f47539[m[33m ([m[1;31morigin/master[m[33m)[m chore: bump version to 1.0.63
+* [33mae73430[m fix: windows start script and dashboard loading
+* [33m6ce71a2[m chore: bump version to 1.0.62
+* [33mb9e8629[m chore: Save all pending changes
+* [33m90d29fc[m chore: bump version to 1.0.61
+* [33m4ae889e[m fix: Export updateDashboard function properly
+* [33m236b9ba[m chore: bump version to 1.0.60
+* [33mebba063[m fix: Fix empty dashboard by subscribing dashboard to state changes - Add state subscription in initDashboard to auto-update when posts load - Export updateDashboard function for proper access - Reduce timeout delay for faster updates - Improve logging for debugging
+* [33mfc6244b[m chore: bump version to 1.0.59
+* [33m5dc1387[m fix: Fix three issues - Equalize KPI and Report card sizes (240px fixed width) - Add localhost:8000 to CORS origins for local development - Improve API base URL detection and error handling - Add detailed logging for data loading debugging
+* [33m33dc824[m chore: bump version to 1.0.58
+* [33mf38270b[m fix: Improve data loading fallback in updateDashboard - Ensure updateDashboard is called after loadDashboardData completes
+* [33m7b62e8a[m chore: bump version to 1.0.57
+* [33madf5ca4[m fix: Restore purple color for Generate Report card and fix data loading - Change report generator card from green to purple gradient - Add fallback data loading in updateDashboard if state is empty - Improve logging for debugging data loading issues
+* [33mb36f029[m chore: bump version to 1.0.56
+* [33mcef27f3[m Amélioration de l'interface: centrage des éléments et encarts verts transparents pour satisfaction et report
+* [33m4747263[m chore: bump version to 1.0.55
+* [33macf2378[m fix: Remove last remaining auto-scroll in resetFilters function
+* [33m34dae70[m chore: bump version to 1.0.54

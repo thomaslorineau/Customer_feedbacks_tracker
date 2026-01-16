@@ -18,23 +18,15 @@ backend/ovh_posts.db
 *.log
 backend/*.log
 backend.log
-logs/
-*.log.*
 
-# Environment variables - CRITICAL: Never commit secrets!
+# Environment variables
 .env
-.env.local
-.env.*.local
 backend/.env
-backend/.env.local
-*.env
-!.env.example
+*.env.local
 
 # Configuration (local)
 backend/.app_config
 .host_alias
-backup.sh
-configure_cors.sh
 
 # IDE
 .vscode/
@@ -54,6 +46,10 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+
+
+
 
 
 
