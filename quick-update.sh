@@ -2,6 +2,10 @@
 # Script de mise à jour rapide pour Linux
 # Usage: bash quick-update.sh
 
+# Se rendre exécutable soi-même (au cas où les permissions sont perdues)
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+chmod +x "$SCRIPT_PATH" 2>/dev/null || true
+
 set -e
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -141,3 +141,4 @@ La migration vers DuckDB en production est **un succès complet** :
 **Version:** 1.0
 
 
+

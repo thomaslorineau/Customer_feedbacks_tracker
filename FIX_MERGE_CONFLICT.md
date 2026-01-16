@@ -44,3 +44,4 @@ export USE_DUCKDB=true
 bash scripts/app/restart.sh
 ```
 
+

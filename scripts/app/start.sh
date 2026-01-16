@@ -81,18 +81,64 @@ if command -v lsof > /dev/null 2>&1; then
     fi
 fi
 
+# Vérifications préalables avant démarrage
+echo "🔍 Vérifications préalables..."
+echo "   APP_DIR: $APP_DIR"
+echo "   APP_PORT: $APP_PORT"
+echo "   Venv: $APP_DIR/venv"
+
+# Vérifier que l'environnement virtuel existe et est valide
+if [ ! -f "$APP_DIR/venv/bin/activate" ]; then
+    echo "❌ Erreur: Environnement virtuel invalide"
+    echo "   Fichier manquant: $APP_DIR/venv/bin/activate"
+    echo "   Exécutez: python3 -m venv venv"
+    exit 1
+fi
+
+# Vérifier que Python est disponible dans le venv
+if [ ! -f "$APP_DIR/venv/bin/python" ]; then
+    echo "❌ Erreur: Python non trouvé dans l'environnement virtuel"
+    echo "   Fichier manquant: $APP_DIR/venv/bin/python"
+    exit 1
+fi
+
+# Vérifier que uvicorn est installé
+if ! "$APP_DIR/venv/bin/python" -c "import uvicorn" 2>/dev/null; then
+    echo "❌ Erreur: uvicorn n'est pas installé"
+    echo "   Installez avec: source venv/bin/activate && pip install uvicorn"
+    exit 1
+fi
+
+# Vérifier que le module app.main existe
+if [ ! -f "$APP_DIR/backend/app/main.py" ]; then
+    echo "❌ Erreur: Module app.main introuvable"
+    echo "   Fichier manquant: $APP_DIR/backend/app/main.py"
+    exit 1
+fi
+
+echo "✅ Vérifications OK"
+echo ""
+
 # Démarrer le serveur en arrière-plan
 echo "🚀 Démarrage du serveur..."
+echo "   Commande: cd $APP_DIR/backend && source $APP_DIR/venv/bin/activate && python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT"
+echo "   Logs: $APP_DIR/backend/server.log"
+echo ""
 
 # Créer le répertoire backend si nécessaire
 mkdir -p "$APP_DIR/backend"
 
+# Créer le fichier de log s'il n'existe pas
+touch "$APP_DIR/backend/server.log"
+
 # Utiliser setsid pour créer un nouveau groupe de processus et détacher du terminal
 # Si setsid n'est pas disponible, utiliser nohup avec redirection complète
+START_CMD="cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT"
+
 if command -v setsid > /dev/null 2>&1; then
     # setsid crée un nouveau groupe de processus, détachant complètement du terminal
     # Utiliser bash -c pour s'assurer que l'environnement virtuel est activé dans le sous-processus
-    setsid bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
+    setsid bash -c "$START_CMD" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
     PID=$!
     # Détacher le processus du shell actuel avec disown si disponible
     if command -v disown > /dev/null 2>&1; then
@@ -102,7 +148,7 @@ else
     # Alternative avec nohup et redirection complète
     # Utiliser bash -c pour s'assurer que l'environnement virtuel est activé
     # exec remplace le processus bash par python, évitant les problèmes de signal
-    nohup bash -c "cd '$APP_DIR/backend' && source '$APP_DIR/venv/bin/activate' && exec python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
+    nohup bash -c "$START_CMD" > "$APP_DIR/backend/server.log" 2>&1 < /dev/null &
     PID=$!
     # Détacher le processus
     if command -v disown > /dev/null 2>&1; then
@@ -110,6 +156,7 @@ else
     fi
 fi
 
+echo "   PID: $PID"
 echo $PID > "$APP_DIR/backend/server.pid"
 
 # Attendre un peu pour vérifier que le serveur démarre correctement
@@ -136,8 +183,77 @@ for i in {1..10}; do
             fi
         fi
     else
-        echo "❌ Le processus s'est arrêté immédiatement"
-        echo "📋 Vérifiez les logs: tail -20 $APP_DIR/backend/server.log"
+        echo ""
+        echo "❌ Le processus s'est arrêté immédiatement (PID: $PID)"
+        echo ""
+        echo "🔍 Diagnostic détaillé:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Vérifier le code de sortie si disponible
+        wait $PID 2>/dev/null
+        EXIT_CODE=$?
+        echo "   Code de sortie: $EXIT_CODE"
+        
+        # Afficher les dernières lignes des logs
+        if [ -f "$APP_DIR/backend/server.log" ]; then
+            LOG_SIZE=$(wc -l < "$APP_DIR/backend/server.log" 2>/dev/null || echo "0")
+            if [ "$LOG_SIZE" -gt 0 ]; then
+                echo ""
+                echo "   📋 Dernières lignes des logs ($APP_DIR/backend/server.log):"
+                echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                tail -30 "$APP_DIR/backend/server.log" | sed 's/^/   /'
+                echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            else
+                echo "   ⚠️  Le fichier de log est vide"
+            fi
+        else
+            echo "   ⚠️  Fichier de log introuvable: $APP_DIR/backend/server.log"
+        fi
+        
+        # Vérifications supplémentaires
+        echo ""
+        echo "   🔍 Vérifications supplémentaires:"
+        echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Vérifier Python
+        if [ -f "$APP_DIR/venv/bin/python" ]; then
+            PYTHON_VERSION=$("$APP_DIR/venv/bin/python" --version 2>&1)
+            echo "   ✅ Python: $PYTHON_VERSION"
+        else
+            echo "   ❌ Python: introuvable dans $APP_DIR/venv/bin/python"
+        fi
+        
+        # Vérifier uvicorn
+        if "$APP_DIR/venv/bin/python" -c "import uvicorn" 2>/dev/null; then
+            UVICORN_VERSION=$("$APP_DIR/venv/bin/python" -c "import uvicorn; print(uvicorn.__version__)" 2>/dev/null || echo "inconnue")
+            echo "   ✅ uvicorn: $UVICORN_VERSION"
+        else
+            echo "   ❌ uvicorn: non installé"
+        fi
+        
+        # Vérifier le module app
+        if [ -f "$APP_DIR/backend/app/main.py" ]; then
+            echo "   ✅ Module app.main: trouvé"
+        else
+            echo "   ❌ Module app.main: introuvable ($APP_DIR/backend/app/main.py)"
+        fi
+        
+        # Vérifier les variables d'environnement
+        echo ""
+        echo "   📋 Variables d'environnement:"
+        echo "      ENVIRONMENT: ${ENVIRONMENT:-non défini}"
+        echo "      USE_DUCKDB: ${USE_DUCKDB:-non défini}"
+        echo "      APP_PORT: ${APP_PORT:-non défini}"
+        
+        # Tester la commande manuellement
+        echo ""
+        echo "   💡 Pour tester manuellement, exécutez:"
+        echo "      cd $APP_DIR/backend"
+        echo "      source $APP_DIR/venv/bin/activate"
+        echo "      python -m uvicorn app.main:app --host 0.0.0.0 --port $APP_PORT"
+        
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         rm -f "$APP_DIR/backend/server.pid"
         exit 1
     fi
@@ -255,15 +371,63 @@ if ps -p $PID > /dev/null 2>&1; then
         echo "   3. Exécutez le diagnostic: bash scripts/install/check_access.sh"
         echo "   4. Vérifiez les logs: tail -f $APP_DIR/backend/server.log"
     else
-        echo "❌ Le processus s'est arrêté immédiatement"
-        echo "📋 Vérifiez les logs: tail -f $APP_DIR/backend/server.log"
-        rm -f server.pid
+        echo ""
+        echo "❌ Le processus s'est arrêté après le démarrage (PID: $PID)"
+        echo ""
+        echo "🔍 Diagnostic détaillé:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        
+        # Afficher les dernières lignes des logs
+        if [ -f "$APP_DIR/backend/server.log" ]; then
+            LOG_SIZE=$(wc -l < "$APP_DIR/backend/server.log" 2>/dev/null || echo "0")
+            if [ "$LOG_SIZE" -gt 0 ]; then
+                echo "   📋 Dernières lignes des logs:"
+                echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+                tail -30 "$APP_DIR/backend/server.log" | sed 's/^/   /'
+                echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            else
+                echo "   ⚠️  Le fichier de log est vide"
+            fi
+        else
+            echo "   ⚠️  Fichier de log introuvable"
+        fi
+        
+        echo ""
+        echo "   💡 Pour voir les logs en temps réel:"
+        echo "      tail -f $APP_DIR/backend/server.log"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        rm -f "$APP_DIR/backend/server.pid"
         exit 1
     fi
 else
-    echo "❌ Échec du démarrage du serveur"
-    echo "📋 Vérifiez les logs: tail -f $APP_DIR/backend/server.log"
-    rm -f server.pid
+    echo ""
+    echo "❌ Échec du démarrage du serveur (processus non trouvé)"
+    echo ""
+    echo "🔍 Diagnostic détaillé:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Afficher les dernières lignes des logs
+    if [ -f "$APP_DIR/backend/server.log" ]; then
+        LOG_SIZE=$(wc -l < "$APP_DIR/backend/server.log" 2>/dev/null || echo "0")
+        if [ "$LOG_SIZE" -gt 0 ]; then
+            echo "   📋 Dernières lignes des logs:"
+            echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            tail -30 "$APP_DIR/backend/server.log" | sed 's/^/   /'
+            echo "   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        else
+            echo "   ⚠️  Le fichier de log est vide"
+        fi
+    else
+        echo "   ⚠️  Fichier de log introuvable: $APP_DIR/backend/server.log"
+    fi
+    
+    echo ""
+    echo "   💡 Pour voir les logs en temps réel:"
+    echo "      tail -f $APP_DIR/backend/server.log"
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    rm -f "$APP_DIR/backend/server.pid"
     exit 1
 fi
 

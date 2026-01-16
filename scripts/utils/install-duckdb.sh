@@ -109,3 +109,4 @@ echo "   export ENVIRONMENT=production"
 echo "   export USE_DUCKDB=true"
 echo "   python3 -c \"import sys; sys.path.insert(0, 'backend'); from app.db import get_db_connection; conn, is_duckdb = get_db_connection(); print('DuckDB' if is_duckdb else 'SQLite'); conn.close()\""
 
+
