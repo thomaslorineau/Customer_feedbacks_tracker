@@ -156,14 +156,14 @@
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             hideSvgFallback(); // Hide again after DOM is ready
-            checkLogoStatus();
+            checkLogoStatus(false); // Don't force reload on initial load
             checkLogoUpdate();
             // Check for updates every 2 seconds
             setInterval(checkLogoUpdate, 2000);
         });
     } else {
         hideSvgFallback(); // Hide immediately if DOM is already ready
-        checkLogoStatus();
+        checkLogoStatus(false); // Don't force reload on initial load
         checkLogoUpdate();
         setInterval(checkLogoUpdate, 2000);
     }
