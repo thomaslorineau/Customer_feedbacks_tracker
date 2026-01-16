@@ -2700,8 +2700,24 @@ async def upload_logo(file: UploadFile = File(...)):
     logo_path = assets_logo_path / logo_filename
     
     try:
+        # FORCE REMOVE old logo files before saving new one
+        # Remove all possible logo formats to ensure clean replacement
+        logo_formats = ['svg', 'png', 'jpg', 'jpeg']
+        for ext in logo_formats:
+            old_logo_path = assets_logo_path / f"ovhcloud-logo.{ext}"
+            if old_logo_path.exists():
+                try:
+                    old_logo_path.unlink()
+                    logger.info(f"Removed old logo file: ovhcloud-logo.{ext}")
+                except Exception as e:
+                    logger.warning(f"Could not remove old logo file ovhcloud-logo.{ext}: {e}")
+        
+        # Save new logo file
+        import os
         with open(logo_path, "wb") as f:
             f.write(contents)
+            f.flush()  # Force write to disk
+            os.fsync(f.fileno())  # Force sync with filesystem
         
         logger.info(f"Logo uploaded successfully: {logo_filename}")
         return JSONResponse({
