@@ -370,6 +370,22 @@ if [ -f "backend/requirements.txt" ]; then
         pip install -r requirements.txt --upgrade
         cd ..
         success "Dépendances mises à jour"
+        
+        # Vérifier que DuckDB est bien installé
+        info "Vérification de l'installation de DuckDB..."
+        if python -c "import duckdb" 2>/dev/null; then
+            DUCKDB_VERSION=$(python -c "import duckdb; print(duckdb.__version__)" 2>/dev/null || echo "inconnue")
+            success "DuckDB installé (version $DUCKDB_VERSION)"
+        else
+            warning "DuckDB n'est pas installé, tentative d'installation..."
+            pip install duckdb==0.10.0
+            if python -c "import duckdb" 2>/dev/null; then
+                success "DuckDB installé avec succès"
+            else
+                error "Échec de l'installation de DuckDB"
+                echo "   L'application fonctionnera en mode SQLite (fallback)"
+            fi
+        fi
     else
         warning "Environnement virtuel introuvable"
         echo "   Exécutez install.sh pour créer l'environnement"

@@ -181,6 +181,24 @@ info "Installation des packages requis..."
 cd backend
 python -m pip install -r requirements.txt
 
+# Vérifier que DuckDB est bien installé
+info "Vérification de l'installation de DuckDB..."
+if python -c "import duckdb" 2>/dev/null; then
+    DUCKDB_VERSION=$(python -c "import duckdb; print(duckdb.__version__)" 2>/dev/null || echo "inconnue")
+    success "DuckDB installé (version $DUCKDB_VERSION)"
+else
+    warning "DuckDB n'est pas installé, tentative d'installation..."
+    python -m pip install duckdb==0.10.0
+    if python -c "import duckdb" 2>/dev/null; then
+        success "DuckDB installé avec succès"
+    else
+        error "Échec de l'installation de DuckDB"
+        echo "   L'application fonctionnera en mode SQLite (fallback)"
+        echo "   Vous pouvez installer DuckDB manuellement plus tard avec:"
+        echo "   pip install duckdb==0.10.0"
+    fi
+fi
+
 success "Dépendances installées"
 echo ""
 
