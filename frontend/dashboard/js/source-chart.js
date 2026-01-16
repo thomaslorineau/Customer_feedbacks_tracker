@@ -38,7 +38,11 @@ function updateSourceChartFromState(state) {
     const sentimentBySource = {};
     
     posts.forEach(post => {
-        const source = post.source || 'Unknown';
+        // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+        let source = post.source || 'Unknown';
+        if (source === 'GitHub Issues' || source === 'GitHub Discussions') {
+            source = 'GitHub';
+        }
         const sentiment = post.sentiment_label || 'neutral';
         
         if (!sourceData[source]) {
