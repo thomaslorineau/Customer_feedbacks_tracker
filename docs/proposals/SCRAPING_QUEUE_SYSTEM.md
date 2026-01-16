@@ -191,38 +191,150 @@ data: {"timestamp": "...", "level": "info", "message": "Starting scraper..."}
 data: {"timestamp": "...", "level": "success", "message": "Added 10 posts"}
 ```
 
-### 4. Frontend : Interface Utilisateur
+### 4. Frontend : Amélioration de la Page Logs Existante
 
-#### Composants à modifier/créer
+#### Page existante : `/logs` (`frontend/logs.html`)
 
-1. **Bouton "Scrape New Data"** → Crée un job et redirige vers la page de monitoring
-2. **Page de monitoring des jobs** (`/jobs` ou `/scraping-jobs`)
-   - Liste des jobs en cours/terminés
+**État actuel :**
+- ✅ Affiche les logs de scraping depuis `/api/logs`
+- ✅ Auto-refresh toutes les 5 secondes
+- ✅ Filtres par source et niveau
+- ✅ Statistiques (total, erreurs, warnings, success)
+- ✅ Affichage des logs avec timestamps et sources
+
+**Améliorations à apporter :**
+
+1. **Section "Jobs en cours"** (nouvelle section en haut de la page)
+   - Liste des jobs actifs avec leur progression
    - Barre de progression pour chaque job
-   - Logs en temps réel (SSE ou polling)
+   - Statut (pending, running, completed, failed, cancelled)
    - Bouton "Cancel" pour chaque job
    - Bouton "Cancel All" global
-3. **Notification toast** : "Scraping démarré, job #1234 créé"
+   - Lien vers les logs du job
 
-#### Workflow utilisateur
+2. **Intégration des logs de jobs**
+   - Les logs des jobs apparaissent dans la liste des logs existante
+   - Filtre par `job_id` pour voir les logs d'un job spécifique
+   - Badge "Job #1234" sur les logs associés à un job
+
+3. **Bouton "Scrape New Data" amélioré**
+   - Crée un job au lieu de lancer directement
+   - Notification toast : "Scraping démarré, job #1234 créé"
+   - Option de redirection automatique vers `/logs` pour voir le job
+
+#### Workflow utilisateur amélioré
 
 ```
-1. Utilisateur clique sur "Scrape New Data"
+1. Utilisateur clique sur "Scrape New Data" (page Feedbacks Collection)
    ↓
 2. Frontend envoie POST /api/scrape/jobs
    ↓
 3. Backend crée un job et retourne job_id
    ↓
-4. Frontend affiche notification + redirige vers /jobs/{job_id}
+4. Frontend affiche notification toast :
+   "✅ Scraping démarré (Job #1234)"
+   "📋 Voir les logs" [bouton]
    ↓
-5. Page de monitoring :
-   - Affiche la progression en temps réel (polling ou SSE)
-   - Affiche les logs en temps réel
+5. Option A : Utilisateur reste sur la page
+   - Le scraping tourne en arrière-plan
+   - Pas de blocage de la page
+   ↓
+6. Option B : Utilisateur clique sur "Voir les logs"
+   - Redirection vers /logs
+   - Section "Jobs en cours" affiche le job actif
+   - Logs apparaissent en temps réel avec auto-refresh
+   ↓
+7. Sur la page /logs :
+   - Section "Jobs en cours" en haut
+   - Barre de progression visible
    - Bouton "Cancel" disponible
+   - Logs du job apparaissent dans la liste
    ↓
-6. Quand terminé :
-   - Affiche les résultats
+8. Quand terminé :
+   - Job passe en "completed"
+   - Résultats affichés dans la section jobs
+   - Logs complets disponibles dans la liste
    - Bouton "Retour à la collection" pour voir les nouveaux posts
+```
+
+#### Modifications de `frontend/logs.html`
+
+**Ajouts à faire :**
+
+1. **Nouvelle section "Active Jobs"** (avant les stats)
+```html
+<div class="active-jobs-section">
+    <h2>🔄 Jobs en cours</h2>
+    <div id="activeJobsContainer">
+        <!-- Jobs actifs affichés ici -->
+    </div>
+    <button id="cancelAllBtn" class="danger" onclick="cancelAllJobs()" style="display:none;">
+        ❌ Cancel All Jobs
+    </button>
+</div>
+```
+
+2. **Composant Job Card**
+```html
+<div class="job-card" data-job-id="...">
+    <div class="job-header">
+        <span class="job-id">Job #1234</span>
+        <span class="job-status running">Running</span>
+        <button onclick="cancelJob('...')">Cancel</button>
+    </div>
+    <div class="job-progress">
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: 45%"></div>
+        </div>
+        <span class="progress-text">8/20 tasks completed</span>
+    </div>
+    <div class="job-current-task">
+        Scraping X/Twitter for 'ovh vps'...
+    </div>
+    <div class="job-results">
+        <span>✅ X: 10 posts</span>
+        <span>✅ GitHub: 5 posts</span>
+    </div>
+</div>
+```
+
+3. **Filtre par job_id** (ajout dans les contrôles)
+```html
+<select id="jobFilter" onchange="loadLogs()">
+    <option value="">Tous les jobs</option>
+    <!-- Options générées dynamiquement -->
+</select>
+```
+
+4. **Fonctions JavaScript à ajouter**
+```javascript
+// Charger les jobs actifs
+async function loadActiveJobs() {
+    const response = await fetch(`${API_BASE}/api/scrape/jobs?status=running`);
+    const data = await response.json();
+    displayActiveJobs(data.jobs);
+}
+
+// Afficher les jobs actifs
+function displayActiveJobs(jobs) {
+    // Afficher dans la section active-jobs-section
+    // Afficher/masquer le bouton "Cancel All"
+}
+
+// Annuler un job
+async function cancelJob(jobId) {
+    await fetch(`${API_BASE}/api/scrape/jobs/${jobId}/cancel`, { method: 'POST' });
+    loadActiveJobs();
+}
+
+// Annuler tous les jobs
+async function cancelAllJobs() {
+    await fetch(`${API_BASE}/api/scrape/jobs/cancel-all`, { method: 'POST' });
+    loadActiveJobs();
+}
+
+// Polling pour les jobs actifs (toutes les 2 secondes)
+setInterval(loadActiveJobs, 2000);
 ```
 
 ### 5. Implémentation Backend
@@ -325,44 +437,164 @@ async def list_jobs(status: str = None, limit: int = 10):
 
 ### 6. Implémentation Frontend
 
-#### Fichiers à créer/modifier
+#### Fichiers à modifier
 
-**`frontend/jobs/index.html`** (nouvelle page)
-- Liste des jobs
-- Monitoring en temps réel
-- Boutons d'annulation
-
-**`frontend/js/jobs.js`** (nouveau fichier)
-```javascript
-class JobMonitor {
-    constructor(jobId) {
-        this.jobId = jobId;
-        this.eventSource = null;
-    }
-    
-    startMonitoring() {
-        // Polling ou SSE pour les logs
-        this.pollStatus();
-    }
-    
-    async pollStatus() {
-        const response = await fetch(`/api/scrape/jobs/${this.jobId}`);
-        const job = await response.json();
-        this.updateUI(job);
-        if (job.status === 'running') {
-            setTimeout(() => this.pollStatus(), 2000);
-        }
-    }
-    
-    cancel() {
-        fetch(`/api/scrape/jobs/${this.jobId}/cancel`, { method: 'POST' });
-    }
-}
-```
+**`frontend/logs.html`** (améliorer la page existante)
+- Ajouter la section "Active Jobs" en haut
+- Ajouter les fonctions JavaScript pour gérer les jobs
+- Intégrer les logs de jobs dans la liste existante
+- Ajouter le filtre par job_id
 
 **`frontend/index.html`** (modifier)
 - Modifier `scrapeAllSources()` pour créer un job au lieu de lancer directement
-- Rediriger vers la page de monitoring
+- Afficher une notification toast avec lien vers `/logs`
+- Ne plus bloquer la page pendant le scraping
+
+**Modifications détaillées :**
+
+1. **`frontend/logs.html`** - Ajouter après la ligne 475 (après le header) :
+```html
+<!-- Section Active Jobs -->
+<div class="active-jobs-section" id="activeJobsSection" style="display:none;">
+    <div style="background: var(--bg-card); padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin: 0; color: var(--accent-primary);">🔄 Jobs en cours</h2>
+            <button id="cancelAllBtn" class="danger" onclick="cancelAllJobs()" style="display:none;">
+                ❌ Cancel All
+            </button>
+        </div>
+        <div id="activeJobsContainer">
+            <!-- Jobs actifs affichés ici -->
+        </div>
+    </div>
+</div>
+```
+
+2. **`frontend/logs.html`** - Ajouter dans les contrôles (ligne 456) :
+```html
+<select id="jobFilter" onchange="loadLogs()" style="display:none;">
+    <option value="">Tous les jobs</option>
+</select>
+```
+
+3. **`frontend/logs.html`** - Ajouter les fonctions JavaScript (avant la fermeture du script) :
+```javascript
+// Gestion des jobs actifs
+let activeJobsInterval = null;
+
+async function loadActiveJobs() {
+    try {
+        const response = await fetch(`${API_BASE}/api/scrape/jobs?status=running`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const jobs = data.jobs || [];
+        
+        if (jobs.length > 0) {
+            document.getElementById('activeJobsSection').style.display = 'block';
+            document.getElementById('cancelAllBtn').style.display = 'inline-block';
+            displayActiveJobs(jobs);
+        } else {
+            document.getElementById('activeJobsSection').style.display = 'none';
+            document.getElementById('cancelAllBtn').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading active jobs:', error);
+    }
+}
+
+function displayActiveJobs(jobs) {
+    const container = document.getElementById('activeJobsContainer');
+    container.innerHTML = jobs.map(job => {
+        const progress = job.progress || { total: 0, completed: 0 };
+        const percentage = progress.total > 0 ? (progress.completed / progress.total * 100) : 0;
+        return `
+            <div class="job-card" data-job-id="${job.job_id}" style="background: var(--bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="font-weight: bold; color: var(--accent-primary);">Job #${job.job_id.substring(0, 8)}</span>
+                    <span class="job-status" style="padding: 4px 12px; border-radius: 4px; background: var(--info); color: white; font-size: 0.85em;">${job.status}</span>
+                    <button onclick="cancelJob('${job.job_id}')" style="padding: 6px 12px; background: var(--error); color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                </div>
+                <div class="job-progress" style="margin-bottom: 10px;">
+                    <div style="background: rgba(0,0,0,0.3); height: 20px; border-radius: 10px; overflow: hidden;">
+                        <div style="background: var(--accent-primary); height: 100%; width: ${percentage}%; transition: width 0.3s;"></div>
+                    </div>
+                    <span style="font-size: 0.9em; color: var(--text-secondary);">${progress.completed}/${progress.total} tasks</span>
+                </div>
+                ${job.progress?.current_task ? `<div style="font-size: 0.9em; color: var(--text-secondary);">${job.progress.current_task}</div>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+async function cancelJob(jobId) {
+    if (!confirm(`Annuler le job #${jobId.substring(0, 8)} ?`)) return;
+    try {
+        await fetch(`${API_BASE}/api/scrape/jobs/${jobId}/cancel`, { method: 'POST' });
+        loadActiveJobs();
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+    }
+}
+
+async function cancelAllJobs() {
+    if (!confirm('Annuler tous les jobs en cours ?')) return;
+    try {
+        await fetch(`${API_BASE}/api/scrape/jobs/cancel-all`, { method: 'POST' });
+        loadActiveJobs();
+    } catch (error) {
+        alert(`Erreur: ${error.message}`);
+    }
+}
+
+// Charger les jobs actifs au chargement de la page
+loadActiveJobs();
+
+// Polling pour les jobs actifs (toutes les 2 secondes)
+activeJobsInterval = setInterval(loadActiveJobs, 2000);
+```
+
+4. **`frontend/index.html`** - Modifier `scrapeAllSources()` :
+```javascript
+async function scrapeAllSources() {
+    const keywords = loadKeywords();
+    if (!keywords || keywords.length === 0) {
+        showToast('Please add keywords before scraping', 'error');
+        return;
+    }
+    
+    try {
+        // Créer un job au lieu de lancer directement
+        const response = await fetch(`${API_BASE}/api/scrape/jobs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                keywords: keywords,
+                sources: ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin'],
+                limit: 50,
+                concurrency: 2
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create scraping job');
+        }
+        
+        const data = await response.json();
+        const jobId = data.job_id;
+        
+        // Afficher notification avec lien vers les logs
+        showToast(
+            `✅ Scraping démarré (Job #${jobId.substring(0, 8)})`,
+            'success',
+            5000,
+            () => window.location.href = '/logs'
+        );
+        
+    } catch (error) {
+        showToast(`Erreur: ${error.message}`, 'error');
+    }
+}
+```
 
 ### 7. Logs et Monitoring
 
