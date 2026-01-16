@@ -881,12 +881,14 @@ function updateCriticalPostsButton() {
     const countSpan = document.getElementById('criticalPostsCount');
     if (!btn || !countSpan) return;
     
-    // Calculate critical posts (negative + recent)
+    // Calculate critical posts (negative + last 7 days)
+    // Use all posts, not just filtered ones
+    const allPosts = state.posts || [];
     const now = new Date();
-    const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-    const criticalPosts = (state.filteredPosts || []).filter(p => {
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const criticalPosts = allPosts.filter(p => {
         const postDate = new Date(p.created_at);
-        const isRecent = postDate >= last48h;
+        const isRecent = postDate >= last7Days;
         const isNegative = p.sentiment_label === 'negative';
         return isRecent && isNegative;
     });
@@ -904,42 +906,171 @@ function updateCriticalPostsButton() {
 function openCriticalPosts() {
     if (!state) return;
     
-    // Set filter to show only negative posts
-    state.setFilter('sentiment', 'negative');
+    // Get all posts (not just filtered ones)
+    const allPosts = state.posts || [];
     
-    // Set sort to critical
-    const sortSelect = document.getElementById('sortSelect');
-    if (sortSelect) {
-        sortSelect.value = 'critical';
+    // Filter negative posts from last 7 days
+    const now = new Date();
+    const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const negativePosts = allPosts.filter(p => {
+        const postDate = new Date(p.created_at);
+        const isRecent = postDate >= last7Days;
+        const isNegative = p.sentiment_label === 'negative';
+        return isRecent && isNegative;
+    });
+    
+    if (negativePosts.length === 0) {
+        // No negative posts, show message
+        alert('No negative posts found in the last 7 days.');
+        return;
     }
     
-    // Update sentiment filter dropdown
-    const sentimentFilter = document.getElementById('sentimentFilter');
-    if (sentimentFilter) {
-        sentimentFilter.value = 'negative';
+    // Sort by score (highest sentiment_score first) then by date (most recent first)
+    const criticalPosts = negativePosts.sort((a, b) => {
+        // First sort by sentiment_score (higher = more negative)
+        const scoreA = a.sentiment_score || 0;
+        const scoreB = b.sentiment_score || 0;
+        if (scoreB !== scoreA) {
+            return scoreB - scoreA; // Higher score first
+        }
+        // If scores are equal, sort by date (most recent first)
+        return new Date(b.created_at) - new Date(a.created_at);
+    });
+    
+    // Open drawer with critical posts
+    openCriticalPostsDrawer(criticalPosts);
+}
+
+function openCriticalPostsDrawer(posts) {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (!drawer) return;
+    
+    // Calculate scrollbar width before hiding it
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    
+    // Prevent body scroll and compensate for scrollbar to prevent layout shift
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    document.body.classList.add('drawer-open');
+    
+    drawer.classList.add('open');
+    updateCriticalPostsDrawer(posts);
+}
+
+function updateCriticalPostsDrawer(posts) {
+    const drawerContent = document.getElementById('filteredPostsDrawerContent');
+    if (!drawerContent) return;
+    
+    const totalPosts = state?.posts?.length || 0;
+    
+    // Helper functions (same as in whats-happening.js)
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
     }
     
-    // Mark that critical filter is active
-    state.criticalFilterActive = true;
-    
-    // Update dashboard
-    updateDashboard();
-    
-    // Don't scroll - keep user on current view
-    // const postsSection = document.querySelector('.panel-bottom');
-    // if (postsSection) {
-    //     postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // }
-    
-    // Highlight the section briefly (if needed)
-    const postsSection = document.querySelector('.panel-bottom');
-    if (postsSection) {
-        postsSection.style.transition = 'box-shadow 0.3s ease';
-        postsSection.style.boxShadow = '0 0 20px rgba(0, 153, 255, 0.5)';
-        setTimeout(() => {
-            postsSection.style.boxShadow = '';
-        }, 2000);
+    function getSourceIcon(source) {
+        const icons = {
+            'twitter': '🐦',
+            'x': '🐦',
+            'reddit': '🔴',
+            'github': '💻',
+            'stackoverflow': '📚',
+            'trustpilot': '⭐',
+            'default': '📝'
+        };
+        return icons[source?.toLowerCase()] || icons.default;
     }
+    
+    function truncateText(text, maxLength) {
+        if (!text) return 'No content';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    let html = `
+        <div class="drawer-header">
+            <h3>Critical Posts (Negative - Last 7 Days)</h3>
+            <button class="drawer-close" onclick="closeFilteredPostsDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div class="drawer-info">
+            <div class="drawer-stats">
+                <span class="drawer-stat-value">${posts.length}</span>
+                <span class="drawer-stat-label">of ${totalPosts} posts</span>
+            </div>
+            <div class="drawer-filters">
+                <span class="filter-tag">Sentiment: negative</span>
+                <span class="filter-tag">Period: Last 7 days</span>
+                <span class="filter-tag">Sorted by: Score (highest) & Date (recent)</span>
+            </div>
+        </div>
+        <div class="drawer-posts">
+    `;
+    
+    if (posts.length === 0) {
+        html += `
+            <div class="drawer-empty">
+                <p>No critical posts found.</p>
+            </div>
+        `;
+    } else {
+        // Show first 50 posts
+        const postsToShow = posts.slice(0, 50);
+        postsToShow.forEach(post => {
+            const timeAgo = getTimeAgo(post.created_at);
+            const sourceIcon = getSourceIcon(post.source);
+            const sentiment = post.sentiment_label || 'neutral';
+            const category = getProductLabel(post.id, post.content, post.language) || 'General';
+            const score = post.sentiment_score ? post.sentiment_score.toFixed(2) : 'N/A';
+            
+            html += `
+                <div class="drawer-post-item">
+                    <div class="drawer-post-header">
+                        <div class="drawer-post-source">
+                            <span class="drawer-source-icon">${sourceIcon}</span>
+                            <span class="drawer-source-name">${post.source || 'Unknown'}</span>
+                            <span class="drawer-post-time">${timeAgo}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="drawer-sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+                            <span style="font-size: 0.85em; color: #ef4444; font-weight: bold;">Score: ${score}</span>
+                        </div>
+                    </div>
+                    <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
+                    <div class="drawer-post-meta">
+                        <span class="drawer-post-category">${category}</span>
+                        ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link">View post →</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        if (posts.length > 50) {
+            html += `
+                <div class="drawer-more">
+                    <p>Showing 50 of ${posts.length} posts</p>
+                </div>
+            `;
+        }
+    }
+    
+    html += `</div>`;
+    drawerContent.innerHTML = html;
 }
 
 function clearCriticalFilter() {
