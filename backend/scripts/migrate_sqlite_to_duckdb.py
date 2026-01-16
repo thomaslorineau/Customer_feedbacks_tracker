@@ -104,9 +104,10 @@ def main():
         cursor_duckdb = conn_duckdb.cursor()
         
         # Table posts
+        cursor_duckdb.execute("CREATE SEQUENCE IF NOT EXISTS posts_id_seq START 1")
         cursor_duckdb.execute('''
             CREATE TABLE IF NOT EXISTS posts (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('posts_id_seq'),
                 source TEXT,
                 author TEXT,
                 content TEXT,
@@ -128,18 +129,20 @@ def main():
         cursor_duckdb.execute('CREATE INDEX IF NOT EXISTS idx_posts_url ON posts(url)')
         
         # Table saved_queries
+        cursor_duckdb.execute("CREATE SEQUENCE IF NOT EXISTS saved_queries_id_seq START 1")
         cursor_duckdb.execute('''
             CREATE TABLE IF NOT EXISTS saved_queries (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('saved_queries_id_seq'),
                 keyword TEXT UNIQUE,
                 created_at TEXT
             )
         ''')
         
         # Table scraping_logs
+        cursor_duckdb.execute("CREATE SEQUENCE IF NOT EXISTS scraping_logs_id_seq START 1")
         cursor_duckdb.execute('''
             CREATE TABLE IF NOT EXISTS scraping_logs (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('scraping_logs_id_seq'),
                 timestamp TEXT NOT NULL,
                 source TEXT,
                 level TEXT,

@@ -57,12 +57,13 @@ def init_db():
     conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
-    # Use SERIAL for DuckDB (auto-increment), INTEGER AUTOINCREMENT for SQLite
+    # Use BIGINT with sequences for DuckDB (auto-increment), INTEGER AUTOINCREMENT for SQLite
     if is_duckdb:
-        # DuckDB: Use SERIAL for auto-increment
+        # DuckDB: Create sequence first, then use BIGINT with DEFAULT nextval
+        c.execute("CREATE SEQUENCE IF NOT EXISTS posts_id_seq START 1")
         c.execute('''
             CREATE TABLE IF NOT EXISTS posts (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('posts_id_seq'),
                 source TEXT,
                 author TEXT,
                 content TEXT,
@@ -119,9 +120,10 @@ def init_db():
     
     # Saved search queries / keywords
     if is_duckdb:
+        c.execute("CREATE SEQUENCE IF NOT EXISTS saved_queries_id_seq START 1")
         c.execute('''
             CREATE TABLE IF NOT EXISTS saved_queries (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('saved_queries_id_seq'),
                 keyword TEXT UNIQUE,
                 created_at TEXT
             )
@@ -137,9 +139,10 @@ def init_db():
     
     # Scraping logs table for persistent logging
     if is_duckdb:
+        c.execute("CREATE SEQUENCE IF NOT EXISTS scraping_logs_id_seq START 1")
         c.execute('''
             CREATE TABLE IF NOT EXISTS scraping_logs (
-                id BIGSERIAL PRIMARY KEY,
+                id BIGINT PRIMARY KEY DEFAULT nextval('scraping_logs_id_seq'),
                 timestamp TEXT NOT NULL,
                 source TEXT,
                 level TEXT,

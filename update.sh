@@ -1,6 +1,11 @@
 #!/bin/bash
 # Script de mise à jour de l'application via git
-# Usage: ./update.sh
+# Usage: ./update.sh ou bash update.sh
+
+# Se rendre exécutable soi-même (au cas où les permissions sont perdues)
+# Note: Si le script n'est pas exécutable, utilisez: bash update.sh
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+chmod +x "$SCRIPT_PATH" 2>/dev/null || true
 
 # Obtenir le répertoire du script (scripts/install/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
