@@ -14,13 +14,20 @@
         if (logoPath && logoUpdated) {
             const updateTime = parseInt(logoUpdated);
             const now = Date.now();
-            // Only update if less than 10 seconds ago (recent update) - force reload for recent updates
-            if (now - updateTime < 10000) {
+            const timeSinceUpdate = now - updateTime;
+            
+            // Always use localStorage logo if available (preserves user's uploaded logo)
+            // Force reload only for very recent updates (< 10 seconds)
+            if (timeSinceUpdate < 10000) {
                 updateLogoInNavigation(logoPath, true); // Force reload for recent uploads
-            } else {
-                // For older updates, still update but don't force reload
+            } else if (timeSinceUpdate < 300000) { // Less than 5 minutes
+                // For updates less than 5 minutes old, update without force reload
                 updateLogoInNavigation(logoPath, false);
             }
+            // For older updates (> 5 minutes), let checkLogoStatus handle it via API
+        } else if (logoPath) {
+            // We have a path but no timestamp - use it anyway
+            updateLogoInNavigation(logoPath, false);
         }
     }
 
