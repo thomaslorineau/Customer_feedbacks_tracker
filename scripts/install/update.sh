@@ -75,8 +75,8 @@ info "Arrêt de l'application..."
 if [ -f "backend/server.pid" ]; then
     PID=$(cat backend/server.pid)
     if ps -p $PID > /dev/null 2>&1; then
-        if [ -f "scripts/start/stop.sh" ]; then
-            bash scripts/start/stop.sh > /dev/null 2>&1
+        if [ -f "scripts/app/stop.sh" ]; then
+            bash scripts/app/stop.sh > /dev/null 2>&1
         elif [ -f "stop.sh" ]; then
             ./stop.sh > /dev/null 2>&1
         else
@@ -354,7 +354,7 @@ echo ""
 info "Configuration des permissions des scripts..."
 chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
 chmod +x scripts/install/check_access.sh 2>/dev/null || true
-chmod +x scripts/start/*.sh 2>/dev/null || true
+chmod +x scripts/app/*.sh 2>/dev/null || true
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 success "Permissions des scripts configurées"
 echo ""

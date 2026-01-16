@@ -128,14 +128,24 @@ echo ""
 
 # Étape 3 : Cloner le dépôt (si nécessaire)
 if [ ! -f "backend/requirements.txt" ]; then
-    info "Téléchargement de l'application depuis Stash..."
+    info "Téléchargement de l'application..."
     
     if [ -d "$INSTALL_DIR" ]; then
         warning "Le répertoire $INSTALL_DIR existe déjà. Suppression..."
         rm -rf "$INSTALL_DIR"
     fi
     
-    git clone ssh://git@stash.ovh.net:7999/~thomas.lorineau/customer_feedbacks_tracker.git "$INSTALL_DIR"
+    # Détecter quelle source utiliser (Stash par défaut, mais peut être GitHub)
+    GIT_SOURCE="${GIT_SOURCE:-stash}"
+    
+    if [ "$GIT_SOURCE" = "github" ]; then
+        info "Clonage depuis GitHub..."
+        git clone https://github.com/thomaslorineau/Customer_feedbacks_tracker.git "$INSTALL_DIR"
+    else
+        info "Clonage depuis Stash..."
+        git clone ssh://git@stash.ovh.net:7999/~thomas.lorineau/customer_feedbacks_tracker.git "$INSTALL_DIR"
+    fi
+    
     cd "$INSTALL_DIR"
     success "Application téléchargée"
 else
@@ -188,14 +198,24 @@ if python -c "import duckdb" 2>/dev/null; then
     success "DuckDB installé (version $DUCKDB_VERSION)"
 else
     warning "DuckDB n'est pas installé, tentative d'installation..."
-    python -m pip install duckdb==0.10.0
-    if python -c "import duckdb" 2>/dev/null; then
-        success "DuckDB installé avec succès"
+    if python -m pip install duckdb==0.10.0; then
+        # Attendre un peu pour que l'installation se termine
+        sleep 1
+        if python -c "import duckdb" 2>/dev/null; then
+            DUCKDB_VERSION=$(python -c "import duckdb; print(duckdb.__version__)" 2>/dev/null || echo "inconnue")
+            success "DuckDB installé avec succès (version $DUCKDB_VERSION)"
+        else
+            error "DuckDB installé mais import échoué"
+            echo "   Essayez de réinstaller avec: python -m pip install --force-reinstall duckdb==0.10.0"
+            echo "   Ou utilisez le script: bash scripts/utils/install-duckdb.sh"
+        fi
     else
         error "Échec de l'installation de DuckDB"
         echo "   L'application fonctionnera en mode SQLite (fallback)"
-        echo "   Vous pouvez installer DuckDB manuellement plus tard avec:"
+        echo "   Pour installer DuckDB manuellement:"
+        echo "   source venv/bin/activate"
         echo "   pip install duckdb==0.10.0"
+        echo "   Ou utilisez: bash scripts/utils/install-duckdb.sh"
     fi
 fi
 
@@ -518,29 +538,31 @@ fi
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-echo "📋 Prochaines étapes :"
-echo ""
-echo "1. Démarrer l'application :"
-echo "   cd $INSTALL_DIR"
-echo "   ./start.sh"
-echo ""
-echo "2. Vérifier l'accessibilité :"
-echo "   bash scripts/install/check_access.sh"
-echo ""
-echo "3. Vérifier le statut :"
-echo "   ./status.sh"
-echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Lancer le diagnostic d'accessibilité
+# Demander si on veut démarrer l'application
 echo ""
-info "Lancement du diagnostic d'accessibilité..."
-echo ""
-if [ -f "scripts/install/check_access.sh" ]; then
-    bash scripts/install/check_access.sh
-elif [ -f "check_access.sh" ]; then
-    ./check_access.sh
+read -p "Voulez-vous démarrer l'application maintenant ? (O/n) : " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    info "Démarrage de l'application..."
+    echo ""
+    
+    # Démarrer l'application
+    if [ -f "scripts/app/start.sh" ]; then
+        bash scripts/app/start.sh
+    else
+        warning "Script scripts/app/start.sh introuvable"
+        echo "   Démarrez manuellement avec: bash scripts/app/start.sh"
+    fi
 else
-    warning "Script check_access.sh non trouvé"
+    echo ""
+    echo "📋 Pour démarrer l'application plus tard :"
+    echo "   cd $INSTALL_DIR"
+    echo "   bash scripts/app/start.sh"
+    echo ""
+    echo "   Ou utilisez restart pour redémarrer :"
+    echo "   bash scripts/app/restart.sh"
+    echo ""
 fi
 

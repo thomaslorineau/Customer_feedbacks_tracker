@@ -110,7 +110,7 @@ if command -v lsof > /dev/null 2>&1; then
         echo "   ⚠️  Port écouté seulement sur localhost (127.0.0.1)"
         echo "   ❌ NON accessible depuis le réseau"
         echo "   💡 Le serveur doit être démarré avec --host 0.0.0.0"
-        echo "   💡 Redémarrez avec: bash scripts/start/stop.sh && bash scripts/start/start.sh"
+        echo "   💡 Redémarrez avec: bash scripts/app/restart.sh"
     else
         echo "   ℹ️  Interface: $LISTEN_ADDR"
     fi
@@ -227,7 +227,7 @@ if [ -f /.dockerenv ] || grep -q docker /proc/1/cgroup 2>/dev/null || [[ "$HOSTN
         echo "   ⚠️  Port non configuré (utilise le port par défaut 8000)"
         echo "   💡 Pour configurer le port (ex: 11840), exécutez :"
         echo "      echo 'APP_PORT=11840' > backend/.app_config"
-        echo "      bash scripts/start/stop.sh && bash scripts/start/start.sh"
+        echo "      bash scripts/app/restart.sh"
     fi
 else
     echo "   ℹ️  Vous n'êtes pas dans un conteneur Docker"

@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 **Linux/Mac :**
 ```bash
-./scripts/start/start.sh
+bash scripts/app/start.sh
 ```
 
 **Vous devriez voir :** `INFO: Uvicorn running on http://127.0.0.1:8000`
@@ -53,7 +53,7 @@ pip install -r requirements.txt
 
 **Linux/Mac :**
 ```bash
-./scripts/start/stop.sh
+bash scripts/app/stop.sh
 ```
 
 ### 🧪 Tester rapidement

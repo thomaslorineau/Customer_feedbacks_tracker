@@ -139,3 +139,4 @@
 - La solution cloud est la meilleure option sans droits admin
 - Supabase et Neon sont les plus simples à configurer
 
+

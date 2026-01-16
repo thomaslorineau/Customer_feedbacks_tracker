@@ -94,3 +94,4 @@
 **Fichier à décider:**
 - `backend/diagnostic.py` (utile mais à adapter ou supprimer selon besoin)
 
+

@@ -140,3 +140,4 @@ La migration vers DuckDB en production est **un succès complet** :
 **Rapport généré le:** 2026-01-16  
 **Version:** 1.0
 
+
