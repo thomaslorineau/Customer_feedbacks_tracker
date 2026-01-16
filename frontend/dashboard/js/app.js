@@ -57,6 +57,9 @@ function toggleTheme() {
     const body = document.body;
     const isDark = body.classList.contains('dark-mode');
     
+    // Add transitioning class to prevent color transition artifacts
+    body.classList.add('dark-mode-transitioning');
+    
     if (isDark) {
         body.classList.remove('dark-mode');
         localStorage.setItem('theme', 'light');
@@ -64,6 +67,11 @@ function toggleTheme() {
         body.classList.add('dark-mode');
         localStorage.setItem('theme', 'dark');
     }
+    
+    // Remove transitioning class after a short delay
+    setTimeout(() => {
+        body.classList.remove('dark-mode-transitioning');
+    }, 200);
     
     // Dispatch event to notify other pages
     window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: isDark ? 'light' : 'dark' } }));

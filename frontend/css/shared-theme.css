@@ -41,6 +41,28 @@ body.dark-mode {
     --modal-bg: rgba(15, 52, 96, 0.98);
 }
 
+/* Prevent transition artifacts when switching themes */
+body,
+body * {
+    /* Disable transitions for color-related properties during theme switch */
+    transition-property: transform, opacity, box-shadow, border-color, filter;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+}
+
+/* Re-enable transitions for specific elements that need smooth color transitions */
+body.dark-mode-transitioning,
+body.dark-mode-transitioning * {
+    transition-property: background-color, color, border-color, box-shadow, transform, opacity, filter;
+    transition-duration: 0.15s;
+    transition-timing-function: ease-out;
+}
+
+/* Remove transitioning class after transition completes */
+body.dark-mode-transitioning {
+    transition: none;
+}
+
 /* Help Menu Styles */
 .help-menu {
     position: fixed;

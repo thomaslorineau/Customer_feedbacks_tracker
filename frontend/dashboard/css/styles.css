@@ -284,6 +284,7 @@ body {
 
 .btn-primary:hover {
     /* Enhanced by modern-enhancements.css */
+    opacity: 0.9;
 }
 
 .btn-primary:active {
@@ -311,6 +312,9 @@ body {
     max-width: 1800px;
     margin: 0 auto;
     /* Enhanced spacing by modern-enhancements.css */
+    /* Prevent layout shift when drawer opens */
+    position: relative;
+    z-index: 1;
 }
 
 .stats-banner {
@@ -1492,6 +1496,12 @@ body {
     margin-bottom: 20px;
     flex-wrap: wrap;
     gap: 16px;
+    /* Prevent layout shift when drawer opens */
+    position: relative;
+    z-index: 1;
+    /* Ensure header doesn't move when drawer opens */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .whats-happening-header h2 {
@@ -1506,6 +1516,15 @@ body {
 .stats-cards {
     display: flex;
     gap: 12px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    /* Prevent layout shift when drawer opens */
+    position: relative;
+    z-index: 1;
+    /* Ensure cards don't move when drawer opens */
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .stat-card {
@@ -1539,6 +1558,47 @@ body {
 
 .stat-card.neutral .stat-card-value {
     color: #6b7280;
+}
+
+.stat-card.clickable-stat-card {
+    transition: all 0.2s ease;
+    user-select: none;
+    cursor: pointer !important;
+    position: relative;
+}
+
+.stat-card.clickable-stat-card:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+    background: var(--bg-hover, var(--bg-secondary));
+    border-color: var(--accent-primary, #3b82f6);
+    border-width: 2px;
+    cursor: pointer !important;
+    opacity: 1 !important;
+}
+
+.stat-card.clickable-stat-card:active {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Ensure all child elements also show pointer cursor */
+.stat-card.clickable-stat-card * {
+    cursor: pointer !important;
+    pointer-events: none; /* Prevent child elements from blocking clicks */
+}
+
+/* More specific selector to ensure styles are applied */
+.stats-cards .stat-card.clickable-stat-card {
+    cursor: pointer !important;
+}
+
+.stats-cards .stat-card.clickable-stat-card:hover {
+    cursor: pointer !important;
+    transform: translateY(-3px) scale(1.02) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25) !important;
+    border-color: var(--accent-primary, #3b82f6) !important;
+    border-width: 2px !important;
 }
 
 .whats-happening-content {
@@ -1813,6 +1873,290 @@ body {
     
     .whats-happening-content {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Filtered Posts Drawer */
+.filtered-posts-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    /* Ensure drawer doesn't affect layout */
+    overflow: hidden;
+}
+
+/* Prevent body scroll when drawer is open */
+body.drawer-open {
+    overflow: hidden;
+    /* Compensate for scrollbar width to prevent layout shift */
+    padding-right: var(--scrollbar-width, 0px);
+}
+
+/* Calculate scrollbar width and store it */
+body:not(.drawer-open) {
+    --scrollbar-width: calc(100vw - 100%);
+}
+
+.filtered-posts-drawer.open {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.drawer-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    /* Remove backdrop-filter to prevent rendering artifacts */
+    /* backdrop-filter: blur(4px); */
+    /* Use will-change for better performance */
+    will-change: opacity;
+}
+
+.drawer-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 500px;
+    max-width: 90vw;
+    background: var(--bg-primary, #ffffff);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* Prevent rendering artifacts */
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform-style: preserve-3d;
+}
+
+.filtered-posts-drawer.open .drawer-panel {
+    transform: translateX(0);
+}
+
+.drawer-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    background: var(--bg-primary, #ffffff);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.drawer-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+}
+
+.drawer-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: var(--text-secondary, #6b7280);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.drawer-close:hover {
+    background: var(--bg-secondary, #f3f4f6);
+    color: var(--text-primary, #1f2937);
+}
+
+.drawer-info {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+    background: var(--bg-secondary, #f9fafb);
+}
+
+.drawer-stats {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.drawer-stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-primary, #3b82f6);
+}
+
+.drawer-stat-label {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #6b7280);
+}
+
+.drawer-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    background: var(--accent-primary, #3b82f6);
+    color: white;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.drawer-posts {
+    padding: 16px 24px;
+}
+
+.drawer-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary, #6b7280);
+}
+
+.drawer-post-item {
+    padding: 16px;
+    margin-bottom: 16px;
+    background: var(--bg-primary, #ffffff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.drawer-post-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.drawer-post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.drawer-post-source {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.drawer-source-icon {
+    font-size: 1.2rem;
+}
+
+.drawer-source-name {
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    font-size: 0.9rem;
+}
+
+.drawer-post-time {
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.85rem;
+    margin-left: 8px;
+}
+
+.drawer-sentiment-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.drawer-sentiment-badge.sentiment-positive {
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e;
+}
+
+.drawer-sentiment-badge.sentiment-negative {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.drawer-sentiment-badge.sentiment-neutral {
+    background: rgba(156, 163, 175, 0.1);
+    color: #9ca3af;
+}
+
+.drawer-post-content {
+    color: var(--text-primary, #1f2937);
+    line-height: 1.6;
+    margin-bottom: 12px;
+    font-size: 0.95rem;
+}
+
+.drawer-post-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.drawer-post-category {
+    padding: 4px 10px;
+    background: var(--bg-secondary, #f3f4f6);
+    color: var(--text-secondary, #6b7280);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.drawer-post-link {
+    color: var(--accent-primary, #3b82f6);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.drawer-post-link:hover {
+    color: var(--accent-secondary, #2563eb);
+    text-decoration: underline;
+}
+
+.drawer-more {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-secondary, #6b7280);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .drawer-panel {
+        width: 100vw;
+        max-width: 100vw;
     }
 }
 

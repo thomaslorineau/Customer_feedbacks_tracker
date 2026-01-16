@@ -1,13 +1,27 @@
 // What's Happening analysis module
 import { getProductLabel } from './product-detection.js';
 import { API } from './api.js';
+import { updateDashboard } from './dashboard.js';
+
+// Store state reference for click handlers
+let currentState = null;
+
+// Track if click handler has been attached to avoid duplicates
+let statsCardsClickHandlerAttached = false;
 
 export function updateWhatsHappening(state) {
+    // Store state reference for click handlers
+    currentState = state;
+    
     const posts = state.filteredPosts || [];
     const allPosts = state.posts || [];
     
     if (posts.length === 0) {
-        document.getElementById('statsCards').innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No data available</div>';
+        // No posts available
+        const statsCards = document.getElementById('statsCards');
+        if (statsCards) {
+            statsCards.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No data available</div>';
+        }
         document.getElementById('whatsHappeningContent').innerHTML = '';
         document.getElementById('recommendedActions').innerHTML = '';
         return;
@@ -74,30 +88,107 @@ export function updateWhatsHappening(state) {
     const topIssue = Object.entries(wordCounts)
         .sort((a, b) => b[1] - a[1])[0];
     
-    // Update stats cards
+    // Update stats cards with click handlers
     const statsCards = document.getElementById('statsCards');
-    statsCards.innerHTML = `
-        <div class="stat-card">
+    if (!statsCards) {
+        console.error('[Stats Cards] ❌ Container #statsCards not found!');
+        console.error('[Stats Cards] Available elements:', document.querySelectorAll('[id*="stat"]'));
+        return;
+    }
+    
+    // Create stats cards with clickable-stat-card class (except Total Posts)
+    const htmlContent = `
+        <div class="stat-card" data-filter-type="all" title="Total posts">
             <div class="stat-card-value">${total}</div>
             <div class="stat-card-label">Total Posts</div>
         </div>
-        <div class="stat-card positive">
+        <div class="stat-card positive clickable-stat-card" data-filter-type="sentiment" data-filter-value="positive" title="Click to filter by positive sentiment">
             <div class="stat-card-value">${positive}</div>
             <div class="stat-card-label">Positive</div>
         </div>
-        <div class="stat-card negative">
+        <div class="stat-card negative clickable-stat-card" data-filter-type="sentiment" data-filter-value="negative" title="Click to filter by negative sentiment">
             <div class="stat-card-value">${negative}</div>
             <div class="stat-card-label">Negative</div>
         </div>
-        <div class="stat-card neutral">
+        <div class="stat-card neutral clickable-stat-card" data-filter-type="sentiment" data-filter-value="neutral" title="Click to filter by neutral sentiment">
             <div class="stat-card-value">${neutral}</div>
             <div class="stat-card-label">Neutral</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card clickable-stat-card" data-filter-type="recent" title="Click to filter posts from last 48 hours">
             <div class="stat-card-value">${recentPosts.length}</div>
             <div class="stat-card-label">Recent (48h)</div>
         </div>
     `;
+    
+    statsCards.innerHTML = htmlContent;
+    
+    // Ensure clickable-stat-card class is applied (fallback in case HTML is modified by other code)
+    // Skip index 0 (Total Posts) - it should not be clickable
+    setTimeout(() => {
+        const allStatCards = statsCards.querySelectorAll('.stat-card');
+        allStatCards.forEach((card, index) => {
+            // Skip Total Posts (index 0) - don't make it clickable
+            if (index === 0) {
+                // Ensure Total Posts is NOT clickable
+                card.classList.remove('clickable-stat-card');
+                if (!card.dataset.filterType) {
+                    card.dataset.filterType = 'all';
+                }
+                return;
+            }
+            
+            // Add clickable class to other cards if missing
+            if (!card.classList.contains('clickable-stat-card')) {
+                card.classList.add('clickable-stat-card');
+            }
+            
+            // Add data attributes if missing
+            if (index === 1 && !card.dataset.filterType) {
+                card.dataset.filterType = 'sentiment';
+                card.dataset.filterValue = 'positive';
+            } else if (index === 2 && !card.dataset.filterType) {
+                card.dataset.filterType = 'sentiment';
+                card.dataset.filterValue = 'negative';
+            } else if (index === 3 && !card.dataset.filterType) {
+                card.dataset.filterType = 'sentiment';
+                card.dataset.filterValue = 'neutral';
+            } else if (index === 4 && !card.dataset.filterType) {
+                card.dataset.filterType = 'recent';
+            }
+        });
+    }, 100);
+    
+    // Add click handlers to stat cards using event delegation
+    // Use event delegation on the parent container to avoid losing listeners when HTML is recreated
+    // Only attach once to avoid duplicate listeners
+    if (!statsCardsClickHandlerAttached) {
+        statsCards.addEventListener('click', handleStatsCardClick);
+        statsCardsClickHandlerAttached = true;
+    }
+    
+    // Add cursor pointer style and ensure cards are interactive
+    const clickableCards = statsCards.querySelectorAll('.clickable-stat-card');
+    clickableCards.forEach((card) => {
+        // Force cursor pointer via inline style
+        card.style.cursor = 'pointer';
+        card.style.userSelect = 'none';
+        card.style.transition = 'all 0.2s ease';
+        
+        // Add hover effects
+        card.addEventListener('mouseenter', () => {
+            card.style.transform = 'translateY(-3px) scale(1.02)';
+            card.style.boxShadow = '0 6px 16px rgba(0, 0, 0, 0.25)';
+            card.style.borderColor = '#3b82f6';
+            card.style.borderWidth = '2px';
+        });
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = '';
+            card.style.boxShadow = '';
+            card.style.borderColor = '';
+            card.style.borderWidth = '';
+        });
+    });
+    
     
     // Update content
     const content = document.getElementById('whatsHappeningContent');
@@ -151,6 +242,253 @@ export function updateWhatsHappening(state) {
     // Update Recommended Actions with full context
     updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters);
 }
+
+// Separate function for the click handler
+function handleStatsCardClick(e) {
+    const card = e.target.closest('.clickable-stat-card');
+    if (!card) {
+        return;
+    }
+    
+    // Use the stored state reference
+    const state = currentState;
+    if (!state) {
+        return;
+    }
+    
+    const filterType = card.dataset.filterType;
+    const filterValue = card.dataset.filterValue;
+    
+    // Skip 'all' filter type - Total Posts should not trigger any action
+    if (filterType === 'all') {
+        return;
+    }
+    
+    if (filterType === 'sentiment') {
+        // Filter by sentiment
+        const currentSentiment = state.filters?.sentiment || 'all';
+        const newSentiment = currentSentiment === filterValue ? 'all' : filterValue;
+        state.setFilter('sentiment', newSentiment);
+        
+        // Sync UI element
+        const sentimentFilter = document.getElementById('sentimentFilter');
+        if (sentimentFilter) sentimentFilter.value = newSentiment;
+        
+        // Update dashboard and open drawer
+        updateDashboard();
+        openFilteredPostsDrawer(state);
+    } else if (filterType === 'recent') {
+        // Filter by last 48 hours
+        const currentNow = new Date();
+        const dateFrom = new Date(currentNow.getTime() - 48 * 60 * 60 * 1000);
+        const dateFromStr = dateFrom.toISOString().split('T')[0];
+        const dateToStr = currentNow.toISOString().split('T')[0];
+        
+        // Check if already filtered by recent 48h
+        const currentDateFrom = state.filters?.dateFrom || '';
+        if (currentDateFrom === dateFromStr) {
+            // Reset date filter
+            state.setFilter('dateFrom', '');
+            state.setFilter('dateTo', '');
+            
+            // Sync UI elements
+            const globalDateFrom = document.getElementById('globalDateFrom');
+            const globalDateTo = document.getElementById('globalDateTo');
+            if (globalDateFrom) globalDateFrom.value = '';
+            if (globalDateTo) globalDateTo.value = '';
+        } else {
+            state.setFilter('dateFrom', dateFromStr);
+            state.setFilter('dateTo', dateToStr);
+            
+            // Sync UI elements
+            const globalDateFrom = document.getElementById('globalDateFrom');
+            const globalDateTo = document.getElementById('globalDateTo');
+            if (globalDateFrom) globalDateFrom.value = dateFromStr;
+            if (globalDateTo) globalDateTo.value = dateToStr;
+        }
+        
+        // Update dashboard and open drawer
+        updateDashboard();
+        openFilteredPostsDrawer(state);
+    }
+}
+
+// Drawer functions for filtered posts
+function openFilteredPostsDrawer(state) {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (!drawer) return;
+    
+    // Calculate scrollbar width before hiding it
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    
+    // Prevent body scroll and compensate for scrollbar to prevent layout shift
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    document.body.classList.add('drawer-open');
+    
+    drawer.classList.add('open');
+    updateFilteredPostsDrawer(state);
+}
+
+function closeFilteredPostsDrawer() {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (drawer) {
+        drawer.classList.remove('open');
+    }
+    
+    // Restore body scroll and remove padding
+    document.body.classList.remove('drawer-open');
+    document.body.style.paddingRight = '';
+    
+    // Clear filters when drawer is closed
+    if (currentState) {
+        // Reset sentiment filter
+        currentState.setFilter('sentiment', 'all');
+        
+        // Reset date filters
+        currentState.setFilter('dateFrom', '');
+        currentState.setFilter('dateTo', '');
+        
+        // Sync UI elements
+        const sentimentFilter = document.getElementById('sentimentFilter');
+        if (sentimentFilter) sentimentFilter.value = 'all';
+        
+        const globalDateFrom = document.getElementById('globalDateFrom');
+        const globalDateTo = document.getElementById('globalDateTo');
+        if (globalDateFrom) globalDateFrom.value = '';
+        if (globalDateTo) globalDateTo.value = '';
+        
+        // Update dashboard to reflect cleared filters
+        updateDashboard();
+    }
+}
+
+function updateFilteredPostsDrawer(state) {
+    const drawerContent = document.getElementById('filteredPostsDrawerContent');
+    if (!drawerContent || !state) return;
+    
+    const posts = state.filteredPosts || [];
+    const totalPosts = state.posts?.length || 0;
+    
+    // Get active filters for display
+    const activeFilters = [];
+    if (state.filters?.sentiment && state.filters.sentiment !== 'all') {
+        activeFilters.push(`Sentiment: ${state.filters.sentiment}`);
+    }
+    if (state.filters?.dateFrom) {
+        activeFilters.push(`From: ${state.filters.dateFrom}`);
+    }
+    if (state.filters?.dateTo) {
+        activeFilters.push(`To: ${state.filters.dateTo}`);
+    }
+    
+    let html = `
+        <div class="drawer-header">
+            <h3>Filtered Posts</h3>
+            <button class="drawer-close" onclick="closeFilteredPostsDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div class="drawer-info">
+            <div class="drawer-stats">
+                <span class="drawer-stat-value">${posts.length}</span>
+                <span class="drawer-stat-label">of ${totalPosts} posts</span>
+            </div>
+            ${activeFilters.length > 0 ? `
+                <div class="drawer-filters">
+                    ${activeFilters.map(f => `<span class="filter-tag">${f}</span>`).join('')}
+                </div>
+            ` : ''}
+        </div>
+        <div class="drawer-posts">
+    `;
+    
+    if (posts.length === 0) {
+        html += `
+            <div class="drawer-empty">
+                <p>No posts match the current filters.</p>
+            </div>
+        `;
+    } else {
+        // Show first 50 posts
+        const postsToShow = posts.slice(0, 50);
+        postsToShow.forEach(post => {
+            const timeAgo = getTimeAgo(post.created_at);
+            const sourceIcon = getSourceIcon(post.source);
+            const sentiment = post.sentiment_label || 'neutral';
+            const category = getProductLabel(post.id, post.content, post.language) || 'General';
+            
+            html += `
+                <div class="drawer-post-item">
+                    <div class="drawer-post-header">
+                        <div class="drawer-post-source">
+                            <span class="drawer-source-icon">${sourceIcon}</span>
+                            <span class="drawer-source-name">${post.source || 'Unknown'}</span>
+                            <span class="drawer-post-time">${timeAgo}</span>
+                        </div>
+                        <span class="drawer-sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+                    </div>
+                    <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
+                    <div class="drawer-post-meta">
+                        <span class="drawer-post-category">${category}</span>
+                        ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link">View post →</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        
+        if (posts.length > 50) {
+            html += `
+                <div class="drawer-more">
+                    <p>Showing 50 of ${posts.length} posts</p>
+                </div>
+            `;
+        }
+    }
+    
+    html += `</div>`;
+    drawerContent.innerHTML = html;
+}
+
+// Helper functions
+function getTimeAgo(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+}
+
+function getSourceIcon(source) {
+    const icons = {
+        'twitter': '🐦',
+        'x': '🐦',
+        'reddit': '🔴',
+        'github': '💻',
+        'stackoverflow': '📚',
+        'trustpilot': '⭐',
+        'default': '📝'
+    };
+    return icons[source?.toLowerCase()] || icons.default;
+}
+
+function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Make closeFilteredPostsDrawer available globally
+window.closeFilteredPostsDrawer = closeFilteredPostsDrawer;
 
 function getActiveFilters(state) {
     const filters = {
@@ -288,4 +626,3 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
         `;
     }
 }
-
