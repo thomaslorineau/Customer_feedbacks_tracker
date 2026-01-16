@@ -99,7 +99,7 @@ def _search_github_issues(query: str, limit: int) -> list:
                     break
                 try:
                     post = {
-                        "source": "GitHub Issues",
+                        "source": "GitHub",
                         "author": issue["user"]["login"],
                         "content": (issue["title"] + "\n" + (issue["body"] or ""))[:500],
                         "url": issue["html_url"],
@@ -184,7 +184,7 @@ def _search_github_discussions(query: str, limit: int) -> list:
                     break
                 try:
                     post = {
-                        "source": "GitHub Discussions",
+                        "source": "GitHub",
                         "author": discussion["user"]["login"],
                         "content": (discussion["title"] + "\n" + (discussion["body"] or ""))[:500],
                         "url": discussion["html_url"],

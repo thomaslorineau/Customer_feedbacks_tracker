@@ -65,9 +65,12 @@ export class State {
                 return false;
             }
             
-            // Source filter
-            if (this.filters.source && post.source !== this.filters.source) {
-                return false;
+            // Source filter (normalize GitHub sources)
+            if (this.filters.source) {
+                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                if (normalizedSource !== this.filters.source && post.source !== this.filters.source) {
+                    return false;
+                }
             }
             
             // Language filter

@@ -985,8 +985,7 @@
                 <option value="">All Sources</option>
                 <option value="X/Twitter">🐦 Twitter/X</option>
                 <option value="Stack Overflow">📚 Stack Overflow</option>
-                <option value="GitHub Issues">💻 GitHub Issues</option>
-                <option value="GitHub Discussions">💬 GitHub Discussions</option>
+                <option value="GitHub">💻 GitHub</option>
                 <option value="Reddit">🔴 Reddit</option>
                 <option value="Google News">📰 Google News</option>
                 <option value="Trustpilot">⭐ Trustpilot</option>
@@ -2417,7 +2416,9 @@
                     postAuthor.includes(searchTerm) ||
                     postUrl.includes(searchTerm);
                     
-                const matchesSource = !sourceFilter || post.source === sourceFilter;
+                // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                const matchesSource = !sourceFilter || normalizedSource === sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
                 
@@ -3333,7 +3334,9 @@
                     postContent.includes(searchTerm) || 
                     postAuthor.includes(searchTerm) ||
                     postUrl.includes(searchTerm);
-                const matchesSource = !sourceFilter || post.source === sourceFilter;
+                // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                const matchesSource = !sourceFilter || normalizedSource === sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
                 
@@ -3613,7 +3616,7 @@
             showCancelBtn(true);
             currentAbortController = new AbortController();
             
-            addLog('🔄 Starting GitHub Issues scraper...', 'info');
+            addLog('🔄 Starting GitHub scraper...', 'info');
             addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {

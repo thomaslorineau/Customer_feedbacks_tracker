@@ -1380,6 +1380,9 @@ async def get_posts_by_source():
     
     for post in posts:
         source = post.get('source', 'Unknown')
+        # Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+        if source == 'GitHub Issues' or source == 'GitHub Discussions':
+            source = 'GitHub'
         sentiment = post.get('sentiment_label', 'neutral')
         
         if source not in source_counts:
@@ -1945,7 +1948,10 @@ async def get_posts_for_improvement(
         filtered = [p for p in filtered if p.get('language') == language]
     
     if source and source != 'all':
-        filtered = [p for p in filtered if p.get('source') == source]
+        # Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+        filtered = [p for p in filtered if 
+                   (p.get('source') == source) or 
+                   (source == 'GitHub' and (p.get('source') == 'GitHub Issues' or p.get('source') == 'GitHub Discussions'))]
     
     # Calculate priority score for each post using: sentiment * keyword_relevance * recency
     now = time.time()
@@ -2814,7 +2820,11 @@ async def generate_powerpoint_report_endpoint(request: Request):
                 filtered_posts = [p for p in filtered_posts if p.get('language') == filters['language']]
             
             if filters.get('source') and filters['source'] != 'all':
-                filtered_posts = [p for p in filtered_posts if p.get('source') == filters['source']]
+                source_filter = filters['source']
+                # Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+                filtered_posts = [p for p in filtered_posts if 
+                                 (p.get('source') == source_filter) or 
+                                 (source_filter == 'GitHub' and (p.get('source') == 'GitHub Issues' or p.get('source') == 'GitHub Discussions'))]
             
             # Date filtering
             if filters.get('dateFrom'):
