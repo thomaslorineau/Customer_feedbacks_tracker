@@ -89,25 +89,34 @@
     // Check logo status on page load
     async function checkLogoStatus(forceReload = false) {
         try {
-            // Check if there was a recent upload (less than 5 seconds ago)
+            // First, check localStorage - prioritize it over API to preserve user's uploaded logo
+            const storedLogoPath = localStorage.getItem('logoPath');
             const logoUpdated = localStorage.getItem('logoUpdated');
-            const isRecentUpload = logoUpdated && (Date.now() - parseInt(logoUpdated) < 5000);
+            const isRecentUpload = logoUpdated && (Date.now() - parseInt(logoUpdated) < 30000); // 30 seconds
             
-            // If recent upload, skip API check to avoid overwriting
-            if (isRecentUpload && !forceReload) {
-                console.debug('Skipping logo status check - recent upload detected');
+            // If we have a stored logo path and it's recent, use it instead of API
+            // This prevents API from overwriting a recently uploaded logo
+            if (storedLogoPath && isRecentUpload && !forceReload) {
+                console.debug('Using stored logo path from localStorage:', storedLogoPath);
+                updateLogoInNavigation(storedLogoPath, false);
                 return;
             }
             
+            // Only check API if no stored path or if forceReload is requested
             const response = await fetch(`${window.location.origin}/api/logo-status`);
             const data = await response.json();
             
             if (data.exists) {
-                // Use fresh timestamp when loading from API
-                // Force reload if explicitly requested or if it's a recent upload
-                updateLogoInNavigation(data.path, forceReload || isRecentUpload);
-                // Store in localStorage
-                localStorage.setItem('logoPath', data.path);
+                // Check if API path matches stored path
+                if (storedLogoPath && storedLogoPath === data.path && !forceReload) {
+                    // Paths match, use stored path (preserves any custom handling)
+                    updateLogoInNavigation(storedLogoPath, false);
+                } else {
+                    // Paths differ or force reload requested - use API path
+                    updateLogoInNavigation(data.path, forceReload);
+                    // Update localStorage with API path
+                    localStorage.setItem('logoPath', data.path);
+                }
             } else {
                 // No logo exists - hide all logo images and ensure SVG fallback is hidden (no fake logo)
                 const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
