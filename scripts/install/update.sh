@@ -419,11 +419,11 @@ else
         exit 1
     }
     
-    # Afficher les informations de diagnostic
+    # Afficher les informations de diagnostic (toujours afficher)
     CURRENT_PWD=$(pwd)
-    info "Recherche du script start.sh..."
-    info "Répertoire actuel: $CURRENT_PWD"
-    info "APP_DIR: $APP_DIR"
+    echo "🔍 Diagnostic: Recherche du script start.sh..."
+    echo "   Répertoire actuel: $CURRENT_PWD"
+    echo "   APP_DIR: $APP_DIR"
     
     # Résoudre le chemin absolu de APP_DIR si possible
     if command -v realpath > /dev/null 2>&1; then
@@ -434,10 +434,9 @@ else
         APP_DIR_ABS="$APP_DIR"
     fi
     
-    info "APP_DIR_ABS: $APP_DIR_ABS"
+    echo "   APP_DIR_ABS: $APP_DIR_ABS"
     
     # Liste des chemins à tester (ordre de priorité)
-    # Essayer aussi depuis le répertoire courant si différent de APP_DIR
     CURRENT_DIR=$(pwd)
     
     POSSIBLE_PATHS=(
@@ -449,39 +448,38 @@ else
         "$(pwd)/scripts/start/start.sh"
     )
     
-    # Si on est dans un sous-répertoire, essayer aussi de remonter
-    if [ "$CURRENT_DIR" != "$APP_DIR" ] && [ "$CURRENT_DIR" != "$APP_DIR_ABS" ]; then
-        # Essayer de trouver la racine en remontant
-        TEMP_DIR="$CURRENT_DIR"
-        while [ "$TEMP_DIR" != "/" ] && [ ${#TEMP_DIR} -gt 1 ]; do
-            if [ -f "$TEMP_DIR/scripts/start/start.sh" ]; then
-                POSSIBLE_PATHS+=("$TEMP_DIR/scripts/start/start.sh")
-                break
-            fi
-            TEMP_DIR=$(dirname "$TEMP_DIR")
-        done
-    fi
-    
     # Tester chaque chemin et afficher le résultat
     START_SCRIPT=""
-    info "Vérification des chemins possibles:"
+    echo "   Vérification des chemins possibles:"
     for path in "${POSSIBLE_PATHS[@]}"; do
         if [ -f "$path" ]; then
-            info "   ✅ Trouvé: $path"
+            echo "   ✅ Trouvé: $path"
             START_SCRIPT="$path"
             break
         else
-            info "   ❌ Non trouvé: $path"
+            echo "   ❌ Non trouvé: $path"
         fi
     done
     
     # Si toujours pas trouvé, essayer avec find depuis APP_DIR
     if [ -z "$START_SCRIPT" ] || [ ! -f "$START_SCRIPT" ]; then
-        info "Recherche avec find depuis $APP_DIR..."
+        echo "   Recherche avec find depuis $APP_DIR..."
         FOUND_SCRIPT=$(find "$APP_DIR" -maxdepth 4 -name "start.sh" -path "*/scripts/start/start.sh" -type f 2>/dev/null | head -1)
         if [ -n "$FOUND_SCRIPT" ] && [ -f "$FOUND_SCRIPT" ]; then
-            info "   ✅ Trouvé avec find: $FOUND_SCRIPT"
+            echo "   ✅ Trouvé avec find: $FOUND_SCRIPT"
             START_SCRIPT="$FOUND_SCRIPT"
+        else
+            echo "   ❌ Aucun résultat avec find"
+            # Vérifier si le répertoire scripts/start existe
+            if [ -d "scripts/start" ]; then
+                echo "   📁 Le répertoire scripts/start existe, contenu:"
+                ls -la scripts/start/ 2>/dev/null | sed 's/^/      /' || echo "      (erreur lors de la liste)"
+            elif [ -d "$APP_DIR/scripts/start" ]; then
+                echo "   📁 Le répertoire $APP_DIR/scripts/start existe, contenu:"
+                ls -la "$APP_DIR/scripts/start/" 2>/dev/null | sed 's/^/      /' || echo "      (erreur lors de la liste)"
+            else
+                echo "   ❌ Le répertoire scripts/start n'existe pas"
+            fi
         fi
     fi
     
