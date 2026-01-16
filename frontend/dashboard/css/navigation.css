@@ -13,7 +13,10 @@
     justify-content: space-between;
     z-index: 10000;
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+    min-height: 60px;
+    height: 60px;
+    box-sizing: border-box;
 }
 
 .nav-menu-left {
@@ -32,13 +35,16 @@
     text-decoration: none;
     padding: 6px 12px;
     border-radius: 8px;
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
     position: relative;
+    height: 40px;
+    min-height: 40px;
+    box-sizing: border-box;
 }
 
 .nav-logo:hover {
     background: var(--bg-secondary);
-    transform: translateY(-1px);
+    /* Removed transform to prevent layout shift */
 }
 
 .nav-logo::before {
@@ -62,14 +68,20 @@
 .nav-logo img {
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    max-width: 40px;
+    max-height: 40px;
     object-fit: contain;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-    transition: all 0.3s ease;
+    transition: filter 0.3s ease;
+    display: block;
+    flex-shrink: 0;
 }
 
 .nav-logo:hover img,
 .nav-logo:hover svg {
-    transform: scale(1.05);
+    /* Removed transform scale to prevent layout shift */
     filter: drop-shadow(0 4px 8px rgba(0, 212, 255, 0.3));
 }
 
@@ -113,7 +125,7 @@
 .nav-tab:hover {
     background: var(--bg-secondary);
     color: var(--text-primary);
-    transform: translateY(-2px);
+    /* Removed transform to prevent layout shift */
 }
 
 .nav-tab:hover::before {
@@ -125,7 +137,7 @@
     color: white;
     border-color: transparent;
     box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
-    transform: translateY(-2px);
+    /* Removed transform to prevent layout shift */
 }
 
 .nav-tab.active::before {

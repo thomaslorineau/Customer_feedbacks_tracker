@@ -173,11 +173,11 @@ body.dark-mode-transitioning {
 }
 
 .nav-logo {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-logo:hover {
-    transform: translateY(-1px);
+    /* Removed transform to prevent layout shift */
 }
 
 .nav-logo img.ovh-logo,
@@ -188,7 +188,7 @@ body.dark-mode-transitioning {
 
 .nav-logo:hover img.ovh-logo,
 .nav-logo:hover .ovh-logo {
-    transform: scale(1.05);
+    /* Removed transform scale to prevent layout shift */
     filter: drop-shadow(0 4px 8px rgba(0, 212, 255, 0.3));
 }
 
@@ -217,7 +217,7 @@ body.dark-mode-transitioning {
 
 .nav-tab.active {
     box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
-    transform: translateY(-2px);
+    /* Removed transform to prevent layout shift */
 }
 
 .nav-tab.active::before {
