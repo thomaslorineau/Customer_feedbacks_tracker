@@ -368,10 +368,10 @@ cd "$APP_DIR" || {
     exit 1
 }
 
-# Debug: afficher le répertoire actuel et les fichiers disponibles
-debug "Répertoire actuel: $(pwd)"
-debug "APP_DIR: $APP_DIR"
-debug "Vérification de l'existence de scripts/start/start.sh: $([ -f "scripts/start/start.sh" ] && echo "OUI" || echo "NON")"
+# Afficher le répertoire actuel pour debug
+CURRENT_DIR=$(pwd)
+info "Répertoire de travail: $CURRENT_DIR"
+info "Répertoire de l'application: $APP_DIR"
 
 # Détecter le système d'exploitation
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] || command -v powershell.exe > /dev/null 2>&1; then
@@ -393,19 +393,40 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] ||
     fi
 else
     # Linux/Mac - utiliser bash
-    # Essayer plusieurs chemins possibles
+    # S'assurer qu'on est dans le bon répertoire
+    cd "$APP_DIR" || {
+        error "Impossible de se déplacer dans: $APP_DIR"
+        exit 1
+    }
+    
+    # Essayer plusieurs chemins possibles dans l'ordre de priorité
     START_SCRIPT=""
     
-    # Essayer avec le chemin absolu depuis APP_DIR
-    if [ -f "$APP_DIR/scripts/start/start.sh" ]; then
-        START_SCRIPT="$APP_DIR/scripts/start/start.sh"
-    # Essayer avec le chemin relatif depuis le répertoire actuel
-    elif [ -f "scripts/start/start.sh" ]; then
-        START_SCRIPT="scripts/start/start.sh"
-    # Essayer avec ./ au début
-    elif [ -f "./scripts/start/start.sh" ]; then
-        START_SCRIPT="./scripts/start/start.sh"
+    # Résoudre le chemin absolu de APP_DIR si possible
+    if command -v realpath > /dev/null 2>&1; then
+        APP_DIR_ABS=$(realpath "$APP_DIR" 2>/dev/null || echo "$APP_DIR")
+    elif command -v readlink > /dev/null 2>&1; then
+        APP_DIR_ABS=$(readlink -f "$APP_DIR" 2>/dev/null || echo "$APP_DIR")
+    else
+        APP_DIR_ABS="$APP_DIR"
     fi
+    
+    # Liste des chemins à tester (ordre de priorité)
+    POSSIBLE_PATHS=(
+        "$APP_DIR_ABS/scripts/start/start.sh"
+        "$APP_DIR/scripts/start/start.sh"
+        "scripts/start/start.sh"
+        "./scripts/start/start.sh"
+        "$(pwd)/scripts/start/start.sh"
+    )
+    
+    # Tester chaque chemin
+    for path in "${POSSIBLE_PATHS[@]}"; do
+        if [ -f "$path" ]; then
+            START_SCRIPT="$path"
+            break
+        fi
+    done
     
     if [ -n "$START_SCRIPT" ] && [ -f "$START_SCRIPT" ]; then
         info "Script trouvé: $START_SCRIPT"
@@ -420,22 +441,31 @@ else
         warning "Script start.sh introuvable"
         echo "   Répertoire actuel: $(pwd)"
         echo "   APP_DIR: $APP_DIR"
+        echo ""
         echo "   Vérifications effectuées:"
-        echo "     - $APP_DIR/scripts/start/start.sh: $([ -f "$APP_DIR/scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
-        echo "     - scripts/start/start.sh: $([ -f "scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
-        echo "     - ./scripts/start/start.sh: $([ -f "./scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
+        for path in "${POSSIBLE_PATHS[@]}"; do
+            if [ -f "$path" ]; then
+                echo "     ✅ $path (EXISTE)"
+            else
+                echo "     ❌ $path (N'EXISTE PAS)"
+            fi
+        done
         echo ""
         echo "   Liste des fichiers dans scripts/start/ (si le répertoire existe):"
         if [ -d "scripts/start" ]; then
             ls -la scripts/start/ 2>/dev/null || echo "   (erreur lors de la liste)"
+        elif [ -d "$APP_DIR/scripts/start" ]; then
+            ls -la "$APP_DIR/scripts/start/" 2>/dev/null || echo "   (erreur lors de la liste)"
         else
             echo "   ❌ Le répertoire scripts/start/ n'existe pas"
+            echo "   Répertoires trouvés:"
+            find . -type d -name "start" 2>/dev/null | head -5 || echo "   (aucun répertoire 'start' trouvé)"
         fi
         echo ""
         echo "   💡 Démarrez manuellement l'application avec:"
-        echo "      bash $APP_DIR/scripts/start/start.sh"
-        echo "   ou"
         echo "      cd $APP_DIR && bash scripts/start/start.sh"
+        echo "   ou"
+        echo "      bash $APP_DIR/scripts/start/start.sh"
     fi
 fi
 
