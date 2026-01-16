@@ -354,13 +354,44 @@ echo ""
 
 # 6. Redémarrer l'application
 info "Redémarrage de l'application..."
-if [ -f "scripts/start/start.sh" ]; then
-    bash scripts/start/start.sh
-elif [ -f "start.sh" ]; then
-    ./start.sh
+
+# Détecter le système d'exploitation
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] || command -v powershell.exe > /dev/null 2>&1; then
+    # Windows - utiliser PowerShell ou batch
+    if [ -f "scripts/start/start_server.ps1" ]; then
+        info "Démarrage avec PowerShell..."
+        powershell.exe -ExecutionPolicy Bypass -File scripts/start/start_server.ps1
+    elif [ -f "scripts/start/start.bat" ]; then
+        info "Démarrage avec batch..."
+        cmd.exe /c scripts/start/start.bat
+    elif [ -f "scripts/start/start.sh" ]; then
+        bash scripts/start/start.sh
+    else
+        warning "Script de démarrage introuvable pour Windows"
+        echo "   Démarrez manuellement avec: powershell.exe scripts/start/start_server.ps1"
+    fi
 else
-    warning "Script start.sh introuvable"
-    echo "   Démarrez manuellement l'application"
+    # Linux/Mac - utiliser bash
+    if [ -f "$APP_DIR/scripts/start/start.sh" ]; then
+        info "Démarrage avec scripts/start/start.sh..."
+        bash "$APP_DIR/scripts/start/start.sh"
+    elif [ -f "$APP_DIR/start.sh" ]; then
+        info "Démarrage avec start.sh..."
+        bash "$APP_DIR/start.sh"
+    elif [ -f "scripts/start/start.sh" ]; then
+        info "Démarrage avec scripts/start/start.sh (chemin relatif)..."
+        bash scripts/start/start.sh
+    elif [ -f "start.sh" ]; then
+        info "Démarrage avec start.sh (chemin relatif)..."
+        ./start.sh
+    else
+        warning "Script start.sh introuvable"
+        echo "   Recherché dans: $APP_DIR/scripts/start/start.sh"
+        echo "   Recherché dans: $APP_DIR/start.sh"
+        echo "   Recherché dans: scripts/start/start.sh"
+        echo "   Recherché dans: start.sh"
+        echo "   Démarrez manuellement l'application avec: bash scripts/start/start.sh"
+    fi
 fi
 
 echo ""
