@@ -851,6 +851,7 @@ async def cancel_job(job_id: str):
 @app.post("/scrape/stackoverflow", response_model=ScrapeResult)
 async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Stack Overflow questions about OVH."""
+    source_name = "Stack Overflow"
     print(f"[STACKOVERFLOW SCRAPER] Starting with query='{query}', limit={limit}")
     try:
         items = stackoverflow.scrape_stackoverflow(query, limit=limit)
