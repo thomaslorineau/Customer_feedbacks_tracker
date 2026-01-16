@@ -228,12 +228,17 @@ info "Configuration des scripts de gestion..."
 cd ..
 # Rendre tous les scripts exécutables
 info "Configuration des permissions des scripts..."
+# Scripts à la racine
+chmod +x install.sh update.sh quick-update.sh 2>/dev/null || true
+# Scripts dans scripts/app/
 chmod +x scripts/app/*.sh 2>/dev/null || true
+# Scripts dans scripts/install/
 chmod +x scripts/install/*.sh 2>/dev/null || true
+# Scripts dans scripts/utils/
+chmod +x scripts/utils/*.sh 2>/dev/null || true
 # Support anciennes installations avec scripts à la racine
-chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
-
-# Rendre aussi exécutables tous les scripts .sh dans le répertoire
+chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh 2>/dev/null || true
+# Tous les autres scripts .sh à la racine
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 success "Scripts configurés"

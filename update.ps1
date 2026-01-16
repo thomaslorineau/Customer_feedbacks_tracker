@@ -106,6 +106,16 @@ if (Test-Path "$backupDir\.env.backup") {
 
 Remove-Item -Recurse -Force $backupDir
 
+# Rendre les scripts exécutables (si on est sur Linux/WSL)
+if (Get-Command chmod -ErrorAction SilentlyContinue) {
+    Write-Info "Configuration des permissions des scripts..."
+    & chmod +x install.sh,update.sh,quick-update.sh 2>$null
+    & chmod +x scripts/app/*.sh 2>$null
+    & chmod +x scripts/install/*.sh 2>$null
+    & chmod +x scripts/utils/*.sh 2>$null
+    Write-Success "Permissions configurées"
+}
+
 # Mettre à jour les dépendances
 Write-Info "Vérification des dépendances..."
 if (Test-Path "venv\Scripts\Activate.ps1") {

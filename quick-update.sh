@@ -54,7 +54,17 @@ else
     exit 1
 fi
 
+# 5. Rendre tous les scripts exécutables
 echo ""
+echo "🔧 Configuration des permissions des scripts..."
+chmod +x install.sh update.sh quick-update.sh 2>/dev/null || true
+chmod +x scripts/app/*.sh 2>/dev/null || true
+chmod +x scripts/install/*.sh 2>/dev/null || true
+chmod +x scripts/utils/*.sh 2>/dev/null || true
+find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+echo "✅ Permissions configurées"
+echo ""
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ Mise à jour terminée !"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
