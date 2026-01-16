@@ -176,10 +176,6 @@ body.dark-mode-transitioning {
     transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-logo:hover {
-    /* Removed transform to prevent layout shift */
-}
-
 .nav-logo img.ovh-logo,
 .nav-logo .ovh-logo {
     transition: all 0.3s ease;
