@@ -399,8 +399,11 @@ else
         exit 1
     }
     
-    # Essayer plusieurs chemins possibles dans l'ordre de priorité
-    START_SCRIPT=""
+    # Afficher les informations de diagnostic
+    CURRENT_PWD=$(pwd)
+    info "Recherche du script start.sh..."
+    info "Répertoire actuel: $CURRENT_PWD"
+    info "APP_DIR: $APP_DIR"
     
     # Résoudre le chemin absolu de APP_DIR si possible
     if command -v realpath > /dev/null 2>&1; then
@@ -411,6 +414,8 @@ else
         APP_DIR_ABS="$APP_DIR"
     fi
     
+    info "APP_DIR_ABS: $APP_DIR_ABS"
+    
     # Liste des chemins à tester (ordre de priorité)
     POSSIBLE_PATHS=(
         "$APP_DIR_ABS/scripts/start/start.sh"
@@ -420,16 +425,21 @@ else
         "$(pwd)/scripts/start/start.sh"
     )
     
-    # Tester chaque chemin
+    # Tester chaque chemin et afficher le résultat
+    START_SCRIPT=""
+    info "Vérification des chemins possibles:"
     for path in "${POSSIBLE_PATHS[@]}"; do
         if [ -f "$path" ]; then
+            info "   ✅ Trouvé: $path"
             START_SCRIPT="$path"
             break
+        else
+            info "   ❌ Non trouvé: $path"
         fi
     done
     
     if [ -n "$START_SCRIPT" ] && [ -f "$START_SCRIPT" ]; then
-        info "Script trouvé: $START_SCRIPT"
+        success "Script trouvé: $START_SCRIPT"
         # Vérifier que le script est exécutable
         if [ ! -x "$START_SCRIPT" ]; then
             info "Ajout des permissions d'exécution au script..."
@@ -439,8 +449,11 @@ else
         bash "$START_SCRIPT"
     else
         warning "Script start.sh introuvable"
+        echo ""
+        echo "   Diagnostic détaillé:"
         echo "   Répertoire actuel: $(pwd)"
         echo "   APP_DIR: $APP_DIR"
+        echo "   APP_DIR_ABS: $APP_DIR_ABS"
         echo ""
         echo "   Vérifications effectuées:"
         for path in "${POSSIBLE_PATHS[@]}"; do
@@ -451,16 +464,26 @@ else
             fi
         done
         echo ""
-        echo "   Liste des fichiers dans scripts/start/ (si le répertoire existe):"
-        if [ -d "scripts/start" ]; then
-            ls -la scripts/start/ 2>/dev/null || echo "   (erreur lors de la liste)"
-        elif [ -d "$APP_DIR/scripts/start" ]; then
-            ls -la "$APP_DIR/scripts/start/" 2>/dev/null || echo "   (erreur lors de la liste)"
+        echo "   Structure des répertoires:"
+        if [ -d "scripts" ]; then
+            echo "     ✅ scripts/ existe"
+            if [ -d "scripts/start" ]; then
+                echo "     ✅ scripts/start/ existe"
+                echo "     Contenu de scripts/start/:"
+                ls -la scripts/start/ 2>/dev/null | sed 's/^/       /' || echo "       (erreur lors de la liste)"
+            else
+                echo "     ❌ scripts/start/ n'existe pas"
+                echo "     Contenu de scripts/:"
+                ls -la scripts/ 2>/dev/null | sed 's/^/       /' || echo "       (erreur lors de la liste)"
+            fi
         else
-            echo "   ❌ Le répertoire scripts/start/ n'existe pas"
-            echo "   Répertoires trouvés:"
-            find . -type d -name "start" 2>/dev/null | head -5 || echo "   (aucun répertoire 'start' trouvé)"
+            echo "     ❌ scripts/ n'existe pas"
+            echo "     Répertoires à la racine:"
+            ls -la . 2>/dev/null | grep "^d" | sed 's/^/       /' || echo "       (erreur lors de la liste)"
         fi
+        echo ""
+        echo "   Recherche de fichiers start.sh dans le projet:"
+        find . -name "start.sh" -type f 2>/dev/null | head -10 | sed 's/^/     /' || echo "     (aucun fichier start.sh trouvé)"
         echo ""
         echo "   💡 Démarrez manuellement l'application avec:"
         echo "      cd $APP_DIR && bash scripts/start/start.sh"
