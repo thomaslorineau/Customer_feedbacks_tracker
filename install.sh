@@ -165,13 +165,34 @@ if [ -d "venv" ]; then
     if [[ $REPLY =~ ^[Oo]$ ]]; then
         info "Suppression de l'ancien environnement virtuel..."
         rm -rf venv
+        # Vérifier que python3 est disponible avant de créer le venv
+        if ! command -v python3 &> /dev/null; then
+            error "python3 n'est pas disponible"
+            exit 1
+        fi
+        info "Création du nouvel environnement virtuel..."
         python3 -m venv venv
+        if [ ! -d "venv" ] || [ ! -f "venv/bin/python" ]; then
+            error "Échec de la création de l'environnement virtuel"
+            echo "   Vérifiez que python3 est correctement installé"
+            exit 1
+        fi
         success "Environnement virtuel recréé"
     else
         info "Utilisation de l'environnement virtuel existant"
     fi
 else
+    # Vérifier que python3 est disponible avant de créer le venv
+    if ! command -v python3 &> /dev/null; then
+        error "python3 n'est pas disponible"
+        exit 1
+    fi
     python3 -m venv venv
+    if [ ! -d "venv" ] || [ ! -f "venv/bin/python" ]; then
+        error "Échec de la création de l'environnement virtuel"
+        echo "   Vérifiez que python3 est correctement installé"
+        exit 1
+    fi
     success "Environnement virtuel créé"
 fi
 
