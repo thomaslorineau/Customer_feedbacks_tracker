@@ -31,6 +31,13 @@ error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+debug() {
+    # Fonction debug (peut être désactivée en production)
+    if [ "${DEBUG:-0}" = "1" ]; then
+        echo -e "${BLUE}🔍 DEBUG: $1${NC}"
+    fi
+}
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔄 Mise à jour de l'application"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -355,42 +362,80 @@ echo ""
 # 6. Redémarrer l'application
 info "Redémarrage de l'application..."
 
+# S'assurer qu'on est dans le bon répertoire (déjà fait au début, mais on le refait pour être sûr)
+cd "$APP_DIR" || {
+    error "Impossible de se déplacer dans le répertoire: $APP_DIR"
+    exit 1
+}
+
+# Debug: afficher le répertoire actuel et les fichiers disponibles
+debug "Répertoire actuel: $(pwd)"
+debug "APP_DIR: $APP_DIR"
+debug "Vérification de l'existence de scripts/start/start.sh: $([ -f "scripts/start/start.sh" ] && echo "OUI" || echo "NON")"
+
 # Détecter le système d'exploitation
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] || command -v powershell.exe > /dev/null 2>&1; then
     # Windows - utiliser PowerShell ou batch
-    if [ -f "scripts/start/start_server.ps1" ]; then
+    if [ -f "$APP_DIR/scripts/start/start_server.ps1" ]; then
         info "Démarrage avec PowerShell..."
-        powershell.exe -ExecutionPolicy Bypass -File scripts/start/start_server.ps1
-    elif [ -f "scripts/start/start.bat" ]; then
+        powershell.exe -ExecutionPolicy Bypass -File "$APP_DIR/scripts/start/start_server.ps1"
+    elif [ -f "$APP_DIR/scripts/start/start.bat" ]; then
         info "Démarrage avec batch..."
-        cmd.exe /c scripts/start/start.bat
-    elif [ -f "scripts/start/start.sh" ]; then
-        bash scripts/start/start.sh
+        cmd.exe /c "$APP_DIR/scripts/start/start.bat"
+    elif [ -f "$APP_DIR/scripts/start/start.sh" ]; then
+        bash "$APP_DIR/scripts/start/start.sh"
     else
         warning "Script de démarrage introuvable pour Windows"
+        echo "   Recherché dans: $APP_DIR/scripts/start/start_server.ps1"
+        echo "   Recherché dans: $APP_DIR/scripts/start/start.bat"
+        echo "   Recherché dans: $APP_DIR/scripts/start/start.sh"
         echo "   Démarrez manuellement avec: powershell.exe scripts/start/start_server.ps1"
     fi
 else
     # Linux/Mac - utiliser bash
+    # Essayer plusieurs chemins possibles
+    START_SCRIPT=""
+    
+    # Essayer avec le chemin absolu depuis APP_DIR
     if [ -f "$APP_DIR/scripts/start/start.sh" ]; then
-        info "Démarrage avec scripts/start/start.sh..."
-        bash "$APP_DIR/scripts/start/start.sh"
-    elif [ -f "$APP_DIR/start.sh" ]; then
-        info "Démarrage avec start.sh..."
-        bash "$APP_DIR/start.sh"
+        START_SCRIPT="$APP_DIR/scripts/start/start.sh"
+    # Essayer avec le chemin relatif depuis le répertoire actuel
     elif [ -f "scripts/start/start.sh" ]; then
-        info "Démarrage avec scripts/start/start.sh (chemin relatif)..."
-        bash scripts/start/start.sh
-    elif [ -f "start.sh" ]; then
-        info "Démarrage avec start.sh (chemin relatif)..."
-        ./start.sh
+        START_SCRIPT="scripts/start/start.sh"
+    # Essayer avec ./ au début
+    elif [ -f "./scripts/start/start.sh" ]; then
+        START_SCRIPT="./scripts/start/start.sh"
+    fi
+    
+    if [ -n "$START_SCRIPT" ] && [ -f "$START_SCRIPT" ]; then
+        info "Script trouvé: $START_SCRIPT"
+        # Vérifier que le script est exécutable
+        if [ ! -x "$START_SCRIPT" ]; then
+            info "Ajout des permissions d'exécution au script..."
+            chmod +x "$START_SCRIPT"
+        fi
+        info "Démarrage de l'application..."
+        bash "$START_SCRIPT"
     else
         warning "Script start.sh introuvable"
-        echo "   Recherché dans: $APP_DIR/scripts/start/start.sh"
-        echo "   Recherché dans: $APP_DIR/start.sh"
-        echo "   Recherché dans: scripts/start/start.sh"
-        echo "   Recherché dans: start.sh"
-        echo "   Démarrez manuellement l'application avec: bash scripts/start/start.sh"
+        echo "   Répertoire actuel: $(pwd)"
+        echo "   APP_DIR: $APP_DIR"
+        echo "   Vérifications effectuées:"
+        echo "     - $APP_DIR/scripts/start/start.sh: $([ -f "$APP_DIR/scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
+        echo "     - scripts/start/start.sh: $([ -f "scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
+        echo "     - ./scripts/start/start.sh: $([ -f "./scripts/start/start.sh" ] && echo "✅ EXISTE" || echo "❌ N'EXISTE PAS")"
+        echo ""
+        echo "   Liste des fichiers dans scripts/start/ (si le répertoire existe):"
+        if [ -d "scripts/start" ]; then
+            ls -la scripts/start/ 2>/dev/null || echo "   (erreur lors de la liste)"
+        else
+            echo "   ❌ Le répertoire scripts/start/ n'existe pas"
+        fi
+        echo ""
+        echo "   💡 Démarrez manuellement l'application avec:"
+        echo "      bash $APP_DIR/scripts/start/start.sh"
+        echo "   ou"
+        echo "      cd $APP_DIR && bash scripts/start/start.sh"
     fi
 fi
 
