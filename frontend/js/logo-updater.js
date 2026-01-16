@@ -23,6 +23,17 @@
 
     // Update logo in navigation menu
     function updateLogoInNavigation(logoPath) {
+        if (!logoPath) {
+            // No logo path provided - hide all logos
+            const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
+            navLogos.forEach(img => {
+                if (img.tagName === 'IMG') {
+                    img.style.display = 'none';
+                }
+            });
+            return;
+        }
+        
         // Update all logo images in navigation
         const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
         navLogos.forEach(img => {
@@ -33,6 +44,10 @@
                 img.style.height = '40px';
                 img.style.objectFit = 'contain';
                 img.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))';
+                img.onerror = function() {
+                    // If logo fails to load, hide it
+                    this.style.display = 'none';
+                };
                 
                 // Hide fallback SVG if exists
                 const fallbackSvg = img.nextElementSibling;
@@ -53,9 +68,26 @@
                 updateLogoInNavigation(data.path);
                 // Store in localStorage
                 localStorage.setItem('logoPath', data.path);
+            } else {
+                // No logo exists - hide all logo images and show placeholder
+                const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
+                navLogos.forEach(img => {
+                    if (img.tagName === 'IMG') {
+                        img.style.display = 'none';
+                    }
+                });
+                // Remove from localStorage if no logo
+                localStorage.removeItem('logoPath');
             }
         } catch (error) {
             console.debug('Logo status check failed (this is OK if no logo uploaded):', error);
+            // On error, hide logos to be safe
+            const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
+            navLogos.forEach(img => {
+                if (img.tagName === 'IMG') {
+                    img.style.display = 'none';
+                }
+            });
         }
     }
 
@@ -76,5 +108,6 @@
     // Export function for manual updates (from settings page)
     window.updateLogoInNavigation = updateLogoInNavigation;
 })();
+
 
 

@@ -16,7 +16,7 @@ if sys.platform == 'win32':
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -2744,152 +2744,184 @@ async def get_logo_status():
     }
 
 
-class PowerPointReportRequest(BaseModel):
-    """Request model for PowerPoint report generation."""
-    filters: Dict = Field(..., description="Current filter settings")
-    include_charts: List[str] = Field(default=['timeline', 'product', 'source', 'sentiment'], description="Charts to include")
-    include_recommendations: bool = Field(default=True, description="Include recommended actions")
-    include_analysis: bool = Field(default=True, description="Include LLM analysis")
+# PowerPoint report generation now uses FormData with images
+# No Pydantic model needed - we'll parse FormData directly
 
 
 @app.post("/api/generate-powerpoint-report")
-async def generate_powerpoint_report_endpoint(request: PowerPointReportRequest):
+async def generate_powerpoint_report_endpoint(request: Request):
     """
     Generate a PowerPoint report with key charts, insights, and recommendations.
+    Accepts FormData with chart images from the dashboard.
     """
-    logger.info(f"[PowerPoint Report] Starting generation with filters: {request.filters}")
+    form = await request.form()
+    
+    # Parse filters from form data
+    filters_str = form.get('filters', '{}')
     try:
-        from . import powerpoint_generator
-        
-        if not powerpoint_generator.PPTX_AVAILABLE:
-            raise HTTPException(
-                status_code=503,
-                detail="PowerPoint generation requires python-pptx, matplotlib, and Pillow. Install with: pip install python-pptx matplotlib Pillow"
-            )
-        
-        # Get filtered posts based on request filters
-        all_posts = db.get_posts(limit=10000, offset=0)
-        
-        # Apply filters (similar to state filtering logic)
-        filtered_posts = all_posts
-        if request.filters.get('search'):
-            search_lower = request.filters['search'].lower()
-            filtered_posts = [p for p in filtered_posts if search_lower in (p.get('content', '') or '').lower()]
-        
-        if request.filters.get('sentiment') and request.filters['sentiment'] != 'all':
-            filtered_posts = [p for p in filtered_posts if p.get('sentiment_label') == request.filters['sentiment']]
-        
-        if request.filters.get('language') and request.filters['language'] != 'all':
-            filtered_posts = [p for p in filtered_posts if p.get('language') == request.filters['language']]
-        
-        if request.filters.get('source') and request.filters['source'] != 'all':
-            filtered_posts = [p for p in filtered_posts if p.get('source') == request.filters['source']]
-        
-        # Date filtering
-        if request.filters.get('dateFrom'):
-            filtered_posts = [p for p in filtered_posts if p.get('created_at', '') >= request.filters['dateFrom']]
-        if request.filters.get('dateTo'):
-            filtered_posts = [p for p in filtered_posts if p.get('created_at', '') <= request.filters['dateTo']]
-        
-        # Calculate stats
-        stats = {
-            'total': len(filtered_posts),
-            'positive': len([p for p in filtered_posts if p.get('sentiment_label') == 'positive']),
-            'negative': len([p for p in filtered_posts if p.get('sentiment_label') == 'negative']),
-            'neutral': len([p for p in filtered_posts if p.get('sentiment_label') == 'neutral' or not p.get('sentiment_label')])
-        }
-        
-        # Get recommended actions
-        recommended_actions = []
-        if request.include_recommendations:
-            try:
-                # Get recent posts for recommendations
-                now = time.time()
-                recent_posts = []
-                for p in filtered_posts:
-                    try:
-                        created_at = p.get('created_at', '')
-                        if created_at:
-                            # Handle different date formats
-                            try:
-                                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                            except:
-                                # Try parsing with strptime as fallback
+        filters = json.loads(filters_str) if isinstance(filters_str, str) else filters_str
+    except:
+        filters = {}
+    
+    include_recommendations = form.get('include_recommendations', 'true').lower() == 'true'
+    include_analysis = form.get('include_analysis', 'true').lower() == 'true'
+    
+    # Get chart images
+    timeline_file = form.get('timeline_chart')
+    source_file = form.get('source_chart')
+    sentiment_file = form.get('sentiment_chart')
+    
+    timeline_chart = await timeline_file.read() if timeline_file else None
+    source_chart = await source_file.read() if source_file else None
+    sentiment_chart = await sentiment_file.read() if sentiment_file else None
+    
+    chart_images = {
+        'timeline': timeline_chart,
+        'source': source_chart,
+        'sentiment': sentiment_chart
+    }
+    
+    logger.info(f"[PowerPoint Report] Starting generation with filters: {filters}")
+    
+    try:
+            from . import powerpoint_generator
+            
+            if not powerpoint_generator.PPTX_AVAILABLE:
+                missing_deps = getattr(powerpoint_generator, 'MISSING_DEPENDENCIES', ['python-pptx', 'matplotlib', 'Pillow'])
+                deps_str = ", ".join(missing_deps)
+                raise HTTPException(
+                    status_code=503,
+                    detail=(
+                        f"PowerPoint generation requires {deps_str}. "
+                        f"Install with: pip install {' '.join(missing_deps)} "
+                        f"or install all dependencies: pip install -r requirements.txt"
+                    )
+                )
+            
+            # Get filtered posts based on request filters
+            all_posts = db.get_posts(limit=10000, offset=0)
+            
+            # Apply filters (similar to state filtering logic)
+            filtered_posts = all_posts
+            if filters.get('search'):
+                search_lower = filters['search'].lower()
+                filtered_posts = [p for p in filtered_posts if search_lower in (p.get('content', '') or '').lower()]
+            
+            if filters.get('sentiment') and filters['sentiment'] != 'all':
+                filtered_posts = [p for p in filtered_posts if p.get('sentiment_label') == filters['sentiment']]
+            
+            if filters.get('language') and filters['language'] != 'all':
+                filtered_posts = [p for p in filtered_posts if p.get('language') == filters['language']]
+            
+            if filters.get('source') and filters['source'] != 'all':
+                filtered_posts = [p for p in filtered_posts if p.get('source') == filters['source']]
+            
+            # Date filtering
+            if filters.get('dateFrom'):
+                filtered_posts = [p for p in filtered_posts if p.get('created_at', '') >= filters['dateFrom']]
+            if filters.get('dateTo'):
+                filtered_posts = [p for p in filtered_posts if p.get('created_at', '') <= filters['dateTo']]
+            
+            # Calculate stats
+            stats = {
+                'total': len(filtered_posts),
+                'positive': len([p for p in filtered_posts if p.get('sentiment_label') == 'positive']),
+                'negative': len([p for p in filtered_posts if p.get('sentiment_label') == 'negative']),
+                'neutral': len([p for p in filtered_posts if p.get('sentiment_label') == 'neutral' or not p.get('sentiment_label')])
+            }
+            
+            # Get recommended actions
+            recommended_actions = []
+            if include_recommendations:
+                try:
+                    # Get recent posts for recommendations
+                    now = time.time()
+                    recent_posts = []
+                    for p in filtered_posts:
+                        try:
+                            created_at = p.get('created_at', '')
+                            if created_at:
+                                # Handle different date formats
                                 try:
-                                    dt = datetime.datetime.strptime(created_at.split('T')[0], '%Y-%m-%d')
+                                    dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
                                 except:
-                                    continue
-                            post_timestamp = dt.timestamp()
-                            if post_timestamp >= (now - 48 * 3600):
-                                recent_posts.append(p)
-                    except Exception as e:
-                        logger.debug(f"Error parsing post date: {e}")
-                        continue
-                
-                # Call recommended actions endpoint logic
-                actions_response = await get_recommended_actions(RecommendedActionRequest(
-                    posts=filtered_posts[:30],
-                    recent_posts=recent_posts[:20],
-                    stats=stats,
-                    max_actions=5
-                ))
-                recommended_actions = [{'icon': a.icon, 'text': a.text, 'priority': a.priority} for a in actions_response.actions]
-            except Exception as e:
-                logger.warning(f"Failed to get recommended actions for report: {e}")
-        
-        # Generate LLM analysis if requested
-        llm_analysis = None
-        if request.include_analysis:
-            try:
-                api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-                if api_key:
-                    # Generate brief analysis
-                    prompt = f"""Analyze the following customer feedback data and provide a concise 3-4 sentence summary:
+                                    # Try parsing with strptime as fallback
+                                    try:
+                                        dt = datetime.datetime.strptime(created_at.split('T')[0], '%Y-%m-%d')
+                                    except:
+                                        continue
+                                post_timestamp = dt.timestamp()
+                                if post_timestamp >= (now - 48 * 3600):
+                                    recent_posts.append(p)
+                        except Exception as e:
+                            logger.debug(f"Error parsing post date: {e}")
+                            continue
+                    
+                    # Call recommended actions endpoint logic
+                    actions_response = await get_recommended_actions(RecommendedActionRequest(
+                        posts=filtered_posts[:30],
+                        recent_posts=recent_posts[:20],
+                        stats=stats,
+                        max_actions=5
+                    ))
+                    recommended_actions = [{'icon': a.icon, 'text': a.text, 'priority': a.priority} for a in actions_response.actions]
+                except Exception as e:
+                    logger.warning(f"Failed to get recommended actions for report: {e}")
+            
+            # Generate LLM analysis if requested
+            llm_analysis = None
+            if include_analysis:
+                try:
+                    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+                    if api_key:
+                        # Generate brief analysis
+                        prompt = f"""Analyze the following customer feedback data and provide 2-3 key bullet points (one sentence each):
 - Total posts: {stats['total']}
 - Positive: {stats['positive']}, Negative: {stats['negative']}, Neutral: {stats['neutral']}
-- Active filters: {request.filters}
+- Active filters: {filters}
 
-Provide key insights and trends in a professional, executive-friendly format."""
-                    
-                    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-                    if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-                        async with httpx.AsyncClient(timeout=30.0) as client:
-                            response = await client.post(
-                                'https://api.openai.com/v1/chat/completions',
-                                headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                                json={
-                                    'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                                    'messages': [
-                                        {'role': 'system', 'content': 'You are a business analyst. Provide concise, professional insights.'},
-                                        {'role': 'user', 'content': prompt}
-                                    ],
-                                    'temperature': 0.7,
-                                    'max_tokens': 200
-                                }
-                            )
-                            response.raise_for_status()
-                            result = response.json()
-                            llm_analysis = result['choices'][0]['message']['content'].strip()
-            except Exception as e:
-                logger.warning(f"Failed to generate LLM analysis for report: {e}")
-        
-        # Generate PowerPoint
-        pptx_bytes = powerpoint_generator.generate_powerpoint_report(
-            posts=filtered_posts,
-            filters=request.filters,
-            recommended_actions=recommended_actions,
-            stats=stats,
-            llm_analysis=llm_analysis
-        )
-        
-        # Return as file download
-        filename = f"OVH_Feedback_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
-        return Response(
-            content=pptx_bytes,
-            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
-        )
-        
+Format as bullet points, professional and executive-friendly."""
+                        
+                        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+                        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
+                            async with httpx.AsyncClient(timeout=30.0) as client:
+                                response = await client.post(
+                                    'https://api.openai.com/v1/chat/completions',
+                                    headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+                                    json={
+                                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                        'messages': [
+                                            {'role': 'system', 'content': 'You are a business analyst. Provide concise, professional insights.'},
+                                            {'role': 'user', 'content': prompt}
+                                        ],
+                                        'temperature': 0.7,
+                                        'max_tokens': 200
+                                    }
+                                )
+                                response.raise_for_status()
+                                result = response.json()
+                                llm_analysis = result['choices'][0]['message']['content'].strip()
+                except Exception as e:
+                    logger.warning(f"Failed to generate LLM analysis for report: {e}")
+            
+            # Generate PowerPoint with chart images
+            pptx_bytes = powerpoint_generator.generate_powerpoint_report(
+                posts=filtered_posts,
+                filters=filters,
+                recommended_actions=recommended_actions,
+                stats=stats,
+                llm_analysis=llm_analysis,
+                chart_images=chart_images
+            )
+            
+            # Return as file download
+            filename = f"OVH_Feedback_Report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pptx"
+            return Response(
+                content=pptx_bytes,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            )
+            
     except Exception as e:
         logger.error(f"Error generating PowerPoint report: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")

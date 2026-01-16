@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <!-- OVHcloud logo inspired design -->
+  <defs>
+    <linearGradient id="ovh-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#123F6D;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00A0E3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Cloud icon -->
+  <g transform="translate(10, 15)">
+    <circle cx="15" cy="15" r="13" fill="url(#ovh-gradient)" opacity="0.3"/>
+    <path d="M 8 15 Q 15 8, 22 15 Q 15 22, 8 15" fill="#123F6D"/>
+    <path d="M 4 15 Q 8 11, 12 15 Q 16 19, 20 15 Q 24 11, 28 15" 
+          stroke="#00D4FF" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+  
+  <!-- OVHcloud text -->
+  <text x="50" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#123F6D">
+    OVH
+  </text>
+  <text x="95" y="30" font-family="Arial, sans-serif" font-size="16" fill="#00A0E3">
+    cloud
+  </text>
+  
+  <!-- Tagline -->
+  <text x="50" y="45" font-family="Arial, sans-serif" font-size="8" fill="#666">
+    Customer Feedbacks Tracker
+  </text>
+</svg>

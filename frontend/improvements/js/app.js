@@ -57,7 +57,7 @@ function setupThemeToggle() {
 // Load and display version
 async function loadVersion() {
     try {
-        const response = await fetch('/api/version');
+        const response = await fetch(`${window.location.origin}/api/version`);
         if (response.ok) {
             const data = await response.json();
             const versionBadge = document.getElementById('versionBadge');

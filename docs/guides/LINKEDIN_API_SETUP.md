@@ -117,3 +117,4 @@ Dans ce cas, l'application retournera une liste vide sans erreur, et vous pourre
 Si vous rencontrez des problèmes, consultez les logs de l'application dans la page **"Scraping Logs"** pour plus de détails.
 
 
+

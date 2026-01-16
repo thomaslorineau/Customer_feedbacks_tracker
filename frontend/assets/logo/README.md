@@ -17,3 +17,4 @@ Ce dossier contient les logos officiels OVHcloud utilisés dans l'application.
 Si le logo n'est pas disponible, l'application utilisera un fallback SVG intégré dans les fichiers HTML.
 
 
+
