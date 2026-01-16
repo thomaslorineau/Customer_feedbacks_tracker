@@ -87,14 +87,25 @@
     }
 
     // Check logo status on page load
-    async function checkLogoStatus() {
+    async function checkLogoStatus(forceReload = false) {
         try {
+            // Check if there was a recent upload (less than 5 seconds ago)
+            const logoUpdated = localStorage.getItem('logoUpdated');
+            const isRecentUpload = logoUpdated && (Date.now() - parseInt(logoUpdated) < 5000);
+            
+            // If recent upload, skip API check to avoid overwriting
+            if (isRecentUpload && !forceReload) {
+                console.debug('Skipping logo status check - recent upload detected');
+                return;
+            }
+            
             const response = await fetch(`${window.location.origin}/api/logo-status`);
             const data = await response.json();
             
             if (data.exists) {
-                // Always use fresh timestamp when loading from API
-                updateLogoInNavigation(data.path, false);
+                // Use fresh timestamp when loading from API
+                // Force reload if explicitly requested or if it's a recent upload
+                updateLogoInNavigation(data.path, forceReload || isRecentUpload);
                 // Store in localStorage
                 localStorage.setItem('logoPath', data.path);
             } else {
