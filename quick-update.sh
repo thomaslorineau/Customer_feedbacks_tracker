@@ -15,6 +15,19 @@ echo ""
 
 # 1. Mettre à jour le code
 echo "📥 Mise à jour du code..."
+
+# Écraser automatiquement les modifications locales sur les scripts versionnés
+SCRIPT_FILES="install.sh scripts/install/install.sh update.sh"
+for file in $SCRIPT_FILES; do
+    if git diff --quiet "$file" 2>/dev/null && git diff --cached --quiet "$file" 2>/dev/null; then
+        continue
+    fi
+    if git ls-files --error-unmatch "$file" >/dev/null 2>&1; then
+        echo "   Écrasement des modifications locales sur $file (script versionné)..."
+        git checkout -- "$file" 2>/dev/null || true
+    fi
+done
+
 if git pull origin master 2>/dev/null || git pull github master 2>/dev/null; then
     echo "✅ Code mis à jour"
 else

@@ -202,7 +202,8 @@ fi
 
 # Forcer la résolution des fichiers de config AVANT le pull
 # On sauvegarde, puis on supprime temporairement ces fichiers pour permettre le pull
-CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
+# Note: install.sh et scripts/install/install.sh sont aussi gérés car ce sont des scripts versionnés
+CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh install.sh scripts/install/install.sh"
 for file in $CONFIG_FILES; do
     if [ ! -f "$file" ]; then
         continue
@@ -322,6 +323,18 @@ else
 fi
 
 # Résoudre les conflits avec les fichiers de config après le pull si nécessaire
+# Pour install.sh et scripts/install/install.sh, on prend la version distante (ce sont des scripts versionnés)
+SCRIPT_FILES="install.sh scripts/install/install.sh"
+for file in $SCRIPT_FILES; do
+    if git status --porcelain 2>/dev/null | grep -q "^UU.*$file\|^AA.*$file"; then
+        warning "Conflit de merge détecté avec $file, résolution automatique..."
+        info "Conservation de la version distante de $file (script versionné)..."
+        git checkout --theirs "$file" 2>/dev/null || true
+        git add "$file" 2>/dev/null || true
+    fi
+done
+
+# Pour les autres fichiers de config, on conserve la version locale
 for file in $CONFIG_FILES; do
     if git status --porcelain 2>/dev/null | grep -q "^UU.*$file\|^AA.*$file"; then
         warning "Conflit de merge détecté avec $file, résolution automatique..."
@@ -360,6 +373,7 @@ if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
 fi
 
 # Restaurer les versions locales des fichiers de config (priorité sur les backups)
+# Note: install.sh et scripts/install/install.sh ne sont PAS restaurés car ce sont des scripts versionnés
 CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
 for file in $CONFIG_FILES; do
     local_backup="$BACKUP_DIR/$(basename $file).local"
