@@ -24,6 +24,9 @@ apscheduler==3.10.4
 # Configuration
 python-dotenv==1.0.0
 
+# Database
+duckdb==0.10.0
+
 # PowerPoint generation
 python-pptx>=0.6.23
 Pillow>=10.1.0

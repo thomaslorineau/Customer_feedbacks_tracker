@@ -2,27 +2,94 @@ import sqlite3
 from pathlib import Path
 import json
 import datetime
+from typing import Optional, Tuple
 
-DB_FILE = Path(__file__).resolve().parents[1] / "data.db"
+# Try to import config for USE_DUCKDB setting
+try:
+    from .config import config
+    USE_DUCKDB = getattr(config, 'USE_DUCKDB', False)
+    DB_FILE = getattr(config, 'DB_PATH', None)
+    if DB_FILE is None:
+        DB_FILE = Path(__file__).resolve().parents[1] / "data.db"
+except ImportError:
+    USE_DUCKDB = False
+    DB_FILE = Path(__file__).resolve().parents[1] / "data.db"
+
+# Try to import duckdb
+if USE_DUCKDB:
+    try:
+        import duckdb
+        DUCKDB_AVAILABLE = True
+    except ImportError:
+        DUCKDB_AVAILABLE = False
+        USE_DUCKDB = False
+else:
+    DUCKDB_AVAILABLE = False
+
+
+def get_db_connection():
+    """
+    Get database connection (DuckDB or SQLite).
+    Returns: (connection, is_duckdb)
+    """
+    if USE_DUCKDB and DUCKDB_AVAILABLE:
+        try:
+            # Connect to DuckDB file directly
+            conn = duckdb.connect(str(DB_FILE))
+            return conn, True
+        except Exception as e:
+            # Fallback to SQLite if DuckDB fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"DuckDB connection failed, falling back to SQLite: {e}")
+            db_file = DB_FILE if DB_FILE else Path(__file__).resolve().parents[1] / "data.db"
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            conn = sqlite3.connect(db_file)
+            return conn, False
+    else:
+        db_file = DB_FILE if DB_FILE else Path(__file__).resolve().parents[1] / "data.db"
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db_file)
+        return conn, False
 
 
 def init_db():
-    DB_FILE.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            source TEXT,
-            author TEXT,
-            content TEXT,
-            url TEXT,
-            created_at TEXT,
-            sentiment_score REAL,
-            sentiment_label TEXT,
-            language TEXT DEFAULT 'unknown'
-        )
-    ''')
+    
+    # Use SERIAL for DuckDB (auto-increment), INTEGER AUTOINCREMENT for SQLite
+    if is_duckdb:
+        # DuckDB: Use SERIAL for auto-increment
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS posts (
+                id BIGSERIAL PRIMARY KEY,
+                source TEXT,
+                author TEXT,
+                content TEXT,
+                url TEXT,
+                created_at TEXT,
+                sentiment_score REAL,
+                sentiment_label TEXT,
+                language TEXT DEFAULT 'unknown',
+                country TEXT
+            )
+        ''')
+    else:
+        # SQLite: Use AUTOINCREMENT
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS posts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source TEXT,
+                author TEXT,
+                content TEXT,
+                url TEXT,
+                created_at TEXT,
+                sentiment_score REAL,
+                sentiment_label TEXT,
+                language TEXT DEFAULT 'unknown',
+                country TEXT
+            )
+        ''')
     
     # Add indexes for faster queries (Performance optimization)
     c.execute('''
@@ -51,26 +118,48 @@ def init_db():
     ''')
     
     # Saved search queries / keywords
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS saved_queries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            keyword TEXT UNIQUE,
-            created_at TEXT
-        )
-    ''')
+    if is_duckdb:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS saved_queries (
+                id BIGSERIAL PRIMARY KEY,
+                keyword TEXT UNIQUE,
+                created_at TEXT
+            )
+        ''')
+    else:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS saved_queries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                keyword TEXT UNIQUE,
+                created_at TEXT
+            )
+        ''')
     
     # Scraping logs table for persistent logging
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS scraping_logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            source TEXT,
-            level TEXT,
-            message TEXT,
-            details TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    if is_duckdb:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS scraping_logs (
+                id BIGSERIAL PRIMARY KEY,
+                timestamp TEXT NOT NULL,
+                source TEXT,
+                level TEXT,
+                message TEXT,
+                details TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+    else:
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS scraping_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                source TEXT,
+                level TEXT,
+                message TEXT,
+                details TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
     
     # Index for faster queries on logs
     c.execute('''
@@ -102,25 +191,43 @@ def insert_post(post: dict):
         if field not in post:
             raise ValueError(f"Missing required field: {field}")
     
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
         # SECURITY: Use parameterized query to prevent SQL injection
-        c.execute(
-            '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-            (
-                str(post.get('source'))[:100],  # Limit length
-                str(post.get('author', 'unknown'))[:100],
-                str(post.get('content', ''))[:10000],  # Limit content length
-                str(post.get('url', ''))[:500],
-                post.get('created_at'),
-                float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
-                str(post.get('sentiment_label', 'neutral'))[:20],
-                str(post.get('language', 'unknown'))[:20],
-            ),
-        )
+        if is_duckdb:
+            # DuckDB: use nextval for auto-increment
+            c.execute(
+                '''INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language)
+                   VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    str(post.get('source'))[:100],  # Limit length
+                    str(post.get('author', 'unknown'))[:100],
+                    str(post.get('content', ''))[:10000],  # Limit content length
+                    str(post.get('url', ''))[:500],
+                    post.get('created_at'),
+                    float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+                    str(post.get('sentiment_label', 'neutral'))[:20],
+                    str(post.get('language', 'unknown'))[:20],
+                ),
+            )
+        else:
+            # SQLite: omit id for auto-increment
+            c.execute(
+                '''INSERT INTO posts (source, author, content, url, created_at, sentiment_score, sentiment_label, language)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    str(post.get('source'))[:100],  # Limit length
+                    str(post.get('author', 'unknown'))[:100],
+                    str(post.get('content', ''))[:10000],  # Limit content length
+                    str(post.get('url', ''))[:500],
+                    post.get('created_at'),
+                    float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+                    str(post.get('sentiment_label', 'neutral'))[:20],
+                    str(post.get('language', 'unknown'))[:20],
+                ),
+            )
         conn.commit()
     finally:
         conn.close()
@@ -134,7 +241,7 @@ def get_posts(limit: int = 100, offset: int = 0, language: str = None):
     if language and not isinstance(language, str):
         raise ValueError("language must be a string")
     
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -161,11 +268,13 @@ def get_posts(limit: int = 100, offset: int = 0, language: str = None):
 
 
 def create_job_record(job_id: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     now = datetime.datetime.utcnow().isoformat()
+    
     # ensure jobs table
-    c.execute('''
+    id_type = "BIGINT PRIMARY KEY" if is_duckdb else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    c.execute(f'''
         CREATE TABLE IF NOT EXISTS jobs (
             job_id TEXT PRIMARY KEY,
             status TEXT,
@@ -179,15 +288,32 @@ def create_job_record(job_id: str):
             updated_at TEXT
         )
     ''')
-    # insert job
-    c.execute('INSERT OR REPLACE INTO jobs (job_id, status, progress_total, progress_completed, results, errors, cancelled, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              (job_id, 'pending', 0, 0, json.dumps([]), json.dumps([]), 0, None, now, now))
+    
+    # insert job - use ON CONFLICT for DuckDB, INSERT OR REPLACE for SQLite
+    if is_duckdb:
+        c.execute('''
+            INSERT INTO jobs (job_id, status, progress_total, progress_completed, results, errors, cancelled, error, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (job_id) DO UPDATE SET
+                status = EXCLUDED.status,
+                progress_total = EXCLUDED.progress_total,
+                progress_completed = EXCLUDED.progress_completed,
+                results = EXCLUDED.results,
+                errors = EXCLUDED.errors,
+                cancelled = EXCLUDED.cancelled,
+                error = EXCLUDED.error,
+                updated_at = EXCLUDED.updated_at
+        ''', (job_id, 'pending', 0, 0, json.dumps([]), json.dumps([]), 0, None, now, now))
+    else:
+        c.execute('INSERT OR REPLACE INTO jobs (job_id, status, progress_total, progress_completed, results, errors, cancelled, error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  (job_id, 'pending', 0, 0, json.dumps([]), json.dumps([]), 0, None, now, now))
+    
     conn.commit()
     conn.close()
 
 
 def update_job_progress(job_id: str, total: int, completed: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     now = datetime.datetime.utcnow().isoformat()
     c.execute('UPDATE jobs SET progress_total = ?, progress_completed = ?, updated_at = ? WHERE job_id = ?', (total, completed, now, job_id))
@@ -196,7 +322,7 @@ def update_job_progress(job_id: str, total: int, completed: int):
 
 
 def append_job_result(job_id: str, result: dict):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT results FROM jobs WHERE job_id = ?', (job_id,))
     row = c.fetchone()
@@ -209,7 +335,7 @@ def append_job_result(job_id: str, result: dict):
 
 
 def append_job_error(job_id: str, error_msg: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT errors FROM jobs WHERE job_id = ?', (job_id,))
     row = c.fetchone()
@@ -222,7 +348,7 @@ def append_job_error(job_id: str, error_msg: str):
 
 
 def finalize_job(job_id: str, status: str, error: str = None):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     now = datetime.datetime.utcnow().isoformat()
     c.execute('UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE job_id = ?', (status, error, now, job_id))
@@ -231,7 +357,7 @@ def finalize_job(job_id: str, status: str, error: str = None):
 
 
 def get_job_record(job_id: str):
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT job_id, status, progress_total, progress_completed, results, errors, cancelled, error, created_at, updated_at FROM jobs WHERE job_id = ?', (job_id,))
     row = c.fetchone()
@@ -259,7 +385,7 @@ def save_queries(keywords: list):
     if len(keywords) > 100:
         raise ValueError("Too many keywords (max 100)")
     
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -276,7 +402,13 @@ def save_queries(keywords: list):
             if not kw:
                 continue
             # SECURITY: Use parameterized query
-            c.execute('INSERT OR IGNORE INTO saved_queries (keyword, created_at) VALUES (?, ?)', (kw, now))
+            if is_duckdb:
+                c.execute('''
+                    INSERT INTO saved_queries (keyword, created_at) VALUES (?, ?)
+                    ON CONFLICT (keyword) DO NOTHING
+                ''', (kw, now))
+            else:
+                c.execute('INSERT OR IGNORE INTO saved_queries (keyword, created_at) VALUES (?, ?)', (kw, now))
         
         conn.commit()
     finally:
@@ -284,7 +416,7 @@ def save_queries(keywords: list):
 
 
 def get_saved_queries():
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     c.execute('SELECT keyword FROM saved_queries ORDER BY id ASC')
     rows = c.fetchall()
@@ -298,7 +430,7 @@ def delete_duplicate_posts():
     Duplicates are identified by same URL or same content+author+source.
     Keeps the oldest post (lowest ID) and deletes the rest.
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -339,13 +471,17 @@ def delete_non_ovh_posts():
     Delete all posts from the database that do NOT mention OVH or its brands.
     Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
         # Check if posts table has country column (for migration compatibility)
-        c.execute("PRAGMA table_info(posts)")
-        columns = [row[1] for row in c.fetchall()]
+        if is_duckdb:
+            c.execute("DESCRIBE posts")
+            columns = [row[0] for row in c.fetchall()]
+        else:
+            c.execute("PRAGMA table_info(posts)")
+            columns = [row[1] for row in c.fetchall()]
         has_country = 'country' in columns
         
         # Delete posts that don't contain OVH-related keywords
@@ -375,7 +511,7 @@ def delete_sample_posts():
     Delete sample/fake posts used for testing.
     Identifies sample posts by checking for test keywords in content or author.
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -400,7 +536,7 @@ def delete_hackernews_posts():
     """
     Delete all posts from Hacker News source.
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -424,7 +560,7 @@ def add_scraping_log(source: str, level: str, message: str, details: str = None)
         message: Log message
         details: Optional additional details (JSON string or dict)
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -460,7 +596,7 @@ def get_scraping_logs(source: str = None, level: str = None, limit: int = 1000, 
     Returns:
         List of log dictionaries
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
@@ -514,7 +650,7 @@ def clear_scraping_logs(source: str = None, older_than_days: int = None):
     Returns:
         Number of logs deleted
     """
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:

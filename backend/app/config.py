@@ -57,7 +57,19 @@ class Config:
     RATE_LIMIT_WINDOW: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
     
     # Database
-    DB_PATH: Path = Path(__file__).resolve().parents[1] / "data.db"
+    USE_DUCKDB: bool = os.getenv("USE_DUCKDB", "false").lower() == "true"
+    
+    # Environment-specific database paths
+    if ENVIRONMENT == "staging":
+        if USE_DUCKDB:
+            DB_PATH: Path = Path(__file__).resolve().parents[1] / "data_staging.duckdb"
+        else:
+            DB_PATH: Path = Path(__file__).resolve().parents[1] / "data_staging.db"
+    else:
+        if USE_DUCKDB:
+            DB_PATH: Path = Path(__file__).resolve().parents[1] / "data.duckdb"
+        else:
+            DB_PATH: Path = Path(__file__).resolve().parents[1] / "data.db"
     
     @classmethod
     def get_api_key(cls, provider: str) -> Optional[str]:
