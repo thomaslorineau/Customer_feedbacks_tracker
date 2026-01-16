@@ -928,16 +928,17 @@
                         localStorage.setItem('logoPath', data.path);
                         localStorage.setItem('logoUpdated', Date.now().toString());
                         
-                        // Update logo in navigation across all pages
+                        // Update logo in navigation across all pages - FORCE RELOAD
                         if (window.updateLogoInNavigation) {
-                            window.updateLogoInNavigation(data.path);
+                            // Force reload to replace old logo with new one
+                            window.updateLogoInNavigation(data.path, true);
                         } else {
                             // If function not available, force reload logo-updater
                             const logoUpdaterScript = document.createElement('script');
-                            logoUpdaterScript.src = '/js/logo-updater.js';
+                            logoUpdaterScript.src = '/js/logo-updater.js?t=' + Date.now();
                             logoUpdaterScript.onload = function() {
                                 if (window.updateLogoInNavigation) {
-                                    window.updateLogoInNavigation(data.path);
+                                    window.updateLogoInNavigation(data.path, true);
                                 }
                             };
                             document.head.appendChild(logoUpdaterScript);
@@ -946,10 +947,10 @@
                         // Re-check logo status to ensure it's saved and persisted
                         setTimeout(() => {
                             checkLogoStatus();
-                            // Force update again after a short delay to ensure persistence
+                            // Force update again after a short delay to ensure persistence - FORCE RELOAD
                             setTimeout(() => {
                                 if (window.updateLogoInNavigation) {
-                                    window.updateLogoInNavigation(data.path);
+                                    window.updateLogoInNavigation(data.path, true);
                                 }
                             }, 500);
                         }, 500);

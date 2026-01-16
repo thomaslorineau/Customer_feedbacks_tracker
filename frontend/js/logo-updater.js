@@ -14,15 +14,18 @@
         if (logoPath && logoUpdated) {
             const updateTime = parseInt(logoUpdated);
             const now = Date.now();
-            // Only update if less than 10 seconds ago (recent update)
+            // Only update if less than 10 seconds ago (recent update) - force reload for recent updates
             if (now - updateTime < 10000) {
-                updateLogoInNavigation(logoPath);
+                updateLogoInNavigation(logoPath, true); // Force reload for recent uploads
+            } else {
+                // For older updates, still update but don't force reload
+                updateLogoInNavigation(logoPath, false);
             }
         }
     }
 
     // Update logo in navigation menu
-    function updateLogoInNavigation(logoPath) {
+    function updateLogoInNavigation(logoPath, forceReload = false) {
         // Always hide SVG fallback first (no fake logo)
         const allSvgFallbacks = document.querySelectorAll('.nav-logo svg.ovh-logo');
         allSvgFallbacks.forEach(svg => {
@@ -40,16 +43,35 @@
             return;
         }
         
+        // Generate a fresh timestamp to force browser cache bypass
+        const timestamp = Date.now();
+        const logoUrl = logoPath + '?t=' + timestamp;
+        
         // Update all logo images in navigation
         const navLogos = document.querySelectorAll('.nav-logo img.ovh-logo, .nav-logo img[alt="OVHcloud"]');
         navLogos.forEach(img => {
             if (img.tagName === 'IMG') {
-                img.src = logoPath + '?t=' + Date.now();
-                img.style.display = 'block';
-                img.style.width = '40px';
-                img.style.height = '40px';
-                img.style.objectFit = 'contain';
-                img.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))';
+                // Force reload by clearing src first, then setting new src with timestamp
+                if (forceReload || img.src !== logoUrl) {
+                    img.src = '';
+                    // Use setTimeout to ensure browser clears cache
+                    setTimeout(() => {
+                        img.src = logoUrl;
+                        img.style.display = 'block';
+                        img.style.width = '40px';
+                        img.style.height = '40px';
+                        img.style.objectFit = 'contain';
+                        img.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))';
+                    }, 10);
+                } else {
+                    img.src = logoUrl;
+                    img.style.display = 'block';
+                    img.style.width = '40px';
+                    img.style.height = '40px';
+                    img.style.objectFit = 'contain';
+                    img.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1))';
+                }
+                
                 img.onerror = function() {
                     // If logo fails to load, hide it (but never show SVG fallback)
                     this.style.display = 'none';
