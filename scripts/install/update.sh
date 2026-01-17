@@ -245,8 +245,29 @@ for file in $CONFIG_FILES; do
     fi
 done
 
-# Faire le pull depuis master
-if git pull origin master; then
+# Détecter la branche actuelle
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
+info "Branche actuelle détectée: $CURRENT_BRANCH"
+
+# Vérifier si la branche existe sur le remote
+BRANCH_TO_PULL="$CURRENT_BRANCH"
+if ! git ls-remote --heads origin "$CURRENT_BRANCH" > /dev/null 2>&1; then
+    # Si la branche actuelle n'existe pas sur le remote, essayer develop puis master
+    if git ls-remote --heads origin "develop" > /dev/null 2>&1; then
+        warning "Branche $CURRENT_BRANCH non trouvée sur origin, utilisation de develop"
+        BRANCH_TO_PULL="develop"
+    elif git ls-remote --heads origin "master" > /dev/null 2>&1; then
+        warning "Branche develop non trouvée sur origin, utilisation de master"
+        BRANCH_TO_PULL="master"
+    else
+        error "Aucune branche valide trouvée sur origin (develop ou master)"
+        exit 1
+    fi
+fi
+
+# Faire le pull depuis la branche détectée
+info "Mise à jour depuis origin/$BRANCH_TO_PULL..."
+if git pull origin $BRANCH_TO_PULL; then
     success "Code mis à jour"
     
     # Essayer de restaurer les modifications si elles existent
