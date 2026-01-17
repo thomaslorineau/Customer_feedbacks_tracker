@@ -272,6 +272,16 @@ for db_file in $DB_FILES; do
     fi
 done
 
+# IMPORTANT: Résoudre automatiquement les conflits avec scripts/install/update.sh
+# en conservant la version locale (pertinent car le script peut avoir des modifications locales)
+if git status --porcelain 2>/dev/null | grep -q "^UU.*scripts/install/update.sh\|^AA.*scripts/install/update.sh\|^M.*scripts/install/update.sh"; then
+    warning "Conflit détecté avec scripts/install/update.sh, résolution automatique..."
+    info "Conservation de la version locale de scripts/install/update.sh (pertinent pour les modifications locales)..."
+    git checkout --ours "scripts/install/update.sh" 2>/dev/null || true
+    git add "scripts/install/update.sh" 2>/dev/null || true
+    success "Conflit avec scripts/install/update.sh résolu (version locale conservée)"
+fi
+
 # Exclure les fichiers de base de données, configuration locale et scripts locaux
 # IMPORTANT: Exclure aussi scripts/install/update.sh pour éviter les conflits avec le script lui-même
 EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/data.duckdb' ':!backend/data_staging.duckdb' ':!backend/data_staging.duckdb.wal' ':!backend/*.db' ':!backend/*.duckdb' ':!backend/*.wal' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh' ':!scripts/install/update.sh' ':!update.sh'"
