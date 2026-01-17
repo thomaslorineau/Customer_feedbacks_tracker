@@ -537,6 +537,23 @@ body.dark-mode #scrapingProgressContainer {
     align-items: center;
     gap: 8px;
     margin-bottom: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+
+/* Ensure proper spacing for cancel button in progress container */
+#scrapingProgressContainer > div:first-child {
+    gap: 16px !important;
+}
+
+.btn-cancel-scraping-progress,
+#cancelScrapingProgressBtn {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    margin-left: auto;
 }
 
 #scrapingProgressText::before {
@@ -684,16 +701,24 @@ body.dark-mode #scrapingProgressContainer > div:last-child {
 #scrapingProgressContainer::after {
     content: attr(data-percentage);
     position: absolute;
-    top: 20px;
+    bottom: 8px;
     right: 20px;
-    font-size: 0.85em;
+    font-size: 0.75em;
     font-weight: 700;
     color: var(--accent-primary);
-    background: rgba(0, 153, 255, 0.1);
-    padding: 4px 12px;
-    border-radius: 20px;
-    border: 1px solid rgba(0, 153, 255, 0.2);
+    background: rgba(0, 153, 255, 0.15);
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 153, 255, 0.3);
     pointer-events: none;
+    z-index: 2;
+    line-height: 1.4;
+}
+
+/* Hide percentage overlay when it would overlap with cancel button */
+/* The percentage is already shown in the progress text, so we can hide this overlay */
+#scrapingProgressContainer::after {
+    display: none; /* Hide by default since percentage is in text */
 }
 
 body.dark-mode #scrapingProgressContainer::after {

@@ -93,7 +93,96 @@ else
 fi
 echo ""
 
-# 2. Sauvegarder la configuration
+# 2. Vérifier l'intégrité des bases de données AVANT la mise à jour
+info "Vérification de l'intégrité des bases de données..."
+cd "$APP_DIR/backend" || {
+    error "Impossible de se déplacer dans le répertoire backend"
+    exit 1
+}
+
+# Activer l'environnement virtuel si disponible
+if [ -f "../venv/bin/activate" ]; then
+    source ../venv/bin/activate
+elif [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
+
+# Vérifier l'intégrité des bases de données
+DB_INTEGRITY_OK=true
+if [ -f "scripts/check_db_integrity.py" ]; then
+    if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
+        success "Intégrité des bases de données vérifiée"
+    else
+        warning "⚠️  Corruption détectée dans au moins une base de données"
+        DB_INTEGRITY_OK=false
+        
+        # Essayer de réparer automatiquement
+        info "Tentative de réparation automatique..."
+        if [ -f "repair_db.py" ]; then
+            # Réparer la base de production
+            if [ -f "data.duckdb" ]; then
+                info "Réparation de la base de données de production..."
+                ENVIRONMENT=production python repair_db.py
+            fi
+            # Réparer la base de staging
+            if [ -f "data_staging.duckdb" ]; then
+                info "Réparation de la base de données de staging..."
+                ENVIRONMENT=staging python repair_db.py
+            fi
+            
+            # Revérifier après réparation
+            if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
+                success "Bases de données réparées avec succès"
+                DB_INTEGRITY_OK=true
+            else
+                error "❌ Impossible de réparer les bases de données"
+                warning "   Les bases de données seront recréées vides lors du redémarrage"
+            fi
+        else
+            warning "Script repair_db.py introuvable, réparation impossible"
+        fi
+    fi
+else
+    warning "Script check_db_integrity.py introuvable, vérification ignorée"
+fi
+
+cd "$APP_DIR" || {
+    error "Impossible de revenir au répertoire racine"
+    exit 1
+}
+echo ""
+
+# 2b. Sauvegarde automatique des bases de données (avec rotation)
+info "Sauvegarde automatique des bases de données..."
+cd "$APP_DIR/backend" || {
+    error "Impossible de se déplacer dans le répertoire backend"
+    exit 1
+}
+
+# Activer l'environnement virtuel si disponible (au cas où)
+if [ -f "../venv/bin/activate" ]; then
+    source ../venv/bin/activate
+elif [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
+
+if [ -f "scripts/backup_db.py" ]; then
+    if python scripts/backup_db.py both --keep=30 > /dev/null 2>&1; then
+        success "Sauvegarde automatique créée avec succès"
+    else
+        warning "⚠️  Échec de la sauvegarde automatique (continuation de la mise à jour)"
+    fi
+else
+    warning "Script backup_db.py introuvable, sauvegarde automatique ignorée"
+fi
+
+cd "$APP_DIR" || {
+    error "Impossible de revenir au répertoire racine"
+    exit 1
+}
+echo ""
+
+# 2c. Sauvegarder la configuration
 info "Sauvegarde de la configuration..."
 BACKUP_DIR="$APP_DIR/.update_backup"
 mkdir -p "$BACKUP_DIR"
@@ -132,10 +221,18 @@ if [ -f "update.sh" ]; then
     success "Script update.sh sauvegardé"
 fi
 
-# Sauvegarder aussi la base de données (juste pour sécurité, on ne la restaure pas)
+# Sauvegarder aussi les bases de données (juste pour sécurité, on ne la restaure pas)
 if [ -f "backend/data.db" ]; then
     cp backend/data.db "$BACKUP_DIR/data.db.backup"
-    info "Base de données sauvegardée (sécurité)"
+    info "Base de données SQLite sauvegardée (sécurité)"
+fi
+if [ -f "backend/data.duckdb" ]; then
+    cp backend/data.duckdb "$BACKUP_DIR/data.duckdb.backup"
+    info "Base de données DuckDB sauvegardée (sécurité)"
+fi
+if [ -f "backend/data_staging.duckdb" ]; then
+    cp backend/data_staging.duckdb "$BACKUP_DIR/data_staging.duckdb.backup"
+    info "Base de données DuckDB staging sauvegardée (sécurité)"
 fi
 
 echo ""

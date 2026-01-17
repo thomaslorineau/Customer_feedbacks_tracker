@@ -998,36 +998,56 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
                             pass
                     return None
         
-        # Execute tasks
-        results = await asyncio.gather(*[process_with_semaphore(task) for task in tasks], return_exceptions=True)
+        # Execute tasks and process results as they complete (for real-time progress updates)
+        # Create tasks explicitly for as_completed
+        wrapped_tasks = [asyncio.create_task(process_with_semaphore(task)) for task in tasks]
         
-        # Process results
-        for result in results:
+        # Use as_completed to process results as they finish, updating progress in real-time
+        for completed_task in asyncio.as_completed(wrapped_tasks):
             if job.get('cancelled'):
                 job['status'] = 'cancelled'
                 return
             
-            if isinstance(result, Exception):
-                job['errors'].append(str(result))
-                try:
-                    db.append_job_error(job_id, str(result))
-                except Exception:
-                    pass
-            elif result is not None:
-                job['results'].append({'added': result})
-                try:
-                    db.append_job_result(job_id, {'added': result})
-                except Exception:
-                    pass
-            
-            job['progress']['completed'] += 1
             try:
-                db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
-            except Exception:
-                pass
-            
-            # Gentle delay between processing results
-            await asyncio.sleep(delay)
+                result = await completed_task
+                
+                if isinstance(result, Exception):
+                    job['errors'].append(str(result))
+                    try:
+                        db.append_job_error(job_id, str(result))
+                    except Exception:
+                        pass
+                elif result is not None:
+                    job['results'].append({'added': result})
+                    try:
+                        db.append_job_result(job_id, {'added': result})
+                    except Exception:
+                        pass
+                
+                # Update progress immediately after each task completes
+                job['progress']['completed'] += 1
+                try:
+                    db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
+                except Exception:
+                    pass
+                
+                # Gentle delay between processing results
+                await asyncio.sleep(delay)
+                
+            except Exception as e:
+                if job.get('status') == 'running':
+                    job['errors'].append(str(e))
+                    try:
+                        db.append_job_error(job_id, str(e))
+                    except Exception:
+                        pass
+                
+                # Still count as completed even if there was an error
+                job['progress']['completed'] += 1
+                try:
+                    db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
+                except Exception:
+                    pass
 
         job['status'] = 'completed'
         try:
