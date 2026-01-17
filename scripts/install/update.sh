@@ -221,6 +221,12 @@ if [ -f "update.sh" ]; then
     success "Script update.sh sauvegardé"
 fi
 
+# Sauvegarder aussi scripts/install/update.sh (le script lui-même)
+if [ -f "scripts/install/update.sh" ]; then
+    cp scripts/install/update.sh "$BACKUP_DIR/update.sh.install.local"
+    success "Script scripts/install/update.sh sauvegardé"
+fi
+
 # Sauvegarder aussi les bases de données (juste pour sécurité, on ne la restaure pas)
 if [ -f "backend/data.db" ]; then
     cp backend/data.db "$BACKUP_DIR/data.db.backup"
@@ -255,7 +261,8 @@ for db_file in $DB_FILES; do
 done
 
 # Exclure les fichiers de base de données, configuration locale et scripts locaux
-EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/data.duckdb' ':!backend/data_staging.duckdb' ':!backend/data_staging.duckdb.wal' ':!backend/*.db' ':!backend/*.duckdb' ':!backend/*.wal' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh'"
+# IMPORTANT: Exclure aussi scripts/install/update.sh pour éviter les conflits avec le script lui-même
+EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/data.duckdb' ':!backend/data_staging.duckdb' ':!backend/data_staging.duckdb.wal' ':!backend/*.db' ':!backend/*.duckdb' ':!backend/*.wal' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh' ':!scripts/install/update.sh' ':!update.sh'"
 
 # Vérifier les modifications (sans les fichiers exclus)
 if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --quiet $EXCLUDE_PATTERNS 2>/dev/null; then
@@ -299,7 +306,8 @@ fi
 
 # Forcer la résolution des fichiers de config AVANT le pull
 # On sauvegarde, puis on supprime temporairement ces fichiers pour permettre le pull
-CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/data_staging.duckdb.wal backend/.app_config backup.sh configure_cors.sh update.sh"
+# IMPORTANT: Inclure scripts/install/update.sh (le script lui-même) pour éviter les conflits
+CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/data_staging.duckdb.wal backend/.app_config backup.sh configure_cors.sh update.sh scripts/install/update.sh"
 for file in $CONFIG_FILES; do
     if [ ! -f "$file" ]; then
         continue
@@ -391,8 +399,13 @@ else
         cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
     fi
     # Restaurer aussi les versions locales si elles existent
-    for file in backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh; do
-        local_backup="$BACKUP_DIR/$(basename $file).local"
+    for file in backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh scripts/install/update.sh; do
+        if [ "$file" = "scripts/install/update.sh" ]; then
+            # Pour scripts/install/update.sh, utiliser le backup spécifique
+            local_backup="$BACKUP_DIR/update.sh.install.local"
+        else
+            local_backup="$BACKUP_DIR/$(basename $file).local"
+        fi
         if [ -f "$local_backup" ]; then
             cp "$local_backup" "$file" 2>/dev/null || true
         fi
@@ -439,9 +452,14 @@ if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
 fi
 
 # Restaurer les versions locales des fichiers de config (priorité sur les backups)
-CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh"
+CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh scripts/install/update.sh"
 for file in $CONFIG_FILES; do
-    local_backup="$BACKUP_DIR/$(basename $file).local"
+    if [ "$file" = "scripts/install/update.sh" ]; then
+        # Pour scripts/install/update.sh, utiliser le backup spécifique
+        local_backup="$BACKUP_DIR/update.sh.install.local"
+    else
+        local_backup="$BACKUP_DIR/$(basename $file).local"
+    fi
     if [ -f "$local_backup" ]; then
         cp "$local_backup" "$file"
         success "Version locale de $file restaurée"
