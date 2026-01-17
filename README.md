@@ -87,7 +87,10 @@ ovh-complaints-tracker/
 │   ├── app/
 │   │   ├── main.py           # Point d'entrée FastAPI
 │   │   ├── scraper/          # Modules de scraping (X, Reddit, GitHub...)
-│   │   ├── analysis/         # Analyse de sentiment
+│   │   │   ├── google_search_fallback.py  # Fallback universel via Google Search
+│   │   │   └── rss_detector.py             # Détection et parsing de feeds RSS/Atom
+│   │   ├── analysis/         # Analyse de sentiment et pertinence
+│   │   ├── config/           # Configuration (keywords de base)
 │   │   └── db.py             # Gestion base de données
 │   └── requirements.txt      # Dépendances Python
 │
@@ -119,6 +122,7 @@ ovh-complaints-tracker/
        │
 ┌──────▼──────┐
 │  Scrapers   │  →  X/Twitter, Reddit, GitHub, Stack Overflow...
+│             │     + Google Search Fallback + RSS Detector
 └──────┬──────┘
        │
 ┌──────▼──────┐
@@ -127,11 +131,12 @@ ovh-complaints-tracker/
 ```
 
 **Flux de données:**
-1. **Scrapers** collectent les posts depuis différentes sources
-2. **Analyse de sentiment** (VADER) classe chaque post
-3. **Base de données** stocke les posts avec métadonnées
-4. **API REST** expose les données au frontend
-5. **Dashboard** visualise les données avec Chart.js
+1. **Scrapers** collectent les posts depuis différentes sources (avec fallbacks Google Search et RSS)
+2. **Relevance Scoring** filtre les posts non pertinents (< 30%)
+3. **Analyse de sentiment** (VADER) classe chaque post
+4. **Base de données** stocke les posts avec métadonnées (relevance_score inclus)
+5. **API REST** expose les données au frontend
+6. **Dashboard** visualise les données avec Chart.js et sections interactives
 
 📖 **Architecture détaillée:** [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)
 
@@ -140,9 +145,15 @@ ovh-complaints-tracker/
 ## 🎯 Fonctionnalités
 
 - ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, Google News, LinkedIn
-- ✅ **Analyse de sentiment** : Classification automatique (positif/négatif/neutre)
+- ✅ **Fallback strategies** : Google Search fallback et RSS/Atom feed detection pour maximiser la collecte de données
+- ✅ **Base Keywords System** : Keywords de base configurables (brands, products, problems, leadership) combinés avec keywords utilisateur
+- ✅ **Relevance Scoring** : Score de pertinence automatique (0-100%) pour filtrer les posts non pertinents (< 30% filtrés)
+- ✅ **Analyse de sentiment** : Classification automatique (positif/négatif/neutre) avec VADER
 - ✅ **Priority Scoring** : Algorithme multiplicatif `sentiment * keyword_relevance * recency` pour prioriser les posts
-- ✅ **Dashboard interactif** : Graphiques, filtres, timeline
+- ✅ **Dashboard interactif** : Graphiques, filtres, timeline, section "All Posts" avec filtres complets
+- ✅ **Posts Statistics** : Métriques de satisfaction avec échelle dynamique (Excellent/Good/Fair/Poor)
+- ✅ **Critical Posts Drawer** : Accès rapide aux posts négatifs avec filtres personnalisables
+- ✅ **Product Analysis** : Analyse LLM des produits avec identification des pain points
 - ✅ **Logs persistants** : Suivi détaillé des opérations de scraping
 - ✅ **Détection de pays** : Identification du pays depuis le contenu
 - ✅ **Actions recommandées** : Suggestions basées sur l'IA (OpenAI/Anthropic)

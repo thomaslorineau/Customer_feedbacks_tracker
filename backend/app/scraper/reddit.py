@@ -1,9 +1,12 @@
 from datetime import datetime
 import requests
+import asyncio
 import logging
 import time
+from typing import List, Dict, Any
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from .base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -11,14 +14,212 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
 
+class RedditScraper(BaseScraper):
+    """Async Reddit scraper."""
+    
+    def __init__(self):
+        super().__init__("Reddit")
+    
+    async def scrape(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Scrape Reddit using JSON API with pagination, fallback to RSS if API fails."""
+        start_time = asyncio.get_event_loop().time()
+        self.logger.log_scraping_start(query, limit)
+        
+        try:
+            # Try API first (better pagination support)
+            try:
+                posts = await self._scrape_with_api(query, limit)
+                if posts:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(posts), duration)
+                    return posts
+            except Exception as e:
+                self.logger.log("warning", f"API scraping failed: {e}, falling back to RSS")
+            
+            # Fallback to RSS
+            posts = await self._scrape_with_rss(query, limit)
+            if posts:
+                duration = asyncio.get_event_loop().time() - start_time
+                self.logger.log_scraping_success(len(posts), duration)
+                return posts
+            
+            # Fallback to Google Search
+            try:
+                from .google_search_fallback import search_via_google
+                self.logger.log("info", "Trying Google Search fallback")
+                posts = await search_via_google("site:reddit.com", query, limit)
+                if posts:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(posts), duration)
+                    return posts
+            except Exception as e:
+                self.logger.log("warning", f"Google Search fallback failed: {e}")
+            
+            # Fallback to RSS Detector
+            try:
+                from .rss_detector import detect_and_parse_feeds
+                self.logger.log("info", "Trying RSS detector fallback")
+                posts = await detect_and_parse_feeds("https://www.reddit.com", limit)
+                if posts:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(posts), duration)
+                    return posts
+            except Exception as e:
+                self.logger.log("warning", f"RSS detector fallback failed: {e}")
+            
+            duration = asyncio.get_event_loop().time() - start_time
+            self.logger.log("warning", "No posts found", duration=duration)
+            return []
+        
+        except Exception as e:
+            duration = asyncio.get_event_loop().time() - start_time
+            self.logger.log_scraping_error(e, duration)
+            return []
+    
+    async def _scrape_with_api(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Scrape Reddit using JSON API with pagination."""
+        all_posts = []
+        after = None
+        page = 0
+        
+        headers = {
+            'User-Agent': 'OVH-Tracker-Bot/1.0 (Feedback Monitor)'
+        }
+        
+        while len(all_posts) < limit:
+            page += 1
+            url = "https://www.reddit.com/search.json"
+            params = {
+                'q': query,
+                'sort': 'new',
+                'limit': min(100, limit - len(all_posts)),
+            }
+            
+            if after:
+                params['after'] = after
+            
+            self.logger.log("info", f"Fetching page {page}", details={'after': after[:10] if after else 'None'})
+            
+            try:
+                response = await self._fetch_get(url, headers=headers, params=params)
+                response.raise_for_status()
+                data = response.json()
+                
+                if 'data' not in data or 'children' not in data['data']:
+                    self.logger.log("warning", "Unexpected API response structure")
+                    break
+                
+                children = data['data']['children']
+                if len(children) == 0:
+                    break
+                
+                for child in children:
+                    if len(all_posts) >= limit:
+                        break
+                    
+                    post_data = child.get('data', {})
+                    try:
+                        title = post_data.get('title', '').strip()
+                        if not title:
+                            continue
+                        
+                        selftext = post_data.get('selftext', '').strip()
+                        content = f"{title}\n{selftext}" if selftext else title
+                        
+                        author = post_data.get('author', 'unknown')
+                        url_link = post_data.get('url', '')
+                        permalink = post_data.get('permalink', '')
+                        if permalink and not url_link.startswith('http'):
+                            url_link = f"https://www.reddit.com{permalink}"
+                        
+                        created_utc = post_data.get('created_utc', 0)
+                        created_at = datetime.fromtimestamp(created_utc).isoformat() if created_utc else datetime.now().isoformat()
+                        
+                        post = {
+                            'source': 'Reddit',
+                            'author': author,
+                            'content': content[:500],
+                            'url': url_link,
+                            'created_at': created_at,
+                        }
+                        all_posts.append(post)
+                    except Exception as e:
+                        self.logger.log("warning", f"Could not parse Reddit post: {e}")
+                        continue
+                
+                after = data['data'].get('after')
+                if not after:
+                    break
+                
+                await asyncio.sleep(0.5)  # Respect rate limits
+            
+            except Exception as e:
+                self.logger.log("error", f"Error fetching page {page}: {e}")
+                break
+        
+        return all_posts
+    
+    async def _scrape_with_rss(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Scrape Reddit using RSS feed."""
+        import feedparser
+        import urllib.parse
+        
+        encoded_query = urllib.parse.quote_plus(query)
+        rss_url = f"https://www.reddit.com/search.rss?q={encoded_query}&sort=new"
+        
+        self.logger.log("info", f"Fetching RSS feed", url=rss_url)
+        
+        try:
+            response = await self._fetch_get(rss_url)
+            response.raise_for_status()
+            
+            feed = feedparser.parse(response.text)
+            posts = []
+            
+            for entry in feed.entries[:limit]:
+                try:
+                    post = {
+                        'source': 'Reddit',
+                        'author': entry.get('author', 'unknown'),
+                        'content': (entry.get('title', '') + '\n' + entry.get('summary', ''))[:500],
+                        'url': entry.get('link', ''),
+                        'created_at': datetime(*entry.published_parsed[:6]).isoformat() if hasattr(entry, 'published_parsed') else datetime.now().isoformat(),
+                    }
+                    posts.append(post)
+                except Exception as e:
+                    self.logger.log("warning", f"Could not parse RSS entry: {e}")
+                    continue
+            
+            return posts
+        
+        except Exception as e:
+            self.logger.log("error", f"RSS scraping failed: {e}")
+            return []
+
+
+# Global scraper instance
+_async_scraper = RedditScraper()
+
+
+async def scrape_reddit_async(query: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """Async entry point for Reddit scraper."""
+    return await _async_scraper.scrape(query, limit)
+
+
 def scrape_reddit(query: str, limit: int = 50):
-    """Scrape Reddit using JSON API with pagination, fallback to RSS if API fails.
-    
-    First tries Reddit JSON API which supports pagination via 'after' token.
-    Falls back to RSS feed if API fails.
-    
-    Returns list of dicts: source, author, content, url, created_at
-    """
+    """Synchronous wrapper for async scraper (for backward compatibility)."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return _scrape_reddit_sync(query, limit)
+        else:
+            return loop.run_until_complete(scrape_reddit_async(query, limit))
+    except RuntimeError:
+        return asyncio.run(scrape_reddit_async(query, limit))
+
+
+def _scrape_reddit_sync(query: str, limit: int = 50):
+    """Synchronous fallback implementation."""
     # Try API first (better pagination support)
     try:
         posts = _scrape_reddit_with_api(query, limit)

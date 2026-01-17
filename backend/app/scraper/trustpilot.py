@@ -1,6 +1,7 @@
 """Trustpilot scraper for real customer reviews and complaints about OVH."""
 import httpx
 import os
+import asyncio
 from datetime import datetime
 import logging
 import json
@@ -8,6 +9,9 @@ from httpx import Timeout
 import time
 import re
 from bs4 import BeautifulSoup
+from typing import List, Dict, Any
+from .base_scraper import BaseScraper
+from .scraper_logging import ScrapingLogger
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +28,242 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
 
+class TrustpilotScraper(BaseScraper):
+    """Async Trustpilot scraper with improved error handling."""
+    
+    def __init__(self):
+        super().__init__("Trustpilot")
+    
+    async def scrape(self, query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Scrape Trustpilot reviews for OVH customer feedback.
+        First tries HTML scraping, then falls back to API if available.
+        Returns a list of review dictionaries ready for insertion.
+        """
+        start_time = asyncio.get_event_loop().time()
+        self.logger.log_scraping_start(query, limit)
+        
+        try:
+            # Try HTML scraping first (most reliable)
+            try:
+                reviews = await self._scrape_html(limit)
+                if reviews:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(reviews), duration)
+                    return reviews
+            except Exception as e:
+                self.logger.log("warning", f"HTML scraping failed: {e}", error_type=type(e).__name__)
+            
+            # Fallback to API if key is provided
+            if TP_API_KEY:
+                try:
+                    reviews = await self._scrape_api(query, limit)
+                    if reviews:
+                        duration = asyncio.get_event_loop().time() - start_time
+                        self.logger.log_scraping_success(len(reviews), duration)
+                        return reviews
+                except Exception as e:
+                    self.logger.log("warning", f"API scraping failed: {e}", error_type=type(e).__name__)
+            
+            # All methods failed
+            duration = asyncio.get_event_loop().time() - start_time
+            self.logger.log("warning", "All scraping methods failed, returning empty list", duration=duration)
+            return []
+            
+        except Exception as e:
+            duration = asyncio.get_event_loop().time() - start_time
+            self.logger.log_scraping_error(e, duration)
+            return []
+    
+    async def _scrape_html(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Scrape Trustpilot reviews directly from HTML page."""
+        self.logger.log("info", f"Starting HTML scrape of {TRUSTPILOT_WEB}", url=TRUSTPILOT_WEB)
+        
+        response = await self._fetch_get(
+            TRUSTPILOT_WEB,
+            headers=DEFAULT_HEADERS
+        )
+        
+        self.logger.log("info", f"Got response: {response.status_code}, length: {len(response.text)}")
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        reviews = []
+        
+        # Find ALL review cards - Trustpilot uses article tags with data-service-review-card-paper
+        all_cards = soup.find_all('article', {'data-service-review-card-paper': True})
+        
+        self.logger.log("info", f"Found {len(all_cards)} total article cards")
+        
+        # Filter to only cards with review text (skip carousel cards)
+        review_cards = []
+        for card in all_cards:
+            text_elem = card.find('p', {'data-service-review-text-typography': True})
+            if text_elem and text_elem.get_text(strip=True):
+                review_cards.append(card)
+        
+        self.logger.log("info", f"Filtered to {len(review_cards)} cards with review text")
+        
+        parsed_count = 0
+        skipped_count = 0
+        
+        for card in review_cards[:limit]:
+            try:
+                # Extract rating (stars)
+                rating_elem = card.find('div', {'data-service-review-rating': True})
+                rating = 3  # default neutral
+                if rating_elem:
+                    rating_img = rating_elem.find('img')
+                    if rating_img and rating_img.get('alt'):
+                        # Extract "Noté 5 sur 5 étoiles" -> 5
+                        match = re.search(r'(\d+)', rating_img['alt'])
+                        if match:
+                            rating = int(match.group(1))
+                
+                # Extract review text
+                text_elem = card.find('p', {'data-service-review-text-typography': True}) or \
+                           card.find('div', class_=re.compile(r'review-content')) or \
+                           card.find('p', class_=re.compile(r'review__text'))
+                review_text = text_elem.get_text(strip=True) if text_elem else ""
+                
+                if not review_text:
+                    skipped_count += 1
+                    continue
+                
+                # Extract author
+                author_elem = card.find('span', {'data-consumer-name-typography': True}) or \
+                             card.find('div', class_=re.compile(r'consumer-name'))
+                author = author_elem.get_text(strip=True) if author_elem else "Client"
+                
+                # Extract date
+                date_elem = card.find('time')
+                created_at = datetime.now().isoformat()
+                if date_elem and date_elem.get('datetime'):
+                    created_at = date_elem['datetime']
+                
+                # Extract review-specific URL
+                review_url = TRUSTPILOT_WEB  # fallback to general page
+                review_link = card.find('a', {'data-review-title-typography': True})
+                if review_link and review_link.get('href'):
+                    # Convert relative URL to absolute
+                    relative_url = review_link['href']
+                    review_url = f"https://fr.trustpilot.com{relative_url}"
+                
+                # Map rating to sentiment
+                if rating >= 4:
+                    sentiment_label = "positive"
+                elif rating >= 3:
+                    sentiment_label = "neutral"
+                else:
+                    sentiment_label = "negative"
+                
+                sentiment_score = (rating - 3) / 2  # 1-5 scale -> -1 to 1
+                
+                post = {
+                    "source": "Trustpilot",
+                    "author": author,
+                    "content": review_text[:500],
+                    "url": review_url,
+                    "created_at": created_at,
+                    "sentiment_score": sentiment_score,
+                    "sentiment_label": sentiment_label,
+                }
+                reviews.append(post)
+                parsed_count += 1
+                
+            except Exception as e:
+                self.logger.log("warning", f"Could not parse review card: {e}")
+                continue
+        
+        self.logger.log("success", f"Successfully parsed {len(reviews)} reviews (skipped {skipped_count})")
+        return reviews
+    
+    async def _scrape_api(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Scrape using Trustpilot API (requires API key)."""
+        headers = DEFAULT_HEADERS.copy()
+        if TP_API_KEY:
+            headers['Authorization'] = f'Bearer {TP_API_KEY}'
+        
+        params = {
+            "q": query,
+            "businessUnitId": "349d5a8279cb5700019b1b97",  # OVH's business unit ID
+            "pageSize": limit,
+            "sort": "recency"
+        }
+        
+        response = await self._fetch_get(
+            f"{TRUSTPILOT_API}/reviews/search",
+            headers=headers,
+            params=params
+        )
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        reviews = []
+        for review in data.get("reviews", [])[:limit]:
+            try:
+                review_text = review.get("text", "")[:500]
+                rating = review.get("rating", 0)
+                
+                if rating >= 4:
+                    sentiment_label = "positive"
+                elif rating >= 3:
+                    sentiment_label = "neutral"
+                else:
+                    sentiment_label = "negative"
+                
+                sentiment_score = (rating - 3) / 2
+                
+                post = {
+                    "source": "Trustpilot",
+                    "author": review.get("consumer", {}).get("displayName", "Anonymous"),
+                    "content": review_text,
+                    "url": review.get("links", {}).get("self", {}).get("href", TRUSTPILOT_WEB),
+                    "created_at": review.get("createdAt", datetime.now().isoformat()),
+                    "sentiment_score": sentiment_score,
+                    "sentiment_label": sentiment_label,
+                }
+                reviews.append(post)
+            except Exception as e:
+                self.logger.log("warning", f"Could not parse API review: {e}")
+                continue
+        
+        return reviews
+
+
+# Global scraper instance
+_async_scraper = TrustpilotScraper()
+
+
+async def scrape_trustpilot_reviews_async(query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
+    """Async entry point for Trustpilot scraper."""
+    return await _async_scraper.scrape(query, limit)
+
+
 def scrape_trustpilot_reviews(query="OVH", limit=20):
     """
+    Synchronous wrapper for async scraper (for backward compatibility).
+    
     Scrape Trustpilot reviews for OVH customer feedback.
-    First tries HTML scraping, then falls back to API if available, then sample data.
+    First tries HTML scraping, then falls back to API if available.
     Returns a list of review dictionaries ready for insertion.
     """
+    try:
+        # Try to get running event loop
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, we can't use run(), so fall back to sync version
+            return _scrape_trustpilot_sync(query, limit)
+        else:
+            return loop.run_until_complete(scrape_trustpilot_reviews_async(query, limit))
+    except RuntimeError:
+        # No event loop, create one
+        return asyncio.run(scrape_trustpilot_reviews_async(query, limit))
+
+
+def _scrape_trustpilot_sync(query="OVH", limit=20):
+    """Synchronous fallback implementation."""
     logger.info(f"[Trustpilot] Scraping reviews for: {query}")
     
     # Try HTML scraping first (most reliable)

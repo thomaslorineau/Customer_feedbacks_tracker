@@ -193,8 +193,10 @@ async function loadProductDistribution() {
             const negativeRatio = product.total_posts > 0 ? (product.negative_posts / product.total_posts) * 100 : 0;
             const positiveRatio = 100 - negativeRatio;
             
+            // Escape product name for onclick attribute
+            const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
             return `
-                <div class="product-item">
+                <div class="product-item" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="openProductAnalysis('${escapedProduct}')">
                     <div class="product-color" style="background: ${product.color};"></div>
                     <div class="product-bar-container">
                         <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -220,8 +222,10 @@ async function loadProductDistribution() {
                     const allProductsHtml = data.products.slice(5).map(product => {
                         const negativeRatio = product.total_posts > 0 ? (product.negative_posts / product.total_posts) * 100 : 0;
                         const positiveRatio = 100 - negativeRatio;
+                        // Escape product name for onclick attribute
+                        const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
                         return `
-                            <div class="product-item">
+                            <div class="product-item" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="openProductAnalysis('${escapedProduct}')">
                                 <div class="product-color" style="background: ${product.color};"></div>
                                 <div class="product-bar-container">
                                     <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -482,6 +486,12 @@ async function init() {
     initializeTheme();
     setupThemeToggle();
     setupEventListeners();
+    // Load version using the shared loader if available, otherwise use local function
+    if (window.loadVersion) {
+        await window.loadVersion();
+    } else {
+        await loadVersion();
+    }
     
     // Load all data with error handling
     try {
@@ -511,6 +521,97 @@ function toggleHelpMenu() {
 window.toggleHelpMenu = toggleHelpMenu;
 
 // Initialize when DOM is ready
+// Product Analysis Drawer
+async function openProductAnalysis(productName) {
+    const drawer = document.getElementById('productAnalysisDrawer');
+    const drawerContent = document.getElementById('productAnalysisDrawerContent');
+    
+    if (!drawer || !drawerContent) {
+        console.error('Product analysis drawer not found');
+        return;
+    }
+    
+    // Show loading state
+    drawerContent.innerHTML = `
+        <div class="drawer-header">
+            <h3>Analyzing ${escapeHtml(productName)}...</h3>
+            <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div style="padding: 24px; text-align: center;">
+            <div class="spinner" style="margin: 0 auto;"></div>
+            <p style="margin-top: 16px; color: var(--text-secondary);">Analyzing posts with LLM...</p>
+        </div>
+    `;
+    
+    drawer.classList.add('open');
+    
+    try {
+        // Fetch product analysis from backend
+        const response = await fetch(`/api/product-analysis/${encodeURIComponent(productName)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        }
+        
+        const data = await response.json();
+        
+        // Display analysis
+        drawerContent.innerHTML = `
+            <div class="drawer-header">
+                <h3>📊 ${escapeHtml(productName)} Analysis</h3>
+                <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
+            </div>
+            <div class="drawer-info" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color);">
+                <div class="drawer-stats" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div>
+                        <span class="drawer-stat-value">${data.posts_count || 0}</span>
+                        <span class="drawer-stat-label">Total Posts</span>
+                    </div>
+                    <div>
+                        <span class="drawer-stat-value" style="color: #ef4444;">${data.negative_posts_count || 0}</span>
+                        <span class="drawer-stat-label">Negative Posts</span>
+                    </div>
+                    ${data.llm_available ? `
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #10b981; font-size: 1.2em;">✓</span>
+                            <span class="drawer-stat-label">LLM Analysis</span>
+                        </div>
+                    ` : `
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span style="color: #f59e0b; font-size: 1.2em;">⚠</span>
+                            <span class="drawer-stat-label">Fallback Analysis</span>
+                        </div>
+                    `}
+                </div>
+            </div>
+            <div style="padding: 24px;">
+                <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1em; font-weight: 600;">Summary of Issues (English)</h4>
+                <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); line-height: 1.8; color: var(--text-primary); white-space: pre-wrap;">
+                    ${escapeHtml(data.summary || 'No analysis available.')}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading product analysis:', error);
+        drawerContent.innerHTML = `
+            <div class="drawer-header">
+                <h3>Error</h3>
+                <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
+            </div>
+            <div style="padding: 24px; text-align: center; color: #ef4444;">
+                <p><strong>Failed to load analysis</strong></p>
+                <p style="margin-top: 8px; font-size: 0.9em; color: var(--text-secondary);">${escapeHtml(error.message)}</p>
+            </div>
+        `;
+    }
+}
+
+function closeProductAnalysisDrawer() {
+    const drawer = document.getElementById('productAnalysisDrawer');
+    if (drawer) {
+        drawer.classList.remove('open');
+    }
+}
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
 } else {

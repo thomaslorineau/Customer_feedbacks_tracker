@@ -583,6 +583,38 @@
             color: var(--text-secondary);
             line-height: 1.4;
         }
+
+        /* Base Keywords Styles */
+        .base-keywords-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .keywords-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+            background: var(--input-bg, #ffffff);
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 80px;
+            transition: all 0.2s ease;
+        }
+
+        .keywords-textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary, #0099ff);
+            box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+        }
+
+        body.dark-mode .keywords-textarea {
+            background: var(--input-bg, #1e293b);
+            border-color: var(--border-color, #334155);
+        }
     </style>
 </head>
 <body class="has-nav-menu">
@@ -739,6 +771,30 @@
                 <div class="info-card">
                     <div class="info-card-label">Window Duration</div>
                     <div class="info-card-value">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Base Keywords Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    <line x1="9" y1="9" x2="15" y2="9"/>
+                    <line x1="9" y1="13" x2="15" y2="13"/>
+                </svg>
+                Base Keywords (Fixed)
+            </h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                These keywords are always used for scraping, even if you don't add custom keywords. 
+                They include OVH brands, products, common problems, and leadership mentions. 
+                You can edit them here, but they will always be included in scraping operations.
+            </p>
+
+            <div id="baseKeywordsContainer">
+                <!-- Loading skeleton -->
+                <div class="api-key-card">
+                    <div class="skeleton-loader"></div>
                 </div>
             </div>
         </div>

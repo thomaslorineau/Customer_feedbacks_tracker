@@ -58,9 +58,16 @@ def init_db():
             sentiment_score REAL,
             sentiment_label TEXT,
             language TEXT DEFAULT 'unknown',
-            country TEXT
+            country TEXT,
+            relevance_score REAL DEFAULT 0.0
         )
     ''')
+    
+    # Add relevance_score column if it doesn't exist (migration for existing databases)
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN relevance_score REAL DEFAULT 0.0")
+    except Exception:
+        pass  # Column already exists
     
     # Add indexes for faster queries (Performance optimization)
     c.execute('''
@@ -126,6 +133,64 @@ def init_db():
         ON scraping_logs(level)
     ''')
     
+    # Base keywords table (editable base keywords)
+    c.execute("CREATE SEQUENCE IF NOT EXISTS base_keywords_id_seq START 1")
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS base_keywords (
+            id BIGINT PRIMARY KEY DEFAULT nextval('base_keywords_id_seq'),
+            category TEXT NOT NULL,
+            keyword TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(category, keyword)
+        )
+    ''')
+    
+    # Initialize base keywords if table is empty
+    c.execute("SELECT COUNT(*) FROM base_keywords")
+    count = c.fetchone()[0]
+    if count == 0:
+        from .config.keywords_base import (
+            DEFAULT_BRAND_KEYWORDS, DEFAULT_PRODUCT_KEYWORDS,
+            DEFAULT_PROBLEM_KEYWORDS, DEFAULT_LEADERSHIP_KEYWORDS
+        )
+        
+        # Insert default keywords
+        for keyword in DEFAULT_BRAND_KEYWORDS:
+            try:
+                c.execute(
+                    "INSERT INTO base_keywords (category, keyword) VALUES (?, ?)",
+                    ('brands', keyword)
+                )
+            except Exception:
+                pass  # Ignore duplicates
+        
+        for keyword in DEFAULT_PRODUCT_KEYWORDS:
+            try:
+                c.execute(
+                    "INSERT INTO base_keywords (category, keyword) VALUES (?, ?)",
+                    ('products', keyword)
+                )
+            except Exception:
+                pass
+        
+        for keyword in DEFAULT_PROBLEM_KEYWORDS:
+            try:
+                c.execute(
+                    "INSERT INTO base_keywords (category, keyword) VALUES (?, ?)",
+                    ('problems', keyword)
+                )
+            except Exception:
+                pass
+        
+        for keyword in DEFAULT_LEADERSHIP_KEYWORDS:
+            try:
+                c.execute(
+                    "INSERT INTO base_keywords (category, keyword) VALUES (?, ?)",
+                    ('leadership', keyword)
+                )
+            except Exception:
+                pass
+    
     conn.commit()
     conn.close()
 
@@ -149,8 +214,8 @@ def insert_post(post: dict):
         # SECURITY: Use parameterized query to prevent SQL injection
         # DuckDB: use nextval for auto-increment
         c.execute(
-            '''INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language)
-               VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?)''',
+            '''INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score)
+               VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (
                 str(post.get('source'))[:100],  # Limit length
                 str(post.get('author', 'unknown'))[:100],
@@ -160,6 +225,7 @@ def insert_post(post: dict):
                 float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
                 str(post.get('sentiment_label', 'neutral'))[:20],
                 str(post.get('language', 'unknown'))[:20],
+                float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
             ),
         )
         conn.commit()
@@ -182,13 +248,13 @@ def get_posts(limit: int = 100, offset: int = 0, language: str = None):
         # SECURITY: Always use parameterized queries
         if language and language != 'all':
             c.execute(
-                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language '
+                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score '
                 'FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?',
                 (language, limit, offset)
             )
         else:
             c.execute(
-                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language '
+                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score '
                 'FROM posts ORDER BY id DESC LIMIT ? OFFSET ?',
                 (limit, offset)
             )
@@ -197,7 +263,7 @@ def get_posts(limit: int = 100, offset: int = 0, language: str = None):
     finally:
         conn.close()
     
-    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language']
+    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language', 'relevance_score']
     return [dict(zip(keys, row)) for row in rows]
 
 
@@ -335,6 +401,74 @@ def save_queries(keywords: list):
                 INSERT INTO saved_queries (id, keyword, created_at) VALUES (nextval('saved_queries_id_seq'), ?, ?)
                 ON CONFLICT (keyword) DO NOTHING
             ''', (kw, now))
+        
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_base_keywords():
+    """Récupère les keywords de base par catégorie depuis la DB."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('SELECT category, keyword FROM base_keywords ORDER BY category, id')
+        rows = c.fetchall()
+        
+        result = {
+            'brands': [],
+            'products': [],
+            'problems': [],
+            'leadership': []
+        }
+        
+        for category, keyword in rows:
+            if category in result:
+                result[category].append(keyword)
+        
+        return result
+    finally:
+        conn.close()
+
+
+def save_base_keywords(keywords_by_category: dict):
+    """Sauvegarde les keywords de base dans la DB."""
+    if not isinstance(keywords_by_category, dict):
+        raise ValueError("keywords_by_category must be a dictionary")
+    
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        # Vider la table
+        c.execute('DELETE FROM base_keywords')
+        
+        # Insérer les nouveaux keywords
+        import datetime
+        now = datetime.datetime.utcnow().isoformat()
+        
+        for category, keywords in keywords_by_category.items():
+            if category not in ['brands', 'products', 'problems', 'leadership']:
+                continue
+            
+            if not isinstance(keywords, list):
+                continue
+            
+            for keyword in keywords:
+                if not isinstance(keyword, str):
+                    continue
+                keyword = keyword.strip()[:100]  # Limit length
+                if not keyword:
+                    continue
+                
+                try:
+                    c.execute(
+                        "INSERT INTO base_keywords (category, keyword, created_at) VALUES (?, ?, ?)",
+                        (category, keyword, now)
+                    )
+                except Exception:
+                    pass  # Ignore duplicates
         
         conn.commit()
     finally:

@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
     loadVersion();
     loadConfiguration();
+    loadBaseKeywords();
 });
 
 // Theme Management
@@ -634,4 +635,80 @@ function showError(message) {
         feedback.classList.remove('show');
         feedback.style.background = '#28a745';
     }, 3000);
+}
+
+// Base Keywords Management
+async function loadBaseKeywords() {
+    const container = document.getElementById('baseKeywordsContainer');
+    if (!container) return;
+    
+    try {
+        container.innerHTML = '<div class="skeleton-loader"></div>';
+        
+        const response = await fetch(`${API_BASE_URL}/settings/base-keywords`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        container.innerHTML = `
+            <div class="base-keywords-form">
+                <div class="form-group">
+                    <label>Brands (Marques OVH)</label>
+                    <textarea id="baseKeywordsBrands" class="keywords-textarea" rows="3" placeholder="OVH, OVHCloud, Kimsufi...">${(data.brands || []).join(', ')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Products (Produits OVH)</label>
+                    <textarea id="baseKeywordsProducts" class="keywords-textarea" rows="3" placeholder="OVH domain, OVH hosting, OVH VPS...">${(data.products || []).join(', ')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Problems (Problèmes/Complaints)</label>
+                    <textarea id="baseKeywordsProblems" class="keywords-textarea" rows="3" placeholder="OVH complaint, OVH support, OVH billing...">${(data.problems || []).join(', ')}</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Leadership (Direction OVH)</label>
+                    <textarea id="baseKeywordsLeadership" class="keywords-textarea" rows="3" placeholder="Michel Paulin, Octave Klaba, OVH CEO...">${(data.leadership || []).join(', ')}</textarea>
+                </div>
+                <div class="form-actions">
+                    <button class="btn-save-key" onclick="saveBaseKeywords()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                            <polyline points="17 21 17 13 7 13 7 21"/>
+                            <polyline points="7 3 7 8 15 8"/>
+                        </svg>
+                        Save Base Keywords
+                    </button>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading base keywords:', error);
+        container.innerHTML = `<div style="color: var(--error, #dc3545); padding: 1rem;">Error loading base keywords: ${error.message}</div>`;
+    }
+}
+
+async function saveBaseKeywords() {
+    try {
+        const brands = document.getElementById('baseKeywordsBrands').value.split(',').map(k => k.trim()).filter(k => k);
+        const products = document.getElementById('baseKeywordsProducts').value.split(',').map(k => k.trim()).filter(k => k);
+        const problems = document.getElementById('baseKeywordsProblems').value.split(',').map(k => k.trim()).filter(k => k);
+        const leadership = document.getElementById('baseKeywordsLeadership').value.split(',').map(k => k.trim()).filter(k => k);
+        
+        const response = await fetch(`${API_BASE_URL}/settings/base-keywords`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brands, products, problems, leadership })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+            throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        showSuccess('Base keywords saved successfully!');
+    } catch (error) {
+        console.error('Error saving base keywords:', error);
+        showError(`Failed to save base keywords: ${error.message}`);
+    }
 }

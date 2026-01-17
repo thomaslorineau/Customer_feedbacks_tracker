@@ -1,9 +1,12 @@
 """GitHub Issues and Discussions scraper for OVH complaints."""
 import httpx
+import asyncio
 from datetime import datetime, timedelta
 import logging
 import time
+from typing import List, Dict, Any
 from httpx import Timeout
+from .base_scraper import BaseScraper
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +19,254 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
 
+class GitHubScraper(BaseScraper):
+    """Async GitHub scraper."""
+    
+    def __init__(self):
+        super().__init__("GitHub")
+    
+    async def scrape(self, query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
+        """Scrape GitHub issues AND discussions for OVH domain customer complaints."""
+        start_time = asyncio.get_event_loop().time()
+        self.logger.log_scraping_start(query, limit)
+        
+        try:
+            all_posts = []
+            
+            # 1. Search Issues
+            issues = await self._search_issues(query, limit // 2)
+            all_posts.extend(issues)
+            
+            # 2. Search Discussions
+            discussions = await self._search_discussions(query, limit // 2)
+            all_posts.extend(discussions)
+            
+            if all_posts:
+                duration = asyncio.get_event_loop().time() - start_time
+                self.logger.log_scraping_success(len(all_posts), duration)
+                return all_posts[:limit]
+            
+            # Fallback to Google Search
+            try:
+                from .google_search_fallback import search_via_google
+                self.logger.log("info", "Trying Google Search fallback")
+                all_posts = await search_via_google("site:github.com", query, limit)
+                if all_posts:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(all_posts), duration)
+                    return all_posts[:limit]
+            except Exception as e:
+                self.logger.log("warning", f"Google Search fallback failed: {e}")
+            
+            # Fallback to RSS Detector
+            try:
+                from .rss_detector import detect_and_parse_feeds
+                self.logger.log("info", "Trying RSS detector fallback")
+                all_posts = await detect_and_parse_feeds("https://github.com", limit)
+                if all_posts:
+                    duration = asyncio.get_event_loop().time() - start_time
+                    self.logger.log_scraping_success(len(all_posts), duration)
+                    return all_posts[:limit]
+            except Exception as e:
+                self.logger.log("warning", f"RSS detector fallback failed: {e}")
+            
+            self.logger.log("warning", f"No GitHub issues or discussions found for: {query}")
+            duration = asyncio.get_event_loop().time() - start_time
+            return []
+        
+        except Exception as e:
+            duration = asyncio.get_event_loop().time() - start_time
+            self.logger.log_scraping_error(e, duration)
+            return []
+    
+    async def _search_issues(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Search GitHub issues with pagination."""
+        try:
+            all_posts = []
+            page = 1
+            per_page = min(100, limit)
+            
+            while len(all_posts) < limit:
+                search_query = f"{query} is:issue"
+                params = {
+                    "q": search_query,
+                    "sort": "updated",
+                    "order": "desc",
+                    "per_page": per_page,
+                    "page": page,
+                }
+                
+                self.logger.log("info", f"Searching issues page {page}", details={'query': search_query})
+                
+                try:
+                    response = await self._fetch_get(
+                        f"{GITHUB_API_BASE}/search/issues",
+                        headers=GITHUB_HEADERS,
+                        params=params
+                    )
+                    
+                    # Check for rate limiting
+                    if response.status_code == 403:
+                        rate_limit_remaining = response.headers.get('X-RateLimit-Remaining', 'unknown')
+                        self.logger.log("warning", f"Rate limit hit! Remaining: {rate_limit_remaining}")
+                        if page == 1:
+                            return []
+                        break
+                    
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    items = data.get("items", [])
+                    if len(items) == 0:
+                        break
+                    
+                    total_count = data.get("total_count", 0)
+                    if page == 1:
+                        self.logger.log("info", f"API returned {total_count} total results, {len(items)} items in first page")
+                    
+                    for issue in items:
+                        if len(all_posts) >= limit:
+                            break
+                        try:
+                            post = {
+                                "source": "GitHub",
+                                "author": issue["user"]["login"],
+                                "content": (issue["title"] + "\n" + (issue["body"] or ""))[:500],
+                                "url": issue["html_url"],
+                                "created_at": issue["created_at"],
+                                "sentiment_score": 0.0,
+                                "sentiment_label": "neutral",
+                            }
+                            all_posts.append(post)
+                        except Exception as e:
+                            self.logger.log("warning", f"Could not parse GitHub issue: {e}")
+                            continue
+                    
+                    page += 1
+                    if len(all_posts) < limit:
+                        await asyncio.sleep(0.5)  # Respect rate limits
+                
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 403:
+                        self.logger.log("error", "Rate limit exceeded. Consider using a GitHub token.")
+                    break
+                except Exception as e:
+                    self.logger.log("warning", f"Error searching GitHub issues: {type(e).__name__}: {e}")
+                    break
+            
+            self.logger.log("success", f"Successfully parsed {len(all_posts)} issues from {page - 1} page(s)")
+            return all_posts
+        
+        except Exception as e:
+            self.logger.log("error", f"Error in _search_issues: {e}")
+            return []
+    
+    async def _search_discussions(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Search GitHub discussions using GitHub's search API with pagination."""
+        try:
+            all_posts = []
+            page = 1
+            per_page = min(100, limit)
+            
+            while len(all_posts) < limit:
+                search_query = f"{query} is:discussion"
+                params = {
+                    "q": search_query,
+                    "sort": "updated",
+                    "order": "desc",
+                    "per_page": per_page,
+                    "page": page,
+                }
+                
+                self.logger.log("info", f"Searching discussions page {page}", details={'query': search_query})
+                
+                try:
+                    response = await self._fetch_get(
+                        f"{GITHUB_API_BASE}/search/issues",  # Discussions are searchable via /search/issues
+                        headers=GITHUB_HEADERS,
+                        params=params
+                    )
+                    
+                    if response.status_code == 403:
+                        rate_limit_remaining = response.headers.get('X-RateLimit-Remaining', 'unknown')
+                        self.logger.log("warning", f"Rate limit hit! Remaining: {rate_limit_remaining}")
+                        if page == 1:
+                            return []
+                        break
+                    
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    items = data.get("items", [])
+                    if len(items) == 0:
+                        break
+                    
+                    for discussion in items:
+                        if len(all_posts) >= limit:
+                            break
+                        try:
+                            post = {
+                                "source": "GitHub",
+                                "author": discussion["user"]["login"],
+                                "content": (discussion["title"] + "\n" + (discussion["body"] or ""))[:500],
+                                "url": discussion["html_url"],
+                                "created_at": discussion["created_at"],
+                                "sentiment_score": 0.0,
+                                "sentiment_label": "neutral",
+                            }
+                            all_posts.append(post)
+                        except Exception as e:
+                            self.logger.log("warning", f"Could not parse GitHub discussion: {e}")
+                            continue
+                    
+                    page += 1
+                    if len(all_posts) < limit:
+                        await asyncio.sleep(0.5)
+                
+                except httpx.HTTPStatusError as e:
+                    if e.response.status_code == 403:
+                        self.logger.log("error", "Rate limit exceeded. Consider using a GitHub token.")
+                    break
+                except Exception as e:
+                    self.logger.log("warning", f"Error searching GitHub discussions: {type(e).__name__}: {e}")
+                    break
+            
+            self.logger.log("success", f"Successfully parsed {len(all_posts)} discussions from {page - 1} page(s)")
+            return all_posts
+        
+        except Exception as e:
+            self.logger.log("error", f"Error in _search_discussions: {e}")
+            return []
+
+
+# Global scraper instance
+_async_scraper = GitHubScraper()
+
+
+async def scrape_github_issues_async(query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
+    """Async entry point for GitHub scraper."""
+    return await _async_scraper.scrape(query, limit)
+
+
 def scrape_github_issues(query="OVH", limit=20):
     """
+    Synchronous wrapper for async scraper (for backward compatibility).
+    
     Scrape GitHub issues AND discussions for OVH domain customer complaints and feedback.
     Returns a list of issue/discussion dictionaries ready for insertion.
     """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return _scrape_github_sync(query, limit)
+        else:
+            return loop.run_until_complete(scrape_github_issues_async(query, limit))
+    except RuntimeError:
+        return asyncio.run(scrape_github_issues_async(query, limit))
+
+
+def _scrape_github_sync(query="OVH", limit=20):
+    """Synchronous fallback implementation."""
     all_posts = []
     
     try:

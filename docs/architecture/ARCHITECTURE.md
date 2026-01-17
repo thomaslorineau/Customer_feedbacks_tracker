@@ -381,11 +381,14 @@ ovh-complaints-tracker/
 9. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
 10. **APScheduler**: Background auto-scraping without external job queue.
 11. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
-12. **Fallback Strategies**: Scrapers use multiple strategies (HTML → API → empty list) for resilience.
-13. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters.
-14. **Priority Scoring**: Multiplicative algorithm: `sentiment * keyword_relevance * recency` (0-100 scale) for accurate prioritization.
-15. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
-16. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
+12. **Fallback Strategies**: Scrapers use multiple strategies (Primary → Google Search → RSS Detector → empty list) for maximum resilience.
+13. **Base Keywords System**: Configurable base keywords (brands, products, problems, leadership) combined with user-defined keywords.
+14. **Relevance Scoring**: Automatic relevance scoring (0-100%) filters out non-relevant posts (< 30% threshold).
+15. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters. Product analysis with AI-powered summaries.
+16. **Priority Scoring**: Multiplicative algorithm: `sentiment * keyword_relevance * recency` (0-100 scale) for accurate prioritization.
+17. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
+18. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
+19. **Dashboard Enhancements**: Posts Statistics with dynamic satisfaction metrics, Critical Posts drawer, All Posts section with comprehensive filters.
 
 ## API Contract
 
@@ -485,21 +488,67 @@ Response (200 OK - Real posts only):
 
 ## Scraper Fallback Strategies
 
+### Universal Fallback System
+All scrapers now implement a multi-tier fallback strategy:
+
+1. **Primary Method**: Site-specific API or HTML scraping
+2. **Google Search Fallback**: Universal fallback via Google Search (`site:domain.com query`)
+3. **RSS/Atom Feed Detection**: Automatic detection and parsing of RSS/Atom feeds
+4. **Final**: Empty list (no sample data)
+
 ### X/Twitter Scraper
-1. **Primary**: Nitter instances (nitter.net, nitter.poast.org, nitter.1d4.us)
+1. **Primary**: Nitter instances (10+ instances with automatic rotation and health checks)
 2. **Fallback**: Twitter API (requires authentication, currently disabled)
-3. **Final**: Empty list (no sample data)
+3. **Google Search Fallback**: `site:twitter.com` or `site:x.com` search
+4. **RSS Fallback**: RSS feed detection on Twitter/X
+5. **Final**: Empty list (no sample data)
+
+### Reddit Scraper
+1. **Primary**: Reddit JSON API with pagination
+2. **Fallback**: Reddit RSS feeds
+3. **Google Search Fallback**: `site:reddit.com` search
+4. **RSS Detector Fallback**: Automatic RSS feed detection
+5. **Final**: Empty list (no sample data)
+
+### GitHub Scraper
+1. **Primary**: GitHub API v3 (issues and discussions)
+2. **Google Search Fallback**: `site:github.com` search
+3. **RSS Detector Fallback**: Automatic RSS feed detection
+4. **Final**: Empty list (no sample data)
+
+### Stack Overflow Scraper
+1. **Primary**: Stack Exchange API v2.3
+2. **Google Search Fallback**: `site:stackoverflow.com` search
+3. **RSS Detector Fallback**: Automatic RSS feed detection
+4. **Final**: Empty list (no sample data)
 
 ### Trustpilot Scraper
 1. **Primary**: HTML scraping from Trustpilot web page
 2. **Fallback**: Trustpilot API (if TRUSTPILOT_API_KEY is set)
-3. **Final**: Empty list (no sample data)
+3. **Google Search Fallback**: `site:trustpilot.com` search
+4. **Final**: Empty list (no sample data)
 
 ### Other Scrapers
-- **GitHub, Stack Overflow, Reddit, News**: Direct API calls with retry logic
-- **OVH Forum, G2 Crowd**: HTML scraping with anti-bot protection
-- **Mastodon**: Mastodon API with hashtag search
+- **News, OVH Forum, G2 Crowd, Mastodon**: Primary method → Google Search Fallback → RSS Detector → Empty list
 - **Error Handling**: Return empty list on failure, log errors for debugging
+
+### Google Search Fallback Module
+- **Location**: `backend/app/scraper/google_search_fallback.py`
+- **Functionality**: 
+  - Searches specific sites via Google Search (`site:domain.com query`)
+  - Parses Google search results HTML
+  - Fetches actual content from found URLs
+  - Extracts source information from URLs
+- **Usage**: Automatically called when primary scraping methods fail
+
+### RSS Detector Module
+- **Location**: `backend/app/scraper/rss_detector.py`
+- **Functionality**:
+  - Detects RSS/Atom feeds on a page (via `<link rel="alternate">` tags)
+  - Tries common feed URLs (`/feed`, `/rss`, `/atom`, etc.)
+  - Parses feeds using `feedparser`
+  - Extracts posts/articles with metadata
+- **Usage**: Automatically called when primary and Google Search fallbacks fail
 
 ## Background Job System
 

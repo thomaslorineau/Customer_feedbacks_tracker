@@ -337,112 +337,255 @@
 
         .post-card {
             background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
+            border: 1px solid rgba(0, 212, 255, 0.15);
+            border-radius: 16px;
+            padding: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 2px 8px var(--shadow);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
             position: relative;
-            overflow: visible;
+            overflow: hidden;
             width: 100%;
-            min-height: 200px;
+            min-height: auto;
         }
 
         .post-card:hover {
-            background: var(--bg-card-hover);
             border-color: var(--accent-primary);
-            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
-            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 212, 255, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
             z-index: 10;
         }
 
-        .post-header {
+        .post-card-header {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
+            padding: 16px 20px 12px 20px;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, rgba(0, 212, 255, 0.02) 100%);
+            border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .post-header-left {
+            display: flex;
             align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
         }
 
         .post-source {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
         }
 
         .source-x {
-            background: rgba(0, 0, 0, 0.6);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .source-reddit {
-            background: rgba(255, 69, 0, 0.6);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #FF4500 0%, #FF6B35 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(255, 69, 0, 0.3);
         }
 
         .source-linkedin {
-            background: rgba(0, 119, 181, 0.6);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #0077B5 0%, #0099CC 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 119, 181, 0.3);
         }
 
         .source-facebook {
-            background: rgba(59, 89, 152, 0.6);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #3B5998 0%, #4C70BA 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 4px rgba(59, 89, 152, 0.3);
         }
 
         .post-date {
             color: var(--text-muted);
-            font-size: 0.85em;
+            font-size: 0.8em;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .post-date::before {
+            content: "🕒";
+            font-size: 0.9em;
+        }
+
+        .post-body {
+            padding: 16px 20px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
 
         .post-author {
             color: var(--accent-primary);
-            font-weight: bold;
-            font-size: 0.95em;
+            font-weight: 600;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .post-author::before {
+            content: "👤";
+            font-size: 0.9em;
         }
 
         .post-content {
             color: var(--text-secondary);
-            line-height: 1.6;
+            line-height: 1.7;
             flex-grow: 1;
-            max-height: 120px;
+            max-height: 150px;
             overflow: hidden;
             text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 5;
+            line-clamp: 5;
+            -webkit-box-orient: vertical;
+            word-break: break-word;
         }
 
         .post-footer {
             display: flex;
-            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
             align-items: center;
-            padding-top: 12px;
+            padding: 14px 20px;
+            background: rgba(0, 212, 255, 0.03);
             border-top: 1px solid rgba(0, 212, 255, 0.1);
         }
 
+        .post-meta-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            flex: 1;
+        }
+
         .sentiment {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 0.8em;
+            font-weight: 600;
+            white-space: nowrap;
         }
 
         .sentiment-positive {
-            background: rgba(52, 211, 153, 0.3);
-            color: #34d399;
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.15) 0%, rgba(52, 211, 153, 0.08) 100%);
+            color: #10b981;
+            border: 1px solid rgba(52, 211, 153, 0.3);
         }
 
         .sentiment-negative {
-            background: rgba(239, 68, 68, 0.3);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.08) 100%);
             color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
 
         .sentiment-neutral {
-            background: rgba(107, 114, 128, 0.3);
-            color: #d1d5db;
+            background: linear-gradient(135deg, rgba(107, 114, 128, 0.15) 0%, rgba(107, 114, 128, 0.08) 100%);
+            color: #4b5563;
+            border: 1px solid rgba(107, 114, 128, 0.3);
+            font-weight: 600;
+        }
+
+        .relevance-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8em;
+            font-weight: 600;
+            white-space: nowrap;
+            border: 1px solid;
+        }
+
+        .relevance-high {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.08) 100%);
+            color: #10b981;
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .relevance-medium {
+            background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(251, 191, 36, 0.08) 100%);
+            color: #f59e0b;
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+
+        .relevance-low {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.08) 100%);
+            color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .post-action-btn {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+
+        .post-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-preview {
+            background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+            color: #1a1a2e;
+        }
+
+        .btn-view {
+            background: transparent;
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+            text-decoration: none;
+        }
+
+        .btn-view:hover {
+            background: var(--accent-primary);
+            color: #1a1a2e;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #0099ff 0%, #0077cc 100%);
+            color: #ffffff;
         }
 
         .post-url {
@@ -837,86 +980,204 @@
     </nav>
     
     <div class="container">
-        <header>
-        </header>
-
-        <!-- 1. Keywords manager: Configure what to search for -->
-        <div class="controls" style="margin-bottom:20px; gap:8px; align-items:center; background: var(--bg-card); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
-            <h3 style="color: var(--accent-primary); margin: 0 0 10px 0; font-size: 1.1em;">🔑 Configure Keywords to Search</h3>
-            <input type="text" id="keywordInput" placeholder="Add keyword (e.g., 'ovh vps', 'ovh hosting', 'ovh support')" style="min-width:220px; max-width:400px;">
-            <button onclick="addKeyword()">＋ Add Keyword</button>
-            <button onclick="clearKeywords()" style="background:#ef4444;">Clear All</button>
-            <button id="revertKeywordsBtn" onclick="revertKeywords()" style="background:#6b7280; display:none;" title="Restore previously cleared keywords">↶ Revert</button>
-            <p style="color: var(--text-secondary); font-size: 0.9em; margin-top: 10px; max-width: 700px;">
-                💡 <strong>How it works:</strong> Add keywords related to OVH products (e.g., "ovh vps", "ovh hosting", "ovh billing", "ovh support") and click "🆕 Scrape New Data" to collect customer feedback from all sources.
+        <!-- Section 1: Keywords Configuration -->
+        <section style="margin-bottom: 24px;">
+            <h2 style="text-align: center; color: var(--text-primary); font-size: 1.2em; font-weight: 600; margin-bottom: 2px; letter-spacing: -0.2px;">
+                Configure Keywords
+            </h2>
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.8em; margin-bottom: 16px; max-width: 600px; margin-left: auto; margin-right: auto;">
+                Add custom keywords to enhance your search. Combined with <a href="/settings" style="color: var(--accent-primary); text-decoration: none;">base keywords</a>.
             </p>
-            <div id="keywordsList" style="width:100%; margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;"></div>
-            <div id="keywordsSyncIndicator" style="display:none; margin-left:8px; color:#00d4ff; font-size:0.95em; align-items:center;">
-                <span class="spinner" aria-hidden="true"></span>
-                <span style="margin-left:8px; vertical-align:middle;">Syncing…</span>
+            
+            <div style="max-width: 900px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
+                <!-- Input Section -->
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;">
+                    <input 
+                        type="text" 
+                        id="keywordInput" 
+                        placeholder="Enter keyword (e.g., 'ovh vps', 'ovh hosting')" 
+                        style="flex: 1; min-width: 250px; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.95em; transition: border-color 0.2s ease;"
+                        onfocus="this.style.borderColor='var(--accent-primary)'; this.style.outline='none';"
+                        onblur="this.style.borderColor='var(--border-color)';"
+                    >
+                    <button 
+                        onclick="addKeyword()" 
+                        style="padding: 12px 24px; background: var(--accent-primary); border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.95em; cursor: pointer; transition: background-color 0.2s ease; white-space: nowrap;"
+                        onmouseover="this.style.background='var(--accent-secondary)';"
+                        onmouseout="this.style.background='var(--accent-primary)';"
+                    >
+                        Add Keyword
+                    </button>
+                    <button 
+                        onclick="clearKeywords()" 
+                        style="padding: 12px 20px; background: transparent; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); font-weight: 500; font-size: 0.95em; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;"
+                        onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444';"
+                        onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';"
+                    >
+                        Clear All
+                    </button>
+                    <button 
+                        id="revertKeywordsBtn" 
+                        onclick="revertKeywords()" 
+                        style="display:none; padding: 12px 20px; background: transparent; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); font-weight: 500; font-size: 0.95em; cursor: pointer; transition: all 0.2s ease;"
+                        title="Restore previously cleared keywords"
+                        onmouseover="this.style.borderColor='var(--accent-primary)'; this.style.color='var(--accent-primary)';"
+                        onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';"
+                    >
+                        ↶ Revert
+                    </button>
+                </div>
+                
+                <!-- Tip Message -->
+                <div style="padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 20px;">
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5; text-align: center;">
+                        💡 When you click <strong>"🆕 Scrape New Data"</strong>, the system uses <strong>both base keywords AND your custom keywords</strong> together.
+                    </p>
+                </div>
+                
+                <!-- Keywords List -->
+                <div id="keywordsList" style="width:100%; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;"></div>
+                
+                <!-- Sync Indicator -->
+                <div id="keywordsSyncIndicator" style="display:none; margin-top:12px; color:var(--accent-primary); font-size:0.9em; text-align:center;">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span style="margin-left:8px;">Syncing…</span>
+                </div>
             </div>
-        </div>
+        </section>
 
-
-        <!-- 3. Primary action + Scraping buttons -->
-        <div class="controls" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
-            <h3 style="color: var(--accent-primary); margin: 0 0 15px 0; font-size: 1.2em;">🚀 Launch Scraping</h3>
-            <!-- PRIMARY ACTION - Left side -->
-            <button id="btnScrapeAll" onclick="scrapeAllSources()" style="background: linear-gradient(135deg, #00d4ff, #0099ff); font-weight: bold; font-size: 1.05em; padding: 12px 24px;" title="Lance tous les scrapers pour ajouter de nouveaux posts à la base de données">
-                <span class="btn-text">🆕 Scrape New Data</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <a href="/logs" style="padding: 12px 24px; background: var(--bg-secondary); border: 2px solid var(--accent-primary); border-radius: 8px; color: var(--accent-primary); text-decoration: none; font-weight: bold; font-size: 1.05em; display: inline-flex; align-items: center; gap: 8px; transition: all 0.3s ease; margin-left: 10px;" onmouseover="this.style.background='var(--accent-primary)'; this.style.color='var(--bg-primary)';" onmouseout="this.style.background='var(--bg-secondary)'; this.style.color='var(--accent-primary)';" title="Voir les logs de scraping persistants">
-                📋 View Logs
-            </a>
-            <button id="cancelBtn" onclick="cancelRequest()" style="display:none; background:#ef4444;">❌ Cancel</button>
+        <!-- Section 2: Launch Scraping -->
+        <section style="margin-bottom: 24px;">
+            <h2 style="text-align: center; color: var(--text-primary); font-size: 1.2em; font-weight: 600; margin-bottom: 2px; letter-spacing: -0.2px;">
+                Launch Scraping
+            </h2>
+            <p style="text-align: center; color: var(--text-muted); font-size: 0.8em; margin-bottom: 16px; max-width: 600px; margin-left: auto; margin-right: auto;">
+                Collect feedback from all sources or target specific platforms
+            </p>
             
-            <!-- INDIVIDUAL SOURCE SCRAPERS -->
-            <button id="btnScrapeX" onclick="scrapeX()">
-                <span class="btn-text">🐦 X/Twitter</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeStackOverflow" onclick="scrapeStackOverflow()">
-                <span class="btn-text">📚 StackOverflow</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeNews" onclick="scrapeNews()">
-                <span class="btn-text">📰 News</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeReddit" onclick="scrapeReddit()">
-                <span class="btn-text">🔴 Reddit</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeTrustpilot" onclick="scrapeTrustpilot()">
-                <span class="btn-text">⭐ Trustpilot</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeGithub" onclick="scrapeGithub()">
-                <span class="btn-text">💻 GitHub</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeOvhForum" onclick="scrapeOvhForum()">
-                <span class="btn-text">💬 OVH Forum</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeMastodon" onclick="scrapeMastodon()">
-                <span class="btn-text">🐘 Mastodon</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeG2" onclick="scrapeG2Crowd()">
-                <span class="btn-text">⭐ G2 Crowd</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            <button id="btnScrapeLinkedIn" onclick="scrapeLinkedIn()">
-                <span class="btn-text">💼 LinkedIn</span>
-                <span class="btn-spinner" style="display:none;"></span>
-            </button>
-            
-            <!-- UTILITY BUTTONS -->
-            <button onclick="cleanupDuplicates()" style="background:#f59e0b;" title="Remove duplicate posts (same URL or same content+author+source)">🔄 Remove Duplicates</button>
-            <button onclick="cleanupNonOvhPosts()" style="background:#ff6b6b;" title="Remove all posts that don't mention OVH or its brands">🗑️ Remove Non-OVH Posts</button>
-        </div>
+            <div style="max-width: 1200px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
+                <!-- Primary Actions -->
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color);">
+                    <button id="btnScrapeAll" onclick="scrapeAllSources()" style="background: linear-gradient(135deg, #00d4ff, #0099ff); font-weight: 700; font-size: 1.05em; padding: 14px 32px; border: none; border-radius: 10px; color: #ffffff; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);" 
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(0, 212, 255, 0.4)';"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 212, 255, 0.3)';"
+                        title="Lance tous les scrapers pour ajouter de nouveaux posts à la base de données">
+                        <span class="btn-text">🆕 Scrape New Data</span>
+                        <span class="btn-spinner" style="display:none;"></span>
+                    </button>
+                    <a href="/logs" target="_blank" style="padding: 14px 32px; background: var(--bg-secondary); border: 2px solid var(--accent-primary); border-radius: 10px; color: var(--accent-primary); text-decoration: none; font-weight: 600; font-size: 1.05em; display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s ease;" 
+                        onmouseover="this.style.background='var(--accent-primary)'; this.style.color='#ffffff';"
+                        onmouseout="this.style.background='var(--bg-secondary)'; this.style.color='var(--accent-primary)';"
+                        title="Voir les logs de scraping persistants (s'ouvre dans un nouvel onglet)">
+                        📋 View Logs
+                    </a>
+                    <button id="cancelBtn" onclick="cancelRequest()" style="display:none; padding: 14px 24px; background:#ef4444; border: none; border-radius: 10px; color: #ffffff; font-weight: 600; cursor: pointer;">❌ Cancel</button>
+                </div>
+                
+                <!-- Scraping Progress Bar -->
+                <div id="scrapingProgressContainer" style="display: none; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color);" data-status="running" data-percentage="0%">
+                    <span id="scrapingProgressText" style="display: block; text-align: center; margin-bottom: 12px; color: var(--text-secondary); font-size: 0.9em;">Initializing scraping job...</span>
+                    <div style="width: 100%; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                        <div id="scrapingProgressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="height: 100%; background: linear-gradient(90deg, #00d4ff, #0099ff); width: 0%; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+                
+                <!-- Individual Scrapers - Organized Grid -->
+                <div style="margin-bottom: 24px;">
+                    <h3 style="text-align: center; color: var(--text-secondary); font-size: 0.9em; font-weight: 600; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        Individual Sources
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; max-width: 1000px; margin: 0 auto;">
+                        <button id="btnScrapeX" onclick="scrapeX()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">🐦</span>
+                            <span class="btn-text">X/Twitter</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeStackOverflow" onclick="scrapeStackOverflow()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">📚</span>
+                            <span class="btn-text">StackOverflow</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeNews" onclick="scrapeNews()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">📰</span>
+                            <span class="btn-text">News</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeReddit" onclick="scrapeReddit()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">🔴</span>
+                            <span class="btn-text">Reddit</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeTrustpilot" onclick="scrapeTrustpilot()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">⭐</span>
+                            <span class="btn-text">Trustpilot</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeGithub" onclick="scrapeGithub()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">💻</span>
+                            <span class="btn-text">GitHub</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeOvhForum" onclick="scrapeOvhForum()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">💬</span>
+                            <span class="btn-text">OVH Forum</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeMastodon" onclick="scrapeMastodon()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">🐘</span>
+                            <span class="btn-text">Mastodon</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeG2" onclick="scrapeG2Crowd()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">⭐</span>
+                            <span class="btn-text">G2 Crowd</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                        <button id="btnScrapeLinkedIn" onclick="scrapeLinkedIn()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
+                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
+                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
+                            <span style="font-size: 1.5em;">💼</span>
+                            <span class="btn-text">LinkedIn</span>
+                            <span class="btn-spinner" style="display:none;"></span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Utility Actions -->
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid var(--border-color);">
+                    <button onclick="cleanupDuplicates()" style="padding: 12px 24px; background: #f59e0b; border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease;" 
+                        title="Remove duplicate posts (same URL or same content+author+source)"
+                        onmouseover="this.style.background='#d97706'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.background='#f59e0b'; this.style.transform='translateY(0)';">
+                        🔄 Remove Duplicates
+                    </button>
+                    <button onclick="cleanupNonOvhPosts()" style="padding: 12px 24px; background: #ef4444; border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease;" 
+                        title="Remove all posts that don't mention OVH or its brands"
+                        onmouseover="this.style.background='#dc2626'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)';">
+                        🗑️ Remove Non-OVH Posts
+                    </button>
+                </div>
+            </div>
+        </section>
 
         <!-- 4. Stats -->
         <!-- Global Stats (all posts in DB) -->
@@ -1047,9 +1308,13 @@
         </div>
 
         <!-- Sort Controls -->
-        <div class="sort-controls" style="margin-bottom: 20px;">
-            <label>Sort by:</label>
-            <select id="sortBy" onchange="applySorting()">
+        <div class="sort-controls" style="margin-bottom: 20px; display: flex; align-items: center; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <label style="color: var(--text-secondary); font-size: 0.9em; font-weight: 500; margin: 0;">Sort by:</label>
+            <select id="sortBy" onchange="applySorting()" style="padding: 10px 16px; padding-right: 40px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 0.95em; font-weight: 500; cursor: pointer; transition: all 0.2s ease; appearance: none; background-image: url('data:image/svg+xml;charset=UTF-8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%234a5568\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>'); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; min-width: 200px;"
+                onmouseover="this.style.borderColor='var(--accent-primary)'; this.style.boxShadow='0 2px 8px rgba(0, 212, 255, 0.15)';"
+                onmouseout="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';"
+                onfocus="this.style.borderColor='var(--accent-primary)'; this.style.outline='none'; this.style.boxShadow='0 2px 8px rgba(0, 212, 255, 0.2)';"
+                onblur="this.style.borderColor='var(--border-color)'; this.style.boxShadow='none';">
                 <option value="date-desc">📅 Date (Newest)</option>
                 <option value="date-asc">📅 Date (Oldest)</option>
                 <option value="sentiment-desc">😡 Sentiment (Negative First)</option>
@@ -1062,16 +1327,18 @@
         <!-- 6. Posts Gallery -->
         <div id="gallery" class="gallery"></div>
 
-        <!-- Statistics, Backlog & Export Buttons -->
+        <!-- Statistics & Export Buttons -->
         <div style="margin-bottom: 30px; text-align: center; display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
             <button onclick="openChartModal()" style="padding: 18px 40px; background: linear-gradient(135deg, #00d4ff, #0099ff); border: none; border-radius: 12px; color: #1a1a2e; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(0, 212, 255, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(0, 212, 255, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(0, 212, 255, 0.4)'">
                 📊 Statistics
             </button>
-            <button onclick="toggleBacklog()" style="padding: 18px 40px; background: linear-gradient(135deg, #34d399, #10b981); border: none; border-radius: 12px; color: #1a1a2e; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(52, 211, 153, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(52, 211, 153, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(52, 211, 153, 0.4)'">
-                📋 Backlog
-            </button>
-            <button onclick="exportFilteredResults()" style="padding: 18px 40px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 12px; color: #fff; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(16, 185, 129, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(16, 185, 129, 0.4)'">
-                📥 Export Posts
+            <button onclick="exportFilteredResults()" style="padding: 18px 40px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); border: none; border-radius: 12px; color: #fff; font-weight: bold; font-size: 1.2em; cursor: pointer; box-shadow: 0 8px 20px rgba(139, 92, 246, 0.4); transition: all 0.3s ease; position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 10px;" onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 12px 30px rgba(139, 92, 246, 0.6)'" onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 8px 20px rgba(139, 92, 246, 0.4)'">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Export Posts</span>
             </button>
         </div>
 
@@ -1321,16 +1588,35 @@
 
                 <h3>🔑 Keywords Configuration</h3>
                 <p>
-                    Add keywords to search for across all sources. Examples:
+                    The scraping system uses <strong>two types of keywords</strong>:
                 </p>
                 <ul>
-                    <li><code>"ovh vps"</code> - VPS-related feedback</li>
-                    <li><code>"ovh hosting"</code> - Web hosting feedback</li>
-                    <li><code>"ovh billing"</code> - Billing and payment issues</li>
-                    <li><code>"ovh support"</code> - Customer support feedback</li>
+                    <li><strong>Base Keywords (Fixed):</strong> Always included automatically. They include:
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                            <li>OVH brands (OVH, OVHCloud, Kimsufi, etc.)</li>
+                            <li>OVH products (OVH domain, OVH hosting, OVH VPS, etc.)</li>
+                            <li>Common problems (OVH complaint, OVH support, OVH billing, etc.)</li>
+                            <li>OVH leadership mentions (Michel Paulin, Octave Klaba, OVH CEO, etc.)</li>
+                        </ul>
+                        <p style="margin-top: 0.5rem; margin-left: 1.5rem; color: var(--text-secondary); font-size: 0.9em;">
+                            💡 You can view and edit base keywords in <a href="/settings" style="color: var(--accent-primary);">Settings</a>.
+                        </p>
+                    </li>
+                    <li><strong>Custom Keywords (User-added):</strong> Additional keywords you add below. Examples:
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                            <li><code>"ovh vps"</code> - VPS-related feedback</li>
+                            <li><code>"ovh hosting"</code> - Web hosting feedback</li>
+                            <li><code>"ovh billing"</code> - Billing and payment issues</li>
+                            <li><code>"ovh support"</code> - Customer support feedback</li>
+                        </ul>
+                    </li>
                 </ul>
+                <p style="margin-top: 10px; padding: 0.75rem; background: rgba(0, 153, 255, 0.1); border-left: 3px solid var(--accent-primary); border-radius: 4px;">
+                    <strong>📌 Important:</strong> When you scrape, the system uses <strong>both base keywords AND your custom keywords</strong> together. 
+                    This ensures comprehensive coverage of OVH-related content, including mentions of OVH leadership.
+                </p>
                 <p style="margin-top: 10px;">
-                    <strong>💡 Tip:</strong> Use specific product names for better results. Keywords are saved automatically.
+                    <strong>💡 Tip:</strong> Use specific product names for better results. Custom keywords are saved automatically.
                 </p>
 
                 <h3>⚙️ Settings</h3>
@@ -1348,10 +1634,13 @@
 
                 <h3>🔄 Scraping Operations</h3>
                 <ul>
-                    <li><strong>🆕 Scrape New Data:</strong> Launches all scrapers simultaneously for all configured keywords</li>
+                    <li><strong>🆕 Scrape New Data:</strong> Launches all scrapers simultaneously for all configured keywords (base + custom)</li>
                     <li><strong>Individual Scrapers:</strong> Use specific scraper buttons (X/Twitter, Reddit, Trustpilot, etc.) for targeted collection</li>
-                    <li><strong>Progress Tracking:</strong> Monitor scraping progress in real-time with job status updates</li>
-                    <li><strong>Cancel Operation:</strong> Stop long-running scraping jobs if needed</li>
+                    <li><strong>Progress Tracking:</strong> Monitor scraping progress in real-time with job status updates and a progress bar</li>
+                    <li><strong>Cancel Operation:</strong> Stop long-running scraping jobs if needed (cancel button appears next to the progress bar)</li>
+                    <li><strong>Automatic Relevance Filtering:</strong> Posts are automatically filtered by relevance score before being saved to the database</li>
+                    <li><strong>Fallback Strategies:</strong> Scrapers use multiple strategies (primary method → Google Search fallback → RSS feeds) to maximize data collection</li>
+                    <li><strong>Nitter Instances:</strong> X/Twitter scraper automatically rotates through multiple Nitter instances for better reliability</li>
                 </ul>
 
                 <h3>🔍 Filtering & Search</h3>
@@ -1362,21 +1651,47 @@
                     <li><strong>Language Filter:</strong> Filter by language (French, English, Other)</li>
                     <li><strong>Product Filter:</strong> Filter by OVH product category (VPS, Hosting, Billing, etc.)</li>
                     <li><strong>Date Range:</strong> Filter posts by creation date</li>
+                    <li><strong>Relevance Score:</strong> Each post displays a relevance score (0-100%) indicating how relevant it is to OVH. Posts with low relevance are automatically filtered out during scraping.</li>
                 </ul>
 
-                <h3>📊 Statistics</h3>
+                <h3>📊 Statistics & Dashboard</h3>
                 <ul>
                     <li><strong>Database Stats:</strong> Global statistics for all posts in the database</li>
                     <li><strong>Filtered Stats:</strong> Statistics for posts matching current filters</li>
                     <li><strong>Click to Filter:</strong> Click on stat cards to filter by sentiment</li>
+                    <li><strong>Posts Statistics Section:</strong> In the Dashboard, view satisfaction metrics with dynamic color coding:
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                            <li>≥ 70%: Green (Excellent Satisfaction) 😊</li>
+                            <li>50-69%: Yellow (Good Satisfaction) 😐</li>
+                            <li>30-49%: Orange (Fair Satisfaction) 😐</li>
+                            <li>&lt; 30%: Red (Poor Satisfaction) 😞</li>
+                        </ul>
+                    </li>
+                    <li><strong>Critical Posts Drawer:</strong> Access negative posts from the last X days with customizable filters (period, sort order). Add posts directly to the improvement backlog.</li>
+                    <li><strong>All Posts Section:</strong> Browse all posts with comprehensive filters (sort, sentiment, source, language, date range). Posts are displayed with rich HTML formatting.</li>
                 </ul>
 
                 <h3>📋 Backlog & Export</h3>
                 <ul>
-                    <li><strong>Add to Backlog:</strong> Save important posts for later review</li>
+                    <li><strong>Add to Backlog:</strong> Save important posts for later review (available in post cards and Critical Posts drawer)</li>
                     <li><strong>Export CSV:</strong> Export backlog or filtered posts to CSV file</li>
                     <li><strong>Generate Ideas:</strong> Use AI to generate improvement ideas from backlog posts</li>
+                    <li><strong>Product Analysis:</strong> In the Improvements page, click on any product to get an AI-powered analysis of issues and pain points</li>
                 </ul>
+
+                <h3>🎯 Relevance Scoring System</h3>
+                <p>
+                    The system automatically calculates a <strong>relevance score</strong> for each scraped post to ensure only OVH-related content is stored:
+                </p>
+                <ul>
+                    <li><strong>OVH Brands (40%):</strong> Mentions of OVH, OVHCloud, Kimsufi, etc.</li>
+                    <li><strong>OVH URLs (30%):</strong> Links to OVH domains</li>
+                    <li><strong>OVH Leadership (20%):</strong> Mentions of Michel Paulin, Octave Klaba, OVH CEO, etc.</li>
+                    <li><strong>OVH Products (10%):</strong> Mentions of VPS, hosting, domain, etc.</li>
+                </ul>
+                <p style="margin-top: 10px; padding: 0.75rem; background: rgba(0, 153, 255, 0.1); border-left: 3px solid var(--accent-primary); border-radius: 4px;">
+                    <strong>📌 Important:</strong> Posts with a relevance score below 30% are automatically filtered out to maintain data quality. The relevance score is displayed on each post card with color-coded badges (green = high, yellow = medium, red = low).
+                </p>
 
                 <h3>🌐 Data Sources</h3>
                 <ul>
@@ -1391,11 +1706,37 @@
                     <li><strong>⭐ G2 Crowd</strong> - Software reviews</li>
                 </ul>
 
+                <h3>📊 Dashboard Features</h3>
+                <ul>
+                    <li><strong>Posts Statistics:</strong> View satisfaction metrics with dynamic labels and color coding based on percentage:
+                        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+                            <li>≥ 70%: Green (Excellent Satisfaction) 😊</li>
+                            <li>50-69%: Yellow (Good Satisfaction) 😐</li>
+                            <li>30-49%: Orange (Fair Satisfaction) 😐</li>
+                            <li>&lt; 30%: Red (Poor Satisfaction) 😞</li>
+                        </ul>
+                    </li>
+                    <li><strong>Critical Posts:</strong> Access a drawer with negative posts from customizable time periods, sorted by score or recency</li>
+                    <li><strong>All Posts Section:</strong> Browse all posts with comprehensive filters at the bottom of the dashboard page</li>
+                    <li><strong>Analytics Section:</strong> View charts and visualizations for trends, sources, sentiment, and geographic distribution</li>
+                    <li><strong>What's Happening:</strong> Get AI-powered insights and recommended actions based on current data</li>
+                </ul>
+
+                <h3>💡 Improvements Page</h3>
+                <ul>
+                    <li><strong>Product Distribution:</strong> See which products have the most feedback and opportunities</li>
+                    <li><strong>Product Analysis:</strong> Click on any product to get an AI-powered analysis of issues, pain points, and recommendations</li>
+                    <li><strong>Pain Points:</strong> Identify recurring issues across all products</li>
+                    <li><strong>Priority Scoring:</strong> Posts are ranked by opportunity score (sentiment × relevance × recency)</li>
+                </ul>
+
                 <h3>🎨 Navigation</h3>
                 <ul>
                     <li><strong>📥 Feedbacks Collection:</strong> Current page - manage data collection and configuration</li>
                     <li><strong>📊 Dashboard Analytics:</strong> Visual analytics with charts and insights</li>
                     <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis and improvement prioritization</li>
+                    <li><strong>📋 Scraping Logs:</strong> View detailed logs of scraping operations</li>
+                    <li><strong>⚙️ Settings:</strong> Configure API keys, base keywords, and application settings</li>
                     <li><strong>❓ Help:</strong> This menu - access help and documentation</li>
                     <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
                 </ul>
@@ -1405,9 +1746,13 @@
                     <ul style="margin: 0; padding-left: 20px;">
                         <li>Run scraping daily to build a comprehensive feedback history</li>
                         <li>Use the backlog feature to track critical issues</li>
-                        <li>Configure API keys in Settings to unlock AI-powered insights</li>
+                        <li>Configure API keys in Settings to unlock AI-powered insights and product analysis</li>
                         <li>Filter by product to focus on specific areas</li>
                         <li>Export data to CSV for external analysis</li>
+                        <li>Check the relevance score on posts to understand data quality</li>
+                        <li>Use the Critical Posts drawer to quickly identify and prioritize negative feedback</li>
+                        <li>Click on products in the Improvements page to get detailed AI analysis</li>
+                        <li>Edit base keywords in Settings to customize the default search terms</li>
                     </ul>
                 </div>
             </div>
@@ -1574,14 +1919,11 @@
     <script>
         // Détection automatique de l'URL du backend
         function getApiBase() {
-            // Si on est sur localhost, utiliser le port 8000 par défaut
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                return `http://${window.location.hostname}:8000`;
-            }
-            // Sinon, utiliser le même hostname et port que la page actuelle
-            // Si le port est dans l'URL, l'utiliser, sinon utiliser le port par défaut 11840 pour Docker OVH
-            const port = window.location.port || '11840';
-            return `${window.location.protocol}//${window.location.hostname}:${port}`;
+            // Utiliser le même hostname et port que la page actuelle
+            // Cela permet de fonctionner avec les deux environnements (8000 et 8001)
+            const hostname = window.location.hostname;
+            const port = window.location.port || (hostname === 'localhost' || hostname === '127.0.0.1' ? '8000' : '11840');
+            return `${window.location.protocol}//${hostname}:${port}`;
         }
         
         const API_BASE = getApiBase();
@@ -1643,19 +1985,43 @@
                         versionBadge.textContent = `v${data.version}`;
                         versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
                     }
+                } else {
+                    // Fallback version if API fails
+                    const versionBadge = document.getElementById('versionBadge');
+                    if (versionBadge) {
+                        versionBadge.textContent = 'v1.0.1';
+                    }
                 }
             } catch (error) {
                 console.warn('Failed to load version:', error);
+                // Fallback version on error
+                const versionBadge = document.getElementById('versionBadge');
+                if (versionBadge) {
+                    versionBadge.textContent = 'v1.0.1';
+                }
             }
         }
         
-        // Initialize theme on page load
-        initializeTheme();
+        // Initialize theme IMMEDIATELY before any rendering to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                document.documentElement.classList.add('light-mode');
+                document.body.classList.add('light-mode');
+            } else {
+                document.documentElement.classList.add('dark-mode');
+                document.body.classList.add('dark-mode');
+            }
+        })();
         
-        // Load version on page load
+        // Initialize theme on page load (for toggle functionality)
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadVersion);
+            document.addEventListener('DOMContentLoaded', () => {
+                initializeTheme();
+                loadVersion();
+            });
         } else {
+            initializeTheme();
             loadVersion();
         }
         
@@ -1815,6 +2181,74 @@
         function getSentimentClass(label) {
             return `sentiment sentiment-${label}`;
         }
+        
+        // Calculate relevance score on frontend (for posts that don't have it yet)
+        function calculateRelevanceScore(post) {
+            // Use stored value if available
+            if (post.relevance_score !== undefined && post.relevance_score !== null && post.relevance_score > 0) {
+                return post.relevance_score;
+            }
+            
+            // Calculate relevance score based on backend logic
+            const content = (post.content || '').toLowerCase();
+            const url = (post.url || '').toLowerCase();
+            const author = (post.author || '').toLowerCase();
+            
+            // If no content, return 0
+            if (!content || content.trim().length === 0) {
+                return 0.0;
+            }
+            
+            const OVH_BRANDS = ['ovh', 'ovhcloud', 'ovh cloud', 'kimsufi', 'soyoustart', 'runabove', 'hubic', 'ovh.com', 'ovhcloud.com'];
+            const OVH_PRODUCTS = ['vps', 'dedicated server', 'dedicated', 'hosting', 'domain', 'email', 'public cloud', 'private cloud', 'object storage', 'cdn', 'ssl', 'backup', 'storage'];
+            const OVH_LEADERSHIP_NAMES = ['michel paulin', 'michel-paulin', 'octave klaba', 'octave-klaba', 'henryk klaba', 'henryk-klaba', 'klaba family', 'famille klaba'];
+            const OVH_LEADERSHIP_TITLES = ['ceo ovh', 'ovh ceo', 'pdg ovh', 'ovh pdg', 'founder ovh', 'ovh founder', 'fondateur ovh', 'ovh management', 'ovh direction', 'ovh executives', 'ovh leadership', 'dirigeant ovh', 'ovh dirigeant'];
+            
+            let score = 0.0;
+            
+            // 1. Marques OVH (40% du score) - Check in content, url, and author
+            const brand_matches_content = OVH_BRANDS.filter(brand => content.includes(brand)).length;
+            const brand_matches_url = OVH_BRANDS.filter(brand => url.includes(brand)).length;
+            const brand_matches_author = OVH_BRANDS.filter(brand => author.includes(brand)).length;
+            const total_brand_matches = brand_matches_content + brand_matches_url + brand_matches_author;
+            
+            if (total_brand_matches > 0) {
+                score += 0.4 * Math.min(total_brand_matches / 2, 1.0);
+            }
+            
+            // 2. URL OVH (30% du score)
+            if (brand_matches_url > 0) {
+                score += 0.3;
+            }
+            
+            // 3. Direction OVH (20% du score)
+            let leadership_score = 0.0;
+            OVH_LEADERSHIP_NAMES.forEach(name => {
+                if (content.includes(name)) leadership_score += 0.1;
+            });
+            OVH_LEADERSHIP_TITLES.forEach(title => {
+                if (content.includes(title)) leadership_score += 0.1;
+            });
+            
+            if (leadership_score > 0 && total_brand_matches > 0) {
+                score += 0.2 * Math.min(leadership_score, 1.0);
+            } else if (leadership_score > 0) {
+                score += 0.1 * Math.min(leadership_score, 1.0);
+            }
+            
+            // 4. Produits OVH (10% du score)
+            const product_matches = OVH_PRODUCTS.filter(product => content.includes(product)).length;
+            if (product_matches > 0 && total_brand_matches > 0) {
+                score += 0.1 * Math.min(product_matches / 3, 1.0);
+            }
+            
+            // Ensure minimum score if OVH is mentioned anywhere
+            if (total_brand_matches > 0 && score === 0) {
+                score = 0.2; // Minimum score if OVH is mentioned
+            }
+            
+            return Math.min(score, 1.0);
+        }
 
         function getSourceClass(source) {
             return `post-source source-${source}`;
@@ -1950,6 +2384,7 @@
                     });
                     renderGallery();
                     updateActiveFiltersCount();
+                    updateDatabaseStats(); // Update database stats after loading posts
                     return true;
                 } else {
                     console.error('Failed to load posts');
@@ -2507,33 +2942,51 @@
                 // Get product label (with manual edit support)
                 const productLabel = getProductLabel(post.id, post.content, post.language);
                 
+                // Calculate relevance score (use stored value or calculate on frontend)
+                const relevanceScore = calculateRelevanceScore(post);
+                
+                const relevanceClass = relevanceScore >= 0.7 ? 'relevance-high' : relevanceScore >= 0.4 ? 'relevance-medium' : 'relevance-low';
+                const relevanceIcon = relevanceScore >= 0.7 ? '✓' : relevanceScore >= 0.4 ? '~' : '?';
+                
                 return `
                 <div class="post-card">
-                    <div class="post-header">
-                        <span class="${getSourceClass(post.source)}">${escapeHtml(post.source)}</span>
+                    <div class="post-card-header">
+                        <div class="post-header-left">
+                            <span class="${getSourceClass(post.source)}">${escapeHtml(post.source)}</span>
+                            ${productLabel ? `
+                                <span style="font-size:0.75em; background:linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.08) 100%); padding:5px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:5px; border:1px solid rgba(0,212,255,0.3); color:var(--accent-primary); font-weight:500;">
+                                    📦 ${escapeHtml(productLabel)}
+                                    <button onclick="editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
+                                            style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.85em; opacity:0.7; line-height:1;"
+                                            title="Edit product label">✏️</button>
+                                </span>
+                            ` : `
+                                <button onclick="editProductLabel(${post.id}, '')" 
+                                        style="font-size:0.75em; background:rgba(0,212,255,0.08); padding:5px 10px; border-radius:6px; border:1px dashed rgba(0,212,255,0.4); color:var(--accent-primary); cursor:pointer; font-weight:500; display:inline-flex; align-items:center; gap:4px;"
+                                        title="Add product label">+ Label</button>
+                            `}
+                        </div>
                         <span class="post-date">${formatDate(post.created_at)}</span>
-                        ${productLabel ? `
-                            <span style="font-size:0.75em; background:rgba(0,212,255,0.2); padding:4px 8px; border-radius:4px; margin-left:5px; display:inline-flex; align-items:center; gap:4px;">
-                                ${escapeHtml(productLabel)}
-                                <button onclick="editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
-                                        style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.9em; opacity:0.7;"
-                                        title="Edit product label">✏️</button>
-                            </span>
-                        ` : `
-                            <button onclick="editProductLabel(${post.id}, '')" 
-                                    style="font-size:0.75em; background:rgba(0,212,255,0.1); padding:4px 8px; border-radius:4px; margin-left:5px; border:1px dashed rgba(0,212,255,0.3); color:var(--accent-primary); cursor:pointer;"
-                                    title="Add product label">+ Label</button>
-                        `}
                     </div>
-                    <div class="post-author">@${escapeHtml(post.author)}</div>
-                    <div class="post-content">${escapeHtml(post.content)}</div>
+                    <div class="post-body">
+                        <div class="post-author">${escapeHtml(post.author)}</div>
+                        <div class="post-content">${escapeHtml(post.content)}</div>
+                    </div>
                     <div class="post-footer">
-                        <span class="${getSentimentClass(post.sentiment_label)}">
-                            ${post.sentiment_label.toUpperCase()} (${(post.sentiment_score).toFixed(2)})
-                        </span>
-                        <button onclick="openPostPreview(${post.id})" style="margin-left:10px; padding:6px 12px; background:#34d399; border:none; border-radius:6px; color:#1a1a2e; cursor:pointer; font-weight:500;">👁️ Preview</button>
-                        <a href="${escapeHtml(post.url)}" target="_blank" class="post-url" style="margin-left:10px;">View</a>
-                        <button onclick="addToBacklog(${post.id})" style="margin-left:10px; padding:6px 12px; background:#0099ff; border:none; border-radius:6px; color:#fff; cursor:pointer;">Save</button>
+                        <div class="post-meta-badges">
+                            <span class="${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
+                                ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
+                                ${post.sentiment_label.toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
+                            </span>
+                            <span class="relevance-badge ${relevanceClass}" title="Relevance Score: ${relevanceScore.toFixed(2)}">
+                                ${relevanceIcon} ${(relevanceScore * 100).toFixed(0)}%
+                            </span>
+                        </div>
+                        <div class="post-actions">
+                            <button onclick="openPostPreview(${post.id})" class="post-action-btn btn-preview">👁️ Preview</button>
+                            <a href="${escapeHtml(post.url)}" target="_blank" class="post-action-btn btn-view">🔗 View</a>
+                            <button onclick="addToBacklog(${post.id})" class="post-action-btn btn-save">💾 Save</button>
+                        </div>
                     </div>
                 </div>
             `}).filter(html => html !== '').join('');
@@ -3196,6 +3649,9 @@
 
         // Abort controller for canceling requests
         let currentAbortController = null;
+        // Job tracking for background scraping
+        let currentJobId = null;
+        let jobStatusInterval = null;
 
         function showCancelBtn(show) {
             const cancelBtn = document.getElementById('cancelBtn');
@@ -3221,10 +3677,47 @@
         }
 
         async function cancelScrape() {
+            // Cancel background job if running
+            if (currentJobId) {
+                try {
+                    const response = await fetch(`${API_BASE}/scrape/jobs/${currentJobId}/cancel`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        addLog('⛔ Job cancellation requested...', 'warning');
+                        showToast('Job cancellation requested', 'info');
+                    }
+                } catch (e) {
+                    console.error(`Error cancelling job: ${e.message}`);
+                }
+                
+                // Stop polling
+                if (jobStatusInterval) {
+                    clearInterval(jobStatusInterval);
+                    jobStatusInterval = null;
+                }
+                currentJobId = null;
+                showCancelBtn(false);
+                
+                // Hide progress bar
+                const progressContainer = document.getElementById('scrapingProgressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'none';
+                }
+            }
+            
+            // Cancel direct requests if any
             if (currentAbortController) {
                 currentAbortController.abort();
                 console.log('Canceling scrape operation...');
+                currentAbortController = null;
+                showCancelBtn(false);
             }
+        }
+        
+        // Alias for cancel button onclick
+        function cancelRequest() {
+            cancelScrape();
         }
 
         function updateActiveFiltersCount() {
@@ -3410,12 +3903,55 @@
         }
 
 
+        // Helper function to safely parse JSON response
+        async function parseJsonResponse(response) {
+            try {
+                const contentType = response.headers.get('content-type') || '';
+                // Try to parse as JSON first (even if content-type is wrong)
+                const text = await response.text();
+                
+                // If it's HTML or plain text error, extract meaningful message
+                if (text.trim().startsWith('<') || (!contentType.includes('application/json') && text.length > 0)) {
+                    // Try to extract error message from HTML or text
+                    const errorMatch = text.match(/<title>(.*?)<\/title>|Internal Server Error|Error:?\s*(.+)/i);
+                    const errorText = errorMatch ? (errorMatch[1] || errorMatch[2] || 'Internal Server Error') : text.substring(0, 100);
+                    return { 
+                        error: `Server error: ${errorText}`,
+                        detail: errorText,
+                        raw: text.substring(0, 200)
+                    };
+                }
+                
+                // Try to parse as JSON
+                try {
+                    const parsed = JSON.parse(text);
+                    // Ensure 'added' field exists for scraper responses
+                    if (parsed && typeof parsed === 'object' && !parsed.error && parsed.added === undefined && parsed.detail === undefined) {
+                        // This might be a valid response but missing 'added', log for debugging
+                        console.warn('Response missing "added" field:', parsed);
+                    }
+                    return parsed;
+                } catch (e) {
+                    return { 
+                        error: `JSON parse error: ${e.message}`,
+                        detail: text.substring(0, 100),
+                        raw: text.substring(0, 200)
+                    };
+                }
+            } catch (e) {
+                return { 
+                    error: `Failed to read response: ${e.message}`,
+                    detail: e.message
+                };
+            }
+        }
+
         async function scrapeX() {
             setButtonLoading('btnScrapeX', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3433,16 +3969,28 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    console.log(`Successfully scraped ${data.added} posts from X/Twitter`);
-                    showToast(`${data.added} new posts from X/Twitter`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    console.error(`Error scraping X: ${errorMsg}`);
+                    showToast(`Error scraping X: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    console.error(`Error parsing response: ${data.error}`);
+                    showToast(`Error scraping X: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                console.log(`Successfully scraped ${addedCount} posts from X/Twitter`, { data, addedCount });
+                showToast(`${addedCount} new posts from X/Twitter`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
@@ -3460,9 +4008,9 @@
         async function scrapeStackOverflow() {
             setButtonLoading('btnScrapeStackOverflow', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3473,29 +4021,51 @@
             showCancelBtn(true);
             currentAbortController = new AbortController();
             
-            console.log('Starting Stack Overflow scraper...', keywords);
+            addLog('🔄 Starting Stack Overflow scraper...', 'info');
+            addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/stackoverflow?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    console.log(`Successfully scraped ${data.added} questions from Stack Overflow`);
-                    showToast(`${data.added} new posts from Stack Overflow`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping Stack Overflow: ${errorMsg}`, 'error');
+                    showToast(`Error scraping Stack Overflow: ${errorMsg}`, 'error');
+                    setButtonLoading('btnScrapeStackOverflow', false);
+                    showCancelBtn(false);
+                    currentAbortController = null;
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping Stack Overflow: ${data.error}`, 'error');
+                    setButtonLoading('btnScrapeStackOverflow', false);
+                    showCancelBtn(false);
+                    currentAbortController = null;
+                    return;
+                }
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} questions from Stack Overflow`, 'success');
+                showToast(`${addedCount} new posts from Stack Overflow`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
+                    addLog('⛔ Scraping cancelled by user', 'info');
                     console.log('Scrape cancelled by user');
                 } else {
-                    console.error(`Error scraping Stack Overflow: ${e.message}`);
-                    showToast(`Error scraping Stack Overflow: ${e.message}`, 'error');
+                    const errorMsg = e.message || 'NetworkError when attempting to fetch resource';
+                    addLog(`❌ Error scraping Stack Overflow: ${errorMsg}`, 'error');
+                    addLog(`📋 Error type: ${e.name || 'Unknown'}`, 'error');
+                    console.error(`Error scraping Stack Overflow: ${errorMsg}`, e);
+                    showToast(`Error scraping Stack Overflow: ${errorMsg}`, 'error');
                 }
             } finally {
                 setButtonLoading('btnScrapeStackOverflow', false);
@@ -3507,9 +4077,9 @@
         async function scrapeNews() {
             setButtonLoading('btnScrapeNews', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3528,16 +4098,28 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} articles from Google News`, 'success');
-                    showToast(`${data.added} new posts from Google News`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping News: ${errorMsg}`, 'error');
+                    showToast(`Error scraping News: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping News: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} articles from Google News`, 'success');
+                showToast(`${addedCount} new posts from Google News`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
@@ -3555,9 +4137,9 @@
         async function scrapeReddit() {
             setButtonLoading('btnScrapeReddit', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3576,16 +4158,28 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} posts from Reddit`, 'success');
-                    showToast(`${data.added} new posts from Reddit`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping Reddit: ${errorMsg}`, 'error');
+                    showToast(`Error scraping Reddit: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping Reddit: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} posts from Reddit`, 'success');
+                showToast(`${addedCount} new posts from Reddit`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
@@ -3603,9 +4197,9 @@
         async function scrapeGithub() {
             setButtonLoading('btnScrapeGithub', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3624,16 +4218,28 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} issues/discussions from GitHub`, 'success');
-                    showToast(`${data.added} new posts from GitHub`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping GitHub: ${errorMsg}`, 'error');
+                    showToast(`Error scraping GitHub: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping GitHub: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} issues/discussions from GitHub`, 'success');
+                showToast(`${addedCount} new posts from GitHub`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
@@ -3652,9 +4258,9 @@
         async function scrapeTrustpilot() {
             setButtonLoading('btnScrapeTrustpilot', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             // Combine keywords with AND
@@ -3673,16 +4279,27 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} reviews from Trustpilot`, 'success');
-                    showToast(`${data.added} new posts from Trustpilot`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    console.error(`Error: ${data.detail}`);
-                    showToast(`Error: ${data.detail}`, 'error');
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping Trustpilot: ${errorMsg}`, 'error');
+                    showToast(`Error scraping Trustpilot: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping Trustpilot: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} reviews from Trustpilot`, 'success');
+                showToast(`${addedCount} new posts from Trustpilot`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
@@ -3698,410 +4315,253 @@
         }
 
         async function scrapeAllSources() {
-            setButtonLoading('btnScrapeAll', true);
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            // Capture the abort controller locally to avoid null reference errors in async functions
-            const localAbortController = currentAbortController;
-            
-            // Clear previous logs and show log panel (like individual scrapers do)
-            console.log('Starting data collection - launching all scrapers...');
-            showToast('Collecting new data from all sources...', 'info');
-            
             const keywords = loadKeywords();
             if (!keywords || keywords.length === 0) {
                 addLog('⚠️ No keywords configured. Add keywords first!', 'error');
                 showToast('Please add keywords before scraping', 'error');
-                setButtonLoading('btnScrapeAll', false);
-                showCancelBtn(false);
-                currentAbortController = null;
                 return;
             }
             
-            let totalAdded = 0;
-            let completedScrapers = 0;
-            const totalScrapers = 10; // X, StackOverflow, News, Reddit, Trustpilot, GitHub, OVH Forum, Mastodon, G2 Crowd, LinkedIn
+            // Stop any existing job polling
+            if (jobStatusInterval) {
+                clearInterval(jobStatusInterval);
+                jobStatusInterval = null;
+            }
+            
+            // Show progress bar immediately
+            const progressContainer = document.getElementById('scrapingProgressContainer');
+            const progressBar = document.getElementById('scrapingProgressBar');
+            const progressText = document.getElementById('scrapingProgressText');
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+                progressContainer.setAttribute('data-status', 'pending');
+                progressContainer.setAttribute('data-percentage', '0%');
+            }
+            if (progressBar) {
+                progressBar.style.width = '0%';
+                progressBar.setAttribute('aria-valuenow', 0);
+            }
+            if (progressText) {
+                progressText.textContent = 'Initializing scraping job...';
+            }
             
             try {
-                // Run all scrapers in parallel
-                const scraperPromises = [];
+                // Launch background job
+                addLog('🚀 Launching background scraping job...', 'info');
+                addLog(`📝 Keywords: ${keywords.join(', ')}`, 'info');
+                showToast('Scraping job started! You can continue using the app.', 'info');
                 
-                // 1. X/Twitter Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Scraping X/Twitter...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/x`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`X/Twitter scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`X/Twitter scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 2. StackOverflow Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Starting Stack Overflow scraper...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/stackoverflow`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    console.log(`Successfully scraped ${result.added} questions from Stack Overflow (keyword: ${keyword})`);
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    console.error(`Error scraping Stack Overflow (keyword: ${keyword}): ${errorData.detail}`);
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`StackOverflow scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`StackOverflow scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 3. News Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Starting Google News scraper...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/news`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    console.log(`Successfully scraped ${result.added} articles from Google News (keyword: ${keyword})`);
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    console.error(`Error scraping Google News (keyword: ${keyword}): ${errorData.detail}`);
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`Google News scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`Google News scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 4. Reddit Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Starting Reddit scraper...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/reddit`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    console.log(`Successfully scraped ${result.added} posts from Reddit (keyword: ${keyword})`);
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    console.error(`Error scraping Reddit (keyword: ${keyword}): ${errorData.detail}`);
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`Reddit scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`Reddit scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 5. Trustpilot Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Starting Trustpilot scraper...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/trustpilot`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 20 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    console.log(`Successfully scraped ${result.added} reviews from Trustpilot (keyword: ${keyword})`);
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    console.error(`Error scraping Trustpilot (keyword: ${keyword}): ${errorData.detail}`);
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`Trustpilot scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`Trustpilot scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 6. GitHub Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            console.log('Starting GitHub scraper...');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/github`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    console.log(`Successfully scraped ${result.added} issues from GitHub (keyword: ${keyword})`);
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    console.error(`Error scraping GitHub (keyword: ${keyword}): ${errorData.detail}`);
-                                }
-                            }
-                            completedScrapers++;
-                            console.log(`GitHub scraping complete (${completedScrapers}/${totalScrapers})`);
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                console.error(`GitHub scraping failed: ${e.message}`);
-                            }
-                        }
-                    })()
-                );
-                
-                // 7. OVH Forum Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            addLog('🔄 Starting OVH Forum scraper...', 'info');
-                            addLog(`💬 Searching for: ${keywords.join(', ')}`, 'info');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/ovh-forum`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    addLog(`✅ Successfully scraped ${result.added} posts from OVH Forum (keyword: ${keyword})`, 'success');
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    addLog(`❌ Error scraping OVH Forum (keyword: ${keyword}): ${errorData.detail}`, 'error');
-                                }
-                            }
-                            completedScrapers++;
-                            addLog(`✅ OVH Forum scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                addLog(`❌ OVH Forum scraping failed: ${e.message}`, 'error');
-                            }
-                        }
-                    })()
-                );
-                
-                // 8. Mastodon Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            addLog('🔄 Starting Mastodon scraper...', 'info');
-                            addLog(`🐘 Searching for: ${keywords.join(', ')}`, 'info');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/mastodon`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    addLog(`✅ Successfully scraped ${result.added} posts from Mastodon (keyword: ${keyword})`, 'success');
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    addLog(`❌ Error scraping Mastodon (keyword: ${keyword}): ${errorData.detail}`, 'error');
-                                }
-                            }
-                            completedScrapers++;
-                            addLog(`✅ Mastodon scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                addLog(`❌ Mastodon scraping failed: ${e.message}`, 'error');
-                            }
-                        }
-                    })()
-                );
-                
-                // 9. G2 Crowd Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            addLog('🔄 Starting G2 Crowd scraper...', 'info');
-                            addLog(`⭐ Searching for: ${keywords.join(', ')}`, 'info');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/g2-crowd`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    addLog(`✅ Successfully scraped ${result.added} reviews from G2 Crowd (keyword: ${keyword})`, 'success');
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    addLog(`❌ Error scraping G2 Crowd (keyword: ${keyword}): ${errorData.detail}`, 'error');
-                                }
-                            }
-                            completedScrapers++;
-                            addLog(`✅ G2 Crowd scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                addLog(`❌ G2 Crowd scraping failed: ${e.message}`, 'error');
-                            }
-                        }
-                    })()
-                );
-                
-                // 10. LinkedIn Scraper
-                scraperPromises.push(
-                    (async () => {
-                        try {
-                            addLog('🔄 Starting LinkedIn scraper...', 'info');
-                            addLog(`💼 Searching for: ${keywords.join(', ')}`, 'info');
-                            addLog('💡 Note: LinkedIn requires API credentials (Client ID & Secret) configured in Settings', 'info');
-                            for (const keyword of keywords) {
-                                const response = await fetch(`${API_BASE}/scrape/linkedin`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ query: keyword, limit: 50 }),
-                                    signal: localAbortController.signal
-                                });
-                                if (response.ok) {
-                                    const result = await response.json();
-                                    totalAdded += result.added || 0;
-                                    if (result.added > 0) {
-                                        addLog(`✅ Successfully scraped ${result.added} posts from LinkedIn (keyword: ${keyword})`, 'success');
-                                    } else {
-                                        addLog(`⚠️ No posts found from LinkedIn (keyword: ${keyword}) - Check API credentials in Settings`, 'warning');
-                                    }
-                                } else {
-                                    const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                                    addLog(`❌ Error scraping LinkedIn (keyword: ${keyword}): ${errorData.detail}`, 'error');
-                                }
-                            }
-                            completedScrapers++;
-                            addLog(`✅ LinkedIn scraping complete (${completedScrapers}/${totalScrapers})`, 'success');
-                        } catch (e) {
-                            if (e.name !== 'AbortError') {
-                                addLog(`❌ LinkedIn scraping failed: ${e.message}`, 'error');
-                            }
-                        }
-                    })()
-                );
-                
-                // Wait for all scrapers to complete
-                await Promise.all(scraperPromises);
-                
-                // Now load the updated data from database
-                addLog('📥 Loading updated data from database...', 'info');
-                const response = await fetch(`${API_BASE}/posts?limit=1000`, {
-                    signal: localAbortController.signal
+                const response = await fetch(`${API_BASE}/scrape/keywords?limit=50&concurrency=2&delay=0.5`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keywords: keywords })
                 });
                 
-                if (response.ok) {
-                    const posts = await response.json();
-                    // Filter out sample posts
-                    allPosts = posts.filter(post => {
-                        const url = post.url || '';
-                        const isSample = (
-                            url.includes('/sample') || 
-                            url.includes('example.com') ||
-                            url.includes('/status/174') ||
-                            url === 'https://trustpilot.com/sample'
-                        );
-                        return !isSample;
-                    });
-                    const filteredCount = posts.length - allPosts.length;
-                    addLog(`✅ Full refresh complete! Added ${totalAdded} new posts. Total: ${allPosts.length} posts${filteredCount > 0 ? ` (${filteredCount} samples filtered)` : ''}`, 'success');
-                    showToast(`Refresh complete! ${totalAdded} new posts added`, 'success');
-                    
-                    // Render gallery with updated data
-                    renderGallery();
-                    updateActiveFiltersCount();
-                } else {
-                    addLog('❌ Failed to load updated data', 'error');
-                    showToast('Failed to load updated data', 'error');
-                    // Still render gallery to keep existing posts visible
-                    renderGallery();
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Failed to start job: ${errorMsg}`, 'error');
+                    showToast(`Failed to start scraping job: ${errorMsg}`, 'error');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    return;
                 }
                 
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    addLog('⛔ Refresh cancelled by user', 'error');
-                    showToast('Refresh cancelled', 'error');
-                } else {
-                    addLog(`❌ Refresh error: ${e.message}`, 'error');
-                    showToast(`Error: ${e.message}`, 'error');
-                }
-                // Keep existing posts visible even if there's an error
-                renderGallery();
-            } finally {
+                const data = await response.json();
+                currentJobId = data.job_id;
+                
+                addLog(`✅ Job started! Job ID: ${currentJobId.substring(0, 8)}...`, 'success');
+                addLog('💡 The scraping is running in the background. You can continue using the app.', 'info');
+                
+                // Enable cancel button
+                showCancelBtn(true);
+                
+                // Start polling job status
+                pollJobStatus(currentJobId);
+                
+                // Re-enable button immediately (job is running in background)
                 setButtonLoading('btnScrapeAll', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-                updateActiveFiltersCount();
+                
+            } catch (e) {
+                console.error(`Error starting scraping job: ${e.message}`);
+                addLog(`❌ Error starting job: ${e.message}`, 'error');
+                showToast(`Error: ${e.message}`, 'error');
+                setButtonLoading('btnScrapeAll', false);
+                if (progressContainer) {
+                    progressContainer.style.display = 'none';
+                }
             }
+        }
+        
+        async function pollJobStatus(jobId) {
+            if (jobStatusInterval) {
+                clearInterval(jobStatusInterval);
+            }
+            
+            const progressBar = document.getElementById('scrapingProgressBar');
+            const progressText = document.getElementById('scrapingProgressText');
+            const progressContainer = document.getElementById('scrapingProgressContainer');
+            
+            // Show progress bar
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+                progressContainer.setAttribute('data-status', 'running');
+                progressContainer.setAttribute('data-percentage', '0%');
+            }
+            if (progressBar) {
+                progressBar.style.width = '0%';
+                progressBar.setAttribute('aria-valuenow', 0);
+            }
+            
+            jobStatusInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            // Job doesn't exist (server restarted or job expired)
+                            console.warn(`Job ${jobId.substring(0, 8)}... not found (404), stopping polling`);
+                            clearInterval(jobStatusInterval);
+                            jobStatusInterval = null;
+                            currentJobId = null;
+                            if (progressContainer) {
+                                progressContainer.style.display = 'none';
+                            }
+                            showCancelBtn(false);
+                            return;
+                        }
+                        console.error(`Failed to fetch job status: ${response.status}`);
+                        return;
+                    }
+                    
+                    const job = await response.json();
+                    const status = job.status || 'unknown';
+                    const progress = job.progress || { total: 0, completed: 0 };
+                    const completed = progress.completed || 0;
+                    const total = progress.total || 0;
+                    
+                    // Debug logs
+                    console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total}`);
+                    
+                    // Always update progress bar if we have progress data (even if total is 0 initially)
+                    if (progressBar) {
+                        if (total > 0) {
+                            const percentage = Math.round((completed / total) * 100);
+                            progressBar.style.width = `${percentage}%`;
+                            progressBar.setAttribute('aria-valuenow', percentage);
+                            
+                            // Update container attributes
+                            if (progressContainer) {
+                                progressContainer.setAttribute('data-percentage', `${percentage}%`);
+                                progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
+                            }
+                        } else if (status === 'running' || status === 'pending') {
+                            // Show indeterminate progress when job is running but total not yet calculated
+                            progressBar.style.width = '10%';
+                            progressBar.setAttribute('aria-valuenow', 0);
+                            if (progressContainer) {
+                                progressContainer.setAttribute('data-percentage', '...');
+                                progressContainer.setAttribute('data-status', 'running');
+                            }
+                        }
+                    }
+                    
+                    // Update progress text
+                    if (progressText) {
+                        if (total > 0) {
+                            const percentage = Math.round((completed / total) * 100);
+                            progressText.textContent = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
+                        } else if (status === 'running' || status === 'pending') {
+                            progressText.textContent = 'Scraping job initialized... Calculating tasks...';
+                        } else {
+                            progressText.textContent = 'Scraping job initialized...';
+                        }
+                    }
+                    
+                    // Also log progress
+                    if (completed !== (progressBar ? parseInt(progressBar.getAttribute('aria-valuenow') || '0') : 0)) {
+                        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                        addLog(`📊 Progress: ${completed}/${total} tasks completed (${percentage}%)`, 'info');
+                    }
+                    
+                    // Check if job is complete
+                    if (status === 'completed') {
+                        clearInterval(jobStatusInterval);
+                        jobStatusInterval = null;
+                        currentJobId = null;
+                        
+                        // Calculate total added
+                        const results = job.results || [];
+                        let totalAdded = 0;
+                        results.forEach(r => {
+                            if (r.added) totalAdded += r.added;
+                        });
+                        
+                        // Update progress bar to 100%
+                        if (progressBar) {
+                            progressBar.style.width = '100%';
+                            progressBar.setAttribute('aria-valuenow', 100);
+                        }
+                        if (progressContainer) {
+                            progressContainer.setAttribute('data-percentage', '100%');
+                            progressContainer.setAttribute('data-status', 'completed');
+                        }
+                        if (progressText) {
+                            progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                        }
+                        
+                        addLog(`✅ Scraping job completed! Added ${totalAdded} new posts.`, 'success');
+                        showToast(`Scraping complete! ${totalAdded} new posts added`, 'success');
+                        
+                        // Hide progress bar after 3 seconds
+                        setTimeout(() => {
+                            if (progressContainer) {
+                                progressContainer.style.display = 'none';
+                            }
+                        }, 3000);
+                        
+                        // Load updated data
+                        await loadPostsFromDB();
+                        renderGallery();
+                        updateActiveFiltersCount();
+                        
+                        showCancelBtn(false);
+                    } else if (status === 'failed' || status === 'cancelled') {
+                        clearInterval(jobStatusInterval);
+                        jobStatusInterval = null;
+                        currentJobId = null;
+                        
+                        const errorMsg = job.error || 'Unknown error';
+                        if (progressContainer) {
+                            progressContainer.setAttribute('data-status', 'failed');
+                        }
+                        if (progressText) {
+                            progressText.textContent = `Job ${status}: ${errorMsg}`;
+                        }
+                        addLog(`❌ Job ${status}: ${errorMsg}`, 'error');
+                        showToast(`Job ${status}`, 'error');
+                        
+                        // Hide progress bar after 5 seconds
+                        setTimeout(() => {
+                            if (progressContainer) {
+                                progressContainer.style.display = 'none';
+                            }
+                        }, 5000);
+                        
+                        showCancelBtn(false);
+                    }
+                } catch (e) {
+                    console.error(`Error polling job status: ${e.message}`);
+                }
+            }, 2000); // Poll every 2 seconds
         }
 
         async function scrapeOvhForum() {
             setButtonLoading('btnScrapeOvhForum', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             const combinedQuery = keywords.join(' ');
@@ -4119,16 +4579,27 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} posts from OVH Forum`, 'success');
-                    showToast(`${data.added} new posts from OVH Forum`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    addLog(`❌ Error scraping OVH Forum: ${data.detail || 'Unknown error'}`, 'error');
-                    showToast('Error scraping OVH Forum', 'error');
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping OVH Forum: ${errorMsg}`, 'error');
+                    showToast(`Error scraping OVH Forum: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping OVH Forum: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} posts from OVH Forum`, 'success');
+                showToast(`${addedCount} new posts from OVH Forum`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     addLog(`❌ Error scraping OVH Forum: ${e.message}`, 'error');
@@ -4144,9 +4615,9 @@
         async function scrapeMastodon() {
             setButtonLoading('btnScrapeMastodon', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             const combinedQuery = keywords.join(' ');
@@ -4164,16 +4635,27 @@
                     method: 'POST',
                     signal: currentAbortController.signal
                 });
-                const data = await response.json();
-                if (response.ok) {
-                    addLog(`✅ Successfully scraped ${data.added} posts from Mastodon`, 'success');
-                    showToast(`${data.added} new posts from Mastodon`, 'success');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    addLog(`❌ Error scraping Mastodon: ${data.detail || 'Unknown error'}`, 'error');
-                    showToast('Error scraping Mastodon', 'error');
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping Mastodon: ${errorMsg}`, 'error');
+                    showToast(`Error scraping Mastodon: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping Mastodon: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`✅ Successfully scraped ${addedCount} posts from Mastodon`, 'success');
+                showToast(`${addedCount} new posts from Mastodon`, 'success');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     addLog(`❌ Error scraping Mastodon: ${e.message}`, 'error');
@@ -4189,9 +4671,9 @@
         async function scrapeG2Crowd() {
             setButtonLoading('btnScrapeG2', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             const combinedQuery = keywords.join(' ');
@@ -4219,29 +4701,38 @@
                 addLog(`⏱️ Request completed in ${elapsed}s`, 'info');
                 addLog(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
                 
-                const data = await response.json();
-                
-                if (response.ok) {
-                    addLog(`📦 Items returned by scraper: ${data.added}`, data.added > 0 ? 'success' : 'warning');
-                    
-                    if (data.added === 0) {
-                        addLog('⚠️ No posts found. Possible reasons:', 'warning');
-                        addLog('   • G2 Crowd may be blocking the scraper (403 Forbidden)', 'info');
-                        addLog('   • The page structure may have changed', 'info');
-                        addLog('   • No reviews match the search criteria', 'info');
-                        addLog('   • Check backend logs for detailed error messages', 'info');
-                    } else {
-                        addLog(`✅ Successfully scraped ${data.added} reviews from G2 Crowd`, 'success');
-                    }
-                    
-                    showToast(`${data.added} new posts from G2 Crowd`, data.added > 0 ? 'success' : 'warning');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    addLog(`❌ API Error: ${data.detail || 'Unknown error'}`, 'error');
-                    addLog(`📋 Error details: ${JSON.stringify(data, null, 2)}`, 'error');
-                    showToast('Error scraping G2 Crowd', 'error');
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping G2 Crowd: ${errorMsg}`, 'error');
+                    showToast(`Error scraping G2 Crowd: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping G2 Crowd: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`📦 Items returned by scraper: ${addedCount}`, addedCount > 0 ? 'success' : 'warning');
+                
+                if (addedCount === 0) {
+                    addLog('⚠️ No posts found. Possible reasons:', 'warning');
+                    addLog('   • G2 Crowd may be blocking the scraper (403 Forbidden)', 'info');
+                    addLog('   • The page structure may have changed', 'info');
+                    addLog('   • No reviews match the search criteria', 'info');
+                    addLog('   • Check backend logs for detailed error messages', 'info');
+                } else {
+                    addLog(`✅ Successfully scraped ${addedCount} reviews from G2 Crowd`, 'success');
+                }
+                
+                showToast(`${addedCount} new posts from G2 Crowd`, addedCount > 0 ? 'success' : 'warning');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     addLog(`❌ Network/Request Error: ${e.message}`, 'error');
@@ -4265,9 +4756,9 @@
         async function scrapeLinkedIn() {
             setButtonLoading('btnScrapeLinkedIn', true);
             const keywords = loadKeywords();
+            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                console.log('No keywords configured - using defaults');
-                keywords = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+                console.log('No custom keywords - backend will use base keywords from Settings');
             }
             
             const combinedQuery = keywords.join(' ');
@@ -4295,30 +4786,39 @@
                 addLog(`⏱️ Request completed in ${elapsed}s`, 'info');
                 addLog(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
                 
-                const data = await response.json();
-                
-                if (response.ok) {
-                    addLog(`📦 Items returned by scraper: ${data.added}`, data.added > 0 ? 'success' : 'warning');
-                    
-                    if (data.added === 0) {
-                        addLog('⚠️ No posts found. Possible reasons:', 'warning');
-                        addLog('   • LinkedIn API credentials not configured (check Settings)', 'info');
-                        addLog('   • LinkedIn API v2 has limited search capabilities', 'info');
-                        addLog('   • No posts match the search criteria', 'info');
-                        addLog('   • Check backend logs for detailed error messages', 'info');
-                        addLog('   • See docs/guides/LINKEDIN_API_SETUP.md for setup instructions', 'info');
-                    } else {
-                        addLog(`✅ Successfully scraped ${data.added} posts from LinkedIn`, 'success');
-                    }
-                    
-                    showToast(`${data.added} new posts from LinkedIn`, data.added > 0 ? 'success' : 'warning');
-                    await loadPostsFromDB();
-                    renderGallery();
-                } else {
-                    addLog(`❌ API Error: ${data.detail || 'Unknown error'}`, 'error');
-                    addLog(`📋 Error details: ${JSON.stringify(data, null, 2)}`, 'error');
-                    showToast('Error scraping LinkedIn', 'error');
+                if (!response.ok) {
+                    const errorData = await parseJsonResponse(response);
+                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+                    addLog(`❌ Error scraping LinkedIn: ${errorMsg}`, 'error');
+                    showToast(`Error scraping LinkedIn: ${errorMsg}`, 'error');
+                    return;
                 }
+                
+                const data = await parseJsonResponse(response);
+                if (data.error) {
+                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
+                    showToast(`Error scraping LinkedIn: ${data.error}`, 'error');
+                    return;
+                }
+                
+                // Extract added count safely - check if data.added exists and is a number
+                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                addLog(`📦 Items returned by scraper: ${addedCount}`, addedCount > 0 ? 'success' : 'warning');
+                
+                if (addedCount === 0) {
+                    addLog('⚠️ No posts found. Possible reasons:', 'warning');
+                    addLog('   • LinkedIn API credentials not configured (check Settings)', 'info');
+                    addLog('   • LinkedIn API v2 has limited search capabilities', 'info');
+                    addLog('   • No posts match the search criteria', 'info');
+                    addLog('   • Check backend logs for detailed error messages', 'info');
+                    addLog('   • See docs/guides/LINKEDIN_API_SETUP.md for setup instructions', 'info');
+                } else {
+                    addLog(`✅ Successfully scraped ${addedCount} posts from LinkedIn`, 'success');
+                }
+                
+                showToast(`${addedCount} new posts from LinkedIn`, addedCount > 0 ? 'success' : 'warning');
+                await loadPostsFromDB();
+                renderGallery();
             } catch (e) {
                 if (e.name !== 'AbortError') {
                     addLog(`❌ Network/Request Error: ${e.message}`, 'error');
@@ -4789,20 +5289,27 @@
         }
 
         // Initialize default keywords if none exist
+        // NOTE: No default custom keywords - base keywords are always used
         function initializeDefaultKeywords() {
             const keywords = loadKeywords();
-            if (!keywords || keywords.length === 0) {
-                const defaultKeywords = [
-                    'ovhcloud',
-                    'ovh vps',
-                    'ovh hosting',
-                    'ovh dedicated',
-                    'ovh cloud',
-                    'ovh support',
-                    'ovh billing'
-                ];
-                saveKeywords(defaultKeywords);
-                addLog('🎯 Initialized default keywords covering main OVH products', 'info');
+            
+            // Liste des keywords par défaut à supprimer s'ils sont présents
+            const defaultKeywords1 = ['ovhcloud', 'ovh vps', 'ovh hosting', 'ovh dedicated', 'ovh cloud', 'ovh support', 'ovh billing'];
+            const defaultKeywords2 = ['ovhcloud', 'ovh cloud', 'ovh hosting'];
+            
+            // Vérifier si les keywords correspondent exactement aux valeurs par défaut
+            const isDefaultSet1 = keywords.length === defaultKeywords1.length && 
+                                   defaultKeywords1.every(kw => keywords.includes(kw));
+            const isDefaultSet2 = keywords.length === defaultKeywords2.length && 
+                                   defaultKeywords2.every(kw => keywords.includes(kw));
+            
+            if (isDefaultSet1 || isDefaultSet2) {
+                // Supprimer les keywords par défaut
+                console.log('Removing default keywords from localStorage');
+                saveKeywords([]);
+                addLog('🧹 Removed default custom keywords. Base keywords (configured in Settings) will be used.', 'info');
+            } else if (!keywords || keywords.length === 0) {
+                addLog('💡 No custom keywords added. Base keywords (configured in Settings) will be used for scraping.', 'info');
             }
         }
         
@@ -4810,7 +5317,7 @@
         loadFilters();
         initializeDefaultKeywords();
         initializeEventListeners();
-        renderKeywords();
+        renderKeywords(); // Re-render après suppression des keywords par défaut
         loadPostsFromDB().then(() => {
             renderGallery();
             addLog('✅ Application ready. Click "🆕 Scrape New Data" to collect posts from all sources.', 'info');
@@ -4835,10 +5342,10 @@
             const keywords = loadKeywords();
             list.innerHTML = '';
             
-            // Show count
+            // Show count (only custom keywords)
             const countEl = document.querySelector('#keywordsList + small') || document.createElement('small');
             if (keywords.length > 0) {
-                countEl.textContent = `${keywords.length} keyword${keywords.length > 1 ? 's' : ''} active`;
+                countEl.textContent = `${keywords.length} custom keyword${keywords.length > 1 ? 's' : ''} active`;
                 countEl.style.color = '#00d4ff';
                 countEl.style.marginLeft = '0';
                 countEl.style.marginTop = '10px';
@@ -4885,8 +5392,12 @@
                 chip.appendChild(rem);
                 list.appendChild(chip);
             });
+            
             if (keywords.length === 0) {
-                list.innerHTML = '<small style="color:var(--text-muted);">No keywords defined — add some to start searches.</small>';
+                const noKeywordsMsg = document.createElement('small');
+                noKeywordsMsg.style.cssText = 'color: var(--text-muted); display: block; text-align: center; padding: 8px;';
+                noKeywordsMsg.textContent = 'No custom keywords — add some to start searches.';
+                list.appendChild(noKeywordsMsg);
             }
         }
 
@@ -5141,6 +5652,17 @@
             try {
                 const resp = await fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(jobId)}`);
                 if (!resp.ok) {
+                    if (resp.status === 404) {
+                        // Job doesn't exist (server restarted or job expired)
+                        addLog(`⚠️ Job ${jobId.substring(0, 8)}... not found (server may have restarted), stopping polling`, 'warning');
+                        if (jobPollInterval) {
+                            clearInterval(jobPollInterval);
+                            jobPollInterval = null;
+                        }
+                        persistLastJob(null);
+                        document.getElementById('jobPanel').style.display = 'none';
+                        return;
+                    }
                     addLog(`❌ Could not fetch job ${jobId}: ${resp.statusText}`, 'error');
                     return;
                 }
@@ -5225,13 +5747,28 @@
             }
         }
 
-        // On load, if there's a recent job, resume polling
+        // On load, if there's a recent job, resume polling (but stop if job doesn't exist)
         (function resumeLastJob() {
             const last = loadLastJob();
             if (last) {
-                document.getElementById('jobPanel').style.display = 'block';
-                jobPollInterval = setInterval(() => pollJobStatus(last), 2000);
-                pollJobStatus(last);
+                // Try to fetch job status first, if 404, clear localStorage and don't start polling
+                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(last)}`)
+                    .then(resp => {
+                        if (resp.ok) {
+                            // Job exists, resume polling
+                            document.getElementById('jobPanel').style.display = 'block';
+                            jobPollInterval = setInterval(() => pollJobStatus(last), 2000);
+                            pollJobStatus(last);
+                        } else if (resp.status === 404) {
+                            // Job doesn't exist, clean up
+                            console.log('Previous job not found, cleaning up localStorage');
+                            persistLastJob(null);
+                        }
+                    })
+                    .catch(err => {
+                        console.warn('Could not check job status on page load:', err);
+                        persistLastJob(null);
+                    });
             }
         })();
 

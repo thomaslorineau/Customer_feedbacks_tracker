@@ -20,6 +20,8 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict
 import time
@@ -27,9 +29,11 @@ import threading
 import uuid
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 import httpx
 from collections import defaultdict
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,25 @@ from .scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot,
 from .scraper import keyword_expander, linkedin
 from .analysis import sentiment
 from .analysis import country_detection
+from .analysis import relevance_scorer
+from .config import keywords_base
+
+# Configuration du seuil de pertinence (peut être ajusté via variable d'environnement)
+RELEVANCE_THRESHOLD = float(os.getenv('RELEVANCE_THRESHOLD', '0.3'))
+
+
+def should_insert_post(post: dict) -> tuple:
+    """
+    Détermine si un post doit être inséré en base selon son score de pertinence.
+    
+    Returns:
+        (should_insert: bool, relevance_score: float)
+    """
+    relevance_score = relevance_scorer.calculate_relevance_score(post)
+    is_relevant = relevance_scorer.is_relevant(post, threshold=RELEVANCE_THRESHOLD)
+    
+    return is_relevant, relevance_score
+
 
 # Configure locale for French support
 try:
@@ -114,6 +137,63 @@ async def add_security_headers(request, call_next):
     if os.getenv("ENVIRONMENT") == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+# Global exception handler to ensure JSON responses for all errors
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Ensure all exceptions return JSON responses, especially for scraper endpoints."""
+    import traceback
+    error_type = type(exc).__name__
+    error_msg = str(exc)
+    
+    # Skip handling for HTTPException and ValidationError (handled by specific handlers)
+    if isinstance(exc, (StarletteHTTPException, RequestValidationError)):
+        raise exc
+    
+    # Log the full traceback
+    try:
+        logger.error(f"Unhandled exception: {error_type}: {error_msg}", exc_info=True)
+        traceback.print_exc()
+    except Exception:
+        # If logging fails, at least print to console
+        print(f"ERROR: {error_type}: {error_msg}")
+        traceback.print_exc()
+    
+    # Check if this is a scraper endpoint
+    if request.url.path.startswith("/scrape/"):
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"{error_type}: {error_msg}",
+                "error_type": error_type,
+                "path": request.url.path
+            }
+        )
+    
+    # For other endpoints, return standard error
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": f"Internal server error: {error_type}: {error_msg}",
+            "error_type": error_type
+        }
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Handle HTTP exceptions and ensure JSON responses."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Handle validation errors and ensure JSON responses."""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
 
 
 class ScrapeRequest(BaseModel):
@@ -222,16 +302,22 @@ scheduler = BackgroundScheduler()
 def auto_scrape_job():
     """Scheduled job to scrape all sources automatically.
 
-    Uses saved queries (if any) from the DB. Adds small sleeps to avoid
-    hammering third-party endpoints (basic throttling).
+    Uses base keywords (fixed) + user keywords (saved queries) from the DB.
+    Adds small sleeps to avoid hammering third-party endpoints (basic throttling).
     """
     print("🔄 Running scheduled scrape...")
 
-    saved = db.get_saved_queries()
-    if saved and len(saved) > 0:
-        queries = saved
-    else:
-        queries = ["OVH domain", "OVH complaint", "OVH support"]
+    # Get user keywords (saved queries)
+    user_keywords = db.get_saved_queries()
+    
+    # Combine base keywords (fixed) + user keywords
+    all_keywords = keywords_base.get_all_keywords(user_keywords)
+    
+    if not all_keywords:
+        # Fallback si vraiment rien
+        all_keywords = keywords_base.get_all_base_keywords()
+    
+    queries = all_keywords
 
     # per-query limit for scheduled job
     per_query_limit = 20
@@ -239,12 +325,9 @@ def auto_scrape_job():
     for qi, query in enumerate(queries):
         print(f"[AUTO SCRAPE] Query: {query}")
 
-        # X/Twitter: use direct query when we have saved keywords
+        # X/Twitter: use direct query
         try:
-            if saved and len(saved) > 0:
-                items = x_scraper.scrape_x(query, limit=per_query_limit)
-            else:
-                items = x_scraper.scrape_x_multi_queries(limit=per_query_limit)
+            items = x_scraper.scrape_x(query, limit=per_query_limit)
 
             added_count = 0
             duplicate_count = 0
@@ -505,6 +588,7 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
     For backward compatibility the endpoint returns the same `ScrapeResult`.
     """
     source_name = "X/Twitter"
+    items = []
     try:
         query_val = query if query and query != "OVH" else None
         log_scraping(source_name, "info", f"Starting scrape with query='{query_val}', limit={limit}")
@@ -512,51 +596,65 @@ async def scrape_x_endpoint(query: str = "OVH", limit: int = 50):
             items = x_scraper.scrape_x(query_val, limit=limit)
         else:
             items = x_scraper.scrape_x_multi_queries(limit=limit)
-
+        
+        if items is None:
+            items = []
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
         log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping X/Twitter: {e}", exc_info=True)
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        items = []
 
     added = 0
     skipped_duplicates = 0
+    errors = 0
     try:
         for it in items:
-            an = sentiment.analyze(it.get('content') or '')
-            it['sentiment_score'] = an['score']
-            it['sentiment_label'] = an['label']
-            # Detect country
-            country = country_detection.detect_country_from_post(it)
-            inserted = db.insert_post({
-                'source': it.get('source'),
-                'author': it.get('author'),
-                'content': it.get('content'),
-                'url': it.get('url'),
-                'created_at': it.get('created_at'),
-                'sentiment_score': it.get('sentiment_score'),
-                'sentiment_label': it.get('sentiment_label'),
-                'language': it.get('language', 'unknown'),
-                'country': country,
-            })
-            if inserted:
-                added += 1
-            else:
-                skipped_duplicates += 1
+            try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    logger.debug(f"Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
+                an = sentiment.analyze(it.get('content') or '')
+                it['sentiment_score'] = an['score']
+                it['sentiment_label'] = an['label']
+                # Detect country
+                country = country_detection.detect_country_from_post(it)
+                inserted = db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': it.get('sentiment_score'),
+                    'sentiment_label': it.get('sentiment_label'),
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                    'relevance_score': relevance_score,
+                })
+                if inserted:
+                    added += 1
+                else:
+                    skipped_duplicates += 1
+            except Exception as e:
+                errors += 1
+                logger.warning(f"Error processing X/Twitter item: {e}")
     except Exception as e:
-        print(f"[X SCRAPER DB ERROR] {type(e).__name__}: {str(e)}")
+        logger.error(f"Error processing X/Twitter items: {e}", exc_info=True)
         import traceback
         traceback.print_exc()
     
     if skipped_duplicates > 0:
-        print(f"[X SCRAPER] Skipped {skipped_duplicates} duplicate posts")
-        db.add_scraping_log(source_name, "info", f"Skipped {skipped_duplicates} duplicate posts")
+        log_scraping(source_name, "info", f"Skipped {skipped_duplicates} duplicate posts")
     
-    db.add_scraping_log(source_name, "success" if added > 0 else "warning", 
-                       f"Scraping completed: {added} posts added, {skipped_duplicates} duplicates skipped")
-    return ScrapeResult(added=added)
+    log_scraping(source_name, "success" if added > 0 else "warning", 
+                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
+    return {'added': added}
 
 
 # In-memory job store for background keyword scraping
@@ -589,17 +687,25 @@ def sanitize_log_message(message: str) -> str:
 # Helper function to log scraping events
 def log_scraping(source: str, level: str, message: str, details: dict = None):
     """Helper function to log scraping events to database and console."""
-    # Sanitize message before logging
-    sanitized_message = sanitize_log_message(message)
-    db.add_scraping_log(source, level, sanitized_message, details)
-    # Also print to console for immediate visibility
-    level_emoji = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}.get(level, "📝")
-    print(f"{level_emoji} [{source}] {sanitized_message}")
+    try:
+        # Sanitize message before logging
+        sanitized_message = sanitize_log_message(message)
+        try:
+            db.add_scraping_log(source, level, sanitized_message, details)
+        except Exception as e:
+            # Don't fail the entire request if logging fails
+            logger.warning(f"Failed to log scraping event: {e}")
+        # Also print to console for immediate visibility
+        level_emoji = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌"}.get(level, "📝")
+        print(f"{level_emoji} [{source}] {sanitized_message}")
+    except Exception as e:
+        # Fallback: just print to console if everything fails
+        print(f"⚠️ [LOG ERROR] Failed to log: {e}")
 
 
-def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
+async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
     """
-    Call the appropriate scraper and insert results into DB; return count added.
+    Async version: Call the appropriate scraper and insert results into DB; return count added.
     
     Args:
         source: Source name (x, github, stackoverflow, etc.)
@@ -607,17 +713,33 @@ def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expa
         limit: Maximum number of posts to fetch
         use_keyword_expansion: Whether to expand keywords for better coverage
     """
-    mapper = {
-        'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
-        'github': lambda q, l: github.scrape_github_issues(q, limit=l),
-        'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow(q, limit=l),
-        'reddit': lambda q, l: reddit.scrape_reddit(q, limit=l),
-        'news': lambda q, l: news.scrape_google_news(q, limit=l),
-        'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews(q, limit=l),
+    # Async mapper - prefer async versions when available
+    async_mapper = {
+        'github': lambda q, l: github.scrape_github_issues_async(q, limit=l),
+        'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews_async(q, limit=l),
+        'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow_async(q, limit=l),
+        'reddit': lambda q, l: reddit.scrape_reddit_async(q, limit=l),
+        'news': lambda q, l: news.scrape_google_news_async(q, limit=l),
+        'mastodon': lambda q, l: mastodon.scrape_mastodon_async(q, limit=l),
+        'linkedin': lambda q, l: linkedin.scrape_linkedin_async(q, limit=l),
     }
-    func = mapper.get(source)
-    if func is None:
+    
+    # Sync mapper for scrapers not yet migrated (X, OVH Forum, G2 Crowd use Selenium/Playwright)
+    sync_mapper = {
+        'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
+        'ovh-forum': lambda q, l: ovh_forum.scrape_ovh_forum(q, limit=l),
+        'g2-crowd': lambda q, l: g2_crowd.scrape_g2_crowd(q, limit=l),
+    }
+    
+    # Try async first, fallback to sync
+    async_func = async_mapper.get(source)
+    sync_func = sync_mapper.get(source)
+    
+    if async_func is None and sync_func is None:
         return 0
+    
+    func = async_func if async_func else sync_func
+    is_async = async_func is not None
     
     # Expand keywords if enabled
     queries_to_try = [query]
@@ -644,7 +766,12 @@ def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expa
             # Distribute limit across queries
             per_query_limit = max(limit // len(queries_to_try), 10)  # At least 10 per query
             
-            items = func(query_variant, per_query_limit)
+            # Call async or sync function
+            if is_async:
+                items = await func(query_variant, per_query_limit)
+            else:
+                # Run sync function in thread pool to avoid blocking event loop
+                items = await asyncio.to_thread(func, query_variant, per_query_limit)
             
             # Deduplicate by URL
             for item in items:
@@ -676,8 +803,16 @@ def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expa
     # Insert into database
     added = 0
     duplicates = 0
+    filtered_by_relevance = 0
     for it in all_items:
         try:
+            # Vérifier la pertinence avant traitement
+            is_relevant, relevance_score = should_insert_post(it)
+            if not is_relevant:
+                filtered_by_relevance += 1
+                logger.debug(f"[{source}] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                continue
+            
             an = sentiment.analyze(it.get('content') or '')
             # Detect country
             country = country_detection.detect_country_from_post(it)
@@ -699,13 +834,120 @@ def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expa
             # ignore per-item failures
             continue
     
+    if filtered_by_relevance > 0:
+        logger.info(f"[{source}] Filtered {filtered_by_relevance} posts by relevance threshold")
+    
     if duplicates > 0:
         print(f"  ⚠️ Skipped {duplicates} duplicate(s) from {source}")
     
     return added
 
 
-def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurrency: int, delay: float):
+def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
+    """
+    Synchronous wrapper for backward compatibility.
+    Call the appropriate scraper and insert results into DB; return count added.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Can't use run_until_complete in running loop, use sync version
+            return _run_scrape_for_source_sync(source, query, limit, use_keyword_expansion)
+        else:
+            return loop.run_until_complete(_run_scrape_for_source_async(source, query, limit, use_keyword_expansion))
+    except RuntimeError:
+        return asyncio.run(_run_scrape_for_source_async(source, query, limit, use_keyword_expansion))
+
+
+def _run_scrape_for_source_sync(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
+    """Synchronous fallback implementation."""
+    mapper = {
+        'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
+        'github': lambda q, l: github.scrape_github_issues(q, limit=l),
+        'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow(q, limit=l),
+        'reddit': lambda q, l: reddit.scrape_reddit(q, limit=l),
+        'news': lambda q, l: news.scrape_google_news(q, limit=l),
+        'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews(q, limit=l),
+    }
+    func = mapper.get(source)
+    if func is None:
+        return 0
+    
+    # Expand keywords if enabled
+    queries_to_try = [query]
+    if use_keyword_expansion:
+        try:
+            expanded = keyword_expander.expand_keywords([query])
+            if len(expanded) > 1:
+                queries_to_try = [query] + expanded[1:5]
+                logger.info(f"[Keyword Expansion] Using {len(queries_to_try)} query variants for {source}: {queries_to_try[:3]}...")
+        except Exception as e:
+            logger.warning(f"[Keyword Expansion] Failed to expand keywords: {e}, using original query only")
+            queries_to_try = [query]
+    
+    # Scrape with each query variant and combine results
+    all_items = []
+    seen_urls = set()
+    
+    for query_variant in queries_to_try:
+        try:
+            per_query_limit = max(limit // len(queries_to_try), 10)
+            items = func(query_variant, per_query_limit)
+            
+            for item in items:
+                url = item.get('url', '')
+                if url and url not in seen_urls:
+                    all_items.append(item)
+                    seen_urls.add(url)
+                elif not url:
+                    all_items.append(item)
+            
+            if len(all_items) >= limit:
+                break
+                
+        except Exception as e:
+            try:
+                for job_id, info in JOBS.items():
+                    if info.get('status') == 'running':
+                        db.append_job_error(job_id, f"{source} (query: {query_variant}): {str(e)}")
+            except Exception:
+                pass
+            continue
+    
+    all_items = all_items[:limit]
+    
+    # Insert into database
+    added = 0
+    duplicates = 0
+    for it in all_items:
+        try:
+            an = sentiment.analyze(it.get('content') or '')
+            country = country_detection.detect_country_from_post(it)
+            if db.insert_post({
+                'source': it.get('source'),
+                'author': it.get('author'),
+                'content': it.get('content'),
+                'url': it.get('url'),
+                'created_at': it.get('created_at'),
+                'sentiment_score': an['score'],
+                'sentiment_label': an['label'],
+                'language': it.get('language', 'unknown'),
+                'country': country,
+            }):
+                added += 1
+            else:
+                duplicates += 1
+        except Exception:
+            continue
+    
+    if duplicates > 0:
+        print(f"  ⚠️ Skipped {duplicates} duplicate(s) from {source}")
+    
+    return added
+
+
+async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: int, concurrency: int, delay: float):
+    """Async version of keyword job processing using asyncio.gather."""
     job = JOBS.get(job_id)
     if job is None:
         return
@@ -715,7 +957,7 @@ def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurren
         db.create_job_record(job_id)
     except Exception:
         pass
-    sources = ['x', 'github', 'stackoverflow', 'hackernews', 'news', 'trustpilot']
+    sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
     total_tasks = len(keywords) * len(sources)
     job['progress'] = {'total': total_tasks, 'completed': 0}
     try:
@@ -724,45 +966,68 @@ def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurren
         pass
 
     try:
-        # Use a ThreadPoolExecutor to control concurrency across requests
-        with ThreadPoolExecutor(max_workers=max(1, concurrency)) as executor:
-            futures = []
-            for kw in keywords:
+        # Create tasks for all scraping operations
+        tasks = []
+        for kw in keywords:
+            if job.get('cancelled'):
+                job['status'] = 'cancelled'
+                return
+            for s in sources:
                 if job.get('cancelled'):
                     job['status'] = 'cancelled'
                     return
-                for s in sources:
-                    if job.get('cancelled'):
-                        job['status'] = 'cancelled'
-                        return
-                    # submit scraping task
-                    futures.append(executor.submit(_run_scrape_for_source, s, kw, limit))
-
-            # iterate completions and update progress
-            for fut in as_completed(futures):
+                # Create async task
+                tasks.append(_run_scrape_for_source_async(s, kw, limit))
+        
+        # Process tasks with controlled concurrency using semaphore
+        semaphore = asyncio.Semaphore(concurrency)
+        
+        async def process_with_semaphore(task):
+            async with semaphore:
                 if job.get('cancelled'):
-                    job['status'] = 'cancelled'
-                    return
+                    return None
                 try:
-                    added = fut.result()
-                    job['results'].append({'added': added})
-                    try:
-                        db.append_job_result(job_id, {'added': added})
-                    except Exception:
-                        pass
+                    result = await task
+                    return result
                 except Exception as e:
-                    job['errors'].append(str(e))
-                    try:
-                        db.append_job_error(job_id, str(e))
-                    except Exception:
-                        pass
-                job['progress']['completed'] += 1
+                    if job.get('status') == 'running':
+                        job['errors'].append(str(e))
+                        try:
+                            db.append_job_error(job_id, str(e))
+                        except Exception:
+                            pass
+                    return None
+        
+        # Execute tasks
+        results = await asyncio.gather(*[process_with_semaphore(task) for task in tasks], return_exceptions=True)
+        
+        # Process results
+        for result in results:
+            if job.get('cancelled'):
+                job['status'] = 'cancelled'
+                return
+            
+            if isinstance(result, Exception):
+                job['errors'].append(str(result))
                 try:
-                    db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
+                    db.append_job_error(job_id, str(result))
                 except Exception:
                     pass
-                # gentle delay between finishing tasks
-                time.sleep(delay)
+            elif result is not None:
+                job['results'].append({'added': result})
+                try:
+                    db.append_job_result(job_id, {'added': result})
+                except Exception:
+                    pass
+            
+            job['progress']['completed'] += 1
+            try:
+                db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
+            except Exception:
+                pass
+            
+            # Gentle delay between processing results
+            await asyncio.sleep(delay)
 
         job['status'] = 'completed'
         try:
@@ -779,21 +1044,54 @@ def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurren
             pass
 
 
+def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurrency: int, delay: float):
+    """Synchronous wrapper that runs async job processing."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, we need to use a different approach
+            # Create a new thread with its own event loop
+            import threading
+            def run_async():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    new_loop.run_until_complete(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
+                finally:
+                    new_loop.close()
+            thread = threading.Thread(target=run_async, daemon=True)
+            thread.start()
+            # Don't join - let it run in background
+        else:
+            loop.run_until_complete(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
+    except RuntimeError:
+        asyncio.run(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
+
+
 @app.post('/scrape/keywords')
 async def start_keyword_scrape(payload: KeywordsPayload, limit: int = 50, concurrency: int = 2, delay: float = 0.5):
     """Start a background job that scrapes multiple keywords across sources with throttling.
 
     Request body: JSON: { "keywords": ["a","b"] }. Returns job id.
+    Les keywords utilisateur sont combinés avec les keywords de base (fixes).
     """
-    keywords = payload.keywords
-    if not keywords or len(keywords) == 0:
-        raise HTTPException(status_code=400, detail='Provide list of keywords')
+    user_keywords = payload.keywords or []
+    
+    # Combiner keywords de base (fixes) + keywords utilisateur
+    all_keywords = keywords_base.get_all_keywords(user_keywords)
+    
+    if not all_keywords:
+        raise HTTPException(status_code=400, detail='No keywords available (base + user)')
+
+    # Calculate total tasks BEFORE creating job so frontend gets correct total immediately
+    sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+    total_tasks = len(all_keywords) * len(sources)
 
     job_id = str(uuid.uuid4())
     JOBS[job_id] = {
         'id': job_id,
         'status': 'pending',
-        'progress': {'total': 0, 'completed': 0},
+        'progress': {'total': total_tasks, 'completed': 0},
         'results': [],
         'errors': [],
         'cancelled': False,
@@ -803,14 +1101,15 @@ async def start_keyword_scrape(payload: KeywordsPayload, limit: int = 50, concur
     # create DB record for job (best-effort)
     try:
         db.create_job_record(job_id)
+        db.update_job_progress(job_id, total_tasks, 0)
     except Exception:
         pass
 
-    # Start background thread
-    t = threading.Thread(target=_process_keyword_job, args=(job_id, keywords, limit, concurrency, delay), daemon=True)
+    # Start background thread (utiliser all_keywords au lieu de keywords)
+    t = threading.Thread(target=_process_keyword_job, args=(job_id, all_keywords, limit, concurrency, delay), daemon=True)
     t.start()
 
-    return {'job_id': job_id}
+    return {'job_id': job_id, 'total_keywords': len(all_keywords), 'base_keywords': len(keywords_base.get_all_base_keywords()), 'user_keywords': len(user_keywords)}
 
 
 @app.get('/scrape/jobs/{job_id}')
@@ -852,23 +1151,37 @@ async def cancel_job(job_id: str):
 async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Stack Overflow questions about OVH."""
     source_name = "Stack Overflow"
-    print(f"[STACKOVERFLOW SCRAPER] Starting with query='{query}', limit={limit}")
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    items = []
     try:
-        items = stackoverflow.scrape_stackoverflow(query, limit=limit)
-        print(f"[STACKOVERFLOW SCRAPER] Got {len(items)} items")
+        # Use async version
+        items = await stackoverflow.scrape_stackoverflow_async(query, limit=limit)
+        if items is None:
+            items = []
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
-        print(f"[STACKOVERFLOW SCRAPER ERROR] {type(e).__name__}: {str(e)}")
-        logger.error(f"Error scraping Stack Overflow: {e}")
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
+        logger.error(f"Error scraping Stack Overflow: {e}", exc_info=True)
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        # Continue with empty items list instead of returning early
+        items = []
 
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     try:
         for it in items:
             try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[Stack Overflow] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
                 an = sentiment.analyze(it.get('content') or '')
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
@@ -905,7 +1218,8 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
     source_name = "GitHub"
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = github.scrape_github_issues(query, limit=limit)
+        # Use async version
+        items = await github.scrape_github_issues_async(query, limit=limit)
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -913,7 +1227,7 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
         logger.error(f"Error scraping GitHub: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
 
     added = 0
     skipped_duplicates = 0
@@ -959,7 +1273,8 @@ async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
     source_name = "Reddit"
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = reddit.scrape_reddit(query, limit=limit)
+        # Use async version
+        items = await reddit.scrape_reddit_async(query, limit=limit)
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -967,14 +1282,22 @@ async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
         logger.error(f"Error scraping Reddit: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
 
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     try:
         for it in items:
             try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[Reddit] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
                 an = sentiment.analyze(it.get('content') or '')
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
@@ -1012,28 +1335,41 @@ async def scrape_ovh_forum_endpoint(query: str = "OVH", limit: int = 50):
         items = ovh_forum.scrape_ovh_forum(query, limit=limit)
     except Exception as e:
         logger.error(f"Error scraping OVH Forum: {e}")
-        return ScrapeResult(added=0)
+        return {'added': 0}
     
     added = 0
     skipped_duplicates = 0
+    filtered_by_relevance = 0
     for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        if db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-        }):
-            added += 1
-        else:
-            skipped_duplicates += 1
+        try:
+            # Vérifier la pertinence avant traitement
+            is_relevant, relevance_score = should_insert_post(it)
+            if not is_relevant:
+                filtered_by_relevance += 1
+                logger.debug(f"[OVH Forum] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                continue
+            
+            an = sentiment.analyze(it.get('content') or '')
+            it['sentiment_score'] = an['score']
+            it['sentiment_label'] = an['label']
+            if db.insert_post({
+                'source': it.get('source'),
+                'author': it.get('author'),
+                'content': it.get('content'),
+                'url': it.get('url'),
+                'created_at': it.get('created_at'),
+                'sentiment_score': it.get('sentiment_score'),
+                'sentiment_label': it.get('sentiment_label'),
+                'language': it.get('language', 'unknown'),
+            }):
+                added += 1
+            else:
+                skipped_duplicates += 1
+        except Exception as e:
+            logger.warning(f"Error processing OVH Forum item: {e}")
     
+    if filtered_by_relevance > 0:
+        logger.info(f"[OVH Forum] Filtered {filtered_by_relevance} posts by relevance threshold")
     if skipped_duplicates > 0:
         logger.info(f"✓ Added {added} posts from OVH Forum (skipped {skipped_duplicates} duplicates)")
     return {'added': added}
@@ -1042,32 +1378,51 @@ async def scrape_ovh_forum_endpoint(query: str = "OVH", limit: int = 50):
 @app.post("/scrape/mastodon", response_model=ScrapeResult)
 async def scrape_mastodon_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Mastodon for posts about OVH using public API."""
+    source_name = "Mastodon"
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = mastodon.scrape_mastodon(query, limit=limit)
+        # Use async version
+        items = await mastodon.scrape_mastodon_async(query, limit=limit)
+        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
         logger.error(f"Error scraping Mastodon: {e}")
-        return ScrapeResult(added=0)
+        return {'added': 0}
     
     added = 0
     skipped_duplicates = 0
+    filtered_by_relevance = 0
     for it in items:
-        an = sentiment.analyze(it.get('content') or '')
-        it['sentiment_score'] = an['score']
-        it['sentiment_label'] = an['label']
-        if db.insert_post({
-            'source': it.get('source'),
-            'author': it.get('author'),
-            'content': it.get('content'),
-            'url': it.get('url'),
-            'created_at': it.get('created_at'),
-            'sentiment_score': it.get('sentiment_score'),
-            'sentiment_label': it.get('sentiment_label'),
-            'language': it.get('language', 'unknown'),
-        }):
-            added += 1
-        else:
-            skipped_duplicates += 1
+        try:
+            # Vérifier la pertinence avant traitement
+            is_relevant, relevance_score = should_insert_post(it)
+            if not is_relevant:
+                filtered_by_relevance += 1
+                logger.debug(f"[Mastodon] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                continue
+            
+            an = sentiment.analyze(it.get('content') or '')
+            it['sentiment_score'] = an['score']
+            it['sentiment_label'] = an['label']
+            if db.insert_post({
+                'source': it.get('source'),
+                'author': it.get('author'),
+                'content': it.get('content'),
+                'url': it.get('url'),
+                'created_at': it.get('created_at'),
+                'sentiment_score': it.get('sentiment_score'),
+                'sentiment_label': it.get('sentiment_label'),
+                'language': it.get('language', 'unknown'),
+            }):
+                added += 1
+            else:
+                skipped_duplicates += 1
+        except Exception as e:
+            logger.warning(f"Error processing Mastodon item: {e}")
     
+    if filtered_by_relevance > 0:
+        logger.info(f"[Mastodon] Filtered {filtered_by_relevance} posts by relevance threshold")
     if skipped_duplicates > 0:
         logger.info(f"✓ Added {added} posts from Mastodon (skipped {skipped_duplicates} duplicates)")
     return {'added': added}
@@ -1079,7 +1434,8 @@ async def scrape_linkedin_endpoint(query: str = "OVH", limit: int = 50):
     source_name = "LinkedIn"
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = linkedin.scrape_linkedin(query, limit=limit)
+        # Use async version
+        items = await linkedin.scrape_linkedin_async(query, limit=limit)
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -1087,14 +1443,22 @@ async def scrape_linkedin_endpoint(query: str = "OVH", limit: int = 50):
         logger.error(f"Error scraping LinkedIn: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
     
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     try:
         for it in items:
             try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[LinkedIn] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
                 an = sentiment.analyze(it.get('content') or '')
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
@@ -1140,15 +1504,23 @@ async def scrape_g2_crowd_endpoint(query: str = "OVH", limit: int = 50):
         logger.error(f"Error scraping G2 Crowd: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
     
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     
     print(f"[G2 CROWD ENDPOINT] Processing {len(items)} items for database insertion...")
     for it in items:
         try:
+            # Vérifier la pertinence avant traitement
+            is_relevant, relevance_score = should_insert_post(it)
+            if not is_relevant:
+                filtered_by_relevance += 1
+                logger.debug(f"[G2 Crowd] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                continue
+            
             an = sentiment.analyze(it.get('content') or '')
             it['sentiment_score'] = an['score']
             it['sentiment_label'] = an['label']
@@ -1180,7 +1552,8 @@ async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
     source_name = "Google News"
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = news.scrape_google_news(query, limit=limit)
+        # Use async version
+        items = await news.scrape_google_news_async(query, limit=limit)
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -1188,14 +1561,22 @@ async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
         logger.error(f"Error scraping Google News: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
 
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     try:
         for it in items:
             try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[Google News] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
                 an = sentiment.analyze(it.get('content') or '')
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
@@ -1225,7 +1606,7 @@ async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
     
     log_scraping(source_name, "success" if added > 0 else "warning", 
                 f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
-    return ScrapeResult(added=added)
+    return {'added': added}
 
 
 @app.post("/scrape/trustpilot", response_model=ScrapeResult)
@@ -1234,7 +1615,8 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
     source_name = "Trustpilot"
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
-        items = trustpilot.scrape_trustpilot_reviews(query, limit=limit)
+        # Use async version
+        items = await trustpilot.scrape_trustpilot_reviews_async(query, limit=limit)
         log_scraping(source_name, "info", f"Scraper returned {len(items)} reviews")
     except Exception as e:
         error_msg = f"{type(e).__name__}: {str(e)}"
@@ -1242,7 +1624,7 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
         logger.error(f"Error scraping Trustpilot: {e}")
         import traceback
         traceback.print_exc()
-        return ScrapeResult(added=0)
+        return {'added': 0}
 
     added = 0
     skipped_duplicates = 0
@@ -1282,20 +1664,63 @@ async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50)
     
     log_scraping(source_name, "success" if added > 0 else "warning", 
                 f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
-    return ScrapeResult(added=added)
+    return {'added': added}
 
 
 @app.get('/settings/queries')
 async def get_saved_queries():
-    """Return saved keywords/queries from DB."""
+    """Return saved keywords/queries from DB (user keywords only)."""
     return {'keywords': db.get_saved_queries()}
 
 
 @app.post('/settings/queries')
 async def post_saved_queries(payload: KeywordsPayload):
-    """Save provided keywords list. Expects JSON: { "keywords": ["a","b"] }"""
+    """Save provided keywords list. Expects JSON: { "keywords": ["a","b"] } (user keywords only)."""
     db.save_queries(payload.keywords)
     return {'saved': len(payload.keywords)}
+
+
+@app.get('/settings/base-keywords')
+async def get_base_keywords():
+    """Get base keywords by category (editable base keywords)."""
+    try:
+        keywords_by_category = db.get_base_keywords()
+        return {
+            'brands': keywords_by_category.get('brands', []),
+            'products': keywords_by_category.get('products', []),
+            'problems': keywords_by_category.get('problems', []),
+            'leadership': keywords_by_category.get('leadership', [])
+        }
+    except Exception as e:
+        logger.error(f"Error getting base keywords: {e}")
+        # Fallback to defaults
+        from .config.keywords_base import get_base_keywords_from_db
+        return get_base_keywords_from_db()
+
+
+class BaseKeywordsPayload(BaseModel):
+    """Payload for updating base keywords."""
+    brands: List[str] = Field(default_factory=list)
+    products: List[str] = Field(default_factory=list)
+    problems: List[str] = Field(default_factory=list)
+    leadership: List[str] = Field(default_factory=list)
+
+
+@app.post('/settings/base-keywords')
+async def update_base_keywords(payload: BaseKeywordsPayload):
+    """Update base keywords by category."""
+    try:
+        keywords_by_category = {
+            'brands': payload.brands,
+            'products': payload.products,
+            'problems': payload.problems,
+            'leadership': payload.leadership
+        }
+        db.save_base_keywords(keywords_by_category)
+        return {'success': True, 'keywords': keywords_by_category}
+    except Exception as e:
+        logger.error(f"Error updating base keywords: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update base keywords: {str(e)}")
 
 
 @app.post('/admin/cleanup-hackernews-posts')
@@ -1545,8 +1970,15 @@ Focus on actionable improvements that address real customer pain points. Be spec
                     ideas_data = json.loads(json_match.group())
                     return [ImprovementIdea(**idea) for idea in ideas_data]
         
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            logger.warning(f"LLM API authentication failed (401): Invalid or expired API key. Using fallback.")
+        else:
+            logger.warning(f"LLM API error ({e.response.status_code}): {e}. Using fallback.")
+        # Fallback to rule-based generation
+        return generate_ideas_fallback(posts, max_ideas)
     except Exception as e:
-        print(f"LLM API error: {e}")
+        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
         # Fallback to rule-based generation
         return generate_ideas_fallback(posts, max_ideas)
     
@@ -1665,29 +2097,39 @@ Generate a sentence in English that summarizes the top improvement ideas in a cl
         if api_key:
             try:
                 if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(
-                            'https://api.openai.com/v1/chat/completions',
-                            headers={
-                                'Authorization': f'Bearer {api_key}',
-                                'Content-Type': 'application/json'
-                            },
-                            json={
-                                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                                'messages': [
-                                    {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
-                                    {'role': 'user', 'content': prompt}
-                                ],
-                                'temperature': 0.7,
-                                'max_tokens': 150
-                            }
-                        )
-                        response.raise_for_status()
-                        result = response.json()
-                        summary = result['choices'][0]['message']['content'].strip()
-                        # Remove quotes if present
-                        summary = summary.strip('"').strip("'")
-                        return {"summary": summary}
+                    try:
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            response = await client.post(
+                                'https://api.openai.com/v1/chat/completions',
+                                headers={
+                                    'Authorization': f'Bearer {api_key}',
+                                    'Content-Type': 'application/json'
+                                },
+                                json={
+                                    'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                    'messages': [
+                                        {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
+                                        {'role': 'user', 'content': prompt}
+                                    ],
+                                    'temperature': 0.7,
+                                    'max_tokens': 150
+                                }
+                            )
+                            response.raise_for_status()
+                            result = response.json()
+                            summary = result['choices'][0]['message']['content'].strip()
+                            # Remove quotes if present
+                            summary = summary.strip('"').strip("'")
+                            return {"summary": summary}
+                    except httpx.HTTPStatusError as e:
+                        if e.response.status_code == 401:
+                            logger.warning(f"LLM API authentication failed (401): Invalid or expired API key. Using fallback summary.")
+                        else:
+                            logger.warning(f"LLM API error ({e.response.status_code}): {e}. Using fallback summary.")
+                        return {"summary": "Analyzing improvement opportunities..."}
+                    except Exception as e:
+                        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback summary.")
+                        return {"summary": "Analyzing improvement opportunities..."}
                 
                 elif llm_provider == 'anthropic':
                     async with httpx.AsyncClient(timeout=30.0) as client:
@@ -1826,6 +2268,255 @@ async def get_pain_points(days: int = 30, limit: int = 5):
         pain_points=pain_points[:limit],
         total_pain_points=len(pain_points)
     )
+
+
+@app.get("/api/product-analysis/{product_name}")
+async def get_product_analysis(product_name: str):
+    """
+    Analyze posts for a specific product using LLM and generate a summary of issues (in English).
+    """
+    try:
+        # Get all posts
+        all_posts = db.get_posts(limit=10000, offset=0)
+        
+        # Filter posts for this product (using same detection logic as product-opportunities)
+        product_posts = []
+        for post in all_posts:
+            content = (post.get('content', '') or '').lower()
+            detected_product = None
+            
+            # Simple product detection (same as in get_product_opportunities)
+            if any(kw in content for kw in ['billing', 'invoice', 'facture', 'charge']):
+                detected_product = 'Billing'
+            elif any(kw in content for kw in ['domain', 'dns', 'domaine', 'nameserver']):
+                detected_product = 'Domain'
+            elif any(kw in content for kw in ['vps', 'virtual private server']):
+                detected_product = 'VPS'
+            elif any(kw in content for kw in ['hosting', 'hébergement', 'web host']):
+                detected_product = 'Hosting'
+            elif any(kw in content for kw in ['api', 'sdk', 'integration']):
+                detected_product = 'API'
+            elif any(kw in content for kw in ['email', 'mail', 'exchange', 'mx']):
+                detected_product = 'Email'
+            elif any(kw in content for kw in ['cdn', 'content delivery']):
+                detected_product = 'CDN'
+            elif any(kw in content for kw in ['dedicated', 'dédié', 'server']):
+                detected_product = 'Dedicated'
+            elif any(kw in content for kw in ['cloud', 'public cloud', 'instance']):
+                detected_product = 'Public Cloud'
+            elif any(kw in content for kw in ['storage', 'object storage', 'swift']):
+                detected_product = 'Storage'
+            
+            if detected_product and detected_product.lower() == product_name.lower():
+                product_posts.append(post)
+        
+        if not product_posts:
+            return {
+                "product": product_name,
+                "summary": f"No posts found for product '{product_name}'.",
+                "posts_count": 0,
+                "llm_available": False
+            }
+        
+        # Focus on negative posts for analysis
+        negative_posts = [p for p in product_posts if p.get('sentiment_label') == 'negative']
+        posts_to_analyze = negative_posts[:30] if len(negative_posts) >= 30 else negative_posts
+        
+        if not posts_to_analyze:
+            # If no negative posts, analyze all posts
+            posts_to_analyze = product_posts[:30]
+        
+        # Prepare posts summary for LLM
+        posts_summary = []
+        for post in posts_to_analyze:
+            posts_summary.append({
+                'content': (post.get('content', '') or '')[:500],
+                'sentiment': post.get('sentiment_label', 'neutral'),
+                'source': post.get('source', 'Unknown'),
+                'created_at': post.get('created_at', '')
+            })
+        
+        # Create prompt for LLM analysis
+        prompt = f"""Analyze the following customer feedback posts about OVH product "{product_name}" and generate a comprehensive summary of what is wrong (in English).
+
+Posts to analyze ({len(posts_to_analyze)} posts, {len(negative_posts)} negative):
+{json.dumps(posts_summary, indent=2, ensure_ascii=False)}
+
+Generate a detailed summary in English that:
+1. Identifies the main issues and problems customers are experiencing
+2. Groups related issues together
+3. Highlights the most critical problems
+4. Provides context about frequency and severity
+5. Is written in clear, professional English
+
+Format your response as a JSON object with this structure:
+{{
+  "summary": "Detailed summary text in English (3-5 paragraphs) explaining what is wrong with this product based on customer feedback..."
+}}
+
+Focus on actionable insights and specific problems mentioned in the posts. Be comprehensive but concise."""
+        
+        # Try LLM API
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        
+        logger.info(f"[Product Analysis] Starting analysis for {product_name}: {len(product_posts)} posts ({len(negative_posts)} negative). API key: {'present' if api_key else 'MISSING'}, Provider: {llm_provider}")
+        
+        if api_key:
+            try:
+                if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
+                    logger.info(f"[Product Analysis] Calling OpenAI API for {product_name}")
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        response = await client.post(
+                            'https://api.openai.com/v1/chat/completions',
+                            headers={
+                                'Authorization': f'Bearer {api_key}',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                'messages': [
+                                    {'role': 'system', 'content': 'You are a product analyst. Analyze customer feedback and identify problems in clear English.'},
+                                    {'role': 'user', 'content': prompt}
+                                ],
+                                'temperature': 0.7,
+                                'max_tokens': 1500
+                            }
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        content = result['choices'][0]['message']['content'].strip()
+                        
+                        # Parse JSON from response
+                        import re
+                        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                        if json_match:
+                            try:
+                                analysis_data = json.loads(json_match.group())
+                                summary = analysis_data.get('summary', content)  # Fallback to full content if no summary key
+                                logger.info(f"[Product Analysis] LLM analysis successful for {product_name}")
+                                return {
+                                    "product": product_name,
+                                    "summary": summary,
+                                    "posts_count": len(product_posts),
+                                    "negative_posts_count": len(negative_posts),
+                                    "llm_available": True
+                                }
+                            except json.JSONDecodeError as je:
+                                logger.warning(f"[Product Analysis] Failed to parse JSON from LLM response: {je}. Using raw content.")
+                                # Use raw content as summary if JSON parsing fails
+                                return {
+                                    "product": product_name,
+                                    "summary": content,
+                                    "posts_count": len(product_posts),
+                                    "negative_posts_count": len(negative_posts),
+                                    "llm_available": True
+                                }
+                        else:
+                            logger.warning(f"[Product Analysis] No JSON found in LLM response. Using raw content.")
+                            # Use raw content as summary if no JSON found
+                            return {
+                                "product": product_name,
+                                "summary": content,
+                                "posts_count": len(product_posts),
+                                "negative_posts_count": len(negative_posts),
+                                "llm_available": True
+                            }
+                
+                elif llm_provider == 'anthropic':
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        response = await client.post(
+                            'https://api.anthropic.com/v1/messages',
+                            headers={
+                                'x-api-key': api_key,
+                                'anthropic-version': '2023-06-01',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                                'max_tokens': 1500,
+                                'messages': [
+                                    {'role': 'user', 'content': prompt}
+                                ]
+                            }
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        content = result['content'][0]['text'].strip()
+                        
+                        # Parse JSON from response
+                        import re
+                        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                        if json_match:
+                            try:
+                                analysis_data = json.loads(json_match.group())
+                                summary = analysis_data.get('summary', content)  # Fallback to full content if no summary key
+                                logger.info(f"[Product Analysis] LLM analysis successful for {product_name}")
+                                return {
+                                    "product": product_name,
+                                    "summary": summary,
+                                    "posts_count": len(product_posts),
+                                    "negative_posts_count": len(negative_posts),
+                                    "llm_available": True
+                                }
+                            except json.JSONDecodeError as je:
+                                logger.warning(f"[Product Analysis] Failed to parse JSON from LLM response: {je}. Using raw content.")
+                                return {
+                                    "product": product_name,
+                                    "summary": content,
+                                    "posts_count": len(product_posts),
+                                    "negative_posts_count": len(negative_posts),
+                                    "llm_available": True
+                                }
+                        else:
+                            logger.warning(f"[Product Analysis] No JSON found in LLM response. Using raw content.")
+                            return {
+                                "product": product_name,
+                                "summary": content,
+                                "posts_count": len(product_posts),
+                                "negative_posts_count": len(negative_posts),
+                                "llm_available": True
+                            }
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 401:
+                    logger.error(f"[Product Analysis] LLM API authentication failed (401) for product {product_name}. Check API key.")
+                    try:
+                        error_detail = e.response.json()
+                        logger.error(f"[Product Analysis] API error details: {error_detail}")
+                    except:
+                        pass
+                else:
+                    logger.error(f"[Product Analysis] LLM API error ({e.response.status_code}) for product {product_name}: {e}")
+                    try:
+                        error_detail = e.response.json()
+                        logger.error(f"[Product Analysis] API error details: {error_detail}")
+                    except:
+                        pass
+            except Exception as e:
+                logger.error(f"[Product Analysis] LLM API error for product {product_name}: {type(e).__name__}: {e}", exc_info=True)
+        else:
+            logger.warning(f"[Product Analysis] No API key found. OPENAI_API_KEY={bool(os.getenv('OPENAI_API_KEY'))}, ANTHROPIC_API_KEY={bool(os.getenv('ANTHROPIC_API_KEY'))}")
+        
+        # Fallback: Generate simple summary
+        logger.info(f"[Product Analysis] Using fallback analysis for {product_name}")
+        negative_ratio = (len(negative_posts) / len(product_posts) * 100) if product_posts else 0
+        fallback_summary = f"Analysis of {len(product_posts)} posts for {product_name}: {len(negative_posts)} negative posts ({negative_ratio:.1f}%). "
+        if negative_posts:
+            fallback_summary += "Common issues include customer complaints about service quality, technical problems, and support issues."
+        else:
+            fallback_summary += "No significant negative feedback detected."
+        
+        return {
+            "product": product_name,
+            "summary": fallback_summary,
+            "posts_count": len(product_posts),
+            "negative_posts_count": len(negative_posts),
+            "llm_available": False
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing product {product_name}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to analyze product: {str(e)}")
 
 
 @app.get("/api/product-opportunities", response_model=ProductDistributionResponse)
@@ -2191,8 +2882,15 @@ Be specific and reference actual content from the posts when possible."""
                     actions_data = json.loads(json_match.group())
                     return [RecommendedAction(**action) for action in actions_data]
         
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            logger.warning(f"LLM API authentication failed (401): Invalid or expired API key. Using fallback.")
+        else:
+            logger.warning(f"LLM API error ({e.response.status_code}): {e}. Using fallback.")
+        # Fallback to rule-based generation
+        return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
     except Exception as e:
-        print(f"LLM API error: {e}")
+        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
         # Fallback to rule-based generation
         return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
     
@@ -2895,25 +3593,39 @@ Format as bullet points, professional and executive-friendly."""
                         
                         llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
                         if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-                            async with httpx.AsyncClient(timeout=30.0) as client:
-                                response = await client.post(
-                                    'https://api.openai.com/v1/chat/completions',
-                                    headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
-                                    json={
-                                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                                        'messages': [
-                                            {'role': 'system', 'content': 'You are a business analyst. Provide concise, professional insights.'},
-                                            {'role': 'user', 'content': prompt}
-                                        ],
-                                        'temperature': 0.7,
-                                        'max_tokens': 200
-                                    }
-                                )
-                                response.raise_for_status()
-                                result = response.json()
-                                llm_analysis = result['choices'][0]['message']['content'].strip()
+                            try:
+                                async with httpx.AsyncClient(timeout=30.0) as client:
+                                    response = await client.post(
+                                        'https://api.openai.com/v1/chat/completions',
+                                        headers={'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'},
+                                        json={
+                                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                            'messages': [
+                                                {'role': 'system', 'content': 'You are a business analyst. Provide concise, professional insights.'},
+                                                {'role': 'user', 'content': prompt}
+                                            ],
+                                            'temperature': 0.7,
+                                            'max_tokens': 200
+                                        }
+                                    )
+                                    response.raise_for_status()
+                                    result = response.json()
+                                    llm_analysis = result['choices'][0]['message']['content'].strip()
+                            except httpx.HTTPStatusError as e:
+                                if e.response.status_code == 401:
+                                    logger.warning(f"LLM API authentication failed (401) for PowerPoint report. Skipping LLM analysis.")
+                                else:
+                                    logger.warning(f"LLM API error ({e.response.status_code}) for PowerPoint report: {e}. Skipping LLM analysis.")
+                                llm_analysis = None
+                            except Exception as e:
+                                logger.warning(f"Failed to generate LLM analysis for report: {type(e).__name__}: {e}")
+                                llm_analysis = None
+                        elif llm_provider == 'anthropic':
+                            # Anthropic handling would go here if needed
+                            pass
                 except Exception as e:
-                    logger.warning(f"Failed to generate LLM analysis for report: {e}")
+                    logger.warning(f"Error generating LLM analysis: {type(e).__name__}: {e}")
+                    llm_analysis = None
             
             # Generate PowerPoint with chart images
             pptx_bytes = powerpoint_generator.generate_powerpoint_report(

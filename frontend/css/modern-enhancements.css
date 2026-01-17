@@ -484,5 +484,251 @@ body.dark-mode .search-section {
     box-shadow: var(--shadow-glow-strong);
 }
 
+/* ============================================
+   SCRAPING PROGRESS BAR - MODERN DESIGN
+   ============================================ */
+
+#scrapingProgressContainer {
+    /* Fallback */
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+    box-shadow: var(--shadow-md);
+    
+    /* Modern: glassmorphism */
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 153, 255, 0.2);
+    box-shadow: 
+        0 8px 32px rgba(0, 153, 255, 0.15),
+        0 2px 8px rgba(0, 0, 0, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: slideDown 0.3s ease-out;
+}
+
+body.dark-mode #scrapingProgressContainer {
+    background: rgba(15, 52, 96, 0.95);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    box-shadow: 
+        0 8px 32px rgba(0, 212, 255, 0.2),
+        0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+#scrapingProgressText {
+    font-size: 0.95em;
+    color: var(--text-primary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+#scrapingProgressText::before {
+    content: '🔄';
+    font-size: 1.1em;
+    animation: spin 2s linear infinite;
+}
+
+#scrapingProgressContainer[data-status="completed"] #scrapingProgressText::before {
+    content: '✅';
+    animation: none;
+}
+
+#scrapingProgressContainer[data-status="failed"] #scrapingProgressText::before {
+    content: '❌';
+    animation: none;
+}
+
+/* Progress bar wrapper */
+#scrapingProgressContainer > div:last-child {
+    width: 100%;
+    height: 12px;
+    background: var(--bg-secondary);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode #scrapingProgressContainer > div:last-child {
+    background: rgba(0, 0, 0, 0.3);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Progress bar fill */
+#scrapingProgressBar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, 
+        #00d4ff 0%, 
+        #0099ff 50%, 
+        #0066ff 100%);
+    border-radius: 10px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        0 0 10px rgba(0, 212, 255, 0.5),
+        0 0 20px rgba(0, 153, 255, 0.3);
+}
+
+/* Shine animation effect */
+#scrapingProgressBar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.4),
+        transparent
+    );
+    animation: shine 2s infinite;
+}
+
+@keyframes shine {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+/* Pulse effect when active */
+#scrapingProgressBar[aria-valuenow]:not([aria-valuenow="0"]):not([aria-valuenow="100"]) {
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Indeterminate progress animation (when total is 0 but job is running) */
+#scrapingProgressBar[aria-valuenow="0"][style*="width: 10%"] {
+    animation: indeterminate 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, 
+        #00d4ff 0%, 
+        #0099ff 30%,
+        #0066ff 60%,
+        #0099ff 100%);
+    background-size: 200% 100%;
+}
+
+@keyframes indeterminate {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 
+            0 0 10px rgba(0, 212, 255, 0.5),
+            0 0 20px rgba(0, 153, 255, 0.3);
+    }
+    50% {
+        box-shadow: 
+            0 0 15px rgba(0, 212, 255, 0.7),
+            0 0 30px rgba(0, 153, 255, 0.5);
+    }
+}
+
+/* Completed state */
+#scrapingProgressBar[aria-valuenow="100"] {
+    background: linear-gradient(90deg, 
+        #34d399 0%, 
+        #10b981 50%, 
+        #059669 100%);
+    box-shadow: 
+        0 0 15px rgba(52, 211, 153, 0.6),
+        0 0 30px rgba(16, 185, 129, 0.4);
+    animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+    0% {
+        transform: scaleX(1);
+    }
+    50% {
+        transform: scaleX(1.02);
+    }
+    100% {
+        transform: scaleX(1);
+    }
+}
+
+/* Percentage indicator */
+#scrapingProgressContainer {
+    position: relative;
+}
+
+#scrapingProgressContainer::after {
+    content: attr(data-percentage);
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: var(--accent-primary);
+    background: rgba(0, 153, 255, 0.1);
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(0, 153, 255, 0.2);
+    pointer-events: none;
+}
+
+body.dark-mode #scrapingProgressContainer::after {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: rgba(0, 212, 255, 0.3);
+    color: var(--accent-secondary);
+}
+
+/* Hide percentage when 0% */
+#scrapingProgressContainer[data-percentage="0%"]::after {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #scrapingProgressContainer {
+        padding: 16px;
+        margin-top: 16px;
+    }
+    
+    #scrapingProgressText {
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+    
+    #scrapingProgressContainer > div:last-child {
+        height: 10px;
+    }
+    
+    #scrapingProgressContainer::after {
+        position: static;
+        display: inline-block;
+        margin-top: 8px;
+    }
+}
+
 
 
