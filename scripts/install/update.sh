@@ -415,10 +415,23 @@ if git pull origin master; then
             # Si les données ont été perdues, restaurer depuis le backup
             if [ "$POST_COUNT_BEFORE" -gt 0 ] && [ "$POST_COUNT_AFTER" -eq 0 ]; then
                 warning "⚠️  Données perdues lors de la réparation, tentative de restauration depuis backup..."
-                LATEST_BACKUP=$(ls -t backend/backups/production_*.duckdb 2>/dev/null | head -1)
+                # Trouver le backup le plus récent (méthode portable)
+                LATEST_BACKUP=""
+                LATEST_TIME=0
+                if [ -d "backups" ]; then
+                    for backup_file in backups/production_*.duckdb; do
+                        if [ -f "$backup_file" ]; then
+                            FILE_TIME=$(stat -c %Y "$backup_file" 2>/dev/null || stat -f %m "$backup_file" 2>/dev/null || echo "0")
+                            if [ "$FILE_TIME" -gt "$LATEST_TIME" ]; then
+                                LATEST_TIME=$FILE_TIME
+                                LATEST_BACKUP="$backup_file"
+                            fi
+                        fi
+                    done
+                fi
                 if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP" ]; then
                     cp "$LATEST_BACKUP" "data.duckdb"
-                    success "Données restaurées depuis: $LATEST_BACKUP"
+                    success "Données restaurées depuis: $(basename $LATEST_BACKUP)"
                 else
                     error "❌ Aucun backup disponible pour restauration"
                 fi
