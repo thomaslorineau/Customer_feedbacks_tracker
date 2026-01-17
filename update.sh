@@ -268,29 +268,9 @@ else
     fi
 fi
 
-# Détecter la branche actuelle
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
-info "Branche actuelle détectée: $CURRENT_BRANCH"
-
-# Vérifier si la branche existe sur le remote
-BRANCH_TO_PULL="$CURRENT_BRANCH"
-if ! git ls-remote --heads $REMOTE_TO_USE "$CURRENT_BRANCH" > /dev/null 2>&1; then
-    # Si la branche actuelle n'existe pas sur le remote, essayer develop puis master
-    if git ls-remote --heads $REMOTE_TO_USE "develop" > /dev/null 2>&1; then
-        warning "Branche $CURRENT_BRANCH non trouvée sur $REMOTE_TO_USE, utilisation de develop"
-        BRANCH_TO_PULL="develop"
-    elif git ls-remote --heads $REMOTE_TO_USE "master" > /dev/null 2>&1; then
-        warning "Branche develop non trouvée sur $REMOTE_TO_USE, utilisation de master"
-        BRANCH_TO_PULL="master"
-    else
-        error "Aucune branche valide trouvée sur $REMOTE_TO_USE (develop ou master)"
-        exit 1
-    fi
-fi
-
-# Faire le pull depuis la branche détectée
-info "Mise à jour depuis $REMOTE_TO_USE/$BRANCH_TO_PULL..."
-if git pull $REMOTE_TO_USE $BRANCH_TO_PULL; then
+# Faire le pull depuis master
+info "Mise à jour depuis $REMOTE_TO_USE/master..."
+if git pull $REMOTE_TO_USE master; then
     success "Code mis à jour"
     
     # Essayer de restaurer les modifications si elles existent
