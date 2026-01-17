@@ -146,16 +146,19 @@ info "Mise à jour du code depuis Stash..."
 # Vérifier s'il y a des modifications locales (en excluant data.db et autres fichiers de DB)
 HAS_CHANGES=false
 
-# D'abord, résoudre les conflits avec data.db s'il y en a
-if git status --porcelain 2>/dev/null | grep -q "^UU.*backend/data.db\|^AA.*backend/data.db"; then
-    warning "Conflit de merge détecté avec data.db, résolution automatique..."
-    info "Conservation de la version locale de data.db..."
-    git checkout --ours backend/data.db 2>/dev/null || true
-    git add backend/data.db 2>/dev/null || true
-fi
+# D'abord, résoudre les conflits avec les fichiers de base de données s'il y en a
+DB_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/data_staging.duckdb.wal"
+for db_file in $DB_FILES; do
+    if git status --porcelain 2>/dev/null | grep -q "^UU.*$db_file\|^AA.*$db_file"; then
+        warning "Conflit de merge détecté avec $db_file, résolution automatique..."
+        info "Conservation de la version locale de $db_file..."
+        git checkout --ours "$db_file" 2>/dev/null || true
+        git add "$db_file" 2>/dev/null || true
+    fi
+done
 
 # Exclure les fichiers de base de données, configuration locale et scripts locaux
-EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/*.db' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh'"
+EXCLUDE_PATTERNS="-- ':!backend/data.db' ':!backend/data.duckdb' ':!backend/data_staging.duckdb' ':!backend/data_staging.duckdb.wal' ':!backend/*.db' ':!backend/*.duckdb' ':!backend/*.wal' ':!backend/*.log' ':!backend/__pycache__' ':!backend/**/__pycache__' ':!backend/.app_config' ':!backup.sh' ':!configure_cors.sh'"
 
 # Vérifier les modifications (sans les fichiers exclus)
 if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --quiet $EXCLUDE_PATTERNS 2>/dev/null; then
@@ -167,15 +170,17 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
     if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
         success "Modifications sauvegardées temporairement"
     else
-        # Si le stash échoue, essayer de résoudre les conflits avec data.db
-        warning "Conflit détecté avec data.db, résolution automatique..."
+        # Si le stash échoue, essayer de résoudre les conflits avec les fichiers de DB
+        warning "Conflit détecté avec des fichiers de base de données, résolution automatique..."
         
-        # Si data.db a un conflit de merge, utiliser notre version locale
-        if git status --porcelain | grep -q "backend/data.db"; then
-            info "Résolution du conflit avec data.db (conservation de la version locale)..."
-            git checkout --ours backend/data.db 2>/dev/null || true
-            git add backend/data.db 2>/dev/null || true
-        fi
+        # Résoudre les conflits avec tous les fichiers de DB
+        for db_file in $DB_FILES; do
+            if git status --porcelain | grep -q "$db_file"; then
+                info "Résolution du conflit avec $db_file (conservation de la version locale)..."
+                git checkout --ours "$db_file" 2>/dev/null || true
+                git add "$db_file" 2>/dev/null || true
+            fi
+        done
         
         # Réessayer le stash
         if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
@@ -186,8 +191,8 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
             echo "   Utilisez 'git status' pour voir les fichiers modifiés"
             echo ""
             echo "   Pour résoudre manuellement :"
-            echo "   1. git checkout --ours backend/data.db  # Garder votre version locale"
-            echo "   2. git add backend/data.db"
+            echo "   1. git checkout --ours backend/data.db backend/data.duckdb  # Garder vos versions locales"
+            echo "   2. git add backend/data.db backend/data.duckdb"
             echo "   3. Relancez ./update.sh"
             exit 1
         fi
@@ -289,7 +294,7 @@ else
         cp "$BACKUP_DIR/configure_cors.sh.backup" configure_cors.sh
     fi
     # Restaurer aussi les versions locales si elles existent
-    for file in backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh; do
+    for file in backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh; do
         local_backup="$BACKUP_DIR/$(basename $file).local"
         if [ -f "$local_backup" ]; then
             cp "$local_backup" "$file" 2>/dev/null || true
@@ -337,7 +342,7 @@ if [ -f "$BACKUP_DIR/configure_cors.sh.backup" ]; then
 fi
 
 # Restaurer les versions locales des fichiers de config (priorité sur les backups)
-CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
+CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/.app_config backup.sh configure_cors.sh update.sh"
 for file in $CONFIG_FILES; do
     local_backup="$BACKUP_DIR/$(basename $file).local"
     if [ -f "$local_backup" ]; then
