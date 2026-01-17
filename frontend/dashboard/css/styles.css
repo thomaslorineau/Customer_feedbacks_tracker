@@ -432,11 +432,12 @@ body {
 }
 
 .date-inputs-compact {
-    display: flex;
+    display: flex !important;
     align-items: center;
     gap: 8px;
     flex: 1;
     min-width: 0;
+    visibility: visible !important;
 }
 
 .date-input-compact {
@@ -1846,11 +1847,14 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 212, 255, 0.3);
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
     gap: 8px;
     white-space: nowrap;
+    width: 100%;
+    max-width: 300px;
+    margin: 16px auto 0 auto;
 }
 
 .btn-go-to-posts:hover {

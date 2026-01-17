@@ -2200,6 +2200,29 @@ window.updatePostsDisplay = updatePostsDisplay;
 window.loadMorePosts = loadMorePosts;
 window.clearPostsFilters = clearPostsFilters;
 
+// Ensure button event listener is set up after DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    const goToPostsBtn = document.getElementById('goToPostsBtn');
+    if (goToPostsBtn) {
+        goToPostsBtn.addEventListener('click', () => {
+            scrollToPostsSection();
+        });
+    }
+});
+
+// Also set up immediately if DOM is already loaded
+if (document.readyState === 'loading') {
+    // DOM is still loading, wait for DOMContentLoaded
+} else {
+    // DOM is already loaded, set up immediately
+    const goToPostsBtn = document.getElementById('goToPostsBtn');
+    if (goToPostsBtn) {
+        goToPostsBtn.addEventListener('click', () => {
+            scrollToPostsSection();
+        });
+    }
+}
+
 // Post preview function (simplified version for dashboard)
 function openPostPreview(postId) {
     if (!state || !state.posts) {
