@@ -2,6 +2,8 @@
 
 Ce guide décrit comment installer l'application et la déployer sur un serveur de production.
 
+> **📌 Note importante :** L'application utilise **DuckDB** comme base de données (migration complète depuis SQLite effectuée en janvier 2026). Voir [Migration DuckDB](migration/MIGRATION_FINALE_DUCKDB.md) pour plus de détails.
+
 ## 📋 Table des Matières
 
 1. [Installation Locale](#installation-locale)
@@ -14,7 +16,8 @@ Ce guide décrit comment installer l'application et la déployer sur un serveur 
 
 ### Prérequis
 
-- **Python 3.11 ou 3.12** (Python 3.13 non supporté)
+- **Python 3.11 ou supérieur** (Python 3.13+ supporté)
+- **DuckDB** (installé automatiquement via requirements.txt)
 - **Git** pour cloner le dépôt
 - **Navigateur web moderne**
 - **Connexion Internet** (pour le scraping)
@@ -119,7 +122,7 @@ chmod +x install.sh
 ```
 
 Le script va automatiquement :
-- ✅ Vérifier que Python 3.11/3.12 est installé
+- ✅ Vérifier que Python 3.11+ est installé
 - ✅ Vérifier que Git est installé
 - ✅ Télécharger l'application depuis GitHub
 - ✅ Créer l'environnement virtuel Python
@@ -156,9 +159,9 @@ Ouvrez un terminal sur la VM et tapez :
 python3 --version
 ```
 
-**Résultat attendu :** `Python 3.11.x` ou `Python 3.12.x`
+**Résultat attendu :** `Python 3.11.x` ou supérieur
 
-Si vous voyez une version inférieure (comme 3.9 ou 3.10), contactez votre administrateur pour installer Python 3.11 ou 3.12.
+Si vous voyez une version inférieure (comme 3.9 ou 3.10), contactez votre administrateur pour installer Python 3.11+.
 
 Vérifiez aussi Git :
 
@@ -611,7 +614,7 @@ lsof -i :8000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 8000
 
 ```bash
 # Vérifier les processus utilisant la DB
-lsof ~/apps/complaints_tracker/backend/data.db 2>/dev/null
+lsof ~/apps/complaints_tracker/backend/data.duckdb 2>/dev/null
 
 # Arrêter tous les processus Python de l'application
 pkill -f "uvicorn app.main:app"
@@ -803,7 +806,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/data.db:/app/backend/data.db
+      - ./backend/data.duckdb:/app/backend/data.duckdb
       - ./backend/.env:/app/backend/.env
     environment:
       - CORS_ORIGINS=https://votre-domaine.com
@@ -835,7 +838,7 @@ docker-compose logs -f
 
 #### Azure App Service
 
-1. **Créer une Web App** avec Python 3.11
+1. **Créer une Web App** avec Python 3.11+
 2. **Configurer les variables d'environnement** dans le portail Azure
 3. **Déployer via Git** ou Azure CLI
 
@@ -863,8 +866,10 @@ CORS_ORIGINS=https://votre-domaine.com,https://www.votre-domaine.com
 OPENAI_API_KEY=votre_cle_secrete
 OPENAI_MODEL=gpt-4o-mini
 
-# Base de données (si PostgreSQL)
-DATABASE_URL=postgresql://user:password@localhost:5432/ovh_tracker
+# Base de données - DuckDB (par défaut, pas de configuration nécessaire)
+# L'application utilise DuckDB automatiquement
+# Fichiers: data.duckdb (production) ou data_staging.duckdb (staging)
+# Pour PostgreSQL (optionnel, future migration): DATABASE_URL=postgresql://user:password@localhost:5432/ovh_tracker
 
 # Logging
 LOG_LEVEL=INFO
@@ -875,11 +880,11 @@ LOG_LEVEL=INFO
 1. **Firewall** : Limiter l'accès au port 8000 (backend) uniquement depuis Nginx
 2. **SSL/TLS** : Toujours utiliser HTTPS en production
 3. **Secrets** : Ne jamais commiter les fichiers `.env` ou clés API
-4. **Backup** : Configurer des sauvegardes régulières de `data.db`
+4. **Backup** : Configurer des sauvegardes régulières de `data.duckdb` (production) et `data_staging.duckdb` (staging)
 
 ### Performance
 
-1. **Base de données** : Pour plus de 100k posts, migrer vers PostgreSQL
+1. **Base de données** : DuckDB offre d'excellentes performances analytiques. Pour très grande échelle (millions+ de posts), considérer PostgreSQL
 2. **Cache** : Considérer Redis pour le cache des requêtes fréquentes
 3. **Rate Limiting** : Configurer des limites de taux pour les endpoints API
 4. **Monitoring** : Utiliser des outils comme Prometheus + Grafana
@@ -970,9 +975,9 @@ pip install -r requirements.txt --upgrade
 BACKUP_DIR="/backups/ovh-tracker"
 DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p $BACKUP_DIR
-cp /home/ovh-tracker/complaints_tracker/backend/data.db $BACKUP_DIR/data_$DATE.db
+cp /home/ovh-tracker/complaints_tracker/backend/data.duckdb $BACKUP_DIR/data_$DATE.duckdb
 # Garder seulement les 30 derniers backups
-find $BACKUP_DIR -name "data_*.db" -mtime +30 -delete
+find $BACKUP_DIR -name "data_*.duckdb" -mtime +30 -delete
 ```
 
 Ajoutez au crontab :
@@ -989,10 +994,10 @@ cat > ~/apps/complaints_tracker/backup.sh << 'EOF'
 BACKUP_DIR="$HOME/backups/ovh-tracker"
 DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BACKUP_DIR"
-cp "$HOME/apps/complaints_tracker/backend/data.db" "$BACKUP_DIR/data_$DATE.db"
+cp "$HOME/apps/complaints_tracker/backend/data.duckdb" "$BACKUP_DIR/data_$DATE.duckdb"
 # Garder seulement les 30 derniers backups
-find "$BACKUP_DIR" -name "data_*.db" -mtime +30 -delete
-echo "Sauvegarde effectuée: $BACKUP_DIR/data_$DATE.db"
+find "$BACKUP_DIR" -name "data_*.duckdb" -mtime +30 -delete
+echo "Sauvegarde effectuée: $BACKUP_DIR/data_$DATE.duckdb"
 EOF
 
 chmod +x ~/apps/complaints_tracker/backup.sh
@@ -1068,7 +1073,7 @@ ps aux | grep uvicorn
 netstat -tlnp 2>/dev/null | grep 8000 || ss -tlnp | grep 8000
 
 # Vérifier les permissions
-ls -la ~/apps/complaints_tracker/backend/data.db
+ls -la ~/apps/complaints_tracker/backend/data.duckdb
 ls -la ~/apps/complaints_tracker/backend/server.log
 
 # Tester manuellement
@@ -1083,14 +1088,19 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 2. **Vérifier Nginx** : `sudo nginx -t`
 3. **Vérifier les logs** : `sudo tail -f /var/log/nginx/error.log`
 
-### Problèmes de Base de Données
+### Problèmes de Base de Données (DuckDB)
+
+> **Note :** L'application utilise DuckDB. Si vous rencontrez des problèmes, vérifiez que DuckDB est installé : `pip install duckdb`
 
 ```bash
+# Vérifier que DuckDB est installé
+python -c "import duckdb; print('DuckDB version:', duckdb.__version__)"
+
 # Vérifier les permissions
-ls -la /home/ovh-tracker/complaints_tracker/backend/data.db
+ls -la /home/ovh-tracker/complaints_tracker/backend/data.duckdb
 
 # Réinitialiser la base (ATTENTION: supprime toutes les données)
-rm /home/ovh-tracker/complaints_tracker/backend/data.db
+rm /home/ovh-tracker/complaints_tracker/backend/data.duckdb
 cd /home/ovh-tracker/complaints_tracker/backend
 source ../venv/bin/activate
 python -c "from app.db import init_db; init_db()"

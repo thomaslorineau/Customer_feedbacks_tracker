@@ -38,8 +38,10 @@
 
 ### Statut : **PRÉSENTE** ✅
 
-- **Fichier DB** : ✅ `backend/data.db` existe
-- **Base de données SQLite** : ✅ Créée
+- **Fichier DB** : ✅ `backend/data.duckdb` existe (production) ou `backend/data_staging.duckdb` (staging)
+- **Base de données DuckDB** : ✅ Créée automatiquement au premier démarrage
+
+> **Note :** Migration complète vers DuckDB effectuée en janvier 2026. Voir [Migration DuckDB](../migration/MIGRATION_FINALE_DUCKDB.md) pour plus de détails.
 
 ---
 
@@ -66,7 +68,7 @@
 |-----------|------|---------|
 | **Serveur Backend** | ✅ **FONCTIONNEL** | Port 8000 actif et répondant |
 | **Frontend** | ✅ **FICHIERS OK** | Présents et prêts à être servis |
-| **Base de données** | ✅ **PRÉSENTE** | `data.db` existe |
+| **Base de données** | ✅ **PRÉSENTE** | `data.duckdb` existe (DuckDB) |
 | **Configuration API** | ✅ **OK** | 35 endpoints configurés |
 
 ---

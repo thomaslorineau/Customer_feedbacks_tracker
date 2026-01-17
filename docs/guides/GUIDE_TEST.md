@@ -235,11 +235,13 @@ python run_scrape_x.py
 
 ### Base de données
 
-La base de données SQLite est créée automatiquement dans `backend/data.db` lors du premier démarrage de l'API.
+La base de données DuckDB est créée automatiquement dans `backend/data.duckdb` (ou `backend/data_staging.duckdb` pour staging) lors du premier démarrage de l'API.
+
+> **Note :** L'application utilise DuckDB depuis janvier 2026 (migration complète depuis SQLite). Voir [Migration DuckDB](../migration/MIGRATION_FINALE_DUCKDB.md) pour plus de détails.
 
 ### Fonctionnalités
 
-- ✅ Base de données SQLite avec index
+- ✅ Base de données DuckDB avec index
 - ✅ Analyse de sentiment (VADER)
 - ✅ Détection automatique de doublons (URL + contenu+auteur+source)
 - ✅ Scraper X (Nitter instances)
@@ -376,12 +378,11 @@ Vérifier que les index sont créés correctement :
 ```powershell
 cd backend
 python -c "
-import sqlite3
-from app.db import DB_FILE
+from app.db import get_db_connection
 
-conn = sqlite3.connect(DB_FILE)
+conn, is_duckdb = get_db_connection()
 c = conn.cursor()
-c.execute(\"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='posts'\")
+c.execute(\"SELECT index_name FROM duckdb_indexes() WHERE table_name='posts'\")
 indexes = c.fetchall()
 print('Indexes on posts table:')
 for idx in indexes:
@@ -389,6 +390,8 @@ for idx in indexes:
 conn.close()
 "
 ```
+
+> **Note :** L'application utilise DuckDB. La syntaxe pour vérifier les index est différente de SQLite.
 
 **Résultat attendu :**
 ```
