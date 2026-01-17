@@ -202,7 +202,7 @@ fi
 
 # Forcer la résolution des fichiers de config AVANT le pull
 # On sauvegarde, puis on supprime temporairement ces fichiers pour permettre le pull
-CONFIG_FILES="backend/data.db backend/.app_config backup.sh configure_cors.sh update.sh"
+CONFIG_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/data_staging.duckdb.wal backend/.app_config backup.sh configure_cors.sh update.sh"
 for file in $CONFIG_FILES; do
     if [ ! -f "$file" ]; then
         continue
