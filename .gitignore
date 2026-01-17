@@ -10,7 +10,12 @@ ENV/
 
 # Database files
 *.db
+*.duckdb
+*.duckdb.wal
 backend/data.db
+backend/data.duckdb
+backend/data_staging.duckdb
+backend/data_staging.duckdb.wal
 backend/*.db
 backend/ovh_posts.db
 
