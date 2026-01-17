@@ -7,18 +7,18 @@ Ce script met à jour tous les posts dans la base de données qui ont comme sour
 - "GitHub Discussions" → "GitHub"
 """
 
-import sqlite3
 import sys
 from pathlib import Path
+import duckdb
 
 # Ajouter le répertoire parent au path pour importer db
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.db import DB_FILE
+from app.db import get_db_connection
 
 def migrate_github_sources():
     """Migre les sources GitHub Issues et GitHub Discussions vers GitHub."""
-    conn = sqlite3.connect(DB_FILE)
+    conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:

@@ -24,7 +24,8 @@ def test_db_connection():
         if is_duckdb:
             print("✓ DuckDB")
         else:
-            print("⚠️ SQLite (fallback)")
+            print("❌ Erreur: DuckDB attendu mais non disponible")
+            return False, False
         conn.close()
         return True, is_duckdb
     except Exception as e:
@@ -122,8 +123,9 @@ def main():
         return 1
     
     if not is_duckdb:
-        print("\n⚠️  ATTENTION: Utilisation de SQLite au lieu de DuckDB!")
-        print("   Vérifiez que USE_DUCKDB=true et que data.duckdb existe")
+        print("\n❌ ERREUR: DuckDB est requis mais non disponible!")
+        print("   Vérifiez que DuckDB est installé: pip install duckdb")
+        return 1
     
     tests = [
         test_get_posts,
@@ -144,11 +146,8 @@ def main():
     total = len(results)
     print(f"Résultats: {passed}/{total} tests réussis")
     
-    if passed == total and is_duckdb:
+    if passed == total:
         print("✅ Tous les tests sont passés avec DuckDB!")
-        return 0
-    elif passed == total:
-        print("⚠️  Tous les tests passent mais avec SQLite (fallback)")
         return 0
     else:
         print("❌ Certains tests ont échoué")

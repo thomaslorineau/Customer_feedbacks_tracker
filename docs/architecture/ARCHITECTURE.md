@@ -157,7 +157,7 @@
 │       │  enriched posts [{id, source, author, content, sentiment...}, ...] │
 │       ▼                                                                      │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │  db.py (SQLite Database Operations)                                 │   │
+│  │  db.py (DuckDB Database Operations)                                 │   │
 │  │                                                                      │   │
 │  │  ├─ init_db()                      Initialize schema               │   │
 │  │  ├─ insert_post(post: dict)        Write to DB (duplicate check)   │   │
@@ -169,11 +169,11 @@
 │       ▼                                                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
         │
-        │ SQLite file: data.db
+        │ DuckDB file: data.duckdb (or data_staging.duckdb for staging)
         │
         ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                            Database (SQLite)                                │
+│                            Database (DuckDB)                                │
 │                                                                              │
 │  ┌──────────────────────────────────────────────────────────────────────┐   │
 │  │  posts table                                                         │   │
@@ -231,7 +231,8 @@ Database Insert (db.py → insert_post)
        │   └─► If duplicate: skip insertion, return False
        │
        ▼
-SQLite: INSERT INTO posts (source, author, content, ...)
+DuckDB: INSERT INTO posts (id, source, author, content, ...)
+       │   VALUES (nextval('posts_id_seq'), ?, ?, ...)
        │   (Only if not duplicate)
        │
        ▼
@@ -306,7 +307,7 @@ ovh-complaints-tracker/
 │   ├── app/
 │   │   ├── __init__.py
 │   │   ├── main.py                       # FastAPI app, endpoints, scheduler
-│   │   ├── db.py                         # SQLite helpers
+│   │   ├── db.py                         # DuckDB helpers
 │   │   │
 │   │   ├── scraper/
 │   │   │   ├── __init__.py
@@ -348,7 +349,7 @@ ovh-complaints-tracker/
 │       └── js/
 │           └── app.js                     # Improvements page logic
 │
-├── data.db                               # SQLite database (created at runtime)
+├── data.duckdb                           # DuckDB database (created at runtime)
 ├── README.md                             # Project documentation
 ├── ARCHITECTURE.md                       # This file
 └── .venv/                                # Python virtual environment
@@ -363,7 +364,7 @@ ovh-complaints-tracker/
 | **Scheduler** | APScheduler | Auto-scraping every 3 hours |
 | **Scrapers** | httpx, feedparser, BeautifulSoup | Real data from Trustpilot, X (Nitter), GitHub, etc. |
 | **Sentiment** | VADER (vaderSentiment) | Classify customer sentiment in complaints |
-| **Database** | SQLite (sqlite3) | Persistent storage of real posts only |
+| **Database** | DuckDB | Persistent storage of real posts only |
 | **Charts** | Chart.js | Interactive timeline, histogram, and product distribution charts |
 | **LLM** | OpenAI GPT-4o-mini / Anthropic Claude 3 Haiku | AI-powered recommended actions and improvement ideas |
 
@@ -371,7 +372,7 @@ ovh-complaints-tracker/
 
 1. **Real Data Only**: No mock data fallbacks. If scraper fails, return empty list instead of fake posts.
 2. **FastAPI**: Lightweight, async-capable, auto-documentation (Swagger).
-3. **SQLite**: Zero-config, file-based, good for small/medium datasets. Indexed for performance.
+3. **DuckDB**: High-performance analytical database, file-based, excellent for analytics workloads. Indexed for performance.
 4. **Duplicate Detection**: URL-based duplicate prevention to avoid data redundancy.
 5. **VADER Sentiment**: Fast, rule-based, tuned for social media language.
 6. **Multi-Page Frontend**: Three dedicated pages (Scraping, Dashboard, Improvements) with shared navigation and theme.
@@ -549,7 +550,7 @@ POST /scrape/jobs/{job_id}/cancel
 
 ## Scaling Considerations
 
-- **More posts**: Use PostgreSQL instead of SQLite, add indexes on `(source, created_at, sentiment_label)`.
+- **More posts**: DuckDB handles large datasets efficiently. For very large scale (millions+), consider PostgreSQL with indexes on `(source, created_at, sentiment_label)`.
 - **More scrapers**: Add Redis queue for async jobs; use Celery for distributed task scheduling.
 - **Better Sentiment**: Replace VADER with Hugging Face transformer model (DistilBERT-multilingual).
 - **Real-time updates**: Add WebSocket endpoint to push new complaint alerts.

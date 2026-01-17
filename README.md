@@ -113,7 +113,7 @@ ovh-complaints-tracker/
 └──────┬──────┘
        │ HTTP
 ┌──────▼──────┐
-│   Backend   │  →  FastAPI + Scrapers + SQLite
+│   Backend   │  →  FastAPI + Scrapers + DuckDB
 │  (FastAPI)  │
 └──────┬──────┘
        │
@@ -122,7 +122,7 @@ ovh-complaints-tracker/
 └──────┬──────┘
        │
 ┌──────▼──────┐
-│  Database   │  →  SQLite (posts, logs, queries)
+│  Database   │  →  DuckDB (posts, logs, queries)
 └─────────────┘
 ```
 
@@ -174,7 +174,7 @@ ovh-complaints-tracker/
 |-----------|------------|
 | **Frontend** | HTML5, CSS3, Vanilla JS (ES6 Modules) |
 | **Backend** | FastAPI (Python 3.11+) |
-| **Base de données** | SQLite |
+| **Base de données** | DuckDB |
 | **Scraping** | httpx, BeautifulSoup, feedparser |
 | **Analyse** | VADER Sentiment |
 | **Visualisation** | Chart.js |

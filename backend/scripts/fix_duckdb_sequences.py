@@ -17,12 +17,26 @@ def fix_sequences(db_file):
         # Pour posts: créer séquence et définir default
         cursor.execute("SELECT MAX(id) FROM posts")
         max_id = cursor.fetchone()[0] or 0
-        
         cursor.execute(f"CREATE SEQUENCE IF NOT EXISTS posts_id_seq START {max_id + 1}")
-        # DuckDB utilise une syntaxe différente pour les defaults
-        # On va plutôt modifier insert_post pour ne pas inclure l'ID
-        
         print(f"✅ Sequence posts_id_seq créée (START {max_id + 1})")
+        
+        # Pour saved_queries
+        try:
+            cursor.execute("SELECT MAX(id) FROM saved_queries")
+            max_id = cursor.fetchone()[0] or 0
+            cursor.execute(f"CREATE SEQUENCE IF NOT EXISTS saved_queries_id_seq START {max_id + 1}")
+            print(f"✅ Sequence saved_queries_id_seq créée (START {max_id + 1})")
+        except Exception as e:
+            print(f"⚠️  saved_queries table might not exist: {e}")
+        
+        # Pour scraping_logs
+        try:
+            cursor.execute("SELECT MAX(id) FROM scraping_logs")
+            max_id = cursor.fetchone()[0] or 0
+            cursor.execute(f"CREATE SEQUENCE IF NOT EXISTS scraping_logs_id_seq START {max_id + 1}")
+            print(f"✅ Sequence scraping_logs_id_seq créée (START {max_id + 1})")
+        except Exception as e:
+            print(f"⚠️  scraping_logs table might not exist: {e}")
         
         conn.commit()
     except Exception as e:

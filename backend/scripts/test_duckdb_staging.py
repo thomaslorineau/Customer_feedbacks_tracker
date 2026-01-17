@@ -24,7 +24,8 @@ def test_db_connection():
         if is_duckdb:
             print("✓ DuckDB")
         else:
-            print("⚠️ SQLite (fallback)")
+            print("❌ Erreur: DuckDB attendu mais non disponible")
+            return False
         conn.close()
         return True
     except Exception as e:

@@ -23,19 +23,19 @@ print(f"DB_PATH: {config.DB_PATH}")
 print(f"Fichier existe: {config.DB_PATH.exists()}")
 
 conn, is_duckdb = get_db_connection()
-db_type = "DuckDB" if is_duckdb else "SQLite (fallback)"
-print(f"\nType de connexion: {db_type}")
+if not is_duckdb:
+    print("\n❌ ERREUR: DuckDB est requis mais non disponible!")
+    print("   Vérifiez que DuckDB est installé: pip install duckdb")
+    conn.close()
+    exit(1)
 
-if is_duckdb:
-    cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM posts")
-    count = cursor.fetchone()[0]
-    print(f"Posts dans DuckDB: {count}")
-    conn.close()
-    print("\n✅ OUI - Vous êtes bien sur DuckDB en staging!")
-else:
-    print("\n⚠️  NON - Fallback vers SQLite (DuckDB non disponible)")
-    conn.close()
+print(f"\nType de connexion: DuckDB")
+cursor = conn.cursor()
+cursor.execute("SELECT COUNT(*) FROM posts")
+count = cursor.fetchone()[0]
+print(f"Posts dans DuckDB: {count}")
+conn.close()
+print("\n✅ OUI - Vous êtes bien sur DuckDB en staging!")
 
 print("=" * 70)
 
