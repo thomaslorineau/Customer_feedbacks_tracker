@@ -8,16 +8,25 @@ venv/
 env/
 ENV/
 
-# Database files
+# Database files - CRITICAL: Never commit database files!
 *.db
 *.duckdb
 *.duckdb.wal
+*.duckdb.backup
 backend/data.db
 backend/data.duckdb
 backend/data_staging.duckdb
 backend/data_staging.duckdb.wal
+backend/data.duckdb.backup
+backend/data_staging.duckdb.backup
 backend/*.db
+backend/*.duckdb
+backend/*.duckdb.wal
+backend/*.duckdb.backup
 backend/ovh_posts.db
+# Backup directories
+backend/backups/
+backups/
 
 # Logs
 *.log

@@ -166,6 +166,18 @@ elif [ -f ".venv/bin/activate" ]; then
     source .venv/bin/activate
 fi
 
+# Vérifier l'intégrité AVANT la sauvegarde
+if [ -f "scripts/check_db_integrity.py" ]; then
+    info "Vérification de l'intégrité des bases de données avant mise à jour..."
+    if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
+        success "Intégrité des bases de données vérifiée"
+    else
+        warning "⚠️  Problème d'intégrité détecté, tentative de réparation..."
+        python scripts/repair_db.py production > /dev/null 2>&1 || true
+        python scripts/repair_db.py staging > /dev/null 2>&1 || true
+    fi
+fi
+
 if [ -f "scripts/backup_db.py" ]; then
     if python scripts/backup_db.py both --keep=30 > /dev/null 2>&1; then
         success "Sauvegarde automatique créée avec succès"
@@ -355,9 +367,80 @@ for file in $CONFIG_FILES; do
     fi
 done
 
+# PROTECTION CRITIQUE: S'assurer que Git ne touche JAMAIS aux fichiers DB
+# Supprimer les fichiers DB de l'index Git s'ils y sont (ne devrait jamais arriver)
+DB_FILES="backend/data.db backend/data.duckdb backend/data_staging.duckdb backend/data_staging.duckdb.wal backend/data.duckdb.backup backend/data_staging.duckdb.backup"
+for db_file in $DB_FILES; do
+    if git ls-files --error-unmatch "$db_file" >/dev/null 2>&1; then
+        warning "⚠️  Fichier DB détecté dans Git: $db_file (suppression de l'index)"
+        git rm --cached "$db_file" 2>/dev/null || true
+    fi
+done
+
 # Faire le pull depuis master
 if git pull origin master; then
     success "Code mis à jour"
+    
+    # Vérifier l'intégrité des bases de données APRÈS le pull
+    cd "$APP_DIR/backend" || {
+        error "Impossible de se déplacer dans le répertoire backend"
+        exit 1
+    }
+    
+    if [ -f "scripts/check_db_integrity.py" ]; then
+        info "Vérification de l'intégrité des bases de données après mise à jour..."
+        DB_INTEGRITY_OK=true
+        
+        # Vérifier production
+        if ! python scripts/check_db_integrity.py production > /dev/null 2>&1; then
+            warning "⚠️  Problème d'intégrité détecté sur la base production après pull"
+            DB_INTEGRITY_OK=false
+            
+            # Compter les posts avant réparation
+            POST_COUNT_BEFORE=0
+            if [ -f "data.duckdb" ]; then
+                POST_COUNT_BEFORE=$(python -c "import duckdb; conn = duckdb.connect('data.duckdb'); c = conn.cursor(); c.execute('SELECT COUNT(*) FROM posts'); print(c.fetchone()[0]); conn.close()" 2>/dev/null || echo "0")
+            fi
+            
+            # Tenter de réparer
+            info "Tentative de réparation de la base production..."
+            python scripts/repair_db.py production > /dev/null 2>&1 || true
+            
+            # Vérifier si les données sont toujours là après réparation
+            POST_COUNT_AFTER=0
+            if [ -f "data.duckdb" ]; then
+                POST_COUNT_AFTER=$(python -c "import duckdb; conn = duckdb.connect('data.duckdb'); c = conn.cursor(); c.execute('SELECT COUNT(*) FROM posts'); print(c.fetchone()[0]); conn.close()" 2>/dev/null || echo "0")
+            fi
+            
+            # Si les données ont été perdues, restaurer depuis le backup
+            if [ "$POST_COUNT_BEFORE" -gt 0 ] && [ "$POST_COUNT_AFTER" -eq 0 ]; then
+                warning "⚠️  Données perdues lors de la réparation, tentative de restauration depuis backup..."
+                LATEST_BACKUP=$(ls -t backend/backups/production_*.duckdb 2>/dev/null | head -1)
+                if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP" ]; then
+                    cp "$LATEST_BACKUP" "data.duckdb"
+                    success "Données restaurées depuis: $LATEST_BACKUP"
+                else
+                    error "❌ Aucun backup disponible pour restauration"
+                fi
+            fi
+        fi
+        
+        # Vérifier staging
+        if ! python scripts/check_db_integrity.py staging > /dev/null 2>&1; then
+            warning "⚠️  Problème d'intégrité détecté sur la base staging après pull"
+            DB_INTEGRITY_OK=false
+            python scripts/repair_db.py staging > /dev/null 2>&1 || true
+        fi
+        
+        if [ "$DB_INTEGRITY_OK" = true ]; then
+            success "Intégrité des bases de données vérifiée après mise à jour"
+        fi
+    fi
+    
+    cd "$APP_DIR" || {
+        error "Impossible de revenir au répertoire racine"
+        exit 1
+    }
     
     # Essayer de restaurer les modifications si elles existent
     if [ "$HAS_CHANGES" = true ]; then

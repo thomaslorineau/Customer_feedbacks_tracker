@@ -12,6 +12,18 @@ def repair_database(db_file: str):
     
     print(f"🔍 Vérification de la base de données: {db_file}")
     
+    # Compter les posts AVANT toute opération (pour détecter les pertes)
+    post_count_before = 0
+    if db_path.exists():
+        try:
+            conn = duckdb.connect(str(db_path))
+            c = conn.cursor()
+            c.execute("SELECT COUNT(*) FROM posts")
+            post_count_before = c.fetchone()[0]
+            conn.close()
+        except:
+            pass  # Ignorer les erreurs, on va réparer
+    
     # Créer un backup si le fichier existe
     if db_path.exists():
         print(f"📦 Création d'un backup: {backup_path}")
@@ -31,6 +43,62 @@ def repair_database(db_file: str):
     except Exception as e:
         print(f"❌ Erreur de connexion: {e}")
         print("🔧 Tentative de réparation...")
+    
+    # AVANT de supprimer, essayer de restaurer depuis les backups automatiques
+    if post_count_before > 0:
+        print(f"⚠️  Base de données corrompue avec {post_count_before} posts")
+        print("🔍 Recherche d'un backup automatique récent...")
+        
+        # Chercher dans le répertoire backups
+        backups_dir = db_path.parent / "backups"
+        if backups_dir.exists():
+            # Déterminer le préfixe selon l'environnement
+            if "staging" in db_file:
+                prefix = "staging_"
+            else:
+                prefix = "production_"
+            
+            # Trouver le backup le plus récent
+            backup_files = sorted(
+                backups_dir.glob(f"{prefix}*.duckdb"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True
+            )
+            
+            if backup_files:
+                latest_backup = backup_files[0]
+                print(f"📦 Backup trouvé: {latest_backup.name}")
+                
+                # Vérifier que le backup contient des données
+                try:
+                    conn_backup = duckdb.connect(str(latest_backup))
+                    c_backup = conn_backup.cursor()
+                    c_backup.execute("SELECT COUNT(*) FROM posts")
+                    backup_post_count = c_backup.fetchone()[0]
+                    conn_backup.close()
+                    
+                    if backup_post_count > 0:
+                        print(f"✅ Backup contient {backup_post_count} posts")
+                        print("🔄 Restauration depuis le backup...")
+                        import shutil
+                        shutil.copy2(latest_backup, db_path)
+                        print(f"✅ Base de données restaurée depuis: {latest_backup.name}")
+                        
+                        # Vérifier que la restauration a fonctionné
+                        try:
+                            conn = duckdb.connect(str(db_path))
+                            c = conn.cursor()
+                            c.execute("SELECT COUNT(*) FROM posts")
+                            restored_count = c.fetchone()[0]
+                            conn.close()
+                            print(f"✅ Vérification: {restored_count} posts restaurés")
+                            return True
+                        except Exception as restore_check_error:
+                            print(f"⚠️  La restauration a échoué: {restore_check_error}")
+                    else:
+                        print(f"⚠️  Le backup est vide, création d'une nouvelle base")
+                except Exception as backup_check_error:
+                    print(f"⚠️  Impossible de vérifier le backup: {backup_check_error}")
     
     # Supprimer le fichier corrompu et en créer un nouveau
     try:
