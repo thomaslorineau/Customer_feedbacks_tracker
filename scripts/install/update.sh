@@ -528,6 +528,16 @@ for file in $CONFIG_FILES; do
         git add "$file" 2>/dev/null || true
     fi
 done
+
+# Résoudre spécifiquement les conflits avec scripts/install/update.sh après le pull
+# (pertinent car le script peut avoir des modifications locales importantes)
+if git status --porcelain 2>/dev/null | grep -q "^UU.*scripts/install/update.sh\|^AA.*scripts/install/update.sh\|^M.*scripts/install/update.sh"; then
+    warning "Conflit détecté avec scripts/install/update.sh après pull, résolution automatique..."
+    info "Conservation de la version locale de scripts/install/update.sh..."
+    git checkout --ours "scripts/install/update.sh" 2>/dev/null || true
+    git add "scripts/install/update.sh" 2>/dev/null || true
+    success "Conflit avec scripts/install/update.sh résolu (version locale conservée)"
+fi
 echo ""
 
 # 4. Restaurer la configuration
@@ -578,10 +588,19 @@ echo ""
 
 # 4b. Rendre tous les scripts exécutables (au cas où les permissions sont perdues)
 info "Configuration des permissions des scripts..."
-chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh 2>/dev/null || true
-chmod +x scripts/install/check_access.sh 2>/dev/null || true
+# Scripts à la racine
+chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh update.sh install.sh quick-update.sh 2>/dev/null || true
+# Scripts dans scripts/
+chmod +x scripts/install/*.sh 2>/dev/null || true
 chmod +x scripts/app/*.sh 2>/dev/null || true
-find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+chmod +x scripts/start/*.sh 2>/dev/null || true
+chmod +x scripts/utils/*.sh 2>/dev/null || true
+chmod +x scripts/backup_db.sh 2>/dev/null || true
+# Trouver et rendre exécutables tous les scripts .sh dans le projet
+find . -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
+# IMPORTANT: S'assurer que scripts/install/update.sh est exécutable
+chmod +x scripts/install/update.sh 2>/dev/null || true
+chmod +x update.sh 2>/dev/null || true
 success "Permissions des scripts configurées"
 echo ""
 
