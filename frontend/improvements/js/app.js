@@ -63,7 +63,8 @@ function setupThemeToggle() {
 }
 
 // Load and display version
-async function loadVersion() {
+// Version loading is handled by version-loader.js module
+async function _deprecated_loadVersion() {
     try {
         const response = await fetch(`${window.location.origin}/api/version`);
         if (response.ok) {
@@ -487,10 +488,9 @@ async function init() {
     setupThemeToggle();
     setupEventListeners();
     // Load version using the shared loader if available, otherwise use local function
+    // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
     if (window.loadVersion) {
         await window.loadVersion();
-    } else {
-        await loadVersion();
     }
     
     // Load all data with error handling

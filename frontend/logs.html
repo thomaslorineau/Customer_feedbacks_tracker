@@ -667,14 +667,12 @@
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 initializeTheme();
-                loadVersion();
                 loadLogs();
                 // Démarrer l'actualisation automatique par défaut
                 startAutoRefresh();
             });
         } else {
             initializeTheme();
-            loadVersion();
             loadLogs();
             // Démarrer l'actualisation automatique par défaut
             startAutoRefresh();
@@ -685,5 +683,6 @@
         document.getElementById('filterLevel').addEventListener('change', loadLogs);
         document.getElementById('filterLimit').addEventListener('change', loadLogs);
     </script>
+    <script type="module" src="/dashboard/js/version-loader.js"></script>
 </body>
 </html>

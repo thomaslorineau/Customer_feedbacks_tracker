@@ -67,20 +67,20 @@
         }
 
         .container {
-            max-width: 1400px;
+            max-width: var(--max-width-md);
             margin: 0 auto;
         }
 
         header {
             background: var(--bg-card);
             border-bottom: 1px solid var(--border-color);
-            padding: 30px 40px;
-            margin: -20px -20px 40px -20px;
+            padding: var(--spacing-lg) var(--spacing-xl);
+            margin: -20px -20px var(--spacing-xl) -20px;
             box-shadow: 0 2px 8px var(--shadow);
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 20px;
+            gap: var(--spacing-md);
             flex-wrap: wrap;
         }
 
@@ -108,25 +108,25 @@
         }
 
         h1 {
-            font-size: 2.2em;
+            font-size: var(--font-size-4xl);
             margin: 0;
             color: var(--text-primary);
-            font-weight: 700;
+            font-weight: var(--font-weight-bold);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--spacing-sm);
         }
 
         .ovh-logo-text {
-            font-size: 1.8em;
-            font-weight: 700;
+            font-size: var(--font-size-3xl);
+            font-weight: var(--font-weight-bold);
             color: var(--accent-ovh);
             letter-spacing: -0.5px;
         }
 
         .subtitle {
             color: var(--text-secondary);
-            font-size: 1em;
+            font-size: var(--font-size-base);
             margin: 0;
         }
 
@@ -1975,33 +1975,7 @@
             });
         }
         
-        // Load and display version
-        async function loadVersion() {
-            try {
-                const response = await fetch(`${API_BASE}/api/version`);
-                if (response.ok) {
-                    const data = await response.json();
-                    const versionBadge = document.getElementById('versionBadge');
-                    if (versionBadge) {
-                        versionBadge.textContent = `v${data.version}`;
-                        versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
-                    }
-                } else {
-                    // Fallback version if API fails
-                    const versionBadge = document.getElementById('versionBadge');
-                    if (versionBadge) {
-                        versionBadge.textContent = 'v1.0.1';
-                    }
-                }
-            } catch (error) {
-                console.warn('Failed to load version:', error);
-                // Fallback version on error
-                const versionBadge = document.getElementById('versionBadge');
-                if (versionBadge) {
-                    versionBadge.textContent = 'v1.0.1';
-                }
-            }
-        }
+        // Version loading is handled by version-loader.js module
         
         // Initialize theme IMMEDIATELY before any rendering to prevent flash
         (function() {
@@ -2016,14 +1990,13 @@
         })();
         
         // Initialize theme on page load (for toggle functionality)
+        // Version loading is handled by version-loader.js module
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 initializeTheme();
-                loadVersion();
             });
         } else {
             initializeTheme();
-            loadVersion();
         }
         
         // Make toggleTheme available globally
@@ -6119,6 +6092,7 @@
             });
             });
         </script>
+        <script type="module" src="/dashboard/js/version-loader.js"></script>
         <script src="/js/logo-updater.js"></script>
     </body>
 </html>

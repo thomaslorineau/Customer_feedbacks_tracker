@@ -6,23 +6,7 @@ import { initCharts } from './charts.js';
 import { initWorldMap } from './world-map.js';
 import { initSourceChart } from './source-chart.js';
 import { initSentimentChart } from './sentiment-chart.js';
-
-// Load and display version
-async function loadVersion() {
-    try {
-        const response = await fetch(`${window.location.origin}/api/version`);
-        if (response.ok) {
-            const data = await response.json();
-            const versionBadge = document.getElementById('versionBadge');
-            if (versionBadge) {
-                versionBadge.textContent = `v${data.version}`;
-                versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
-            }
-        }
-    } catch (error) {
-        console.warn('Failed to load version:', error);
-    }
-}
+// Version loading is handled by version-loader.js module (loaded via script tag in HTML)
 
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -109,8 +93,7 @@ class App {
         // Setup theme toggle button
         setupThemeToggle();
         
-        // Load and display version
-        loadVersion();
+        // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
         
         // Initialize charts
         initCharts(this.state);

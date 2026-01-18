@@ -10,41 +10,43 @@
     <link rel="stylesheet" href="/css/modern-enhancements.css">
     <style>
         .settings-container {
-            max-width: 1200px;
+            max-width: var(--max-width-md);
             margin: 0 auto;
-            padding: 2rem;
+            padding: var(--spacing-lg);
         }
 
         .settings-header {
-            margin-bottom: 2rem;
+            margin-bottom: var(--spacing-lg);
         }
 
         .settings-header h1 {
-            font-size: 2rem;
+            font-size: var(--font-size-3xl);
+            font-weight: var(--font-weight-bold);
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: var(--spacing-xs);
         }
 
         .settings-header p {
             color: var(--text-secondary);
-            font-size: 1rem;
+            font-size: var(--font-size-base);
         }
 
         .settings-section {
-            background: var(--panel-bg);
+            background: var(--bg-card);
             border-radius: 12px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            box-shadow: 0 2px 8px var(--shadow);
         }
 
         .section-title {
-            font-size: 1.5rem;
+            font-size: var(--font-size-2xl);
+            font-weight: var(--font-weight-bold);
             color: var(--text-primary);
-            margin-bottom: 1.5rem;
+            margin-bottom: var(--spacing-md);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: var(--spacing-xs);
         }
 
         .section-title svg {
@@ -1088,6 +1090,7 @@
             }
         });
     </script>
+    <script type="module" src="/dashboard/js/version-loader.js"></script>
     <script src="/js/logo-updater.js"></script>
 </body>
 </html>
