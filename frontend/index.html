@@ -1048,7 +1048,7 @@
                 Configure Keywords
             </h2>
             <p style="text-align: center; color: var(--text-muted); font-size: 0.8em; margin-bottom: 16px; max-width: 600px; margin-left: auto; margin-right: auto;">
-                Add custom keywords to enhance your search. Combined with <a href="/settings" style="color: var(--accent-primary); text-decoration: none;">base keywords</a>.
+                Add custom keywords to enhance your search. <strong>These keywords are permanently saved</strong> and combined with <a href="/dashboard/settings.html" style="color: var(--accent-primary); text-decoration: underline;">base keywords from Settings</a>.
             </p>
             
             <div style="max-width: 900px; margin: 0 auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px;">
@@ -1072,11 +1072,11 @@
                     </button>
                     <button 
                         onclick="clearKeywords()" 
-                        style="padding: 12px 20px; background: transparent; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-secondary); font-weight: 500; font-size: 0.95em; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;"
-                        onmouseover="this.style.borderColor='#ef4444'; this.style.color='#ef4444';"
-                        onmouseout="this.style.borderColor='var(--border-color)'; this.style.color='var(--text-secondary)';"
+                        style="padding: 12px 20px; background: #ef4444; border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.95em; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;"
+                        onmouseover="this.style.background='#dc2626';"
+                        onmouseout="this.style.background='#ef4444';"
                     >
-                        Clear All
+                        🗑️ Clear All
                     </button>
                     <button 
                         id="revertKeywordsBtn" 
@@ -1093,7 +1093,8 @@
                 <!-- Tip Message -->
                 <div style="padding: 12px 16px; background: var(--bg-secondary); border-radius: 8px; margin-bottom: 20px;">
                     <p style="margin: 0; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5; text-align: center;">
-                        💡 When you click <strong>"🆕 Scrape New Data"</strong>, the system uses <strong>both base keywords AND your custom keywords</strong> together.
+                        💡 <strong>Important:</strong> Custom keywords are <strong>permanently saved</strong> and will be used in <strong>every scraping</strong> (manual and automatic every 3 hours).<br>
+                        They are combined with <a href="/dashboard/settings.html" style="color: var(--accent-primary); text-decoration: underline;">base keywords from Settings</a>.
                     </p>
                 </div>
                 
@@ -5225,7 +5226,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         }
 
         function clearKeywords() {
-            if (!confirm('Clear all saved keywords?')) return;
+            if (!confirm('⚠️ Clear all custom keywords permanently?\n\nThis will remove all your custom keywords and they will no longer be used in future scrapings (manual and automatic).\n\nYou can restore them using the "Revert" button if needed.')) return;
             
             // Save current keywords before clearing (for revert)
             const currentKeywords = loadKeywords();
