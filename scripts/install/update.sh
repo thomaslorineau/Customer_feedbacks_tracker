@@ -58,6 +58,11 @@ debug() {
     fi
 }
 
+log_command() {
+    # Affiche la commande qui va être exécutée
+    echo -e "${BLUE}🔧 Exécution: $1${NC}"
+}
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔄 Mise à jour de l'application"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -76,10 +81,13 @@ if [ -f "backend/server.pid" ]; then
     PID=$(cat backend/server.pid)
     if ps -p $PID > /dev/null 2>&1; then
         if [ -f "scripts/app/stop.sh" ]; then
+            log_command "bash scripts/app/stop.sh"
             bash scripts/app/stop.sh > /dev/null 2>&1
         elif [ -f "stop.sh" ]; then
+            log_command "./stop.sh"
             ./stop.sh > /dev/null 2>&1
         else
+            log_command "kill $PID"
             kill $PID 2>/dev/null || true
         fi
         sleep 2
@@ -110,6 +118,7 @@ fi
 # Vérifier l'intégrité des bases de données
 DB_INTEGRITY_OK=true
 if [ -f "scripts/check_db_integrity.py" ]; then
+    log_command "python scripts/check_db_integrity.py both"
     if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
         success "Intégrité des bases de données vérifiée"
     else
@@ -122,11 +131,13 @@ if [ -f "scripts/check_db_integrity.py" ]; then
             # Réparer la base de production
             if [ -f "data.duckdb" ]; then
                 info "Réparation de la base de données de production..."
+                log_command "ENVIRONMENT=production python repair_db.py"
                 ENVIRONMENT=production python repair_db.py
             fi
             # Réparer la base de staging
             if [ -f "data_staging.duckdb" ]; then
                 info "Réparation de la base de données de staging..."
+                log_command "ENVIRONMENT=staging python repair_db.py"
                 ENVIRONMENT=staging python repair_db.py
             fi
             
@@ -167,9 +178,10 @@ elif [ -f ".venv/bin/activate" ]; then
 fi
 
 # Vérifier l'intégrité AVANT la sauvegarde
-if [ -f "scripts/check_db_integrity.py" ]; then
-    info "Vérification de l'intégrité des bases de données avant mise à jour..."
-    if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
+    if [ -f "scripts/check_db_integrity.py" ]; then
+        info "Vérification de l'intégrité des bases de données avant mise à jour..."
+        log_command "python scripts/check_db_integrity.py both"
+        if python scripts/check_db_integrity.py both > /dev/null 2>&1; then
         success "Intégrité des bases de données vérifiée"
     else
         warning "⚠️  Problème d'intégrité détecté, tentative de réparation..."
@@ -179,6 +191,7 @@ if [ -f "scripts/check_db_integrity.py" ]; then
 fi
 
 if [ -f "scripts/backup_db.py" ]; then
+    log_command "python scripts/backup_db.py both --keep=30"
     if python scripts/backup_db.py both --keep=30 > /dev/null 2>&1; then
         success "Sauvegarde automatique créée avec succès"
     else
@@ -387,8 +400,31 @@ for db_file in $DB_FILES; do
     fi
 done
 
-# Faire le pull depuis master
-if git pull origin master; then
+# Fetch d'abord pour récupérer les dernières modifications
+info "Récupération des dernières modifications depuis origin/master..."
+log_command "git fetch origin master"
+if git fetch origin master; then
+    success "Fetch réussi depuis origin/master"
+else
+    error "Échec du fetch depuis origin/master"
+    exit 1
+fi
+
+# Afficher les informations sur les commits récupérés
+info "Vérification des différences avec la version locale..."
+log_command "git log HEAD..origin/master --oneline"
+COMMITS_AHEAD=$(git log HEAD..origin/master --oneline 2>/dev/null | wc -l || echo "0")
+if [ "$COMMITS_AHEAD" -gt 0 ]; then
+    info "$COMMITS_AHEAD nouveau(x) commit(s) à récupérer"
+    git log HEAD..origin/master --oneline | head -5 | sed 's/^/   /' || true
+else
+    info "Aucun nouveau commit à récupérer"
+fi
+
+# Forcer la mise à jour vers la version distante (ignore les divergences locales)
+info "Mise à jour forcée vers origin/master..."
+log_command "git reset --hard origin/master"
+if git reset --hard origin/master; then
     success "Code mis à jour"
     
     # Vérifier l'intégrité des bases de données APRÈS le pull
@@ -414,6 +450,7 @@ if git pull origin master; then
             
             # Tenter de réparer
             info "Tentative de réparation de la base production..."
+            log_command "python scripts/repair_db.py production"
             python scripts/repair_db.py production > /dev/null 2>&1 || true
             
             # Vérifier si les données sont toujours là après réparation
@@ -440,6 +477,7 @@ if git pull origin master; then
                     done
                 fi
                 if [ -n "$LATEST_BACKUP" ] && [ -f "$LATEST_BACKUP" ]; then
+                    log_command "cp \"$LATEST_BACKUP\" \"data.duckdb\""
                     cp "$LATEST_BACKUP" "data.duckdb"
                     success "Données restaurées depuis: $(basename $LATEST_BACKUP)"
                 else
@@ -449,9 +487,11 @@ if git pull origin master; then
         fi
         
         # Vérifier staging
+        log_command "python scripts/check_db_integrity.py staging"
         if ! python scripts/check_db_integrity.py staging > /dev/null 2>&1; then
             warning "⚠️  Problème d'intégrité détecté sur la base staging après pull"
             DB_INTEGRITY_OK=false
+            log_command "python scripts/repair_db.py staging"
             python scripts/repair_db.py staging > /dev/null 2>&1 || true
         fi
         
@@ -468,6 +508,7 @@ if git pull origin master; then
     # Essayer de restaurer les modifications si elles existent
     if [ "$HAS_CHANGES" = true ]; then
         info "Tentative de restauration des modifications locales..."
+        log_command "git stash pop"
         if git stash pop > /dev/null 2>&1; then
             success "Modifications locales restaurées"
         else
@@ -612,6 +653,7 @@ if [ -f "backend/requirements.txt" ]; then
         info "Mise à jour des dépendances Python..."
         cd backend
         pip install --upgrade pip > /dev/null 2>&1
+        log_command "pip install -r requirements.txt --upgrade"
         pip install -r requirements.txt --upgrade
         cd ..
         success "Dépendances mises à jour"
@@ -667,6 +709,7 @@ if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" || "$OSTYPE" == "cygwin" ]] ||
         info "Démarrage avec batch..."
         cmd.exe /c "$APP_DIR/scripts/start/start.bat"
     elif [ -f "$APP_DIR/scripts/start/start.sh" ]; then
+        log_command "bash \"$APP_DIR/scripts/start/start.sh\""
         bash "$APP_DIR/scripts/start/start.sh"
     else
         warning "Script de démarrage introuvable pour Windows"
@@ -753,9 +796,11 @@ else
         # Vérifier que le script est exécutable
         if [ ! -x "$START_SCRIPT" ]; then
             info "Ajout des permissions d'exécution au script..."
+            log_command "chmod +x \"$START_SCRIPT\""
             chmod +x "$START_SCRIPT"
         fi
         info "Démarrage de l'application..."
+        log_command "bash \"$START_SCRIPT\""
         bash "$START_SCRIPT"
     else
         warning "Script start.sh introuvable"

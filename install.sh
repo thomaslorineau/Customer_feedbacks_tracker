@@ -28,6 +28,11 @@ error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
+log_command() {
+    # Affiche la commande qui va être exécutée
+    echo -e "${BLUE}🔧 Exécution: $1${NC}"
+}
+
 # Fonction pour obtenir le hostname depuis une IP (reverse DNS)
 get_hostname_from_ip() {
     local ip=$1
@@ -140,9 +145,11 @@ if [ ! -f "backend/requirements.txt" ]; then
     
     if [ "$GIT_SOURCE" = "github" ]; then
         info "Clonage depuis GitHub..."
+        log_command "git clone https://github.com/thomaslorineau/Customer_feedbacks_tracker.git \"$INSTALL_DIR\""
         git clone https://github.com/thomaslorineau/Customer_feedbacks_tracker.git "$INSTALL_DIR"
     else
         info "Clonage depuis Stash..."
+        log_command "git clone ssh://git@stash.ovh.net:7999/~thomas.lorineau/customer_feedbacks_tracker.git \"$INSTALL_DIR\""
         git clone ssh://git@stash.ovh.net:7999/~thomas.lorineau/customer_feedbacks_tracker.git "$INSTALL_DIR"
     fi
     
@@ -187,6 +194,7 @@ else
         error "python3 n'est pas disponible"
         exit 1
     fi
+    log_command "python3 -m venv venv"
     python3 -m venv venv
     if [ ! -d "venv" ] || [ ! -f "venv/bin/python" ]; then
         error "Échec de la création de l'environnement virtuel"
@@ -205,11 +213,13 @@ source venv/bin/activate
 
 # Mettre à jour pip
 info "Mise à jour de pip..."
+log_command "python -m pip install --upgrade pip --quiet"
 python -m pip install --upgrade pip --quiet
 
 # Installer les dépendances
 info "Installation des packages requis..."
 cd backend
+log_command "python -m pip install -r requirements.txt"
 python -m pip install -r requirements.txt
 
 # Vérifier que DuckDB est bien installé
@@ -219,7 +229,8 @@ if python -c "import duckdb" 2>/dev/null; then
     success "DuckDB installé (version $DUCKDB_VERSION)"
 else
     warning "DuckDB n'est pas installé, tentative d'installation..."
-    if python -m pip install duckdb==0.10.0; then
+        log_command "python -m pip install duckdb==0.10.0"
+        if python -m pip install duckdb==0.10.0; then
         # Attendre un peu pour que l'installation se termine
         sleep 1
         if python -c "import duckdb" 2>/dev/null; then
@@ -250,16 +261,22 @@ cd ..
 # Rendre tous les scripts exécutables
 info "Configuration des permissions des scripts..."
 # Scripts à la racine
+log_command "chmod +x install.sh update.sh quick-update.sh"
 chmod +x install.sh update.sh quick-update.sh 2>/dev/null || true
 # Scripts dans scripts/app/
+log_command "chmod +x scripts/app/*.sh"
 chmod +x scripts/app/*.sh 2>/dev/null || true
 # Scripts dans scripts/install/
+log_command "chmod +x scripts/install/*.sh"
 chmod +x scripts/install/*.sh 2>/dev/null || true
 # Scripts dans scripts/utils/
+log_command "chmod +x scripts/utils/*.sh"
 chmod +x scripts/utils/*.sh 2>/dev/null || true
 # Support anciennes installations avec scripts à la racine
+log_command "chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh"
 chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh 2>/dev/null || true
 # Tous les autres scripts .sh à la racine
+log_command "find . -maxdepth 1 -name \"*.sh\" -type f -exec chmod +x {} \\;"
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 
 success "Scripts configurés"

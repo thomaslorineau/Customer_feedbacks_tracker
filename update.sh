@@ -63,6 +63,11 @@ debug() {
     fi
 }
 
+log_command() {
+    # Affiche la commande qui va être exécutée
+    echo -e "${BLUE}🔧 Exécution: $1${NC}"
+}
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔄 Mise à jour de l'application"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -81,10 +86,13 @@ if [ -f "backend/server.pid" ]; then
     PID=$(cat backend/server.pid)
     if ps -p $PID > /dev/null 2>&1; then
         if [ -f "scripts/app/stop.sh" ]; then
+            log_command "bash scripts/app/stop.sh"
             bash scripts/app/stop.sh > /dev/null 2>&1
         elif [ -f "stop.sh" ]; then
+            log_command "./stop.sh"
             ./stop.sh > /dev/null 2>&1
         else
+            log_command "kill $PID"
             kill $PID 2>/dev/null || true
         fi
         sleep 2
@@ -172,7 +180,9 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
     info "Sauvegarde temporaire des modifications (stash)..."
     
     # Essayer de stash en excluant les fichiers problématiques
-    if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+    STASH_MESSAGE="Auto-stash before update $(date +%Y%m%d_%H%M%S)"
+    log_command "git stash push $EXCLUDE_PATTERNS -m \"$STASH_MESSAGE\""
+    if git stash push $EXCLUDE_PATTERNS -m "$STASH_MESSAGE" 2>/dev/null; then
         success "Modifications sauvegardées temporairement"
     else
         # Si le stash échoue, essayer de résoudre les conflits avec les fichiers de DB
@@ -188,7 +198,9 @@ if ! git diff --quiet $EXCLUDE_PATTERNS 2>/dev/null || ! git diff --cached --qui
         done
         
         # Réessayer le stash
-        if git stash push $EXCLUDE_PATTERNS -m "Auto-stash before update $(date +%Y%m%d_%H%M%S)" 2>/dev/null; then
+        STASH_MESSAGE="Auto-stash before update $(date +%Y%m%d_%H%M%S)"
+        log_command "git stash push $EXCLUDE_PATTERNS -m \"$STASH_MESSAGE\" (retry)"
+        if git stash push $EXCLUDE_PATTERNS -m "$STASH_MESSAGE" 2>/dev/null; then
             success "Modifications sauvegardées temporairement (après résolution)"
         else
             error "Impossible de sauvegarder les modifications locales"
@@ -273,14 +285,37 @@ else
     fi
 fi
 
-# Faire le pull depuis master
-info "Mise à jour depuis $REMOTE_TO_USE/master..."
-if git pull $REMOTE_TO_USE master; then
+# Fetch d'abord pour récupérer les dernières modifications
+info "Récupération des dernières modifications depuis $REMOTE_TO_USE/master..."
+log_command "git fetch $REMOTE_TO_USE master"
+if git fetch $REMOTE_TO_USE master; then
+    success "Fetch réussi depuis $REMOTE_TO_USE/master"
+else
+    error "Échec du fetch depuis $REMOTE_TO_USE/master"
+    exit 1
+fi
+
+# Afficher les informations sur les commits récupérés
+info "Vérification des différences avec la version locale..."
+log_command "git log HEAD..$REMOTE_TO_USE/master --oneline"
+COMMITS_AHEAD=$(git log HEAD..$REMOTE_TO_USE/master --oneline 2>/dev/null | wc -l || echo "0")
+if [ "$COMMITS_AHEAD" -gt 0 ]; then
+    info "$COMMITS_AHEAD nouveau(x) commit(s) à récupérer"
+    git log HEAD..$REMOTE_TO_USE/master --oneline | head -5 | sed 's/^/   /' || true
+else
+    info "Aucun nouveau commit à récupérer"
+fi
+
+# Forcer la mise à jour vers la version distante (ignore les divergences locales)
+info "Mise à jour forcée vers $REMOTE_TO_USE/master..."
+log_command "git reset --hard $REMOTE_TO_USE/master"
+if git reset --hard $REMOTE_TO_USE/master; then
     success "Code mis à jour"
     
     # Essayer de restaurer les modifications si elles existent
     if [ "$HAS_CHANGES" = true ]; then
         info "Tentative de restauration des modifications locales..."
+        log_command "git stash pop"
         if git stash pop > /dev/null 2>&1; then
             success "Modifications locales restaurées"
         else
@@ -395,16 +430,22 @@ echo ""
 # 4b. Rendre tous les scripts exécutables (au cas où les permissions sont perdues)
 info "Configuration des permissions des scripts..."
 # Scripts à la racine
+log_command "chmod +x install.sh update.sh quick-update.sh"
 chmod +x install.sh update.sh quick-update.sh 2>/dev/null || true
 # Scripts dans scripts/app/
+log_command "chmod +x scripts/app/*.sh"
 chmod +x scripts/app/*.sh 2>/dev/null || true
 # Scripts dans scripts/install/
+log_command "chmod +x scripts/install/*.sh"
 chmod +x scripts/install/*.sh 2>/dev/null || true
 # Scripts dans scripts/utils/
+log_command "chmod +x scripts/utils/*.sh"
 chmod +x scripts/utils/*.sh 2>/dev/null || true
 # Support anciennes installations avec scripts à la racine
+log_command "chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh"
 chmod +x start.sh stop.sh status.sh backup.sh configure_cors.sh 2>/dev/null || true
 # Tous les autres scripts .sh à la racine
+log_command "find . -maxdepth 1 -name \"*.sh\" -type f -exec chmod +x {} \\;"
 find . -maxdepth 1 -name "*.sh" -type f -exec chmod +x {} \; 2>/dev/null || true
 success "Permissions des scripts configurées"
 echo ""
@@ -417,6 +458,7 @@ if [ -f "backend/requirements.txt" ]; then
         info "Mise à jour des dépendances Python..."
         cd backend
         pip install --upgrade pip > /dev/null 2>&1
+        log_command "pip install -r requirements.txt --upgrade"
         pip install -r requirements.txt --upgrade
         cd ..
         success "Dépendances mises à jour"
@@ -551,9 +593,11 @@ else
         # Vérifier que le script est exécutable
         if [ ! -x "$START_SCRIPT" ]; then
             info "Ajout des permissions d'exécution au script..."
+            log_command "chmod +x \"$START_SCRIPT\""
             chmod +x "$START_SCRIPT"
         fi
         info "Démarrage de l'application..."
+        log_command "bash \"$START_SCRIPT\""
         bash "$START_SCRIPT"
     else
         warning "Script start.sh introuvable"
