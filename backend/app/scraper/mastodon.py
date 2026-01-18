@@ -130,15 +130,15 @@ class MastodonScraper(BaseScraper):
                                     
                                     created_at = status.get('created_at', datetime.now().isoformat())
                                     
-                                post = {
-                                    'source': 'Mastodon',
-                                    'author': author,
-                                    'content': content[:500],
-                                    'url': post_url,
-                                    'created_at': created_at,
-                                    'sentiment_score': 0.0,
-                                    'sentiment_label': 'neutral',
-                                }
+                                    post = {
+                                        'source': 'Mastodon',
+                                        'author': author,
+                                        'content': content[:500],
+                                        'url': post_url,
+                                        'created_at': created_at,
+                                        'sentiment_score': 0.0,
+                                        'sentiment_label': 'neutral',
+                                    }
                                     all_posts.append(post)
                                 except Exception as e:
                                     self.logger.log("warning", f"Error parsing Mastodon search result: {e}")
