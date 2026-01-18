@@ -4201,6 +4201,32 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                 progressText.textContent = `Initializing ${sourceName} scraper...`;
             }
             
+            // Poll immediately first time
+            (async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
+                    if (response.ok) {
+                        const job = await response.json();
+                        const status = job.status || 'unknown';
+                        const progress = job.progress || { total: 0, completed: 0 };
+                        const completed = progress.completed || 0;
+                        const total = progress.total || 0;
+                        
+                        if (total > 0 && progressBar) {
+                            const percentage = Math.round((completed / total) * 100);
+                            progressBar.style.width = `${percentage}%`;
+                            progressBar.setAttribute('aria-valuenow', percentage);
+                            if (progressContainer) {
+                                progressContainer.setAttribute('data-percentage', `${percentage}%`);
+                                progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error in immediate poll:', e);
+                }
+            })();
+            
             jobStatusInterval = setInterval(async () => {
                 try {
                     const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
@@ -4411,7 +4437,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                 } catch (e) {
                     console.error(`Error polling job status: ${e.message}`);
                 }
-            }, 2000); // Poll every 2 seconds
+            }, 500); // Poll every 500ms for smoother progress updates
         }
 
         async function scrapeOvhForum() {
@@ -5422,7 +5448,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                 updateJobPanel({ id: jobId, status: 'pending', progress: { total: 0, completed: 0 } });
                 // start polling
                 if (jobPollInterval) clearInterval(jobPollInterval);
-                jobPollInterval = setInterval(() => pollJobStatus(jobId), 2000);
+                jobPollInterval = setInterval(() => pollJobStatus(jobId), 500);
                 // immediate poll
                 pollJobStatus(jobId);
             } catch (e) {

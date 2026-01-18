@@ -1173,18 +1173,26 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     async def progress_heartbeat():
         """Update progress gradually during scraping to show activity."""
         nonlocal heartbeat_step
+        logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
         while heartbeat_running and heartbeat_step < scraping_end:
-            await asyncio.sleep(0.3)  # Update every 300ms for smoother progress
+            await asyncio.sleep(0.5)  # Update every 500ms
             if not heartbeat_running:
+                logger.info(f"[{source}] Heartbeat stopped (heartbeat_running=False)")
                 break
             # Increment progress gradually (max 1 step per heartbeat)
             if heartbeat_step < scraping_end - 1:
                 heartbeat_step += 1
+                # Update both in-memory job and DB
                 job['progress']['completed'] = heartbeat_step
                 try:
                     db.update_job_progress(job_id, total_steps, heartbeat_step)
-                except Exception:
-                    pass
+                    logger.debug(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
+                except Exception as e:
+                    logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
+            else:
+                logger.info(f"[{source}] Heartbeat reached max step {scraping_end}")
+                break
+        logger.info(f"[{source}] Heartbeat finished at step {heartbeat_step}")
     
     try:
         # Check for cancellation
@@ -1440,8 +1448,22 @@ async def get_all_jobs_endpoint(status: Optional[str] = None, limit: int = 100):
 
 @app.get('/scrape/jobs/{job_id}')
 async def get_job_status(job_id: str):
+    # First check in-memory JOBS dict (faster, more up-to-date)
     job = JOBS.get(job_id)
     if job:
+        # Also sync with DB to ensure we have the latest progress
+        # The heartbeat updates DB, so we merge DB progress into in-memory job
+        try:
+            db_job = db.get_job_record(job_id)
+            if db_job and db_job.get('progress'):
+                # DB is source of truth for progress (updated by heartbeat)
+                job['progress'] = db_job['progress']
+                # Also sync status if different
+                if db_job.get('status') and db_job['status'] != job.get('status'):
+                    job['status'] = db_job['status']
+        except Exception as e:
+            # If DB read fails, just use in-memory job
+            logger.debug(f"Could not sync job {job_id} with DB: {e}")
         return job
     # fall back to DB persisted job record
     try:
