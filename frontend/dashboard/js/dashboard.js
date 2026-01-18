@@ -917,6 +917,19 @@ function updateResetFiltersButtonVisibility() {
 let currentJobId = null;
 let jobStatusInterval = null;
 
+// Persist job ID to localStorage so it can be resumed after page navigation
+function persistLastJob(jobId) {
+    if (!jobId) {
+        localStorage.removeItem('ovh_last_job');
+    } else {
+        localStorage.setItem('ovh_last_job', jobId);
+    }
+}
+
+function loadLastJob() {
+    return localStorage.getItem('ovh_last_job');
+}
+
 async function scrapeAll() {
     console.log('🔵 scrapeAll() called from dashboard');
     
@@ -987,6 +1000,9 @@ async function scrapeAll() {
         const jobData = await api.startScrapingJob(keywords, 50, 2, 0.5);
         currentJobId = jobData.job_id;
         
+        // Persist job ID so it can be resumed after page navigation
+        persistLastJob(currentJobId);
+        
         console.log(`✅ Job started! Job ID: ${currentJobId.substring(0, 8)}...`);
         
         // Show cancel button
@@ -1039,6 +1055,7 @@ async function pollJobStatus(jobId) {
                     clearInterval(jobStatusInterval);
                     jobStatusInterval = null;
                     currentJobId = null;
+                    persistLastJob(null); // Clear persisted job
                     const progressContainer = document.getElementById('scrapingProgressContainer');
                     if (progressContainer) {
                         progressContainer.style.display = 'none';
@@ -1104,6 +1121,7 @@ async function pollJobStatus(jobId) {
                 clearInterval(jobStatusInterval);
                 jobStatusInterval = null;
                 currentJobId = null;
+                persistLastJob(null); // Clear persisted job
                 
                 // Calculate total added
                 const results = job.results || [];
@@ -1152,6 +1170,7 @@ async function pollJobStatus(jobId) {
                 clearInterval(jobStatusInterval);
                 jobStatusInterval = null;
                 currentJobId = null;
+                persistLastJob(null); // Clear persisted job
                 
                 const errorMsg = job.error || 'Unknown error';
                 if (progressContainer) {
@@ -1178,6 +1197,7 @@ async function pollJobStatus(jobId) {
                 clearInterval(jobStatusInterval);
                 jobStatusInterval = null;
                 currentJobId = null;
+                persistLastJob(null); // Clear persisted job
                 const progressContainer = document.getElementById('scrapingProgressContainer');
                 if (progressContainer) {
                     progressContainer.style.display = 'none';
@@ -1221,6 +1241,7 @@ async function cancelScraping() {
             jobStatusInterval = null;
         }
         currentJobId = null;
+        persistLastJob(null); // Clear persisted job
         showCancelButton(false);
         
         const progressContainer = document.getElementById('scrapingProgressContainer');
@@ -2201,12 +2222,69 @@ window.loadMorePosts = loadMorePosts;
 window.clearPostsFilters = clearPostsFilters;
 
 // Ensure button event listener is set up after DOM is ready
+// Resume last job on page load (so jobs continue even if user navigates away)
+(function resumeLastJob() {
+    const lastJobId = loadLastJob();
+    if (lastJobId) {
+        // Try to fetch job status first, if 404, clear localStorage and don't start polling
+        api.getJobStatus(lastJobId)
+            .then(job => {
+                // Job exists and is still running, resume polling
+                console.log(`Resuming job ${lastJobId.substring(0, 8)}... after page navigation`);
+                currentJobId = lastJobId;
+                
+                // Show progress bar
+                const progressContainer = document.getElementById('scrapingProgressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+                
+                // Show cancel button
+                showCancelButton(true);
+                
+                // Start polling
+                pollJobStatus(lastJobId);
+            })
+            .catch(error => {
+                // Job doesn't exist (404) or error, clean up
+                if (error.status === 404 || (error.message && error.message.includes('404'))) {
+                    console.log('Previous job not found, cleaning up localStorage');
+                    persistLastJob(null);
+                } else {
+                    console.warn('Could not check job status on page load:', error);
+                    persistLastJob(null);
+                }
+            });
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     const goToPostsBtn = document.getElementById('goToPostsBtn');
     if (goToPostsBtn) {
         goToPostsBtn.addEventListener('click', () => {
             scrollToPostsSection();
         });
+    }
+    
+    // Also try to resume job on DOMContentLoaded (in case the IIFE ran too early)
+    const lastJobId = loadLastJob();
+    if (lastJobId && !currentJobId) {
+        api.getJobStatus(lastJobId)
+            .then(job => {
+                if (job.status === 'running' || job.status === 'pending') {
+                    console.log(`Resuming job ${lastJobId.substring(0, 8)}... on DOMContentLoaded`);
+                    currentJobId = lastJobId;
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'block';
+                    }
+                    showCancelButton(true);
+                    pollJobStatus(lastJobId);
+                }
+            })
+            .catch(() => {
+                persistLastJob(null);
+            });
     }
 });
 

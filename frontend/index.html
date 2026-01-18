@@ -1107,7 +1107,7 @@
                             onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
                             onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
                             <span style="font-size: 1.5em;">📰</span>
-                            <span class="btn-text">News</span>
+                            <span class="btn-text">Google News</span>
                             <span class="btn-spinner" style="display:none;"></span>
                         </button>
                         <button id="btnScrapeReddit" onclick="scrapeReddit()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
@@ -2385,7 +2385,7 @@
                     });
                     renderGallery();
                     updateActiveFiltersCount();
-                    updateDatabaseStats(); // Update database stats after loading posts
+                    // Note: updateDatabaseStats removed - stats are updated automatically via renderGallery()
                     return true;
                 } else {
                     console.error('Failed to load posts');
@@ -3946,17 +3946,46 @@
                 };
             }
         }
+        
+        // Utility function to safely extract added count from scraper response
+        function extractAddedCount(data) {
+            if (!data) return 0;
+            
+            // Try direct access first
+            if (typeof data.added === 'number') {
+                return data.added;
+            }
+            
+            // Try parsing as string
+            if (data.added !== undefined && data.added !== null) {
+                const parsed = parseInt(data.added);
+                if (!isNaN(parsed)) {
+                    return parsed;
+                }
+            }
+            
+            // Fallback: check if it's in a nested structure
+            if (data.result && typeof data.result.added === 'number') {
+                return data.result.added;
+            }
+            
+            return 0;
+        }
 
         async function scrapeX() {
             setButtonLoading('btnScrapeX', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -3986,10 +4015,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
-                console.log(`Successfully scraped ${addedCount} posts from X/Twitter`, { data, addedCount });
-                showToast(`${addedCount} new posts from X/Twitter`, 'success');
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
+                console.log('X/Twitter scrape response:', { data, addedCount, dataType: typeof data?.added, rawAdded: data?.added });
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from X/Twitter`, 'success');
+                } else {
+                    showToast('No new posts from X/Twitter (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4009,13 +4042,17 @@
         async function scrapeStackOverflow() {
             setButtonLoading('btnScrapeStackOverflow', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -4023,7 +4060,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Stack Overflow scraper...', 'info');
-            addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`⭐ Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/stackoverflow?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4051,8 +4092,8 @@
                     currentAbortController = null;
                     return;
                 }
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} questions from Stack Overflow`, 'success');
                 showToast(`${addedCount} new posts from Stack Overflow`, 'success');
                 await loadPostsFromDB();
@@ -4078,13 +4119,17 @@
         async function scrapeNews() {
             setButtonLoading('btnScrapeNews', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -4092,7 +4137,11 @@
             currentAbortController = new AbortController();
             
             console.log('Starting Google News scraper...');
-            addLog(`📰 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`📰 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`📰 Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/news?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
@@ -4115,10 +4164,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} articles from Google News`, 'success');
-                showToast(`${addedCount} new posts from Google News`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from Google News`, 'success');
+                } else {
+                    showToast('No new posts from Google News (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4138,13 +4191,17 @@
         async function scrapeReddit() {
             setButtonLoading('btnScrapeReddit', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -4152,7 +4209,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Reddit scraper...', 'info');
-            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`🔍 Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/reddit?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4176,9 +4237,19 @@
                 }
                 
                 // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                let addedCount = 0;
+                if (data && typeof data.added === 'number') {
+                    addedCount = data.added;
+                } else if (data && data.added !== undefined) {
+                    addedCount = parseInt(data.added) || 0;
+                }
+                console.log('Reddit scrape response:', { data, addedCount, dataType: typeof data?.added, rawAdded: data?.added });
                 addLog(`✅ Successfully scraped ${addedCount} posts from Reddit`, 'success');
-                showToast(`${addedCount} new posts from Reddit`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from Reddit`, 'success');
+                } else {
+                    showToast('No new posts from Reddit (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4198,13 +4269,17 @@
         async function scrapeGithub() {
             setButtonLoading('btnScrapeGithub', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -4212,7 +4287,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting GitHub scraper...', 'info');
-            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`🔍 Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/github?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4235,10 +4314,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} issues/discussions from GitHub`, 'success');
-                showToast(`${addedCount} new posts from GitHub`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from GitHub`, 'success');
+                } else {
+                    showToast('No new posts from GitHub (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4259,13 +4342,17 @@
         async function scrapeTrustpilot() {
             setButtonLoading('btnScrapeTrustpilot', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
             
-            // Combine keywords with AND
-            const combinedQuery = keywords.join(' ');
+            // Combine keywords with AND, or use empty string to trigger base keywords usage
+            let combinedQuery = '';
+            if (keywords && keywords.length > 0) {
+                combinedQuery = keywords.join(' ');
+                console.log('Using custom keywords:', keywords);
+            } else {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+                // Empty string will trigger backend to use base keywords
+                combinedQuery = '';
+            }
             
             const gallery = document.getElementById('gallery');
             gallery.innerHTML = '';
@@ -4273,7 +4360,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Trustpilot scraper...', 'info');
-            addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`⭐ Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4295,10 +4386,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} reviews from Trustpilot`, 'success');
-                showToast(`${addedCount} new posts from Trustpilot`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from Trustpilot`, 'success');
+                } else {
+                    showToast('No new posts from Trustpilot (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4573,7 +4668,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting OVH Forum scraper...', 'info');
-            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`🔍 Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/ovh-forum?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4595,10 +4694,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} posts from OVH Forum`, 'success');
-                showToast(`${addedCount} new posts from OVH Forum`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from OVH Forum`, 'success');
+                } else {
+                    showToast('No new posts from OVH Forum (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4629,7 +4732,11 @@
             currentAbortController = new AbortController();
             
             addLog('🔄 Starting Mastodon scraper...', 'info');
-            addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            if (keywords && keywords.length > 0) {
+                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            } else {
+                addLog(`🔍 Using base keywords from Settings`, 'info');
+            }
             
             try {
                 const response = await fetch(`${API_BASE}/scrape/mastodon?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
@@ -4651,10 +4758,14 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`✅ Successfully scraped ${addedCount} posts from Mastodon`, 'success');
-                showToast(`${addedCount} new posts from Mastodon`, 'success');
+                if (addedCount > 0) {
+                    showToast(`${addedCount} new posts from Mastodon`, 'success');
+                } else {
+                    showToast('No new posts from Mastodon (may be duplicates or filtered)', 'info');
+                }
                 await loadPostsFromDB();
                 renderGallery();
             } catch (e) {
@@ -4717,8 +4828,8 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`📦 Items returned by scraper: ${addedCount}`, addedCount > 0 ? 'success' : 'warning');
                 
                 if (addedCount === 0) {
@@ -4802,8 +4913,8 @@
                     return;
                 }
                 
-                // Extract added count safely - check if data.added exists and is a number
-                const addedCount = (data && typeof data.added === 'number') ? data.added : (data?.added ?? 0);
+                // Extract added count safely using utility function
+                const addedCount = extractAddedCount(data);
                 addLog(`📦 Items returned by scraper: ${addedCount}`, addedCount > 0 ? 'success' : 'warning');
                 
                 if (addedCount === 0) {

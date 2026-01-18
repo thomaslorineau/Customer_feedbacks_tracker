@@ -712,135 +712,152 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
         query: Search query
         limit: Maximum number of posts to fetch
         use_keyword_expansion: Whether to expand keywords for better coverage
+    
+    Returns:
+        Number of posts added to database. Returns 0 on any error to allow other tasks to continue.
     """
-    # Async mapper - prefer async versions when available
-    async_mapper = {
-        'github': lambda q, l: github.scrape_github_issues_async(q, limit=l),
-        'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews_async(q, limit=l),
-        'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow_async(q, limit=l),
-        'reddit': lambda q, l: reddit.scrape_reddit_async(q, limit=l),
-        'news': lambda q, l: news.scrape_google_news_async(q, limit=l),
-        'mastodon': lambda q, l: mastodon.scrape_mastodon_async(q, limit=l),
-        'linkedin': lambda q, l: linkedin.scrape_linkedin_async(q, limit=l),
-    }
-    
-    # Sync mapper for scrapers not yet migrated (X, OVH Forum, G2 Crowd use Selenium/Playwright)
-    sync_mapper = {
-        'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
-        'ovh-forum': lambda q, l: ovh_forum.scrape_ovh_forum(q, limit=l),
-        'g2-crowd': lambda q, l: g2_crowd.scrape_g2_crowd(q, limit=l),
-    }
-    
-    # Try async first, fallback to sync
-    async_func = async_mapper.get(source)
-    sync_func = sync_mapper.get(source)
-    
-    if async_func is None and sync_func is None:
-        return 0
-    
-    func = async_func if async_func else sync_func
-    is_async = async_func is not None
-    
-    # Expand keywords if enabled
-    queries_to_try = [query]
-    if use_keyword_expansion:
-        try:
-            # Generate keyword variants (limit to avoid too many requests)
-            expanded = keyword_expander.expand_keywords([query])
-            # Limit to first 5 variants to avoid excessive requests
-            # Prioritize original query + most relevant variants
-            if len(expanded) > 1:
-                # Keep original first, then add up to 4 more variants
-                queries_to_try = [query] + expanded[1:5]
-                logger.info(f"[Keyword Expansion] Using {len(queries_to_try)} query variants for {source}: {queries_to_try[:3]}...")
-        except Exception as e:
-            logger.warning(f"[Keyword Expansion] Failed to expand keywords: {e}, using original query only")
-            queries_to_try = [query]
-    
-    # Scrape with each query variant and combine results
-    all_items = []
-    seen_urls = set()  # Deduplicate by URL across queries
-    
-    for query_variant in queries_to_try:
-        try:
-            # Distribute limit across queries
-            per_query_limit = max(limit // len(queries_to_try), 10)  # At least 10 per query
-            
-            # Call async or sync function
-            if is_async:
-                items = await func(query_variant, per_query_limit)
-            else:
-                # Run sync function in thread pool to avoid blocking event loop
-                items = await asyncio.to_thread(func, query_variant, per_query_limit)
-            
-            # Deduplicate by URL
-            for item in items:
-                url = item.get('url', '')
-                if url and url not in seen_urls:
-                    all_items.append(item)
-                    seen_urls.add(url)
-                elif not url:
-                    # If no URL, add anyway to avoid losing data
-                    all_items.append(item)
-            
-            # If we have enough items, stop early
-            if len(all_items) >= limit:
-                break
-                
-        except Exception as e:
+    try:
+        # Async mapper - prefer async versions when available
+        async_mapper = {
+            'github': lambda q, l: github.scrape_github_issues_async(q, limit=l),
+            'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews_async(q, limit=l),
+            'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow_async(q, limit=l),
+            'reddit': lambda q, l: reddit.scrape_reddit_async(q, limit=l),
+            'news': lambda q, l: news.scrape_google_news_async(q, limit=l),
+            'mastodon': lambda q, l: mastodon.scrape_mastodon_async(q, limit=l),
+            'linkedin': lambda q, l: linkedin.scrape_linkedin_async(q, limit=l),
+        }
+        
+        # Sync mapper for scrapers not yet migrated (X, OVH Forum, G2 Crowd use Selenium/Playwright)
+        sync_mapper = {
+            'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
+            'ovh-forum': lambda q, l: ovh_forum.scrape_ovh_forum(q, limit=l),
+            'g2-crowd': lambda q, l: g2_crowd.scrape_g2_crowd(q, limit=l),
+        }
+        
+        # Try async first, fallback to sync
+        async_func = async_mapper.get(source)
+        sync_func = sync_mapper.get(source)
+        
+        if async_func is None and sync_func is None:
+            return 0
+        
+        func = async_func if async_func else sync_func
+        is_async = async_func is not None
+        
+        # Expand keywords if enabled
+        queries_to_try = [query]
+        if use_keyword_expansion:
             try:
-                for job_id, info in JOBS.items():
-                    if info.get('status') == 'running':
-                        db.append_job_error(job_id, f"{source} (query: {query_variant}): {str(e)}")
-            except Exception:
-                pass
-            # Continue with next query variant
-            continue
-    
-    # Limit to requested amount
-    all_items = all_items[:limit]
-    
-    # Insert into database
-    added = 0
-    duplicates = 0
-    filtered_by_relevance = 0
-    for it in all_items:
-        try:
-            # Vérifier la pertinence avant traitement
-            is_relevant, relevance_score = should_insert_post(it)
-            if not is_relevant:
-                filtered_by_relevance += 1
-                logger.debug(f"[{source}] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                # Generate keyword variants (limit to avoid too many requests)
+                expanded = keyword_expander.expand_keywords([query])
+                # Limit to first 5 variants to avoid excessive requests
+                # Prioritize original query + most relevant variants
+                if len(expanded) > 1:
+                    # Keep original first, then add up to 4 more variants
+                    queries_to_try = [query] + expanded[1:5]
+                    logger.info(f"[Keyword Expansion] Using {len(queries_to_try)} query variants for {source}: {queries_to_try[:3]}...")
+            except Exception as e:
+                logger.warning(f"[Keyword Expansion] Failed to expand keywords: {e}, using original query only")
+                queries_to_try = [query]
+        
+        # Scrape with each query variant and combine results
+        all_items = []
+        seen_urls = set()  # Deduplicate by URL across queries
+        
+        for query_variant in queries_to_try:
+            try:
+                # Distribute limit across queries
+                per_query_limit = max(limit // len(queries_to_try), 10)  # At least 10 per query
+                
+                # Call async or sync function
+                if is_async:
+                    items = await func(query_variant, per_query_limit)
+                else:
+                    # Run sync function in thread pool to avoid blocking event loop
+                    items = await asyncio.to_thread(func, query_variant, per_query_limit)
+                
+                # Deduplicate by URL
+                for item in items:
+                    url = item.get('url', '')
+                    if url and url not in seen_urls:
+                        all_items.append(item)
+                        seen_urls.add(url)
+                    elif not url:
+                        # If no URL, add anyway to avoid losing data
+                        all_items.append(item)
+                
+                # If we have enough items, stop early
+                if len(all_items) >= limit:
+                    break
+                    
+            except Exception as e:
+                try:
+                    for job_id, info in JOBS.items():
+                        if info.get('status') == 'running':
+                            db.append_job_error(job_id, f"{source} (query: {query_variant}): {str(e)}")
+                except Exception:
+                    pass
+                # Continue with next query variant
                 continue
-            
-            an = sentiment.analyze(it.get('content') or '')
-            # Detect country
-            country = country_detection.detect_country_from_post(it)
-            if db.insert_post({
-                'source': it.get('source'),
-                'author': it.get('author'),
-                'content': it.get('content'),
-                'url': it.get('url'),
-                'created_at': it.get('created_at'),
-                'sentiment_score': an['score'],
-                'sentiment_label': an['label'],
-                'language': it.get('language', 'unknown'),
-                'country': country,
-            }):
-                added += 1
-            else:
-                duplicates += 1  # Duplicate detected and skipped
+        
+        # Limit to requested amount
+        all_items = all_items[:limit]
+        
+        # Insert into database
+        added = 0
+        duplicates = 0
+        filtered_by_relevance = 0
+        for it in all_items:
+            try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[{source}] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
+                an = sentiment.analyze(it.get('content') or '')
+                # Detect country
+                country = country_detection.detect_country_from_post(it)
+                if db.insert_post({
+                    'source': it.get('source'),
+                    'author': it.get('author'),
+                    'content': it.get('content'),
+                    'url': it.get('url'),
+                    'created_at': it.get('created_at'),
+                    'sentiment_score': an['score'],
+                    'sentiment_label': an['label'],
+                    'language': it.get('language', 'unknown'),
+                    'country': country,
+                }):
+                    added += 1
+                else:
+                    duplicates += 1  # Duplicate detected and skipped
+            except Exception:
+                # ignore per-item failures
+                continue
+        
+        if filtered_by_relevance > 0:
+            logger.info(f"[{source}] Filtered {filtered_by_relevance} posts by relevance threshold")
+        
+        if duplicates > 0:
+            print(f"  ⚠️ Skipped {duplicates} duplicate(s) from {source}")
+        
+        return added
+    except Exception as e:
+        # Catch any unhandled exceptions to prevent blocking other tasks
+        error_msg = f"{source} (query: {query}): {str(e)}"
+        logger.error(f"Error in _run_scrape_for_source_async: {error_msg}", exc_info=True)
+        try:
+            # Try to log error to job if available
+            for job_id, info in JOBS.items():
+                if info.get('status') == 'running':
+                    db.append_job_error(job_id, error_msg)
         except Exception:
-            # ignore per-item failures
-            continue
-    
-    if filtered_by_relevance > 0:
-        logger.info(f"[{source}] Filtered {filtered_by_relevance} posts by relevance threshold")
-    
-    if duplicates > 0:
-        print(f"  ⚠️ Skipped {duplicates} duplicate(s) from {source}")
-    
-    return added
+            pass
+        # Return 0 to indicate failure but allow other tasks to continue
+        return 0
 
 
 def _run_scrape_for_source(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
@@ -987,15 +1004,29 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
                 if job.get('cancelled'):
                     return None
                 try:
-                    result = await task
+                    # Add timeout to prevent tasks from blocking indefinitely (5 minutes max per task)
+                    result = await asyncio.wait_for(task, timeout=300.0)
                     return result
-                except Exception as e:
+                except asyncio.TimeoutError:
+                    error_msg = "Task timed out after 5 minutes"
                     if job.get('status') == 'running':
-                        job['errors'].append(str(e))
+                        job['errors'].append(error_msg)
                         try:
-                            db.append_job_error(job_id, str(e))
+                            db.append_job_error(job_id, error_msg)
                         except Exception:
                             pass
+                    logger.warning(f"Task timed out for job {job_id}")
+                    return None
+                except Exception as e:
+                    # Log error but continue with other tasks
+                    error_msg = str(e)
+                    if job.get('status') == 'running':
+                        job['errors'].append(error_msg)
+                        try:
+                            db.append_job_error(job_id, error_msg)
+                        except Exception:
+                            pass
+                    logger.warning(f"Task error for job {job_id}: {error_msg}")
                     return None
         
         # Execute tasks and process results as they complete (for real-time progress updates)
@@ -1011,36 +1042,47 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
             try:
                 result = await completed_task
                 
-                if isinstance(result, Exception):
-                    job['errors'].append(str(result))
-                    try:
-                        db.append_job_error(job_id, str(result))
-                    except Exception:
-                        pass
-                elif result is not None:
-                    job['results'].append({'added': result})
-                    try:
-                        db.append_job_result(job_id, {'added': result})
-                    except Exception:
-                        pass
-                
-                # Update progress immediately after each task completes
+                # Always increment progress counter, regardless of success or failure
                 job['progress']['completed'] += 1
                 try:
                     db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
                 except Exception:
                     pass
                 
+                if isinstance(result, Exception):
+                    # Task raised an exception
+                    error_msg = str(result)
+                    if job.get('status') == 'running':
+                        job['errors'].append(error_msg)
+                        try:
+                            db.append_job_error(job_id, error_msg)
+                        except Exception:
+                            pass
+                    logger.warning(f"Task failed for job {job_id}: {error_msg}")
+                elif result is None:
+                    # Task returned None (likely failed but handled gracefully)
+                    logger.debug(f"Task returned None for job {job_id}")
+                else:
+                    # Task succeeded
+                    job['results'].append({'added': result})
+                    try:
+                        db.append_job_result(job_id, {'added': result})
+                    except Exception:
+                        pass
+                
                 # Gentle delay between processing results
                 await asyncio.sleep(delay)
                 
             except Exception as e:
+                # Unexpected error while processing completed task
+                error_msg = str(e)
                 if job.get('status') == 'running':
-                    job['errors'].append(str(e))
+                    job['errors'].append(error_msg)
                     try:
-                        db.append_job_error(job_id, str(e))
+                        db.append_job_error(job_id, error_msg)
                     except Exception:
                         pass
+                logger.error(f"Error processing completed task for job {job_id}: {error_msg}", exc_info=True)
                 
                 # Still count as completed even if there was an error
                 job['progress']['completed'] += 1
@@ -1171,6 +1213,14 @@ async def cancel_job(job_id: str):
 async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Stack Overflow questions about OVH."""
     source_name = "Stack Overflow"
+    
+    # Use base keywords if query is empty or default
+    if not query or query.strip() == "" or query == "OVH":
+        base_keywords = keywords_base.get_all_base_keywords()
+        if base_keywords:
+            query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+            log_scraping(source_name, "info", f"Using base keywords: {query}")
+    
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     items = []
     try:
@@ -1236,6 +1286,14 @@ async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
 async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape GitHub issues mentioning OVH."""
     source_name = "GitHub"
+    
+    # Use base keywords if query is empty or default
+    if not query or query.strip() == "" or query == "OVH":
+        base_keywords = keywords_base.get_all_base_keywords()
+        if base_keywords:
+            query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+            log_scraping(source_name, "info", f"Using base keywords: {query}")
+    
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
         # Use async version
@@ -1291,6 +1349,14 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
 async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
     """Scrape Reddit posts and discussions about OVH using RSS feeds."""
     source_name = "Reddit"
+    
+    # Use base keywords if query is empty or default
+    if not query or query.strip() == "" or query == "OVH":
+        base_keywords = keywords_base.get_all_base_keywords()
+        if base_keywords:
+            query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+            log_scraping(source_name, "info", f"Using base keywords: {query}")
+    
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
         # Use async version
@@ -1570,6 +1636,15 @@ async def scrape_g2_crowd_endpoint(query: str = "OVH", limit: int = 50):
 @app.post("/scrape/news", response_model=ScrapeResult)
 async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
     source_name = "Google News"
+    
+    # Use base keywords if query is empty or default
+    if not query or query.strip() == "" or query == "OVH":
+        base_keywords = keywords_base.get_all_base_keywords()
+        if base_keywords:
+            # Use first base keyword as default, or combine them
+            query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+            log_scraping(source_name, "info", f"Using base keywords: {query}")
+    
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
         # Use async version
@@ -1633,6 +1708,14 @@ async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
 async def scrape_trustpilot_endpoint(query: str = "OVH domain", limit: int = 50):
     """Scrape Trustpilot customer reviews about OVH."""
     source_name = "Trustpilot"
+    
+    # Use base keywords if query is empty or default
+    if not query or query.strip() == "" or query == "OVH domain":
+        base_keywords = keywords_base.get_all_base_keywords()
+        if base_keywords:
+            query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+            log_scraping(source_name, "info", f"Using base keywords: {query}")
+    
     log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
     try:
         # Use async version
