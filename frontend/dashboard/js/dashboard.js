@@ -33,6 +33,11 @@ function setupEventListeners() {
             state.setFilter('search', e.target.value);
             updateResetFiltersButtonVisibility();
             updateDashboard();
+            // Sync with All Posts section - update display immediately
+            if (document.getElementById('postsGallery')) {
+                postsCurrentOffset = 0; // Reset pagination
+                updatePostsDisplay();
+            }
         });
     }
     
@@ -1922,7 +1927,10 @@ let postsCurrentOffset = 0;
 const postsPerPage = 20;
 
 function scrollToPostsSection() {
-    const postsSection = document.getElementById('postsSection');
+    // Try multiple selectors to find posts section
+    const postsSection = document.getElementById('postsSection') || 
+                         document.getElementById('postsGallery')?.closest('section') ||
+                         document.querySelector('section:has(#postsGallery)');
     if (postsSection) {
         postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => {
@@ -1931,7 +1939,7 @@ function scrollToPostsSection() {
             if (backBtn) {
                 backBtn.style.display = 'block';
             }
-        }, 500);
+        }, 800); // Increased timeout to ensure scroll completes
     }
 }
 
@@ -1948,19 +1956,33 @@ function scrollToSearch() {
     }
 }
 
-// Hide back button when manually scrolling back to search
+// Show/hide back button based on scroll position
 window.addEventListener('scroll', () => {
     const backBtn = document.getElementById('backToSearchBtn');
-    if (backBtn && backBtn.style.display === 'block') {
-        const searchSection = document.querySelector('.search-section-with-kpi');
-        if (searchSection) {
-            const searchTop = searchSection.getBoundingClientRect().top;
-            if (searchTop >= 0 && searchTop < 100) {
-                backBtn.style.display = 'none';
-            }
+    if (!backBtn) return;
+    
+    const searchSection = document.querySelector('.search-section-with-kpi');
+    const postsSection = document.getElementById('postsSection');
+    
+    if (searchSection && postsSection) {
+        const searchTop = searchSection.getBoundingClientRect().top;
+        const postsTop = postsSection.getBoundingClientRect().top;
+        const viewportHeight = window.innerHeight;
+        
+        // Show button when:
+        // - Posts section is visible (top of posts is above bottom of viewport)
+        // - Search section is not visible (top of search is below viewport or scrolled past)
+        const postsVisible = postsTop < viewportHeight;
+        const searchVisible = searchTop >= 0 && searchTop < viewportHeight;
+        
+        if (postsVisible && !searchVisible) {
+            backBtn.style.display = 'block';
+        } else if (searchVisible) {
+            // Hide when search section is visible
+            backBtn.style.display = 'none';
         }
     }
-});
+}, { passive: true });
 
 function updatePostsDisplay() {
     if (!state || !state.posts) {
@@ -1977,6 +1999,58 @@ function updatePostsDisplay() {
     const languageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
     const dateFrom = document.getElementById('postsDateFrom')?.value || '';
     const dateTo = document.getElementById('postsDateTo')?.value || '';
+    
+    // Get global search filter from state
+    const globalSearch = state.filters?.search || '';
+    
+    // Sync local filters with global state filters if they exist
+    if (state.filters) {
+        // Sync sentiment filter
+        if (state.filters.sentiment && state.filters.sentiment !== 'all') {
+            const postsSentimentFilterEl = document.getElementById('postsSentimentFilter');
+            if (postsSentimentFilterEl && postsSentimentFilterEl.value !== state.filters.sentiment) {
+                postsSentimentFilterEl.value = state.filters.sentiment;
+            }
+        }
+        
+        // Sync source filter
+        if (state.filters.source) {
+            const postsSourceFilterEl = document.getElementById('postsSourceFilter');
+            if (postsSourceFilterEl && postsSourceFilterEl.value !== state.filters.source) {
+                postsSourceFilterEl.value = state.filters.source;
+            }
+        }
+        
+        // Sync language filter
+        if (state.filters.language && state.filters.language !== 'all') {
+            const postsLanguageFilterEl = document.getElementById('postsLanguageFilter');
+            if (postsLanguageFilterEl && postsLanguageFilterEl.value !== state.filters.language) {
+                postsLanguageFilterEl.value = state.filters.language;
+            }
+        }
+        
+        // Sync date filters
+        if (state.filters.dateFrom) {
+            const postsDateFromEl = document.getElementById('postsDateFrom');
+            if (postsDateFromEl && postsDateFromEl.value !== state.filters.dateFrom) {
+                postsDateFromEl.value = state.filters.dateFrom;
+            }
+        }
+        
+        if (state.filters.dateTo) {
+            const postsDateToEl = document.getElementById('postsDateTo');
+            if (postsDateToEl && postsDateToEl.value !== state.filters.dateTo) {
+                postsDateToEl.value = state.filters.dateTo;
+            }
+        }
+    }
+    
+    // Use synced values after potential updates
+    const finalSentimentFilter = document.getElementById('postsSentimentFilter')?.value || 'all';
+    const finalSourceFilter = document.getElementById('postsSourceFilter')?.value || 'all';
+    const finalLanguageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
+    const finalDateFrom = document.getElementById('postsDateFrom')?.value || '';
+    const finalDateTo = document.getElementById('postsDateTo')?.value || '';
 
     // Filter posts
     let filtered = state.posts.filter(post => {
@@ -1988,19 +2062,30 @@ function updatePostsDisplay() {
             post.url === 'https://trustpilot.com/sample'
         );
         if (isSample) return false;
+        
+        // Apply global search filter (from main search bar)
+        if (globalSearch) {
+            const searchLower = globalSearch.toLowerCase();
+            const matchesSearch = 
+                post.content?.toLowerCase().includes(searchLower) ||
+                post.author?.toLowerCase().includes(searchLower) ||
+                post.url?.toLowerCase().includes(searchLower) ||
+                post.source?.toLowerCase().includes(searchLower);
+            if (!matchesSearch) return false;
+        }
 
         // Apply filters
         const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
-        const matchesSource = !sourceFilter || sourceFilter === 'all' || normalizedSource === sourceFilter || post.source === sourceFilter;
-        const matchesSentiment = !sentimentFilter || sentimentFilter === 'all' || post.sentiment_label === sentimentFilter;
-        const matchesLanguage = !languageFilter || languageFilter === 'all' || post.language === languageFilter;
+        const matchesSource = !finalSourceFilter || finalSourceFilter === 'all' || normalizedSource === finalSourceFilter || post.source === finalSourceFilter;
+        const matchesSentiment = !finalSentimentFilter || finalSentimentFilter === 'all' || post.sentiment_label === finalSentimentFilter;
+        const matchesLanguage = !finalLanguageFilter || finalLanguageFilter === 'all' || post.language === finalLanguageFilter;
         
         // Date range filter
         let matchesDate = true;
-        if (dateFrom || dateTo) {
+        if (finalDateFrom || finalDateTo) {
             const postDate = new Date(post.created_at).toISOString().split('T')[0];
-            if (dateFrom && postDate < dateFrom) matchesDate = false;
-            if (dateTo && postDate > dateTo) matchesDate = false;
+            if (finalDateFrom && postDate < finalDateFrom) matchesDate = false;
+            if (finalDateTo && postDate > finalDateTo) matchesDate = false;
         }
 
         return matchesSource && matchesSentiment && matchesLanguage && matchesDate;

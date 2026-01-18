@@ -23,9 +23,10 @@
 .nav-menu-left {
     display: flex;
     align-items: center;
-    gap: 16px; /* Reduced from 32px to prevent overflow */
+    gap: 12px; /* Further reduced gap */
     flex: 1;
     min-width: 0; /* Allow shrinking */
+    max-width: calc(100% - 200px); /* Reserve space for right menu */
 }
 
 .nav-logo {
@@ -166,8 +167,10 @@
 .nav-menu-right {
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-shrink: 0; /* Prevent button from overlapping menu */
+    gap: 8px; /* Reduced gap */
+    flex-shrink: 0;
+    min-width: 0; /* Allow shrinking if needed */
+    max-width: 100%; /* Prevent overflow */
 }
 
 /* Adjust body padding to account for fixed nav */
@@ -239,8 +242,13 @@ body.v1-page {
 
 /* Scrape button compact styling */
 .btn-scrape-compact {
-    padding: 6px 12px !important; /* Reduced from 8px 16px */
-    font-size: 0.8em !important; /* Reduced font size */
+    padding: 6px 10px !important; /* Further reduced padding */
+    font-size: 0.75em !important; /* Smaller font */
+    white-space: nowrap; /* Prevent text wrapping */
+    max-width: 120px; /* Limit button width */
+    overflow: hidden; /* Hide overflow */
+    text-overflow: ellipsis; /* Show ellipsis if too long */
+    flex-shrink: 1; /* Allow button to shrink if needed */
 }
 
 /* Media queries for responsive navigation */
@@ -255,13 +263,24 @@ body.v1-page {
     }
     
     .nav-menu-left {
-        gap: 12px; /* Further reduce gap */
+        gap: 8px; /* Further reduce gap */
+        max-width: calc(100% - 180px); /* Adjust reserved space */
+    }
+    
+    .btn-scrape-compact {
+        padding: 5px 8px !important;
+        font-size: 0.7em !important;
+        max-width: 100px;
+    }
+    
+    .nav-menu-right {
+        gap: 6px;
     }
 }
 
 @media (max-width: 768px) {
     .nav-menu {
-        padding: 10px 16px; /* Reduce horizontal padding */
+        padding: 10px 12px; /* Further reduce horizontal padding */
     }
     
     .nav-tab {
@@ -270,13 +289,22 @@ body.v1-page {
     
     .beta-badge,
     .version-badge {
-        font-size: 0.7em; /* Smaller badges */
-        padding: 3px 8px;
+        font-size: 0.65em; /* Smaller badges */
+        padding: 3px 6px;
     }
     
     .btn-scrape-compact {
-        padding: 5px 10px !important;
-        font-size: 0.75em !important;
+        padding: 4px 8px !important;
+        font-size: 0.65em !important;
+        max-width: 80px;
+    }
+    
+    .nav-menu-right {
+        gap: 4px;
+    }
+    
+    .nav-menu-left {
+        max-width: calc(100% - 150px);
     }
 }
 

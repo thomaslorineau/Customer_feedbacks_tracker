@@ -4254,10 +4254,43 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     if (progressText) {
                         if (total > 0) {
                             const percentage = Math.round((completed / total) * 100);
+                            let statusText = '';
                             if (sourceName) {
-                                progressText.textContent = `Scraping ${sourceName}: ${completed}/${total} tasks completed (${percentage}%)`;
+                                if (completed === 0) {
+                                    statusText = `Initializing ${sourceName} scraper...`;
+                                } else if (completed < total) {
+                                    // Determine step based on progress
+                                    if (total === 100) {
+                                        // Single source job with 100 steps (granular progress)
+                                        if (percentage < 5) {
+                                            statusText = `Preparing ${sourceName} scraper... (${percentage}%)`;
+                                        } else if (percentage < 90) {
+                                            statusText = `Scraping ${sourceName}... (${percentage}%)`;
+                                        } else if (percentage < 95) {
+                                            statusText = `Processing ${sourceName} results... (${percentage}%)`;
+                                        } else {
+                                            statusText = `Finalizing ${sourceName}... (${percentage}%)`;
+                                        }
+                                    } else if (total === 4) {
+                                        // Single source job with 4 steps (legacy)
+                                        if (completed === 1) {
+                                            statusText = `Preparing ${sourceName} scraper...`;
+                                        } else if (completed === 2) {
+                                            statusText = `Scraping ${sourceName}...`;
+                                        } else if (completed === 3) {
+                                            statusText = `Processing ${sourceName} results...`;
+                                        }
+                                    } else {
+                                        statusText = `Scraping ${sourceName}: ${completed}/${total} tasks completed (${percentage}%)`;
+                                    }
+                                } else {
+                                    statusText = `✅ Completed ${sourceName} scraping!`;
+                                }
                             } else {
-                                progressText.textContent = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
+                                statusText = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
+                            }
+                            if (statusText) {
+                                progressText.textContent = statusText;
                             }
                         } else if (status === 'running' || status === 'pending') {
                             if (sourceName) {
