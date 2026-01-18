@@ -413,8 +413,7 @@
             <button class="btn-primary" onclick="loadLogs()">🔄 Actualiser</button>
             <button class="btn-danger" onclick="clearLogs()">🗑️ Effacer</button>
             <div class="auto-refresh">
-                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()">
-                <label for="autoRefresh">Actualisation auto (5s)</label>
+                <span style="color: var(--text-secondary); font-size: 14px;">🔄 Actualisation auto (2s)</span>
             </div>
         </div>
 
@@ -452,6 +451,7 @@
         const API_BASE = window.location.origin;
         let autoRefreshInterval = null;
         let sources = new Set();
+        const AUTO_REFRESH_INTERVAL = 2000; // 2 secondes pour un feedback temps réel
 
         async function loadLogs() {
             const source = document.getElementById('filterSource').value;
@@ -572,18 +572,33 @@
             }
         }
 
-        function toggleAutoRefresh() {
-            const enabled = document.getElementById('autoRefresh').checked;
-            
-            if (enabled) {
-                autoRefreshInterval = setInterval(loadLogs, 5000);
-            } else {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
-                }
+        function startAutoRefresh() {
+            // Démarrer l'actualisation automatique immédiatement
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            autoRefreshInterval = setInterval(loadLogs, AUTO_REFRESH_INTERVAL);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
             }
         }
+
+        // Démarrer l'actualisation automatique dès le chargement
+        // et reprendre automatiquement quand la page redevient visible
+        function handleVisibilityChange() {
+            if (document.visibilityState === 'visible') {
+                startAutoRefresh();
+            } else {
+                // Optionnel: arrêter quand la page n'est pas visible pour économiser les ressources
+                // stopAutoRefresh();
+            }
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         function toggleTheme() {
             const body = document.body;
@@ -653,17 +668,19 @@
             }
         })();
 
-        // Load logs on page load
+        // Load logs on page load and start auto-refresh
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 initializeTheme();
                 loadVersion();
                 loadLogs();
+                startAutoRefresh(); // Démarrer l'actualisation automatique
             });
         } else {
             initializeTheme();
             loadVersion();
             loadLogs();
+            startAutoRefresh(); // Démarrer l'actualisation automatique
         }
 
         // Update filters trigger reload
