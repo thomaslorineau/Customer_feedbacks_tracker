@@ -4066,6 +4066,9 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                 const data = await response.json();
                 currentJobId = data.job_id;
                 
+                // Persist job ID to localStorage for cross-page persistence
+                persistLastJob(currentJobId, sourceDisplayName);
+                
                 addLog(`✅ ${sourceDisplayName} job started! Job ID: ${currentJobId.substring(0, 8)}...`, 'success');
                 addLog('💡 The scraping is running in the background. You can continue using the app.', 'info');
                 
@@ -4314,10 +4317,9 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     }
                     
                     // Check if job is complete
-                    if (status === 'completed') {
+                    if (status === 'completed' || status === 'failed' || status === 'cancelled') {
                         clearInterval(jobStatusInterval);
                         jobStatusInterval = null;
-                        currentJobId = null;
                         
                         // Calculate total added
                         const results = job.results || [];
@@ -4326,37 +4328,55 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                             if (r.added) totalAdded += r.added;
                         });
                         
-                        // Update progress bar to 100%
-                        if (progressBar) {
-                            progressBar.style.width = '100%';
-                            progressBar.setAttribute('aria-valuenow', 100);
-                        }
-                        if (progressContainer) {
-                            progressContainer.setAttribute('data-percentage', '100%');
-                            progressContainer.setAttribute('data-status', 'completed');
-                        }
-                        if (progressText) {
-                            if (sourceName) {
-                                progressText.textContent = `${sourceName} scraping complete! Added ${totalAdded} new posts.`;
-                            } else {
-                                progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                        // Update progress bar to 100% if completed
+                        if (status === 'completed') {
+                            if (progressBar) {
+                                progressBar.style.width = '100%';
+                                progressBar.setAttribute('aria-valuenow', 100);
+                            }
+                            if (progressContainer) {
+                                progressContainer.setAttribute('data-percentage', '100%');
+                                progressContainer.setAttribute('data-status', 'completed');
+                            }
+                            if (progressText) {
+                                if (sourceName) {
+                                    progressText.textContent = `${sourceName} scraping complete! Added ${totalAdded} new posts.`;
+                                } else {
+                                    progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                                }
                             }
                         }
                         
+                        // Show global notification (works on any page)
+                        const message = status === 'completed' 
+                            ? `Scraping terminé avec succès`
+                            : status === 'failed'
+                            ? `Erreur: ${job.error || 'Erreur inconnue'}`
+                            : `Scraping annulé par l'utilisateur`;
+                        
+                        showJobNotification(status, sourceName, message, totalAdded);
+                        
+                        // Clear persisted job
+                        persistLastJob(null);
+                        currentJobId = null;
+                        
                         if (sourceName) {
-                            addLog(`✅ ${sourceName} scraping completed! Added ${totalAdded} new posts.`, 'success');
-                            showToast(`${sourceName} complete! ${totalAdded} new posts added`, 'success');
+                            addLog(`✅ ${sourceName} scraping ${status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'cancelled'}! ${status === 'completed' ? `Added ${totalAdded} new posts.` : ''}`, status === 'completed' ? 'success' : 'error');
+                            if (status === 'completed') {
+                                showToast(`${sourceName} complete! ${totalAdded} new posts added`, 'success');
+                            }
                         } else {
                             addLog(`✅ Scraping job completed! Added ${totalAdded} new posts.`, 'success');
                             showToast(`Scraping complete! ${totalAdded} new posts added`, 'success');
                         }
                         
-                        // Hide progress bar after 3 seconds
+                        // Hide progress bar after 5 seconds (longer to see completion)
                         setTimeout(() => {
                             if (progressContainer) {
                                 progressContainer.style.display = 'none';
                             }
-                        }, 3000);
+                            showCancelBtn(false);
+                        }, 5000);
                         
                         // Load updated data
                         await loadPostsFromDB();
@@ -5256,13 +5276,117 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         // Job polling / background job UI
         let jobPollInterval = null;
 
-        function persistLastJob(jobId) {
-            if (!jobId) return localStorage.removeItem('ovh_last_job');
+        function persistLastJob(jobId, sourceName = '') {
+            if (!jobId) {
+                localStorage.removeItem('ovh_last_job');
+                localStorage.removeItem('ovh_last_job_source');
+                return;
+            }
             localStorage.setItem('ovh_last_job', jobId);
+            if (sourceName) {
+                localStorage.setItem('ovh_last_job_source', sourceName);
+            }
         }
 
         function loadLastJob() {
-            return localStorage.getItem('ovh_last_job');
+            return {
+                jobId: localStorage.getItem('ovh_last_job'),
+                sourceName: localStorage.getItem('ovh_last_job_source') || ''
+            };
+        }
+        
+        // Global job notification system (works across all pages)
+        function showJobNotification(jobStatus, sourceName, message, totalAdded = 0) {
+            // Create notification element if it doesn't exist
+            let notification = document.getElementById('globalJobNotification');
+            if (!notification) {
+                notification = document.createElement('div');
+                notification.id = 'globalJobNotification';
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 80px;
+                    right: 24px;
+                    z-index: 10000;
+                    min-width: 300px;
+                    max-width: 500px;
+                    padding: 20px;
+                    border-radius: 12px;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+                    animation: slideInRight 0.3s ease-out;
+                    cursor: pointer;
+                `;
+                document.body.appendChild(notification);
+                
+                // Add animation
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes slideInRight {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOutRight {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // Set notification content based on status
+            let bgColor, icon, title;
+            if (jobStatus === 'completed') {
+                bgColor = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                icon = '✅';
+                title = 'Scraping terminé';
+            } else if (jobStatus === 'failed') {
+                bgColor = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+                icon = '❌';
+                title = 'Scraping échoué';
+            } else if (jobStatus === 'cancelled') {
+                bgColor = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+                icon = '⏹️';
+                title = 'Scraping annulé';
+            } else {
+                return; // Don't show notification for other statuses
+            }
+            
+            notification.style.background = bgColor;
+            notification.style.color = 'white';
+            notification.innerHTML = `
+                <div style="display: flex; align-items: flex-start; gap: 12px;">
+                    <div style="font-size: 24px;">${icon}</div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 700; font-size: 1.1em; margin-bottom: 8px;">${title}</div>
+                        <div style="font-size: 0.95em; opacity: 0.95;">${sourceName ? `${sourceName}: ` : ''}${message}</div>
+                        ${totalAdded > 0 ? `<div style="margin-top: 8px; font-weight: 600;">${totalAdded} nouveau${totalAdded > 1 ? 'x' : ''} post${totalAdded > 1 ? 's' : ''} ajouté${totalAdded > 1 ? 's' : ''}</div>` : ''}
+                    </div>
+                    <button onclick="this.closest('#globalJobNotification').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1; padding: 0;">×</button>
+                </div>
+            `;
+            
+            // Auto-remove after 8 seconds
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.style.animation = 'slideOutRight 0.3s ease-out';
+                    setTimeout(() => {
+                        if (notification && notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            }, 8000);
+            
+            // Click to dismiss
+            notification.onclick = (e) => {
+                if (e.target.tagName !== 'BUTTON') {
+                    notification.style.animation = 'slideOutRight 0.3s ease-out';
+                    setTimeout(() => {
+                        if (notification && notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 300);
+                }
+            };
         }
 
         async function startBackgroundJob() {
@@ -5292,7 +5416,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     showToast('Server did not return job id', 'error');
                     return;
                 }
-                persistLastJob(jobId);
+                persistLastJob(jobId, 'All Sources');
                 addLog(`✅ Background job started: ${jobId}`, 'success');
                 document.getElementById('jobPanel').style.display = 'block';
                 updateJobPanel({ id: jobId, status: 'pending', progress: { total: 0, completed: 0 } });
@@ -5408,25 +5532,78 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
 
         // On load, if there's a recent job, resume polling (but stop if job doesn't exist)
         (function resumeLastJob() {
-            const last = loadLastJob();
-            if (last) {
+            const lastJob = loadLastJob();
+            if (lastJob && lastJob.jobId) {
+                // Show progress bar immediately if it exists
+                const progressContainer = document.getElementById('scrapingProgressContainer');
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+                const jobPanel = document.getElementById('jobPanel');
+                if (jobPanel) {
+                    jobPanel.style.display = 'block';
+                }
+                
                 // Try to fetch job status first, if 404, clear localStorage and don't start polling
-                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(last)}`)
+                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(lastJob.jobId)}`)
                     .then(resp => {
                         if (resp.ok) {
-                            // Job exists, resume polling
-                            document.getElementById('jobPanel').style.display = 'block';
-                            jobPollInterval = setInterval(() => pollJobStatus(last), 2000);
-                            pollJobStatus(last);
+                            return resp.json().then(job => {
+                                // Job exists, check if still running
+                                if (job.status === 'running' || job.status === 'pending') {
+                                    // Job still running, resume polling
+                                    console.log(`Resuming job ${lastJob.jobId.substring(0, 8)}... after page navigation`);
+                                    currentJobId = lastJob.jobId;
+                                    if (jobPanel) {
+                                        jobPollInterval = setInterval(() => pollJobStatus(lastJob.jobId), 2000);
+                                        pollJobStatus(lastJob.jobId);
+                                    } else {
+                                        // Use the main polling function
+                                        pollJobStatus(lastJob.jobId, lastJob.sourceName);
+                                    }
+                                } else {
+                                    // Job finished, show notification and clean up
+                                    const results = job.results || [];
+                                    let totalAdded = 0;
+                                    results.forEach(r => {
+                                        if (r.added) totalAdded += r.added;
+                                    });
+                                    showJobNotification(
+                                        job.status,
+                                        lastJob.sourceName,
+                                        job.status === 'completed' ? 'Scraping terminé avec succès' : job.error || 'Erreur inconnue',
+                                        totalAdded
+                                    );
+                                    persistLastJob(null);
+                                    if (progressContainer) {
+                                        progressContainer.style.display = 'none';
+                                    }
+                                    if (jobPanel) {
+                                        jobPanel.style.display = 'none';
+                                    }
+                                }
+                            });
                         } else if (resp.status === 404) {
                             // Job doesn't exist, clean up
                             console.log('Previous job not found, cleaning up localStorage');
                             persistLastJob(null);
+                            if (progressContainer) {
+                                progressContainer.style.display = 'none';
+                            }
+                            if (jobPanel) {
+                                jobPanel.style.display = 'none';
+                            }
                         }
                     })
                     .catch(err => {
                         console.warn('Could not check job status on page load:', err);
                         persistLastJob(null);
+                        if (progressContainer) {
+                            progressContainer.style.display = 'none';
+                        }
+                        if (jobPanel) {
+                            jobPanel.style.display = 'none';
+                        }
                     });
             }
         })();

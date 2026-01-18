@@ -923,16 +923,117 @@ let currentJobId = null;
 let jobStatusInterval = null;
 
 // Persist job ID to localStorage so it can be resumed after page navigation
-function persistLastJob(jobId) {
+function persistLastJob(jobId, sourceName = '') {
     if (!jobId) {
         localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
     } else {
         localStorage.setItem('ovh_last_job', jobId);
+        if (sourceName) {
+            localStorage.setItem('ovh_last_job_source', sourceName);
+        }
     }
 }
 
 function loadLastJob() {
-    return localStorage.getItem('ovh_last_job');
+    return {
+        jobId: localStorage.getItem('ovh_last_job'),
+        sourceName: localStorage.getItem('ovh_last_job_source') || ''
+    };
+}
+
+// Global job notification system (works across all pages)
+function showJobNotification(jobStatus, sourceName, message, totalAdded = 0) {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('globalJobNotification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'globalJobNotification';
+        notification.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 10000;
+            min-width: 300px;
+            max-width: 500px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            animation: slideInRight 0.3s ease-out;
+            cursor: pointer;
+        `;
+        document.body.appendChild(notification);
+        
+        // Add animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOutRight {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Set notification content based on status
+    let bgColor, icon, title;
+    if (jobStatus === 'completed') {
+        bgColor = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        icon = '✅';
+        title = 'Scraping terminé';
+    } else if (jobStatus === 'failed') {
+        bgColor = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        icon = '❌';
+        title = 'Scraping échoué';
+    } else if (jobStatus === 'cancelled') {
+        bgColor = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+        icon = '⏹️';
+        title = 'Scraping annulé';
+    } else {
+        return; // Don't show notification for other statuses
+    }
+    
+    notification.style.background = bgColor;
+    notification.style.color = 'white';
+    notification.innerHTML = `
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+            <div style="font-size: 24px;">${icon}</div>
+            <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 1.1em; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 0.95em; opacity: 0.95;">${sourceName ? `${sourceName}: ` : ''}${message}</div>
+                ${totalAdded > 0 ? `<div style="margin-top: 8px; font-weight: 600;">${totalAdded} nouveau${totalAdded > 1 ? 'x' : ''} post${totalAdded > 1 ? 's' : ''} ajouté${totalAdded > 1 ? 's' : ''}</div>` : ''}
+            </div>
+            <button onclick="this.closest('#globalJobNotification').remove()" style="background: rgba(255,255,255,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 50%; cursor: pointer; font-size: 18px; line-height: 1; padding: 0;">×</button>
+        </div>
+    `;
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (notification && notification.parentNode) {
+            notification.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    }, 8000);
+    
+    // Click to dismiss
+    notification.onclick = (e) => {
+        if (e.target.tagName !== 'BUTTON') {
+            notification.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => {
+                if (notification && notification.parentNode) {
+                    notification.remove();
+                }
+            }, 300);
+        }
+    };
 }
 
 async function scrapeAll() {
@@ -1006,7 +1107,7 @@ async function scrapeAll() {
         currentJobId = jobData.job_id;
         
         // Persist job ID so it can be resumed after page navigation
-        persistLastJob(currentJobId);
+        persistLastJob(currentJobId, 'All Sources');
         
         console.log(`✅ Job started! Job ID: ${currentJobId.substring(0, 8)}...`);
         

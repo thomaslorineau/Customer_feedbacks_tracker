@@ -1168,20 +1168,21 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     
     # Heartbeat task to update progress during scraping
     heartbeat_running = True
+    heartbeat_step = scraping_start
     
     async def progress_heartbeat():
         """Update progress gradually during scraping to show activity."""
-        current_step = scraping_start
-        while heartbeat_running and current_step < scraping_end:
-            await asyncio.sleep(0.5)  # Update every 500ms
+        nonlocal heartbeat_step
+        while heartbeat_running and heartbeat_step < scraping_end:
+            await asyncio.sleep(0.3)  # Update every 300ms for smoother progress
             if not heartbeat_running:
                 break
             # Increment progress gradually (max 1 step per heartbeat)
-            if current_step < scraping_end - 1:
-                current_step += 1
-                job['progress']['completed'] = current_step
+            if heartbeat_step < scraping_end - 1:
+                heartbeat_step += 1
+                job['progress']['completed'] = heartbeat_step
                 try:
-                    db.update_job_progress(job_id, total_steps, current_step)
+                    db.update_job_progress(job_id, total_steps, heartbeat_step)
                 except Exception:
                     pass
     
@@ -1208,9 +1209,6 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
                 log_scraping(source, "info", f"Using base keywords: {query}")
         
-        # Start heartbeat task
-        heartbeat_task = asyncio.create_task(progress_heartbeat())
-        
         # Steps 6-90: Scraping (85% with heartbeat)
         job['progress']['completed'] = scraping_start
         try:
@@ -1218,16 +1216,26 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
         except Exception:
             pass
         
-        # Run the scraper (heartbeat will update progress during this)
-        added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False)
+        # Start heartbeat task BEFORE running scraper
+        heartbeat_task = asyncio.create_task(progress_heartbeat())
         
-        # Stop heartbeat
-        heartbeat_running = False
-        heartbeat_task.cancel()
+        # Run the scraper (heartbeat will update progress during this)
         try:
-            await heartbeat_task
-        except asyncio.CancelledError:
-            pass
+            added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False)
+        finally:
+            # Stop heartbeat after scraper completes
+            heartbeat_running = False
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
+            # Set progress to scraping_end when scraper finishes
+            job['progress']['completed'] = scraping_end
+            try:
+                db.update_job_progress(job_id, total_steps, scraping_end)
+            except Exception:
+                pass
         
         # Steps 91-95: Processing results (5%)
         for step in range(processing_start, processing_start + 5):
@@ -1240,8 +1248,8 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
         
         job['results'].append({'added': added, 'source': source})
         
-        # Steps 96-100: Finalizing (5%)
-        for step in range(processing_start + 5, total_steps + 1):
+        # Steps 96-99: Finalizing (4%)
+        for step in range(processing_start + 5, total_steps):
             job['progress']['completed'] = step
             try:
                 db.update_job_progress(job_id, total_steps, step)
@@ -1249,7 +1257,26 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 pass
             await asyncio.sleep(0.05)
         
+        # Step 100: Cleanup duplicates (final step)
+        job['progress']['completed'] = total_steps - 1
         try:
+            db.update_job_progress(job_id, total_steps, total_steps - 1)
+        except Exception:
+            pass
+        
+        # Cleanup duplicates after scraping
+        try:
+            deleted_duplicates = db.delete_duplicate_posts()
+            if deleted_duplicates > 0:
+                logger.info(f"[{source}] Cleaned up {deleted_duplicates} duplicate posts after scraping")
+                job['results'].append({'duplicates_removed': deleted_duplicates})
+        except Exception as e:
+            logger.warning(f"[{source}] Failed to cleanup duplicates: {e}")
+        
+        # Final step: 100%
+        job['progress']['completed'] = total_steps
+        try:
+            db.update_job_progress(job_id, total_steps, total_steps)
             db.append_job_result(job_id, {'added': added, 'source': source})
         except Exception:
             pass
