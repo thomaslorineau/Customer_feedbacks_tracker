@@ -1169,29 +1169,52 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     # Heartbeat task to update progress during scraping
     heartbeat_running = True
     heartbeat_step = scraping_start
+    scraping_start_time = None
     
     async def progress_heartbeat():
         """Update progress gradually during scraping to show activity."""
-        nonlocal heartbeat_step
+        nonlocal heartbeat_step, scraping_start_time
+        scraping_start_time = asyncio.get_event_loop().time()
         logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
+        
+        # Calculate time-based progression: aim for ~10-30 seconds to reach scraping_end
+        # This ensures progress moves even if scraping is fast
+        target_duration = 15.0  # Target 15 seconds for scraping phase
+        steps_to_progress = scraping_end - scraping_start
+        time_per_step = target_duration / steps_to_progress if steps_to_progress > 0 else 0.1
+        
         while heartbeat_running and heartbeat_step < scraping_end:
-            await asyncio.sleep(0.5)  # Update every 500ms
+            await asyncio.sleep(0.3)  # Update every 300ms for smooth progress
             if not heartbeat_running:
                 logger.info(f"[{source}] Heartbeat stopped (heartbeat_running=False)")
                 break
-            # Increment progress gradually (max 1 step per heartbeat)
-            if heartbeat_step < scraping_end - 1:
-                heartbeat_step += 1
-                # Update both in-memory job and DB
-                job['progress']['completed'] = heartbeat_step
-                try:
-                    db.update_job_progress(job_id, total_steps, heartbeat_step)
-                    logger.debug(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
-                except Exception as e:
-                    logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
+            
+            # Calculate progress based on elapsed time
+            if scraping_start_time:
+                elapsed = asyncio.get_event_loop().time() - scraping_start_time
+                # Progress should advance based on time, but cap at scraping_end
+                time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
+                time_based_step = min(time_based_step, scraping_end - 1)
+                
+                # Always increment at least 1 step per heartbeat if we're behind
+                if time_based_step > heartbeat_step:
+                    heartbeat_step = time_based_step
+                elif heartbeat_step < scraping_end - 1:
+                    # Still increment gradually even if time-based hasn't caught up
+                    heartbeat_step += 1
             else:
-                logger.info(f"[{source}] Heartbeat reached max step {scraping_end}")
-                break
+                # Fallback: simple increment
+                if heartbeat_step < scraping_end - 1:
+                    heartbeat_step += 1
+            
+            # Update both in-memory job and DB
+            job['progress']['completed'] = heartbeat_step
+            try:
+                db.update_job_progress(job_id, total_steps, heartbeat_step)
+                logger.debug(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
+            except Exception as e:
+                logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
+        
         logger.info(f"[{source}] Heartbeat finished at step {heartbeat_step}")
     
     try:

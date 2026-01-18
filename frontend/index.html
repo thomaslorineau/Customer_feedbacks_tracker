@@ -2979,7 +2979,7 @@ Calculé à partir de :
 • Produits OVH (10%) : VPS, hosting, domain, etc.
 
 Les posts avec un score < 30% sont automatiquement filtrés.">
-                                ${relevanceIcon} ${(relevanceScore * 100).toFixed(0)}%
+                                ${relevanceIcon} Pertinence: ${(relevanceScore * 100).toFixed(0)}%
                             </span>
                         </div>
                         <div class="post-actions">
@@ -4253,15 +4253,28 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     const completed = progress.completed || 0;
                     const total = progress.total || 0;
                     
-                    // Debug logs
-                    console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total}`);
+                    // Debug logs - more detailed
+                    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                    const oldWidth = progressBar ? progressBar.style.width : '0%';
+                    console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${percentage}%)`, {
+                        job: job,
+                        progress: progress,
+                        progressBarExists: !!progressBar,
+                        currentWidth: oldWidth
+                    });
                     
                     // Always update progress bar if we have progress data (even if total is 0 initially)
                     if (progressBar) {
                         if (total > 0) {
                             const percentage = Math.round((completed / total) * 100);
-                            progressBar.style.width = `${percentage}%`;
+                            const newWidth = `${percentage}%`;
+                            progressBar.style.width = newWidth;
                             progressBar.setAttribute('aria-valuenow', percentage);
+                            
+                            // Log if progress actually changed
+                            if (oldWidth !== newWidth) {
+                                console.log(`[Progress Bar] ✅ Updated from ${oldWidth} to ${newWidth} (${completed}/${total})`);
+                            }
                             
                             // Update container attributes
                             if (progressContainer) {
@@ -4277,6 +4290,8 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                                 progressContainer.setAttribute('data-status', 'running');
                             }
                         }
+                    } else {
+                        console.warn('[Progress] ⚠️ progressBar element not found!');
                     }
                     
                     // Update progress text

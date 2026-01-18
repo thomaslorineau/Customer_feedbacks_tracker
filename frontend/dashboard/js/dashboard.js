@@ -2251,7 +2251,7 @@ function updatePostsDisplay() {
                 </div>
                 <div class="post-footer">
                     <div class="post-meta-badges">
-                        <span class="${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
+                        <span class="sentiment ${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
                             ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
                             ${(post.sentiment_label || 'neutral').toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
                         </span>
@@ -2264,7 +2264,7 @@ Calculé à partir de :
 • Produits OVH (10%) : VPS, hosting, domain, etc.
 
 Les posts avec un score < 30% sont automatiquement filtrés.">
-                            ${relevanceIcon} ${(relevanceScore * 100).toFixed(0)}%
+                            ${relevanceIcon} Pertinence: ${(relevanceScore * 100).toFixed(0)}%
                         </span>
                     </div>
                     <div class="post-actions">
