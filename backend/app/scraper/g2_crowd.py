@@ -75,12 +75,12 @@ def scrape_g2_crowd(query: str = "OVH", limit: int = 50):
                         logger.info(f"[G2 Crowd] Browser automation succeeded, HTML size: {len(html)} bytes")
                         soup = BeautifulSoup(html, 'html.parser')
                     else:
-                        logger.warning("[G2 Crowd] Browser automation also failed")
-                        logger.info("[G2 Crowd] Solutions:")
-                        logger.info("  1. Use G2 API (requires API key)")
-                        logger.info("  2. Install Playwright: pip install playwright && playwright install")
-                        logger.info("  3. Use residential proxies")
-                        logger.info("  4. Manual data collection")
+                        logger.warning("[G2 Crowd] Browser automation not available or failed")
+                        logger.debug("[G2 Crowd] Solutions (optional):")
+                        logger.debug("  1. Use G2 API (requires API key)")
+                        logger.debug("  2. Install Playwright: pip install playwright && playwright install")
+                        logger.debug("  3. Use residential proxies")
+                        logger.debug("  4. Manual data collection")
                         return []
                 else:
                     raise
@@ -297,7 +297,7 @@ def _try_browser_automation(url: str) -> str:
         elif method == 'selenium':
             return scrape_with_selenium(url, wait_selector='body', timeout=20)
         else:
-            logger.warning("[G2 Crowd] No browser automation available. Install: pip install playwright")
+            logger.debug("[G2 Crowd] No browser automation available (optional dependency)")
             return None
     except Exception as e:
         logger.debug(f"Browser automation failed: {e}")

@@ -24,7 +24,8 @@ try:
     from selenium.common.exceptions import TimeoutException, WebDriverException
     SELENIUM_AVAILABLE = True
 except ImportError:
-    logger.warning("Selenium not installed. Install with: pip install selenium")
+    # Selenium is optional - only log at debug level
+    logger.debug("Selenium not installed (optional dependency). Install with: pip install selenium")
 
 # Check if Playwright is available
 PLAYWRIGHT_AVAILABLE = False
@@ -32,7 +33,8 @@ try:
     from playwright.sync_api import sync_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
-    logger.warning("Playwright not installed. Install with: pip install playwright && playwright install")
+    # Playwright is optional - only log at debug level
+    logger.debug("Playwright not installed (optional dependency). Install with: pip install playwright && playwright install")
 
 
 def create_stealth_chrome_driver(headless: bool = True):

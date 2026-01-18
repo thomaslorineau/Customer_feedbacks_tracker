@@ -27,7 +27,8 @@ class GitHubScraper(BaseScraper):
     
     async def scrape(self, query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
         """Scrape GitHub issues AND discussions for OVH domain customer complaints."""
-        start_time = asyncio.get_event_loop().time()
+        import time
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         try:
@@ -42,7 +43,7 @@ class GitHubScraper(BaseScraper):
             all_posts.extend(discussions)
             
             if all_posts:
-                duration = asyncio.get_event_loop().time() - start_time
+                duration = time.time() - start_time
                 self.logger.log_scraping_success(len(all_posts), duration)
                 return all_posts[:limit]
             
@@ -52,7 +53,7 @@ class GitHubScraper(BaseScraper):
                 self.logger.log("info", "Trying Google Search fallback")
                 all_posts = await search_via_google("site:github.com", query, limit)
                 if all_posts:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(all_posts), duration)
                     return all_posts[:limit]
             except Exception as e:
@@ -64,18 +65,18 @@ class GitHubScraper(BaseScraper):
                 self.logger.log("info", "Trying RSS detector fallback")
                 all_posts = await detect_and_parse_feeds("https://github.com", limit)
                 if all_posts:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(all_posts), duration)
                     return all_posts[:limit]
             except Exception as e:
                 self.logger.log("warning", f"RSS detector fallback failed: {e}")
             
             self.logger.log("warning", f"No GitHub issues or discussions found for: {query}")
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             return []
         
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_scraping_error(e, duration)
             return []
     

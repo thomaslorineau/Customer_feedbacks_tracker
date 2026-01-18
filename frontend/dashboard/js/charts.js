@@ -43,10 +43,25 @@ export function updateTimelineChart(state) {
         return;
     }
     
-    // Prepare data
-    const labels = sortedKeys.map(key => {
+    // Prepare data with better date formatting
+    const labels = sortedKeys.map((key, index) => {
         const date = new Date(key);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        // Format: "Jan 15" for compact display
+        const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        // Add year if it's the first date or year changed
+        if (index === 0) {
+            const year = date.getFullYear();
+            return `${monthDay}\n${year}`;
+        }
+        
+        const prevDate = new Date(sortedKeys[index - 1]);
+        if (date.getFullYear() !== prevDate.getFullYear()) {
+            const year = date.getFullYear();
+            return `${monthDay}\n${year}`;
+        }
+        
+        return monthDay;
     });
     
     const positiveData = sortedKeys.map(key => grouped[key].positive);
@@ -84,23 +99,29 @@ export function updateTimelineChart(state) {
                 {
                     label: 'Positive',
                     data: positiveData,
-                    backgroundColor: 'rgba(52, 211, 153, 0.7)',
+                    backgroundColor: 'rgba(52, 211, 153, 0.8)',
                     borderColor: 'rgba(52, 211, 153, 1)',
-                    borderWidth: 1
+                    borderWidth: 1.5,
+                    barThickness: 'flex',
+                    maxBarThickness: 50
                 },
                 {
                     label: 'Neutral',
                     data: neutralData,
-                    backgroundColor: 'rgba(107, 114, 128, 0.7)',
+                    backgroundColor: 'rgba(107, 114, 128, 0.8)',
                     borderColor: 'rgba(107, 114, 128, 1)',
-                    borderWidth: 1
+                    borderWidth: 1.5,
+                    barThickness: 'flex',
+                    maxBarThickness: 50
                 },
                 {
                     label: 'Negative',
                     data: negativeData,
-                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
                     borderColor: 'rgba(239, 68, 68, 1)',
-                    borderWidth: 1
+                    borderWidth: 1.5,
+                    barThickness: 'flex',
+                    maxBarThickness: 50
                 }
             ]
         },
@@ -113,9 +134,45 @@ export function updateTimelineChart(state) {
                     position: 'top'
                 },
                 tooltip: {
+                    enabled: true,
                     mode: 'index',
                     intersect: false,
+                    titleFont: {
+                        size: 13,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 12
+                    },
+                    footerFont: {
+                        size: 11,
+                        style: 'italic'
+                    },
+                    padding: 12,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    footerColor: '#e0e0e0',
                     callbacks: {
+                        title: (context) => {
+                            if (context.length > 0 && currentTimelineData) {
+                                const index = context[0].dataIndex;
+                                const dateKey = currentTimelineData.sortedKeys[index];
+                                const date = new Date(dateKey);
+                                return date.toLocaleDateString('en-US', { 
+                                    weekday: 'short', 
+                                    year: 'numeric', 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                });
+                            }
+                            return '';
+                        },
+                        label: (context) => {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            return `${label}: ${value} posts`;
+                        },
                         afterLabel: (context) => {
                             // Show product breakdown in tooltip
                             if (currentTimelineData) {
@@ -139,9 +196,16 @@ export function updateTimelineChart(state) {
                                     .map(([product, count]) => `${product}: ${count}`)
                                     .join(', ');
                                 
-                                return topProducts ? `Products: ${topProducts}` : '';
+                                return topProducts ? `Top products: ${topProducts}` : '';
                             }
                             return '';
+                        },
+                        footer: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                const total = tooltipItems.reduce((sum, item) => sum + (item.parsed.y || 0), 0);
+                                return `Total: ${total} posts | Click to filter by this date | Drag to select a date range`;
+                            }
+                            return 'Hover over bars to see details. Click to filter by date. Drag to select a date range.';
                         }
                     }
                 }
@@ -153,28 +217,59 @@ export function updateTimelineChart(state) {
                         display: false
                     },
                     ticks: {
+                        // Rotation à 45° au lieu de 90° pour économiser l'espace
                         maxRotation: 45,
                         minRotation: 45,
                         autoSkip: true,
-                        maxTicksLimit: 20,
-                        padding: 10
+                        maxTicksLimit: 12, // Réduit de 30 à 12 pour moins de labels
+                        padding: 10, // Réduit de 15
+                        font: {
+                            size: 10 // Réduit de 11
+                        },
+                        callback: function(value, index) {
+                            if (!currentTimelineData) return '';
+                            const dateKey = currentTimelineData.sortedKeys[index];
+                            if (!dateKey) return '';
+                            
+                            const date = new Date(dateKey);
+                            const totalDays = currentTimelineData.sortedKeys.length;
+                            
+                            // Format intelligent des dates selon la période
+                            if (totalDays > 60) {
+                                // Plus de 60 jours : format compact mois/année
+                                return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            } else if (totalDays > 30) {
+                                // Entre 30 et 60 jours : mois/jour
+                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            } else {
+                                // Moins de 30 jours : mois/jour complet
+                                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                        }
                     }
                 },
                 y: {
                     stacked: true,
                     beginAtZero: true,
                     ticks: {
-                        stepSize: 1,
-                        precision: 0
+                        stepSize: 5, // Au lieu de 1 pour moins de labels
+                        precision: 0,
+                        font: {
+                            size: 11 // Réduit de 12
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.08)', // Plus subtil
+                        drawBorder: false
                     }
                 }
             },
             layout: {
                 padding: {
-                    bottom: 30,
-                    left: 10,
-                    right: 10,
-                    top: 10
+                    bottom: 60, // Réduit de 100
+                    left: 20,
+                    right: 20,
+                    top: 20
                 }
             },
             onClick: (event, elements) => {

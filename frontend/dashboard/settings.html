@@ -10,13 +10,14 @@
     <link rel="stylesheet" href="/css/modern-enhancements.css">
     <style>
         .settings-container {
-            max-width: var(--max-width-md);
+            max-width: 1200px;
             margin: 0 auto;
             padding: var(--spacing-lg);
         }
 
         .settings-header {
-            margin-bottom: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+            text-align: center;
         }
 
         .settings-header h1 {
@@ -31,16 +32,100 @@
             font-size: var(--font-size-base);
         }
 
-        .settings-section {
+        /* Accordion System */
+        .accordion {
             background: var(--bg-card);
             border-radius: 12px;
-            padding: var(--spacing-md);
             margin-bottom: var(--spacing-md);
             box-shadow: 0 2px 8px var(--shadow);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .accordion:hover {
+            box-shadow: 0 4px 12px var(--shadow);
+        }
+
+        .accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.25rem 1.5rem;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s ease;
+            border-bottom: 1px solid transparent;
+        }
+
+        .accordion-header:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .accordion-header.active {
+            border-bottom-color: var(--border-color);
+        }
+
+        .accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .accordion-title-icon {
+            font-size: 1.5rem;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .accordion-badge {
+            margin-left: 0.5rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .accordion-chevron {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+            color: var(--text-secondary);
+        }
+
+        .accordion-header.active .accordion-chevron {
+            transform: rotate(180deg);
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            padding: 0 1.5rem;
+        }
+
+        .accordion-content.active {
+            max-height: 5000px;
+            padding: 1.5rem;
+        }
+
+        .settings-section {
+            background: transparent;
+            border-radius: 0;
+            padding: 0;
+            margin-bottom: 0;
+            box-shadow: none;
         }
 
         .section-title {
-            font-size: var(--font-size-2xl);
+            font-size: var(--font-size-xl);
             font-weight: var(--font-weight-bold);
             color: var(--text-primary);
             margin-bottom: var(--spacing-md);
@@ -50,8 +135,8 @@
         }
 
         .section-title svg {
-            width: 24px;
-            height: 24px;
+            width: 20px;
+            height: 20px;
         }
 
         .api-key-card {
@@ -190,41 +275,6 @@
             gap: 0.35rem;
         }
 
-        .security-notice {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 1rem 1.25rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: start;
-            gap: 0.75rem;
-        }
-
-        .security-notice svg {
-            width: 20px;
-            height: 20px;
-            color: #856404;
-            flex-shrink: 0;
-            margin-top: 0.125rem;
-        }
-
-        .security-notice-content {
-            flex: 1;
-        }
-
-        .security-notice-content strong {
-            display: block;
-            color: #856404;
-            margin-bottom: 0.35rem;
-        }
-
-        .security-notice-content p {
-            margin: 0;
-            color: #856404;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
 
         .copy-feedback {
             position: fixed;
@@ -588,23 +638,51 @@
 
         /* Base Keywords Styles */
         .base-keywords-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.25rem;
+            max-width: 900px;
+        }
+
+        .keywords-field-group {
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 0.5rem;
+        }
+
+        .keywords-field-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .keywords-field-label-icon {
+            font-size: 1rem;
+            opacity: 0.8;
         }
 
         .keywords-textarea {
             width: 100%;
-            padding: 0.75rem 1rem;
+            padding: 0.625rem 0.875rem;
             border: 1px solid var(--border-color, #dee2e6);
             border-radius: 6px;
-            font-size: 0.9rem;
-            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--input-bg, #ffffff);
             color: var(--text-primary);
             resize: vertical;
-            min-height: 80px;
+            min-height: 60px;
+            max-height: 120px;
             transition: all 0.2s ease;
+            line-height: 1.5;
         }
 
         .keywords-textarea:focus {
@@ -616,6 +694,221 @@
         body.dark-mode .keywords-textarea {
             background: var(--input-bg, #1e293b);
             border-color: var(--border-color, #334155);
+        }
+
+        @media (max-width: 768px) {
+            .base-keywords-form {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* API Keys Grouping */
+        .api-keys-groups {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .api-keys-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .api-keys-group-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .api-keys-group-llm {
+            background: rgba(0, 153, 255, 0.03);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 153, 255, 0.1);
+        }
+
+        .api-keys-group-third-party {
+            background: rgba(108, 117, 125, 0.03);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(108, 117, 125, 0.1);
+        }
+
+        /* Security Notice in API Keys */
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+
+        body.dark-mode .security-notice {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: #ffc107;
+        }
+
+        .security-notice svg {
+            width: 20px;
+            height: 20px;
+            color: #856404;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        body.dark-mode .security-notice svg {
+            color: #ffc107;
+        }
+
+        .security-notice-content {
+            flex: 1;
+        }
+
+        .security-notice-content strong {
+            display: block;
+            color: #856404;
+            margin-bottom: 0.35rem;
+        }
+
+        body.dark-mode .security-notice-content strong {
+            color: #ffc107;
+        }
+
+        .security-notice-content p {
+            margin: 0;
+            color: #856404;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        body.dark-mode .security-notice-content p {
+            color: #ffc107;
+        }
+
+        /* Rate Limiting Explanation */
+        .rate-limit-explanation {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid var(--accent-primary);
+        }
+
+        .rate-limit-explanation h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+        }
+
+        .rate-limit-explanation p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 0.5rem;
+        }
+
+        .rate-limit-example {
+            background: var(--bg-card);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin-top: 0.75rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        /* Appearance Section */
+        .appearance-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .appearance-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .appearance-option-label {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .appearance-option-label strong {
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .appearance-option-label span {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .appearance-toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+            background: var(--border-color);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .appearance-toggle.active {
+            background: var(--accent-primary);
+        }
+
+        .appearance-toggle::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .appearance-toggle.active::after {
+            transform: translateX(22px);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .settings-container {
+                padding: var(--spacing-md);
+            }
+
+            .accordion-header {
+                padding: 1rem;
+            }
+
+            .accordion-content.active {
+                padding: 1rem;
+            }
+
+            .api-keys-groups {
+                gap: 1rem;
+            }
         }
     </style>
 </head>
@@ -670,133 +963,237 @@
     <div class="settings-container">
         <!-- Header -->
         <div class="settings-header">
-            <h1>🔐 API Configuration & Settings</h1>
-            <p>Manage your API keys and application configuration securely</p>
+            <h1>Settings</h1>
+            <p>Configurez votre application</p>
         </div>
 
-        <!-- Security Notice -->
-        <div class="security-notice">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-            </svg>
-            <div class="security-notice-content">
-                <strong>⚠️ Security Notice</strong>
-                <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
-                   The "Reveal" button temporarily shows the full key for copying - use it carefully and only when needed.</p>
-            </div>
-        </div>
-
-        <!-- Logo Upload Section -->
-        <div class="settings-section">
-            <div class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
+        <!-- Section 1: LLM (Priorité Haute) -->
+        <div class="accordion" data-accordion="llm">
+            <div class="accordion-header" onclick="toggleAccordion('llm')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🤖</span>
+                    <span>LLM Configuration</span>
+                    <span class="accordion-badge" id="llmBadge">--</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
                 </svg>
-                Logo OVHcloud
             </div>
-            <div class="logo-upload-container">
-                <div class="logo-preview-section">
-                    <div class="logo-preview">
-                        <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
-                        <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                <polyline points="21 15 16 10 5 21"/>
-                            </svg>
-                            <p>Aucun logo</p>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <div id="llmStatusContainer" style="margin-bottom: 1.5rem;">
+                        <!-- LLM Status will be rendered here -->
+                    </div>
+
+                    <div id="llmContainer">
+                        <!-- Loading skeleton -->
+                        <div class="api-key-card">
+                            <div class="skeleton-loader"></div>
                         </div>
                     </div>
-                    <div class="logo-info" id="logoInfo">
-                        <p class="logo-status">Chargement...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: Scrapers API Keys (Priorité Haute) -->
+        <div class="accordion" data-accordion="scrapers-api-keys">
+            <div class="accordion-header" onclick="toggleAccordion('scrapers-api-keys')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🔑</span>
+                    <span>Scrapers API Keys</span>
+                    <span class="accordion-badge" id="scrapersApiKeysBadge">--</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <!-- Security Notice -->
+                    <div class="security-notice">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div class="security-notice-content">
+                            <strong>Security Notice</strong>
+                            <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
+                               The "Reveal" button temporarily shows the full key for copying - use it carefully and only when needed.</p>
+                        </div>
+                    </div>
+
+                    <div id="scrapersApiKeysContainer">
+                        <!-- Loading skeleton -->
+                        <div class="api-key-card">
+                            <div class="skeleton-loader"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="logo-upload-form">
-                    <label for="logoFileInput" class="upload-label">
-                        <input type="file" id="logoFileInput" accept=".svg,.png,.jpg,.jpeg" style="display: none;">
-                        <span class="upload-button">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="17 8 12 3 7 8"/>
-                                <line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                            Choisir un fichier
-                        </span>
-                    </label>
-                    <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
-                        <span class="btn-text">Uploader le logo</span>
-                        <span class="btn-spinner" style="display:none;"></span>
-                    </button>
-                    <p class="upload-hint">
-                        Formats acceptés : SVG (recommandé), PNG, JPG, JPEG<br>
-                        Taille maximale : 5MB
+            </div>
+        </div>
+
+        <!-- Section 2: Base Keywords (Priorité Haute) -->
+        <div class="accordion" data-accordion="keywords">
+            <div class="accordion-header" onclick="toggleAccordion('keywords')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🔍</span>
+                    <span>Base Keywords</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
+                        Ces mots-clés sont toujours utilisés pour le scraping, même si vous n'ajoutez pas de mots-clés personnalisés. 
+                        Ils incluent les marques OVH, les produits, les problèmes courants et les mentions de la direction. 
+                        Vous pouvez les modifier ici, mais ils seront toujours inclus dans les opérations de scraping.
                     </p>
+
+                    <div id="baseKeywordsContainer">
+                        <!-- Loading skeleton -->
+                        <div class="api-key-card">
+                            <div class="skeleton-loader"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- API Keys Section -->
-        <div class="settings-section">
-            <h2 class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        <!-- Section 3: Rate Limiting (Priorité Basse - Améliorer l'explication) -->
+        <div class="accordion" data-accordion="rate-limiting">
+            <div class="accordion-header" onclick="toggleAccordion('rate-limiting')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">⏱️</span>
+                    <span>Rate Limiting</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
                 </svg>
-                API Keys
-            </h2>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <!-- Explication améliorée -->
+                    <div class="rate-limit-explanation">
+                        <h3>Qu'est-ce que le Rate Limiting ?</h3>
+                        <p>
+                            Le rate limiting limite le nombre de requêtes API par minute pour éviter de dépasser les quotas et protéger contre les abus.
+                            Ces paramètres contrôlent la fréquence des appels API lors du scraping.
+                        </p>
+                        <p>
+                            <strong>Pourquoi c'est important ?</strong><br>
+                            Les APIs externes (GitHub, Trustpilot, etc.) imposent des limites sur le nombre de requêtes que vous pouvez effectuer.
+                            Sans rate limiting, vous risquez de dépasser ces limites et de voir vos requêtes bloquées temporairement.
+                        </p>
+                        <div class="rate-limit-example">
+                            <strong>Exemple :</strong> 100 requêtes par 60 secondes = maximum 1.67 requêtes/seconde
+                        </div>
+                    </div>
 
-            <div id="apiKeysContainer">
-                <!-- Loading skeleton -->
-                <div class="api-key-card">
-                    <div class="skeleton-loader"></div>
+                    <div class="rate-limit-info" id="rateLimitInfo">
+                        <div class="info-card">
+                            <div class="info-card-label">Requests per Window</div>
+                            <div class="info-card-value">--</div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-label">Window Duration</div>
+                            <div class="info-card-value">--</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Rate Limiting Section -->
-        <div class="settings-section">
-            <h2 class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                    <polyline points="17 6 23 6 23 12"/>
-                </svg>
-                Rate Limiting
-            </h2>
-
-            <div class="rate-limit-info" id="rateLimitInfo">
-                <div class="info-card">
-                    <div class="info-card-label">Requests per Window</div>
-                    <div class="info-card-value">--</div>
+        <!-- Section 4: Apparence (Priorité Basse) -->
+        <div class="accordion" data-accordion="appearance">
+            <div class="accordion-header" onclick="toggleAccordion('appearance')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🎨</span>
+                    <span>Apparence</span>
                 </div>
-                <div class="info-card">
-                    <div class="info-card-label">Window Duration</div>
-                    <div class="info-card-value">--</div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <div class="appearance-options">
+                        <div class="appearance-option">
+                            <div class="appearance-option-label">
+                                <strong>Mode sombre</strong>
+                                <span>Basculer entre le thème clair et sombre</span>
+                            </div>
+                            <div class="appearance-toggle" id="themeToggle" onclick="toggleThemeFromSettings()">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Logo Upload Section -->
+                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                            Logo OVHcloud
+                        </h3>
+                        <div class="logo-upload-container">
+                            <div class="logo-preview-section">
+                                <div class="logo-preview">
+                                    <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+                                    <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                                            <polyline points="21 15 16 10 5 21"/>
+                                        </svg>
+                                        <p>Aucun logo</p>
+                                    </div>
+                                </div>
+                                <div class="logo-info" id="logoInfo">
+                                    <p class="logo-status">Chargement...</p>
+                                </div>
+                            </div>
+                            <div class="logo-upload-form">
+                                <label for="logoFileInput" class="upload-label">
+                                    <input type="file" id="logoFileInput" accept=".svg,.png,.jpg,.jpeg" style="display: none;">
+                                    <span class="upload-button">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="17 8 12 3 7 8"/>
+                                            <line x1="12" y1="3" x2="12" y2="15"/>
+                                        </svg>
+                                        Choisir un fichier
+                                    </span>
+                                </label>
+                                <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
+                                    <span class="btn-text">Uploader le logo</span>
+                                    <span class="btn-spinner" style="display:none;"></span>
+                                </button>
+                                <p class="upload-hint">
+                                    Formats acceptés : SVG (recommandé), PNG, JPG, JPEG<br>
+                                    Taille maximale : 5MB
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Base Keywords Section -->
-        <div class="settings-section">
-            <h2 class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                    <line x1="9" y1="9" x2="15" y2="9"/>
-                    <line x1="9" y1="13" x2="15" y2="13"/>
+        <!-- Section 5: Environment & Version (Dernière section) -->
+        <div class="accordion" data-accordion="environment">
+            <div class="accordion-header" onclick="toggleAccordion('environment')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🌐</span>
+                    <span>Environment & Version</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
                 </svg>
-                Base Keywords (Fixed)
-            </h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                These keywords are always used for scraping, even if you don't add custom keywords. 
-                They include OVH brands, products, common problems, and leadership mentions. 
-                You can edit them here, but they will always be included in scraping operations.
-            </p>
-
-            <div id="baseKeywordsContainer">
-                <!-- Loading skeleton -->
-                <div class="api-key-card">
-                    <div class="skeleton-loader"></div>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <div id="environmentInfo">
+                        <!-- Loading skeleton -->
+                        <div class="skeleton-loader" style="height: 100px;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1075,6 +1472,52 @@
             const menu = document.getElementById('helpMenu');
             if (menu) {
                 menu.classList.toggle('active');
+            }
+        };
+
+        // Make toggleAccordion available globally
+        window.toggleAccordion = function(id) {
+            const accordion = document.querySelector(`[data-accordion="${id}"]`);
+            if (!accordion) return;
+            
+            const header = accordion.querySelector('.accordion-header');
+            const content = accordion.querySelector('.accordion-content');
+            
+            if (!header || !content) return;
+            
+            const isActive = header.classList.contains('active');
+            
+            if (isActive) {
+                header.classList.remove('active');
+                content.classList.remove('active');
+            } else {
+                header.classList.add('active');
+                content.classList.add('active');
+            }
+            
+            // Save state to localStorage
+            const state = {};
+            document.querySelectorAll('.accordion').forEach(acc => {
+                const accId = acc.getAttribute('data-accordion');
+                const accHeader = acc.querySelector('.accordion-header');
+                state[accId] = accHeader && accHeader.classList.contains('active');
+            });
+            localStorage.setItem('settingsAccordionState', JSON.stringify(state));
+        };
+
+        // Make toggleThemeFromSettings available globally
+        window.toggleThemeFromSettings = function() {
+            if (window.toggleTheme) {
+                window.toggleTheme();
+            }
+            const toggle = document.getElementById('themeToggle');
+            if (toggle) {
+                const isDark = document.body.classList.contains('dark-mode');
+                if (isDark) {
+                    toggle.classList.add('active');
+                } else {
+                    toggle.classList.remove('active');
+                }
             }
         };
 

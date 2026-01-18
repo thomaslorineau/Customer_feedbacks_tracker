@@ -421,13 +421,14 @@ function updateFilteredPostsDrawer(state) {
                         <div class="drawer-post-source">
                             <span class="drawer-source-icon">${sourceIcon}</span>
                             <span class="drawer-source-name">${post.source || 'Unknown'}</span>
+                            ${category && category !== 'General' ? `<span class="drawer-post-category" style="margin-left: 8px; padding: 3px 8px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.75em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : ''}
                             <span class="drawer-post-time">${timeAgo}</span>
                         </div>
                         <span class="drawer-sentiment-badge sentiment-${sentiment}">${sentiment}</span>
                     </div>
                     <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
                     <div class="drawer-post-meta">
-                        <span class="drawer-post-category">${category}</span>
+                        ${category && category !== 'General' ? `<span class="drawer-post-category" style="padding: 4px 10px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.8em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : '<span class="drawer-post-category" style="padding: 4px 10px; background: var(--bg-secondary, #f3f4f6); border-radius: 6px; color: var(--text-secondary, #6b7280); font-size: 0.8em;">General</span>'}
                         ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link">View post →</a>` : ''}
                     </div>
                 </div>

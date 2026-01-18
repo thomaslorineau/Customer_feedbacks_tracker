@@ -842,6 +842,7 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
                     'sentiment_label': an['label'],
                     'language': it.get('language', 'unknown'),
                     'country': country,
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:
@@ -1207,11 +1208,12 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 if heartbeat_step < scraping_end - 1:
                     heartbeat_step += 1
             
-            # Update both in-memory job and DB
+            # Update both in-memory job and DB - CRITICAL: ensure we update the shared variable
             job['progress']['completed'] = heartbeat_step
+            job['progress']['total'] = total_steps
             try:
                 db.update_job_progress(job_id, total_steps, heartbeat_step)
-                logger.debug(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
+                logger.info(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
             except Exception as e:
                 logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
         
@@ -1242,12 +1244,14 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
         
         # Steps 6-90: Scraping (85% with heartbeat)
         job['progress']['completed'] = scraping_start
+        job['progress']['total'] = total_steps
         try:
             db.update_job_progress(job_id, total_steps, scraping_start)
         except Exception:
             pass
         
         # Start heartbeat task BEFORE running scraper
+        logger.info(f"[{source}] Starting heartbeat task for job {job_id[:8]}...")
         heartbeat_task = asyncio.create_task(progress_heartbeat())
         
         # Run the scraper (heartbeat will update progress during this)
@@ -1625,6 +1629,7 @@ async def scrape_stackoverflow_endpoint(query: str = "OVH", limit: int = 50):
                     'sentiment_score': it.get('sentiment_score'),
                     'sentiment_label': it.get('sentiment_label'),
                     'language': it.get('language', 'unknown'),
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:
@@ -1671,9 +1676,17 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
     added = 0
     skipped_duplicates = 0
     errors = 0
+    filtered_by_relevance = 0
     try:
         for it in items:
             try:
+                # Vérifier la pertinence avant traitement
+                is_relevant, relevance_score = should_insert_post(it)
+                if not is_relevant:
+                    filtered_by_relevance += 1
+                    logger.debug(f"[GitHub] Skipping post (relevance={relevance_score:.2f} < {RELEVANCE_THRESHOLD}): {it.get('content', '')[:100]}")
+                    continue
+                
                 an = sentiment.analyze(it.get('content') or '')
                 it['sentiment_score'] = an['score']
                 it['sentiment_label'] = an['label']
@@ -1688,6 +1701,7 @@ async def scrape_github_endpoint(query: str = "OVH", limit: int = 50):
                     'sentiment_label': it.get('sentiment_label'),
                     'language': it.get('language', 'unknown'),
                     'country': country,
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:
@@ -1757,6 +1771,7 @@ async def scrape_reddit_endpoint(query: str = "OVH", limit: int = 50):
                     'sentiment_score': it.get('sentiment_score'),
                     'sentiment_label': it.get('sentiment_label'),
                     'language': it.get('language', 'unknown'),
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:
@@ -1808,6 +1823,7 @@ async def scrape_ovh_forum_endpoint(query: str = "OVH", limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'relevance_score': relevance_score,
             }):
                 added += 1
             else:
@@ -1861,6 +1877,7 @@ async def scrape_mastodon_endpoint(query: str = "OVH", limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'relevance_score': relevance_score,
             }):
                 added += 1
             else:
@@ -1920,6 +1937,7 @@ async def scrape_linkedin_endpoint(query: str = "OVH", limit: int = 50):
                     'sentiment_label': it.get('sentiment_label'),
                     'language': it.get('language', 'unknown'),
                     'country': country,
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:
@@ -1980,6 +1998,7 @@ async def scrape_g2_crowd_endpoint(query: str = "OVH", limit: int = 50):
                 'sentiment_score': it.get('sentiment_score'),
                 'sentiment_label': it.get('sentiment_label'),
                 'language': it.get('language', 'unknown'),
+                'relevance_score': relevance_score,
             }):
                 added += 1
             else:
@@ -2047,6 +2066,7 @@ async def scrape_news_endpoint(query: str = "OVH", limit: int = 50):
                     'sentiment_label': it.get('sentiment_label'),
                     'language': it.get('language', 'unknown'),
                     'country': country,
+                    'relevance_score': relevance_score,
                 }):
                     added += 1
                 else:

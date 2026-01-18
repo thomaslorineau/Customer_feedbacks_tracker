@@ -44,8 +44,57 @@ export function detectOVHProduct(postContent) {
     return null;
 }
 
-export function getProductLabel(postId, postContent, postLanguage) {
-    // For now, just use detection (can add manual label editing later)
-    return detectOVHProduct(postContent);
+// Store for manually edited product labels (post_id -> label)
+function saveProductLabel(postId, label) {
+    const labels = loadProductLabels();
+    if (label && label.trim()) {
+        labels[postId] = label.trim();
+    } else {
+        delete labels[postId]; // Remove if empty
+    }
+    localStorage.setItem('ovh_product_labels', JSON.stringify(labels));
 }
+
+function loadProductLabels() {
+    const saved = localStorage.getItem('ovh_product_labels');
+    return saved ? JSON.parse(saved) : {};
+}
+
+export function getProductLabel(postId, postContent, postLanguage) {
+    // First check if there's a manually edited label
+    const editedLabels = loadProductLabels();
+    if (editedLabels[postId]) {
+        return editedLabels[postId];
+    }
+    
+    // Otherwise detect automatically
+    const detectedProduct = detectOVHProduct(postContent);
+    if (detectedProduct) {
+        return detectedProduct;
+    }
+    
+    // Fallback to language if not unknown
+    if (postLanguage && postLanguage !== 'unknown') {
+        return postLanguage.toUpperCase();
+    }
+    
+    return null;
+}
+
+export function editProductLabel(postId, currentLabel) {
+    const newLabel = prompt(`Edit product label for post #${postId}:\n\nCurrent: ${currentLabel || '(none)'}\n\nEnter new label (or leave empty to remove):`, currentLabel || '');
+    
+    if (newLabel !== null) { // User didn't cancel
+        saveProductLabel(postId, newLabel);
+        // Trigger a refresh of the posts display
+        if (typeof window.updatePostsDisplay === 'function') {
+            window.updatePostsDisplay();
+        }
+        // Show a simple notification (you can replace with a toast system if available)
+        alert('Product label updated');
+    }
+}
+
+// Expose to window for onclick handlers
+window.editProductLabel = editProductLabel;
 

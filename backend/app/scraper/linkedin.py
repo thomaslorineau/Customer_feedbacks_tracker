@@ -25,7 +25,8 @@ class LinkedInScraper(BaseScraper):
     
     async def scrape(self, query: str = "OVH", limit: int = 50) -> List[Dict[str, Any]]:
         """Scrape LinkedIn for posts about OVH."""
-        start_time = asyncio.get_event_loop().time()
+        import time
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         from ..config import config
@@ -47,7 +48,7 @@ class LinkedInScraper(BaseScraper):
             # 2. Search for posts
             posts = await self._search_posts(access_token, query, limit)
             
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             if posts:
                 self.logger.log_scraping_success(len(posts), duration)
             else:
@@ -55,7 +56,7 @@ class LinkedInScraper(BaseScraper):
             return posts
         
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_scraping_error(e, duration)
             return []
     

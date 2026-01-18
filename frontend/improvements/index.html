@@ -458,6 +458,12 @@
             </div>
         </div>
         <div class="nav-menu-right">
+            <button class="btn-scrape-compact" id="scrapeAllBtn" title="Scrape new data from all sources">
+                🆕 Scrape
+            </button>
+            <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScraping()" title="Cancel current scraping job">
+                ❌ Cancel
+            </button>
             <span class="beta-badge" title="Application en version beta">BETA</span>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
@@ -690,6 +696,39 @@
 
     <script src="/js/logo-updater.js"></script>
     <script type="module" src="/dashboard/js/version-loader.js"></script>
+    <script type="module">
+        import { API } from '/dashboard/js/api.js';
+        const api = new API();
+        
+        // Scrape All button handler
+        const scrapeAllBtn = document.getElementById('scrapeAllBtn');
+        if (scrapeAllBtn) {
+            scrapeAllBtn.addEventListener('click', async () => {
+                try {
+                    scrapeAllBtn.disabled = true;
+                    scrapeAllBtn.innerHTML = '⏳ Starting...';
+                    
+                    // Load keywords from localStorage
+                    const saved = localStorage.getItem('ovh_queries');
+                    const keywords = saved ? JSON.parse(saved) : [];
+                    
+                    // Start scraping job
+                    const jobData = await api.startScrapingJob(keywords, 50, 2, 0.5);
+                    
+                    scrapeAllBtn.disabled = false;
+                    scrapeAllBtn.innerHTML = '🆕 Scrape';
+                    
+                    // Redirect to collection page to see progress
+                    window.location.href = '/scraping';
+                } catch (error) {
+                    console.error('Error starting scraping:', error);
+                    scrapeAllBtn.disabled = false;
+                    scrapeAllBtn.innerHTML = '🆕 Scrape';
+                    alert(`Error: ${error.message}`);
+                }
+            });
+        }
+    </script>
     <script src="/improvements/js/app.js"></script>
     <script>
         // Close help menu when clicking outside

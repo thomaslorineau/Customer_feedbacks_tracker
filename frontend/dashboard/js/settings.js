@@ -9,28 +9,95 @@ let configData = null;
 let revealedKeys = new Set();
 
 // Load and display version
+let versionData = null;
 async function loadVersion() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/version`);
         if (response.ok) {
-            const data = await response.json();
+            versionData = await response.json();
             const versionBadge = document.getElementById('versionBadge');
             if (versionBadge) {
-                versionBadge.textContent = `v${data.version}`;
-                versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
+                versionBadge.textContent = `v${versionData.version}`;
+                versionBadge.title = `Version ${versionData.version} - Build: ${new Date(versionData.build_date).toLocaleDateString()}`;
+            }
+            // Also render in environment section (will be called after configData is loaded)
+            if (configData) {
+                renderEnvironmentInfo();
             }
         }
     } catch (error) {
         console.warn('Failed to load version:', error);
+        // Still try to render with what we have
+        if (configData) {
+            renderEnvironmentInfo();
+        }
     }
+}
+
+// Render Environment Info
+function renderEnvironmentInfo() {
+    const container = document.getElementById('environmentInfo');
+    if (!container) return;
+    
+    if (!configData || !versionData) {
+        container.innerHTML = '<div class="skeleton-loader" style="height: 100px;"></div>';
+        return;
+    }
+    
+    const buildDate = versionData.build_date ? new Date(versionData.build_date).toLocaleDateString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    }) : 'Unknown';
+    
+    container.innerHTML = `
+        <div class="rate-limit-info" style="margin-bottom: 1.5rem;">
+            <div class="info-card">
+                <div class="info-card-label">Environment</div>
+                <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
+                    ${configData.environment || 'Unknown'}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Version</div>
+                <div class="info-card-value" style="font-size: 1.25rem;">
+                    v${versionData.version || 'Unknown'}
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-label">Build Date</div>
+                <div class="info-card-value" style="font-size: 0.95rem; font-weight: 400;">
+                    ${buildDate}
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 1.5rem;">
+            <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">
+                Version Notes
+            </h3>
+            <div style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-primary);">
+                <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin: 0;">
+                    <strong style="color: var(--text-primary);">v${versionData.version}</strong> - Build ${buildDate}
+                </p>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; margin: 0.5rem 0 0 0;">
+                    This version includes improvements to the scraping system, enhanced error handling, and UI refinements.
+                </p>
+            </div>
+        </div>
+    `;
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
+    initializeAccordion();
     loadVersion();
     loadConfiguration();
     loadBaseKeywords();
+    updateThemeToggle();
 });
 
 // Theme Management
@@ -73,6 +140,7 @@ function initializeTheme() {
         } else {
             document.body.classList.remove('dark-mode');
         }
+        updateThemeToggle();
     });
     
     // Setup theme toggle button
@@ -98,19 +166,103 @@ async function loadConfiguration() {
         
         configData = await response.json();
         console.log('Configuration loaded:', configData);
-        renderAPIKeys();
+        renderLLM();
+        renderScrapersAPIKeys();
         renderRateLimiting();
+        // Render environment info if version data is already loaded
+        if (versionData) {
+            renderEnvironmentInfo();
+        }
     } catch (error) {
         console.error('Error loading configuration:', error);
         showError(`Failed to load configuration: ${error.message}`);
     }
 }
 
-// Render API Keys
-function renderAPIKeys() {
-    const container = document.getElementById('apiKeysContainer');
-    if (!container) {
-        console.error('apiKeysContainer not found');
+// Accordion Management
+function initializeAccordion() {
+    // Load saved state from localStorage
+    const savedState = localStorage.getItem('settingsAccordionState');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            Object.keys(state).forEach(key => {
+                const accordion = document.querySelector(`[data-accordion="${key}"]`);
+                if (accordion) {
+                    const header = accordion.querySelector('.accordion-header');
+                    const content = accordion.querySelector('.accordion-content');
+                    if (header && content) {
+                        if (state[key]) {
+                            header.classList.add('active');
+                            content.classList.add('active');
+                        } else {
+                            header.classList.remove('active');
+                            content.classList.remove('active');
+                        }
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn('Failed to load accordion state:', e);
+        }
+    }
+    // By default, all sections are closed (no active class in HTML)
+}
+
+function toggleAccordion(id) {
+    const accordion = document.querySelector(`[data-accordion="${id}"]`);
+    if (!accordion) return;
+    
+    const header = accordion.querySelector('.accordion-header');
+    const content = accordion.querySelector('.accordion-content');
+    
+    if (!header || !content) return;
+    
+    const isActive = header.classList.contains('active');
+    
+    if (isActive) {
+        header.classList.remove('active');
+        content.classList.remove('active');
+    } else {
+        header.classList.add('active');
+        content.classList.add('active');
+    }
+    
+    // Save state to localStorage
+    const state = {};
+    document.querySelectorAll('.accordion').forEach(acc => {
+        const accId = acc.getAttribute('data-accordion');
+        const accHeader = acc.querySelector('.accordion-header');
+        state[accId] = accHeader && accHeader.classList.contains('active');
+    });
+    localStorage.setItem('settingsAccordionState', JSON.stringify(state));
+}
+
+// Theme Toggle from Settings
+function toggleThemeFromSettings() {
+    toggleTheme();
+    updateThemeToggle();
+}
+
+function updateThemeToggle() {
+    const toggle = document.getElementById('themeToggle');
+    if (toggle) {
+        const isDark = document.body.classList.contains('dark-mode');
+        if (isDark) {
+            toggle.classList.add('active');
+        } else {
+            toggle.classList.remove('active');
+        }
+    }
+}
+
+// Render LLM Section
+function renderLLM() {
+    const container = document.getElementById('llmContainer');
+    const statusContainer = document.getElementById('llmStatusContainer');
+    
+    if (!container || !statusContainer) {
+        console.error('LLM containers not found');
         return;
     }
     
@@ -119,7 +271,7 @@ function renderAPIKeys() {
         return;
     }
     
-    const providers = [
+    const llmProviders = [
         { 
             id: 'openai', 
             name: 'OpenAI', 
@@ -140,20 +292,104 @@ function renderAPIKeys() {
             icon: '🔍',
             description: 'Gemini models for multimodal AI capabilities',
             docsUrl: 'https://makersuite.google.com/app/apikey'
-        },
+        }
+    ];
+    
+    // Check if any LLM is configured
+    let configuredLLM = null;
+    let configuredCount = 0;
+    
+    llmProviders.forEach(provider => {
+        const keyData = configData.api_keys[provider.id];
+        if (keyData && keyData.configured) {
+            configuredCount++;
+            if (!configuredLLM) {
+                configuredLLM = provider.id;
+            }
+        }
+    });
+    
+    // Determine active LLM provider
+    const activeLLM = configData.llm_provider && configuredLLM && 
+                      configData.api_keys[configData.llm_provider]?.configured 
+                      ? configData.llm_provider 
+                      : (configuredLLM || null);
+    
+    // Get provider name
+    const activeProviderName = activeLLM ? llmProviders.find(p => p.id === activeLLM)?.name || activeLLM : null;
+    
+    // Render status
+    statusContainer.innerHTML = `
+        <div class="rate-limit-info" style="margin-bottom: 1.5rem; max-width: 600px;">
+            <div class="info-card">
+                <div class="info-card-label">LLM Status</div>
+                <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
+                    ${activeProviderName || 'Disabled'}
+                </div>
+            </div>
+            ${activeLLM ? `
+                <div class="info-card">
+                    <div class="info-card-label">Active Provider</div>
+                    <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
+                        ${activeLLM}
+                    </div>
+                </div>
+            ` : `
+                <div class="info-card" style="border-left: 3px solid var(--warning, #f59e0b);">
+                    <div class="info-card-label">Warning</div>
+                    <div class="info-card-value" style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 400;">
+                        No LLM provider configured. AI features will be disabled.
+                    </div>
+                </div>
+            `}
+        </div>
+    `;
+    
+    // Update badge
+    const badge = document.getElementById('llmBadge');
+    if (badge) {
+        badge.textContent = `${configuredCount}/${llmProviders.length}`;
+    }
+    
+    // Render LLM providers
+    container.innerHTML = `
+        <div class="api-keys-groups">
+            <div class="api-keys-group api-keys-group-llm">
+                ${llmProviders.map(provider => renderProviderCard(provider)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Render Scrapers API Keys Section
+function renderScrapersAPIKeys() {
+    const container = document.getElementById('scrapersApiKeysContainer');
+    if (!container) {
+        console.error('scrapersApiKeysContainer not found');
+        return;
+    }
+    
+    if (!configData || !configData.api_keys) {
+        console.error('configData or api_keys missing', configData);
+        return;
+    }
+    
+    const scraperProviders = [
         { 
             id: 'github', 
             name: 'GitHub', 
             icon: '🐙',
             description: 'Personal access token for enhanced rate limits',
-            docsUrl: 'https://github.com/settings/tokens'
+            docsUrl: 'https://github.com/settings/tokens',
+            group: 'scraper'
         },
         { 
             id: 'trustpilot', 
             name: 'Trustpilot', 
             icon: '⭐',
             description: 'API access for Trustpilot review scraping',
-            docsUrl: 'https://developers.trustpilot.com/'
+            docsUrl: 'https://developers.trustpilot.com/',
+            group: 'scraper'
         },
         { 
             id: 'linkedin', 
@@ -180,144 +416,168 @@ function renderAPIKeys() {
         }
     ];
     
-    container.innerHTML = providers.map(provider => {
+    // Count configured keys
+    let configuredCount = 0;
+    scraperProviders.forEach(provider => {
         const keyData = configData.api_keys[provider.id];
-        if (!keyData) {
-            console.warn(`No key data for provider: ${provider.id}`);
-            return '';
+        if (keyData && keyData.configured) {
+            configuredCount++;
         }
-        const isConfigured = keyData.configured || false;
-        const maskedKey = keyData.masked || 'Not configured';
-        
-        return `
-            <div class="api-key-card" data-provider="${provider.id}">
-                <div class="api-key-header">
-                    <div class="api-key-title">
-                        <span style="font-size: 1.5rem;">${provider.icon}</span>
-                        <div>
-                            <h3>${provider.name}</h3>
-                            <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);">
-                                ${provider.description}
-                            </p>
-                        </div>
+    });
+    
+    // Update badge
+    const badge = document.getElementById('scrapersApiKeysBadge');
+    if (badge) {
+        badge.textContent = `${configuredCount}/${scraperProviders.length}`;
+    }
+    
+    // Render scraper providers
+    container.innerHTML = `
+        <div class="api-keys-groups">
+            <div class="api-keys-group">
+                ${scraperProviders.map(provider => renderProviderCard(provider)).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderProviderCard(provider) {
+    const keyData = configData.api_keys[provider.id];
+    if (!keyData) {
+        console.warn(`No key data for provider: ${provider.id}`);
+        return '';
+    }
+    const isConfigured = keyData.configured || false;
+    const maskedKey = keyData.masked || 'Not configured';
+    
+    return `
+        <div class="api-key-card" data-provider="${provider.id}">
+            <div class="api-key-header">
+                <div class="api-key-title">
+                    <span style="font-size: 1.5rem;">${provider.icon}</span>
+                    <div>
+                        <h3>${provider.name}</h3>
+                        <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem; color: var(--text-secondary);">
+                            ${provider.description}
+                        </p>
                     </div>
-                    <span class="status-badge ${isConfigured ? 'configured' : 'not-configured'}">
-                        ${isConfigured ? '✓ Configured' : '✗ Not Configured'}
-                    </span>
+                </div>
+                <span class="status-badge ${isConfigured ? 'configured' : 'not-configured'}">
+                    ${isConfigured ? '✓ Configured' : '✗ Not Configured'}
+                </span>
+            </div>
+            
+            ${isConfigured ? `
+                <div class="api-key-value">
+                    <div class="key-display ${revealedKeys.has(provider.id) ? '' : 'hidden'}" 
+                         id="key-${provider.id}">
+                        ${revealedKeys.has(provider.id) ? '••••••••' : maskedKey}
+                    </div>
+                    <div class="key-actions">
+                        <button class="btn-icon" 
+                                onclick="toggleRevealKey('${provider.id}')"
+                                id="reveal-btn-${provider.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            ${revealedKeys.has(provider.id) ? 'Hide' : 'Reveal'}
+                        </button>
+                        <button class="btn-icon secondary" 
+                                onclick="copyKey('${provider.id}')"
+                                id="copy-btn-${provider.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
                 </div>
                 
-                ${isConfigured ? `
-                    <div class="api-key-value">
-                        <div class="key-display ${revealedKeys.has(provider.id) ? '' : 'hidden'}" 
-                             id="key-${provider.id}">
-                            ${revealedKeys.has(provider.id) ? '••••••••' : maskedKey}
-                        </div>
-                        <div class="key-actions">
-                            <button class="btn-icon" 
-                                    onclick="toggleRevealKey('${provider.id}')"
-                                    id="reveal-btn-${provider.id}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                    <circle cx="12" cy="12" r="3"/>
-                                </svg>
-                                ${revealedKeys.has(provider.id) ? 'Hide' : 'Reveal'}
-                            </button>
-                            <button class="btn-icon secondary" 
-                                    onclick="copyKey('${provider.id}')"
-                                    id="copy-btn-${provider.id}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                                </svg>
-                                Copy
-                            </button>
-                        </div>
+                <div class="api-key-info">
+                    <div class="info-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+                        </svg>
+                        Length: ${keyData.length} chars
                     </div>
-                    
-                    <div class="api-key-info">
-                        <div class="info-item">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-                            </svg>
-                            Length: ${keyData.length} chars
-                        </div>
-                        <div class="info-item">
-                            <a href="${provider.docsUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none;">
-                                📄 Get API Key
+                    <div class="info-item">
+                        <a href="${provider.docsUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none;">
+                            📄 Get API Key
+                        </a>
+                    </div>
+                </div>
+            ` : `
+                <div class="api-key-form-container">
+                    <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider.id}');">
+                        ${provider.fields && provider.fields.length > 1 ? 
+                            // Multiple fields (e.g., LinkedIn)
+                            provider.fields.map(field => `
+                                <div class="form-group">
+                                    <label for="key-input-${provider.id}-${field.name}">${field.label}</label>
+                                    <div class="input-with-button">
+                                        <input 
+                                            type="password" 
+                                            id="key-input-${provider.id}-${field.name}"
+                                            class="api-key-input"
+                                            placeholder="Enter your ${field.label}"
+                                            autocomplete="off"
+                                        />
+                                        <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}-${field.name}')">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('') :
+                            // Single field (default)
+                            `
+                                <div class="form-group">
+                                    <label for="key-input-${provider.id}">API Key</label>
+                                    <div class="input-with-button">
+                                        <input 
+                                            type="password" 
+                                            id="key-input-${provider.id}"
+                                            class="api-key-input"
+                                            placeholder="Enter your ${provider.name} API key"
+                                            autocomplete="off"
+                                        />
+                                        <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}')">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                                <circle cx="12" cy="12" r="3"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            `
+                        }
+                        <div class="form-actions">
+                            <button type="submit" class="btn-save-key" id="save-btn-${provider.id}">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                Save API Key
+                            </button>
+                            <a href="${provider.docsUrl}" target="_blank" class="btn-get-key">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                    <polyline points="15 3 21 3 21 9"/>
+                                    <line x1="10" y1="14" x2="21" y2="3"/>
+                                </svg>
+                                Get API Key
                             </a>
                         </div>
-                    </div>
-                ` : `
-                    <div class="api-key-form-container">
-                        <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider.id}');">
-                            ${provider.fields && provider.fields.length > 1 ? 
-                                // Multiple fields (e.g., LinkedIn)
-                                provider.fields.map(field => `
-                                    <div class="form-group">
-                                        <label for="key-input-${provider.id}-${field.name}">${field.label}</label>
-                                        <div class="input-with-button">
-                                            <input 
-                                                type="password" 
-                                                id="key-input-${provider.id}-${field.name}"
-                                                class="api-key-input"
-                                                placeholder="Enter your ${field.label}"
-                                                autocomplete="off"
-                                            />
-                                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}-${field.name}')">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                                    <circle cx="12" cy="12" r="3"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `).join('') :
-                                // Single field (default)
-                                `
-                                    <div class="form-group">
-                                        <label for="key-input-${provider.id}">API Key</label>
-                                        <div class="input-with-button">
-                                            <input 
-                                                type="password" 
-                                                id="key-input-${provider.id}"
-                                                class="api-key-input"
-                                                placeholder="Enter your ${provider.name} API key"
-                                                autocomplete="off"
-                                            />
-                                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider.id}')">
-                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                                    <circle cx="12" cy="12" r="3"/>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `
-                            }
-                            <div class="form-actions">
-                                <button type="submit" class="btn-save-key" id="save-btn-${provider.id}">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                        <polyline points="17 21 17 13 7 13 7 21"/>
-                                        <polyline points="7 3 7 8 15 8"/>
-                                    </svg>
-                                    Save API Key
-                                </button>
-                                <a href="${provider.docsUrl}" target="_blank" class="btn-get-key">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                                        <polyline points="15 3 21 3 21 9"/>
-                                        <line x1="10" y1="14" x2="21" y2="3"/>
-                                    </svg>
-                                    Get API Key
-                                </a>
-                            </div>
-                        </form>
-                    </div>
-                `}
-            </div>
-        `;
-    }).join('');
+                    </form>
+                </div>
+            `}
+        </div>
+    `;
 }
 
 // Render Rate Limiting Info
@@ -333,18 +593,6 @@ function renderRateLimiting() {
         <div class="info-card">
             <div class="info-card-label">Window Duration</div>
             <div class="info-card-value">${rateLimiting.window_seconds}s</div>
-        </div>
-        <div class="info-card">
-            <div class="info-card-label">Environment</div>
-            <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
-                ${configData.environment}
-            </div>
-        </div>
-        <div class="info-card">
-            <div class="info-card-label">Active LLM Provider</div>
-            <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
-                ${configData.llm_provider}
-            </div>
         </div>
     `;
 }
@@ -584,6 +832,17 @@ async function saveAPIKey(provider) {
         await loadConfiguration();
         showSuccess(`${provider.toUpperCase()} API key saved successfully!`);
         
+        // Update badges and re-render sections
+        if (configData && configData.api_keys) {
+            // Check if it's an LLM provider
+            const llmProviders = ['openai', 'anthropic', 'google'];
+            if (llmProviders.includes(provider)) {
+                renderLLM();
+            } else {
+                renderScrapersAPIKeys();
+            }
+        }
+        
     } catch (error) {
         console.error('Error saving API key:', error);
         showError(`Failed to save ${provider.toUpperCase()} API key: ${error.message}`);
@@ -654,32 +913,44 @@ async function loadBaseKeywords() {
         
         container.innerHTML = `
             <div class="base-keywords-form">
-                <div class="form-group">
-                    <label>Brands (Marques OVH)</label>
-                    <textarea id="baseKeywordsBrands" class="keywords-textarea" rows="3" placeholder="OVH, OVHCloud, Kimsufi...">${(data.brands || []).join(', ')}</textarea>
+                <div class="keywords-field-group">
+                    <label class="keywords-field-label">
+                        <span class="keywords-field-label-icon">🏢</span>
+                        <span>Brands <span style="color: var(--text-secondary); font-weight: 400;">(Marques OVH)</span></span>
+                    </label>
+                    <textarea id="baseKeywordsBrands" class="keywords-textarea" placeholder="OVH, OVHCloud, Kimsufi...">${(data.brands || []).join(', ')}</textarea>
                 </div>
-                <div class="form-group">
-                    <label>Products (Produits OVH)</label>
-                    <textarea id="baseKeywordsProducts" class="keywords-textarea" rows="3" placeholder="OVH domain, OVH hosting, OVH VPS...">${(data.products || []).join(', ')}</textarea>
+                <div class="keywords-field-group">
+                    <label class="keywords-field-label">
+                        <span class="keywords-field-label-icon">📦</span>
+                        <span>Products <span style="color: var(--text-secondary); font-weight: 400;">(Produits OVH)</span></span>
+                    </label>
+                    <textarea id="baseKeywordsProducts" class="keywords-textarea" placeholder="OVH domain, OVH hosting, OVH VPS...">${(data.products || []).join(', ')}</textarea>
                 </div>
-                <div class="form-group">
-                    <label>Problems (Problèmes/Complaints)</label>
-                    <textarea id="baseKeywordsProblems" class="keywords-textarea" rows="3" placeholder="OVH complaint, OVH support, OVH billing...">${(data.problems || []).join(', ')}</textarea>
+                <div class="keywords-field-group">
+                    <label class="keywords-field-label">
+                        <span class="keywords-field-label-icon">⚠️</span>
+                        <span>Problems <span style="color: var(--text-secondary); font-weight: 400;">(Problèmes/Complaints)</span></span>
+                    </label>
+                    <textarea id="baseKeywordsProblems" class="keywords-textarea" placeholder="OVH complaint, OVH support, OVH billing...">${(data.problems || []).join(', ')}</textarea>
                 </div>
-                <div class="form-group">
-                    <label>Leadership (Direction OVH)</label>
-                    <textarea id="baseKeywordsLeadership" class="keywords-textarea" rows="3" placeholder="Michel Paulin, Octave Klaba, OVH CEO...">${(data.leadership || []).join(', ')}</textarea>
+                <div class="keywords-field-group">
+                    <label class="keywords-field-label">
+                        <span class="keywords-field-label-icon">👔</span>
+                        <span>Leadership <span style="color: var(--text-secondary); font-weight: 400;">(Direction OVH)</span></span>
+                    </label>
+                    <textarea id="baseKeywordsLeadership" class="keywords-textarea" placeholder="Michel Paulin, Octave Klaba, OVH CEO...">${(data.leadership || []).join(', ')}</textarea>
                 </div>
-                <div class="form-actions">
-                    <button class="btn-save-key" onclick="saveBaseKeywords()">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                            <polyline points="17 21 17 13 7 13 7 21"/>
-                            <polyline points="7 3 7 8 15 8"/>
-                        </svg>
-                        Save Base Keywords
-                    </button>
-                </div>
+            </div>
+            <div class="form-actions" style="margin-top: 1.5rem; max-width: 900px;">
+                <button class="btn-save-key" onclick="saveBaseKeywords()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Base Keywords
+                </button>
             </div>
         `;
     } catch (error) {

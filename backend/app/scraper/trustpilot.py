@@ -40,7 +40,8 @@ class TrustpilotScraper(BaseScraper):
         First tries HTML scraping, then falls back to API if available.
         Returns a list of review dictionaries ready for insertion.
         """
-        start_time = asyncio.get_event_loop().time()
+        import time
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         try:
@@ -48,7 +49,7 @@ class TrustpilotScraper(BaseScraper):
             try:
                 reviews = await self._scrape_html(limit)
                 if reviews:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(reviews), duration)
                     return reviews
             except Exception as e:
@@ -59,19 +60,19 @@ class TrustpilotScraper(BaseScraper):
                 try:
                     reviews = await self._scrape_api(query, limit)
                     if reviews:
-                        duration = asyncio.get_event_loop().time() - start_time
+                        duration = time.time() - start_time
                         self.logger.log_scraping_success(len(reviews), duration)
                         return reviews
                 except Exception as e:
                     self.logger.log("warning", f"API scraping failed: {e}", error_type=type(e).__name__)
             
             # All methods failed
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log("warning", "All scraping methods failed, returning empty list", duration=duration)
             return []
             
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_scraping_error(e, duration)
             return []
     

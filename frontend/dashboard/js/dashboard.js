@@ -1,7 +1,7 @@
 // Dashboard UI management
 import { API } from './api.js';
 import { State } from './state.js';
-import { getProductLabel } from './product-detection.js';
+import { getProductLabel, editProductLabel } from './product-detection.js';
 import { updateWhatsHappening } from './whats-happening.js';
 import { updateTimelineChart } from './charts.js';
 
@@ -11,8 +11,14 @@ let state = null;
 export function initDashboard(appState) {
     state = appState;
     
+    // Initialize default date range (last 12 months) if no dates are set
+    initializeDefaultDateRange();
+    
     // Initialize event listeners
     setupEventListeners();
+    
+    // Setup modal close handlers
+    setupModalHandlers();
     
     // Subscribe to state changes to update dashboard automatically
     state.subscribe((updatedState) => {
@@ -23,6 +29,41 @@ export function initDashboard(appState) {
     // Posts are loaded by app.js, so we just update the dashboard
     // when state changes (via subscription)
     // No need to load data here
+}
+
+function initializeDefaultDateRange() {
+    if (!state) return;
+    
+    // Only set default if no dates are already set
+    const hasDateFrom = state.filters?.dateFrom && state.filters.dateFrom !== '';
+    const hasDateTo = state.filters?.dateTo && state.filters.dateTo !== '';
+    
+    if (!hasDateFrom && !hasDateTo) {
+        // Set default: last 12 months
+        const now = new Date();
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(now.getMonth() - 12);
+        
+        const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+        const dateToStr = now.toISOString().split('T')[0];
+        
+        // Update date filters
+        const dateFromInput = document.getElementById('dateFrom');
+        const dateToInput = document.getElementById('dateTo');
+        const globalDateFrom = document.getElementById('globalDateFrom');
+        const globalDateTo = document.getElementById('globalDateTo');
+        
+        if (dateFromInput) dateFromInput.value = dateFromStr;
+        if (dateToInput) dateToInput.value = dateToStr;
+        if (globalDateFrom) globalDateFrom.value = dateFromStr;
+        if (globalDateTo) globalDateTo.value = dateToStr;
+        
+        // Update state
+        state.setFilter('dateFrom', dateFromStr);
+        state.setFilter('dateTo', dateToStr);
+        
+        console.log('Default date range initialized: last 12 months');
+    }
 }
 
 function setupEventListeners() {
@@ -85,6 +126,7 @@ function setupEventListeners() {
             // Sync with local date inputs
             const dateFromInput = document.getElementById('dateFrom');
             if (dateFromInput) dateFromInput.value = dateValue;
+            updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
         });
@@ -97,6 +139,7 @@ function setupEventListeners() {
             // Sync with local date inputs
             const dateToInput = document.getElementById('dateTo');
             if (dateToInput) dateToInput.value = dateValue;
+            updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
         });
@@ -104,15 +147,24 @@ function setupEventListeners() {
     
     if (clearDatesBtn) {
         clearDatesBtn.addEventListener('click', () => {
-            state.setFilter('dateFrom', '');
-            state.setFilter('dateTo', '');
-            if (globalDateFrom) globalDateFrom.value = '';
-            if (globalDateTo) globalDateTo.value = '';
+            // Reset to default: last 12 months
+            const now = new Date();
+            const twelveMonthsAgo = new Date();
+            twelveMonthsAgo.setMonth(now.getMonth() - 12);
+            
+            const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+            const dateToStr = now.toISOString().split('T')[0];
+            
+            state.setFilter('dateFrom', dateFromStr);
+            state.setFilter('dateTo', dateToStr);
+            if (globalDateFrom) globalDateFrom.value = dateFromStr;
+            if (globalDateTo) globalDateTo.value = dateToStr;
             // Sync with local date inputs
             const dateFromInput = document.getElementById('dateFrom');
             const dateToInput = document.getElementById('dateTo');
-            if (dateFromInput) dateFromInput.value = '';
-            if (dateToInput) dateToInput.value = '';
+            if (dateFromInput) dateFromInput.value = dateFromStr;
+            if (dateToInput) dateToInput.value = dateToStr;
+            updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
         });
@@ -142,6 +194,7 @@ function setupEventListeners() {
             state.setFilter('dateFrom', dateValue);
             // Sync with global date slicer
             if (globalDateFrom) globalDateFrom.value = dateValue;
+            updateDefaultDateRangeIndicator();
             updateDashboard();
         });
     }
@@ -153,9 +206,15 @@ function setupEventListeners() {
             state.setFilter('dateTo', dateValue);
             // Sync with global date slicer
             if (globalDateTo) globalDateTo.value = dateValue;
+            updateDefaultDateRangeIndicator();
             updateDashboard();
         });
     }
+    
+    // Update indicator on page load
+    setTimeout(() => {
+        updateDefaultDateRangeIndicator();
+    }, 100);
     
     // Open critical posts button
     const openCriticalPostsBtn = document.getElementById('openCriticalPostsBtn');
@@ -842,8 +901,43 @@ function clearTimelineFilter() {
     state.setFilter('language', 'all');
     state.setFilter('product', 'all');
     
+    // Update indicator
+    updateDefaultDateRangeIndicator();
+    
     // Update dashboard
     updateDashboard();
+}
+
+function updateDefaultDateRangeIndicator() {
+    const indicator = document.getElementById('globalDefaultDateRangeIndicator');
+    if (!indicator) return;
+    
+    const globalDateFrom = document.getElementById('globalDateFrom');
+    const globalDateTo = document.getElementById('globalDateTo');
+    
+    if (!globalDateFrom || !globalDateTo) return;
+    
+    const dateFrom = globalDateFrom.value;
+    const dateTo = globalDateTo.value;
+    
+    // Check if current dates match default (last 12 months)
+    if (dateFrom && dateTo) {
+        const now = new Date();
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(now.getMonth() - 12);
+        
+        const defaultFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+        const defaultToStr = now.toISOString().split('T')[0];
+        
+        if (dateFrom === defaultFromStr && dateTo === defaultToStr) {
+            indicator.style.display = 'inline';
+            indicator.textContent = '(12 derniers mois par défaut)';
+        } else {
+            indicator.style.display = 'none';
+        }
+    } else {
+        indicator.style.display = 'none';
+    }
 }
 
 function resetFilters() {
@@ -1396,15 +1490,34 @@ function updateCriticalPostsButton() {
     if (!btn || !countSpan) return;
     
     // Calculate critical posts (negative + last 7 days)
-    // Use all posts, not just filtered ones
+    // Apply global search filter if present
     const allPosts = state.posts || [];
+    const globalSearch = state.filters?.search || '';
     const now = new Date();
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const criticalPosts = allPosts.filter(p => {
         const postDate = new Date(p.created_at);
         const isRecent = postDate >= last7Days;
         const isNegative = p.sentiment_label === 'negative';
-        return isRecent && isNegative;
+        
+        if (!isRecent || !isNegative) {
+            return false;
+        }
+        
+        // Apply global search filter if present
+        if (globalSearch && globalSearch.trim() !== '') {
+            const searchLower = globalSearch.toLowerCase();
+            const matchesSearch = 
+                p.content?.toLowerCase().includes(searchLower) ||
+                p.author?.toLowerCase().includes(searchLower) ||
+                p.url?.toLowerCase().includes(searchLower) ||
+                p.source?.toLowerCase().includes(searchLower);
+            if (!matchesSearch) {
+                return false;
+            }
+        }
+        
+        return true;
     });
     
     const count = criticalPosts.length;
@@ -1430,13 +1543,16 @@ function getFilteredCriticalPosts(sentiment, periodDays, sortBy = 'score') {
     // Get all posts (not just filtered ones)
     const allPosts = state.posts || [];
     
+    // Get global search filter from state
+    const globalSearch = state.filters?.search || '';
+    
     // Filter by sentiment and period
     const now = new Date();
     const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
     // Set to start of day for accurate comparison
     periodStart.setHours(0, 0, 0, 0);
     
-    console.log(`Filtering posts: periodDays=${periodDays}, periodStart=${periodStart.toISOString()}, sentiment=${sentiment}`);
+    console.log(`Filtering posts: periodDays=${periodDays}, periodStart=${periodStart.toISOString()}, sentiment=${sentiment}, search=${globalSearch}`);
     
     let filteredPosts = allPosts.filter(p => {
         if (!p.created_at) return false;
@@ -1450,6 +1566,19 @@ function getFilteredCriticalPosts(sentiment, periodDays, sortBy = 'score') {
         
         if (!isRecent || !matchesSentiment) {
             return false;
+        }
+        
+        // Apply global search filter if present
+        if (globalSearch && globalSearch.trim() !== '') {
+            const searchLower = globalSearch.toLowerCase();
+            const matchesSearch = 
+                p.content?.toLowerCase().includes(searchLower) ||
+                p.author?.toLowerCase().includes(searchLower) ||
+                p.url?.toLowerCase().includes(searchLower) ||
+                p.source?.toLowerCase().includes(searchLower);
+            if (!matchesSearch) {
+                return false;
+            }
         }
         
         return true;
@@ -1663,6 +1792,7 @@ function updateCriticalPostsDrawer(filters) {
                         <div class="drawer-post-source">
                             <span class="drawer-source-icon">${sourceIcon}</span>
                             <span class="drawer-source-name">${post.source || 'Unknown'}</span>
+                            ${category && category !== 'General' ? `<span class="drawer-post-category" style="margin-left: 8px; padding: 3px 8px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.75em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : ''}
                             <span class="drawer-post-time">${timeAgo}</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -1672,7 +1802,7 @@ function updateCriticalPostsDrawer(filters) {
                     </div>
                     <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
                     <div class="drawer-post-meta" style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-                        <span class="drawer-post-category">${category}</span>
+                        ${category && category !== 'General' ? `<span class="drawer-post-category" style="padding: 4px 10px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.8em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : '<span class="drawer-post-category" style="padding: 4px 10px; background: var(--bg-secondary, #f3f4f6); border-radius: 6px; color: var(--text-secondary, #6b7280); font-size: 0.8em;">General</span>'}
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <button onclick="addPostToBacklog(${post.id})" style="padding: 6px 12px; background: var(--accent-primary); border: none; border-radius: 6px; color: #ffffff; font-size: 0.85em; font-weight: 500; cursor: pointer; transition: all 0.2s ease;" 
                                 onmouseover="this.style.background='var(--accent-secondary)'; this.style.transform='translateY(-1px)';"
@@ -2192,6 +2322,12 @@ function updatePostsDisplay() {
         return matchesSource && matchesSentiment && matchesLanguage && matchesDate;
     });
 
+    // Filter out posts with relevance_score = 0 BEFORE pagination
+    filtered = filtered.filter(post => {
+        const relevanceScore = calculateRelevanceScore(post);
+        return relevanceScore !== 0 && relevanceScore !== null && relevanceScore !== undefined;
+    });
+
     // Apply sorting
     if (sortBy === 'date-desc') {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -2201,13 +2337,33 @@ function updatePostsDisplay() {
         filtered.sort((a, b) => (a.sentiment_score || 0) - (b.sentiment_score || 0));
     } else if (sortBy === 'sentiment-asc') {
         filtered.sort((a, b) => (b.sentiment_score || 0) - (a.sentiment_score || 0));
+    } else if (sortBy === 'relevancy-desc') {
+        filtered.sort((a, b) => {
+            const relevanceA = calculateRelevanceScore(a);
+            const relevanceB = calculateRelevanceScore(b);
+            if (relevanceB !== relevanceA) {
+                return relevanceB - relevanceA; // Highest first
+            }
+            // If same relevance, sort by date (most recent first)
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    } else if (sortBy === 'relevancy-asc') {
+        filtered.sort((a, b) => {
+            const relevanceA = calculateRelevanceScore(a);
+            const relevanceB = calculateRelevanceScore(b);
+            if (relevanceA !== relevanceB) {
+                return relevanceA - relevanceB; // Lowest first
+            }
+            // If same relevance, sort by date (most recent first)
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
     } else if (sortBy === 'source-asc') {
         filtered.sort((a, b) => (a.source || '').localeCompare(b.source || ''));
     } else if (sortBy === 'source-desc') {
         filtered.sort((a, b) => (b.source || '').localeCompare(a.source || ''));
     }
 
-    // Pagination
+    // Pagination (after filtering relevance_score = 0)
     const totalPosts = filtered.length;
     const paginated = filtered.slice(postsCurrentOffset, postsCurrentOffset + postsPerPage);
 
@@ -2229,6 +2385,12 @@ function updatePostsDisplay() {
 
         const productLabel = getProductLabel(post.id, post.content, post.language);
         const relevanceScore = calculateRelevanceScore(post);
+        
+        // Relevance score already filtered before pagination, but double-check for safety
+        if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
+            return '';
+        }
+        
         const relevanceClass = relevanceScore >= 0.7 ? 'relevance-high' : relevanceScore >= 0.4 ? 'relevance-medium' : 'relevance-low';
         const relevanceIcon = relevanceScore >= 0.7 ? '✓' : relevanceScore >= 0.4 ? '~' : '?';
 
@@ -2240,8 +2402,15 @@ function updatePostsDisplay() {
                         ${productLabel ? `
                             <span style="font-size:0.75em; background:linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.08) 100%); padding:5px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:5px; border:1px solid rgba(0,212,255,0.3); color:var(--accent-primary); font-weight:500;">
                                 📦 ${escapeHtml(productLabel)}
+                                <button onclick="window.editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
+                                        style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.85em; opacity:0.7; line-height:1;"
+                                        title="Edit product label">✏️</button>
                             </span>
-                        ` : ''}
+                        ` : `
+                            <button onclick="window.editProductLabel(${post.id}, '')" 
+                                    style="font-size:0.75em; background:rgba(0,212,255,0.08); padding:5px 10px; border-radius:6px; border:1px dashed rgba(0,212,255,0.4); color:var(--accent-primary); cursor:pointer; font-weight:500; display:inline-flex; align-items:center; gap:4px;"
+                                    title="Add product label">+ Label</button>
+                        `}
                     </div>
                     <span class="post-date">${formatDate(post.created_at)}</span>
                 </div>
@@ -2264,7 +2433,7 @@ Calculé à partir de :
 • Produits OVH (10%) : VPS, hosting, domain, etc.
 
 Les posts avec un score < 30% sont automatiquement filtrés.">
-                            ${relevanceIcon} Pertinence: ${(relevanceScore * 100).toFixed(0)}%
+                            ${relevanceIcon} Relevance: ${(relevanceScore * 100).toFixed(0)}%
                         </span>
                     </div>
                     <div class="post-actions">
@@ -2530,7 +2699,7 @@ if (document.readyState === 'loading') {
     }
 }
 
-// Post preview function (simplified version for dashboard)
+// Post preview function (displays modal like in index.html)
 function openPostPreview(postId) {
     if (!state || !state.posts) {
         console.error('State or posts not available');
@@ -2542,16 +2711,102 @@ function openPostPreview(postId) {
         console.error('Post not found:', postId);
         return;
     }
-
-    // Open post in new window/tab
-    if (post.url) {
-        window.open(post.url, '_blank');
+    
+    const modal = document.getElementById('postPreviewModal');
+    const contentDiv = document.getElementById('postPreviewContent');
+    const linkDiv = document.getElementById('postPreviewLink');
+    
+    if (!modal || !contentDiv || !linkDiv) {
+        console.error('Preview modal elements not found');
+        return;
+    }
+    
+    // Get product label
+    const productLabel = getProductLabel(post.id, post.content, post.language);
+    
+    // Format date
+    const postDate = new Date(post.created_at).toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // Build content HTML
+    contentDiv.innerHTML = `
+        <div style="margin-bottom: 20px; padding: 15px; background: rgba(0, 212, 255, 0.1); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="color: var(--accent-primary); font-size: 1.1em;">${escapeHtml(post.source || 'Unknown Source')}</strong>
+                    ${productLabel ? `<span style="margin-left: 10px; padding: 4px 8px; background: rgba(52, 211, 153, 0.2); border-radius: 4px; color: #34d399; font-size: 0.9em;">${escapeHtml(productLabel)}</span>` : ''}
+                </div>
+                <span class="${getSentimentClass(post.sentiment_label)}" style="font-size: 0.95em;">
+                    ${(post.sentiment_label || 'neutral').toUpperCase()} (${(post.sentiment_score || 0).toFixed(2)})
+                </span>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Author:</strong> ${escapeHtml(post.author || 'Unknown')}
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Date:</strong> ${postDate}
+            </div>
+            ${post.language ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Language:</strong> ${escapeHtml(post.language.toUpperCase())}
+            </div>` : ''}
+        </div>
+        
+        <div style="padding: 20px; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(0, 212, 255, 0.2);">
+            <h3 style="color: var(--accent-primary); margin-top: 0; margin-bottom: 15px; font-size: 1.2em;">Content:</h3>
+            <div style="color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; max-height: 500px; overflow-y: auto;">
+                ${escapeHtml(post.content || 'No content available')}
+            </div>
+        </div>
+    `;
+    
+    // Set link
+    linkDiv.href = post.url || '#';
+    if (!post.url || post.url === '#') {
+        linkDiv.style.display = 'none';
     } else {
-        console.log('Post URL not available');
+        linkDiv.style.display = 'inline-block';
+    }
+    
+    // Show modal
+    modal.style.display = 'block';
+}
+
+function closePostPreviewModal() {
+    const modal = document.getElementById('postPreviewModal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 }
 
+window.closePostPreviewModal = closePostPreviewModal;
+
+function setupModalHandlers() {
+    // Close modal when clicking outside
+    document.addEventListener('click', function(event) {
+        const postPreviewModal = document.getElementById('postPreviewModal');
+        if (postPreviewModal && event.target === postPreviewModal) {
+            closePostPreviewModal();
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            const postPreviewModal = document.getElementById('postPreviewModal');
+            if (postPreviewModal && postPreviewModal.style.display !== 'none') {
+                closePostPreviewModal();
+            }
+        }
+    });
+}
+
 window.openPostPreview = openPostPreview;
+window.updatePostsDisplay = updatePostsDisplay;
 
 export { updateProductDistribution, updatePostsList };
 

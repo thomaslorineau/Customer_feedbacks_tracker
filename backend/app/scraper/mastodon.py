@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from .base_scraper import BaseScraper
+from .circuit_breaker import CircuitBreakerOpenError
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,8 @@ class MastodonScraper(BaseScraper):
     
     async def scrape(self, query: str = "OVH", limit: int = 50) -> List[Dict[str, Any]]:
         """Scrape Mastodon for posts about OVH."""
-        start_time = asyncio.get_event_loop().time()
+        import time
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         all_posts = []
@@ -89,6 +91,10 @@ class MastodonScraper(BaseScraper):
                             except Exception as e:
                                 self.logger.log("warning", f"Error parsing Mastodon status: {e}")
                                 continue
+                except CircuitBreakerOpenError as e:
+                    # Circuit breaker is open - skip this instance and try next one
+                    self.logger.log("info", f"Circuit breaker open for {instance}, trying next instance: {e}")
+                    continue
                 except Exception as e:
                     self.logger.log("debug", f"Tag search failed for {instance}: {e}")
                 
@@ -143,6 +149,10 @@ class MastodonScraper(BaseScraper):
                                 except Exception as e:
                                     self.logger.log("warning", f"Error parsing Mastodon search result: {e}")
                                     continue
+                    except CircuitBreakerOpenError as e:
+                        # Circuit breaker is open - skip this instance and try next one
+                        self.logger.log("info", f"Circuit breaker open for {instance}, trying next instance: {e}")
+                        continue
                     except Exception as e:
                         self.logger.log("debug", f"Search API failed for {instance}: {e}")
                 
@@ -155,7 +165,7 @@ class MastodonScraper(BaseScraper):
             
             await asyncio.sleep(1)  # Delay between instances
         
-        duration = asyncio.get_event_loop().time() - start_time
+        duration = time.time() - start_time
         if all_posts:
             self.logger.log_scraping_success(len(all_posts), duration)
             return all_posts[:limit]

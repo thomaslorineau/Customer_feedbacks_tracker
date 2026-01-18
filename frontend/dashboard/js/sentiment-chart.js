@@ -115,12 +115,35 @@ function renderSentimentChart(sentimentCounts, state) {
                     }
                 },
                 tooltip: {
+                    enabled: true,
+                    titleFont: {
+                        size: 13,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 12
+                    },
+                    footerFont: {
+                        size: 11,
+                        style: 'italic'
+                    },
+                    padding: 12,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    footerColor: '#e0e0e0',
                     callbacks: {
+                        title: () => {
+                            return 'Sentiment Distribution';
+                        },
                         label: (context) => {
                             const label = context.label || '';
                             const value = context.parsed || 0;
                             const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-                            return `${label}: ${value} (${percentage}%)`;
+                            return `${label}: ${value} posts (${percentage}%)`;
+                        },
+                        footer: () => {
+                            return `Total: ${total} posts | Click to filter by sentiment`;
                         }
                     }
                 }

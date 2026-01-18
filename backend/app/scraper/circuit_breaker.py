@@ -30,7 +30,7 @@ class CircuitBreaker:
         self,
         source_name: str,
         failure_threshold: int = 5,
-        timeout: int = 60,
+        timeout: int = 30,  # Reduced from 60 to 30 seconds for faster recovery
         success_threshold: int = 2
     ):
         """

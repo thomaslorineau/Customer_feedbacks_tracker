@@ -185,12 +185,43 @@ function renderSourceChart(sourceData, sentimentBySource) {
                     }
                 },
                 tooltip: {
+                    enabled: true,
                     mode: 'index',
                     intersect: false,
+                    titleFont: {
+                        size: 13,
+                        weight: 'bold'
+                    },
+                    bodyFont: {
+                        size: 12
+                    },
+                    footerFont: {
+                        size: 11,
+                        style: 'italic'
+                    },
+                    padding: 12,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    footerColor: '#e0e0e0',
                     callbacks: {
+                        title: (tooltipItems) => {
+                            if (tooltipItems.length > 0) {
+                                return `Source: ${tooltipItems[0].label}`;
+                            }
+                            return 'Posts by Source';
+                        },
+                        label: (context) => {
+                            const label = context.dataset.label || '';
+                            const value = context.parsed.y || 0;
+                            return `${label}: ${value} posts`;
+                        },
                         footer: (tooltipItems) => {
-                            const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
-                            return `Total: ${total} posts`;
+                            if (tooltipItems.length > 0) {
+                                const total = tooltipItems.reduce((sum, item) => sum + item.parsed.y, 0);
+                                return `Total: ${total} posts | Hover to see breakdown by sentiment`;
+                            }
+                            return 'Hover over bars to see detailed sentiment breakdown';
                         }
                     }
                 }

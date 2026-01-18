@@ -22,7 +22,8 @@ class NewsScraper(BaseScraper):
     
     async def scrape(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Scrape Google News using feedparser RSS."""
-        start_time = asyncio.get_event_loop().time()
+        import time
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         import feedparser
@@ -104,7 +105,7 @@ class NewsScraper(BaseScraper):
                 self.logger.log("error", f"Error fetching keyword '{keyword}': {e}")
                 continue
         
-        duration = asyncio.get_event_loop().time() - start_time
+        duration = time.time() - start_time
         if all_results:
             self.logger.log_scraping_success(len(all_results[:limit]), duration)
             return all_results[:limit]
@@ -125,13 +126,27 @@ async def scrape_google_news_async(query: str, limit: int = 50) -> List[Dict[str
 def scrape_google_news(query: str, limit: int = 50):
     """Synchronous wrapper for async scraper (for backward compatibility)."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        # Try to get existing event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're in a running loop, use sync fallback
             return _scrape_google_news_sync(query, limit)
-        else:
-            return loop.run_until_complete(scrape_google_news_async(query, limit))
-    except RuntimeError:
-        return asyncio.run(scrape_google_news_async(query, limit))
+        except RuntimeError:
+            # No running loop, try to get event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    # Loop is closed, create new one
+                    return asyncio.run(scrape_google_news_async(query, limit))
+                else:
+                    return loop.run_until_complete(scrape_google_news_async(query, limit))
+            except RuntimeError:
+                # No event loop available, create new one
+                return asyncio.run(scrape_google_news_async(query, limit))
+    except Exception as e:
+        # Fallback to sync implementation if async fails
+        logger.warning(f"[GOOGLE NEWS] Async scraping failed: {e}, using sync fallback")
+        return _scrape_google_news_sync(query, limit)
 
 
 def _scrape_google_news_sync(query: str, limit: int = 50):

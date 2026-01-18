@@ -58,12 +58,30 @@ class AsyncHTTPClient:
     
     async def _ensure_client(self):
         """Ensure client is initialized."""
+        # Check if client exists and is still valid
         if self._client is None:
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 limits=self.limits,
                 follow_redirects=True
             )
+        else:
+            # Check if client is closed (httpx.AsyncClient doesn't have is_closed, so we try to use it)
+            try:
+                # Try to access a property to see if client is still valid
+                # If it fails, the client is likely closed
+                _ = self._client.timeout
+            except (RuntimeError, AttributeError):
+                # Client is closed or invalid, create a new one
+                try:
+                    await self._client.aclose()
+                except Exception:
+                    pass  # Ignore errors when closing
+                self._client = httpx.AsyncClient(
+                    timeout=self.timeout,
+                    limits=self.limits,
+                    follow_redirects=True
+                )
     
     async def get(
         self,

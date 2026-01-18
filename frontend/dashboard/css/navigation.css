@@ -240,15 +240,24 @@ body.v1-page {
     border-color: var(--accent-primary);
 }
 
-/* Scrape button compact styling */
+/* Scrape button compact styling - aligned with badges */
 .btn-scrape-compact {
-    padding: 6px 10px !important; /* Further reduced padding */
-    font-size: 0.75em !important; /* Smaller font */
-    white-space: nowrap; /* Prevent text wrapping */
-    max-width: 120px; /* Limit button width */
-    overflow: hidden; /* Hide overflow */
-    text-overflow: ellipsis; /* Show ellipsis if too long */
-    flex-shrink: 1; /* Allow button to shrink if needed */
+    padding: 4px 12px !important; /* Same as version-badge */
+    font-size: 0.85em !important; /* Same as version-badge */
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%) !important;
+    color: #1a1a2e !important;
+    border: 1px solid #0099cc !important;
+    border-radius: 6px !important; /* Same as badges */
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 212, 255, 0.3);
+    height: auto;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Media queries for responsive navigation */

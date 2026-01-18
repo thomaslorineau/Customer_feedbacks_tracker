@@ -63,8 +63,9 @@ class BaseScraper(ABC):
         **kwargs
     ):
         """Make GET request with logging and error handling."""
+        import time
         client = await self._get_client()
-        start_time = asyncio.get_event_loop().time()
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         
         try:
             self.logger.log_request_start(url, "GET")
@@ -75,11 +76,11 @@ class BaseScraper(ABC):
                 params=params,
                 **kwargs
             )
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_request_success(url, duration, response.status_code)
             return response
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_request_error(url, e, duration)
             raise
     
@@ -92,8 +93,9 @@ class BaseScraper(ABC):
         **kwargs
     ):
         """Make POST request with logging and error handling."""
+        import time
         client = await self._get_client()
-        start_time = asyncio.get_event_loop().time()
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         
         try:
             self.logger.log_request_start(url, "POST")
@@ -105,11 +107,11 @@ class BaseScraper(ABC):
                 data=data,
                 **kwargs
             )
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_request_success(url, duration, response.status_code)
             return response
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_request_error(url, e, duration)
             raise
     

@@ -22,7 +22,7 @@ class RedditScraper(BaseScraper):
     
     async def scrape(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         """Scrape Reddit using JSON API with pagination, fallback to RSS if API fails."""
-        start_time = asyncio.get_event_loop().time()
+        start_time = time.time()  # Use time.time() instead of asyncio.get_event_loop().time()
         self.logger.log_scraping_start(query, limit)
         
         try:
@@ -30,7 +30,7 @@ class RedditScraper(BaseScraper):
             try:
                 posts = await self._scrape_with_api(query, limit)
                 if posts:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(posts), duration)
                     return posts
             except Exception as e:
@@ -39,7 +39,7 @@ class RedditScraper(BaseScraper):
             # Fallback to RSS
             posts = await self._scrape_with_rss(query, limit)
             if posts:
-                duration = asyncio.get_event_loop().time() - start_time
+                duration = time.time() - start_time
                 self.logger.log_scraping_success(len(posts), duration)
                 return posts
             
@@ -49,7 +49,7 @@ class RedditScraper(BaseScraper):
                 self.logger.log("info", "Trying Google Search fallback")
                 posts = await search_via_google("site:reddit.com", query, limit)
                 if posts:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(posts), duration)
                     return posts
             except Exception as e:
@@ -61,18 +61,18 @@ class RedditScraper(BaseScraper):
                 self.logger.log("info", "Trying RSS detector fallback")
                 posts = await detect_and_parse_feeds("https://www.reddit.com", limit)
                 if posts:
-                    duration = asyncio.get_event_loop().time() - start_time
+                    duration = time.time() - start_time
                     self.logger.log_scraping_success(len(posts), duration)
                     return posts
             except Exception as e:
                 self.logger.log("warning", f"RSS detector fallback failed: {e}")
             
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log("warning", "No posts found", duration=duration)
             return []
         
         except Exception as e:
-            duration = asyncio.get_event_loop().time() - start_time
+            duration = time.time() - start_time
             self.logger.log_scraping_error(e, duration)
             return []
     
