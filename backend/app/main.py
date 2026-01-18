@@ -316,6 +316,9 @@ def auto_scrape_job():
 
     Uses base keywords (fixed) + user keywords (saved queries) from the DB.
     Adds small sleeps to avoid hammering third-party endpoints (basic throttling).
+    Verifies relevance score and filters non-OVH posts.
+    Uses keyword expansion for better coverage (same as manual scraping).
+    Reuses existing scraping logic to avoid code duplication.
     """
     print("🔄 Running scheduled scrape...")
 
@@ -331,230 +334,53 @@ def auto_scrape_job():
     
     queries = all_keywords
 
-    # per-query limit for scheduled job
-    per_query_limit = 20
-
+    # Configuration pour le scraping automatique
+    per_query_limit = 30  # Augmenté de 20 à 30 pour meilleure couverture
+    use_keyword_expansion = True  # Activer l'expansion (comme scraping manuel)
+    
+    # Toutes les sources disponibles (aligné avec scraping manuel)
+    sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 
+               'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+    
+    total_added = 0
+    total_errors = 0
+    
     for qi, query in enumerate(queries):
-        print(f"[AUTO SCRAPE] Query: {query}")
-
-        # X/Twitter: use direct query
-        try:
-            items = x_scraper.scrape_x(query, limit=per_query_limit)
-
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
+        print(f"[AUTO SCRAPE] Query {qi+1}/{len(queries)}: {query}")
+        
+        for source in sources:
+            try:
+                # Utiliser la même logique que le scraping manuel
+                # Cette fonction gère déjà : expansion, pertinence, doublons, etc.
+                added = _run_scrape_for_source(source, query, per_query_limit, use_keyword_expansion)
+                
+                if added > 0:
+                    print(f"  ✓ {source}: {added} posts added")
+                    total_added += added
                 else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from X/Twitter for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from X/Twitter for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping X (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # Stack Overflow
-        try:
-            items = stackoverflow.scrape_stackoverflow(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from Stack Overflow for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from Stack Overflow for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping Stack Overflow (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # Reddit
-        try:
-            items = reddit.scrape_reddit(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from Reddit for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from Reddit for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping Reddit (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # OVH Forum
-        try:
-            items = ovh_forum.scrape_ovh_forum(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from OVH Forum for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from OVH Forum for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping OVH Forum (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # Mastodon
-        try:
-            items = mastodon.scrape_mastodon(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from Mastodon for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from Mastodon for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping Mastodon (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # G2 Crowd
-        try:
-            items = g2_crowd.scrape_g2_crowd(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} reviews from G2 Crowd for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} reviews from G2 Crowd for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping G2 Crowd (non-fatal): {type(e).__name__}")
-
-        time.sleep(0.5)
-
-        # GitHub Issues
-        try:
-            items = github.scrape_github_issues(query, limit=per_query_limit)
-            added_count = 0
-            duplicate_count = 0
-            for it in items:
-                an = sentiment.analyze(it.get('content') or '')
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                }):
-                    added_count += 1
-                else:
-                    duplicate_count += 1
-            if duplicate_count > 0:
-                print(f"✓ Added {added_count} posts from GitHub Issues for '{query}' (skipped {duplicate_count} duplicates)")
-            else:
-                print(f"✓ Added {added_count} posts from GitHub Issues for '{query}'")
-        except Exception as e:
-            print(f"✗ Error scraping GitHub Issues (non-fatal): {type(e).__name__}")
-
-        # small pause between queries to avoid bursts
-        time.sleep(1.0)
+                    print(f"  - {source}: no new posts")
+                
+                # Pause entre sources pour éviter de surcharger les APIs
+                time.sleep(0.5)
+                
+            except Exception as e:
+                total_errors += 1
+                print(f"  ✗ {source}: Error ({type(e).__name__})")
+                # Continue avec les autres sources même en cas d'erreur
+        
+        # Pause entre queries pour éviter les bursts
+        if qi < len(queries) - 1:  # Pas de pause après la dernière query
+            time.sleep(1.0)
+    
+    # Nettoyer les doublons à la fin du job automatique
+    try:
+        deleted_duplicates = db.delete_duplicate_posts()
+        if deleted_duplicates > 0:
+            print(f"🧹 [AUTO SCRAPE] Cleaned up {deleted_duplicates} duplicate post(s)")
+    except Exception as e:
+        print(f"⚠️ [AUTO SCRAPE] Warning: Could not clean duplicates: {e}")
+    
+    print(f"✅ Scheduled scrape completed: {total_added} total posts added, {total_errors} errors")
 
 
 @app.on_event("startup")
