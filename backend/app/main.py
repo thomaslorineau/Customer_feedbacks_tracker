@@ -1142,6 +1142,142 @@ def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurren
         asyncio.run(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
 
 
+async def _process_single_source_job_async(job_id: str, source: str, query: str, limit: int):
+    """Process a single source scraping job."""
+    job = JOBS.get(job_id)
+    if job is None:
+        return
+    
+    job['status'] = 'running'
+    
+    # Persist job
+    try:
+        db.create_job_record(job_id)
+        db.update_job_progress(job_id, 1, 0)
+    except Exception:
+        pass
+    
+    job['progress'] = {'total': 1, 'completed': 0}
+    
+    try:
+        # Check for cancellation
+        if job.get('cancelled'):
+            job['status'] = 'cancelled'
+            db.finalize_job(job_id, 'cancelled', 'cancelled by user')
+            return
+        
+        # Use base keywords if query is empty
+        if not query or query.strip() == "":
+            base_keywords = keywords_base.get_all_base_keywords()
+            if base_keywords:
+                query = base_keywords[0] if len(base_keywords) == 1 else " ".join(base_keywords[:3])
+                log_scraping(source, "info", f"Using base keywords: {query}")
+        
+        # Run the scraper
+        added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False)
+        
+        # Update progress
+        job['progress']['completed'] = 1
+        job['results'].append({'added': added, 'source': source})
+        
+        try:
+            db.update_job_progress(job_id, 1, 1)
+            db.append_job_result(job_id, {'added': added, 'source': source})
+        except Exception:
+            pass
+        
+        # Finalize job
+        job['status'] = 'completed'
+        db.finalize_job(job_id, 'completed')
+        
+    except Exception as e:
+        error_msg = str(e)
+        job['status'] = 'failed'
+        job['error'] = error_msg
+        job['errors'].append(error_msg)
+        try:
+            db.append_job_error(job_id, error_msg)
+            db.finalize_job(job_id, 'failed', error_msg)
+        except Exception:
+            pass
+        logger.error(f"Error in single source job {job_id}: {error_msg}", exc_info=True)
+
+
+def _process_single_source_job(job_id: str, source: str, query: str, limit: int):
+    """Wrapper to run async job processing in a thread."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is running, create new thread with new event loop
+            import threading
+            def run_in_new_loop():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    new_loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
+                finally:
+                    new_loop.close()
+            t = threading.Thread(target=run_in_new_loop, daemon=True)
+            t.start()
+        else:
+            loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
+    except RuntimeError:
+        asyncio.run(_process_single_source_job_async(job_id, source, query, limit))
+
+
+@app.post('/scrape/{source}/job')
+async def start_single_source_job(
+    source: str,
+    query: str = "",
+    limit: int = 50
+):
+    """Start a background job for a single scraper source.
+    
+    Args:
+        source: Source name (x, github, stackoverflow, reddit, trustpilot, etc.)
+        query: Search query (optional, uses base keywords if empty)
+        limit: Maximum number of posts to fetch (default: 50)
+    
+    Returns:
+        Job ID and source information
+    """
+    # Validate source
+    valid_sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+    if source not in valid_sources:
+        raise HTTPException(status_code=400, detail=f"Invalid source. Must be one of: {', '.join(valid_sources)}")
+    
+    # Create job
+    job_id = str(uuid.uuid4())
+    JOBS[job_id] = {
+        'id': job_id,
+        'status': 'pending',
+        'progress': {'total': 1, 'completed': 0},
+        'results': [],
+        'errors': [],
+        'cancelled': False,
+        'error': None,
+    }
+    
+    # Create DB record
+    try:
+        db.create_job_record(job_id)
+        db.update_job_progress(job_id, 1, 0)
+    except Exception:
+        pass
+    
+    # Start background thread
+    t = threading.Thread(target=_process_single_source_job, args=(job_id, source, query, limit), daemon=True)
+    t.start()
+    
+    return {
+        'job_id': job_id,
+        'source': source,
+        'query': query,
+        'limit': limit,
+        'total_tasks': 1
+    }
+
+
 @app.post('/scrape/keywords')
 async def start_keyword_scrape(payload: KeywordsPayload, limit: int = 50, concurrency: int = 2, delay: float = 0.5):
     """Start a background job that scrapes multiple keywords across sources with throttling.

@@ -3978,469 +3978,121 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         }
 
         async function scrapeX() {
-            setButtonLoading('btnScrapeX', true);
             const keywords = loadKeywords();
-            
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
-            }
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            console.log('Starting X/Twitter scraper...', keywords);
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/x?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    console.error(`Error scraping X: ${errorMsg}`);
-                    showToast(`Error scraping X: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    console.error(`Error parsing response: ${data.error}`);
-                    showToast(`Error scraping X: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                console.log('X/Twitter scrape response:', { data, addedCount, dataType: typeof data?.added, rawAdded: data?.added });
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from X/Twitter`, 'success');
-                } else {
-                    showToast('No new posts from X/Twitter (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.log('Scrape cancelled by user');
-                } else {
-                    console.error(`Error scraping X: ${e.message}`);
-                    showToast(`Error scraping X: ${e.message}`, 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeX', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('x', 'X/Twitter', combinedQuery, 50, 'btnScrapeX');
         }
 
         async function scrapeStackOverflow() {
-            setButtonLoading('btnScrapeStackOverflow', true);
             const keywords = loadKeywords();
-            
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
-            }
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting Stack Overflow scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`⭐ Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/stackoverflow?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping Stack Overflow: ${errorMsg}`, 'error');
-                    showToast(`Error scraping Stack Overflow: ${errorMsg}`, 'error');
-                    setButtonLoading('btnScrapeStackOverflow', false);
-                    showCancelBtn(false);
-                    currentAbortController = null;
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping Stack Overflow: ${data.error}`, 'error');
-                    setButtonLoading('btnScrapeStackOverflow', false);
-                    showCancelBtn(false);
-                    currentAbortController = null;
-                    return;
-                }
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} questions from Stack Overflow`, 'success');
-                showToast(`${addedCount} new posts from Stack Overflow`, 'success');
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    addLog('⛔ Scraping cancelled by user', 'info');
-                    console.log('Scrape cancelled by user');
-                } else {
-                    const errorMsg = e.message || 'NetworkError when attempting to fetch resource';
-                    addLog(`❌ Error scraping Stack Overflow: ${errorMsg}`, 'error');
-                    addLog(`📋 Error type: ${e.name || 'Unknown'}`, 'error');
-                    console.error(`Error scraping Stack Overflow: ${errorMsg}`, e);
-                    showToast(`Error scraping Stack Overflow: ${errorMsg}`, 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeStackOverflow', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('stackoverflow', 'Stack Overflow', combinedQuery, 100, 'btnScrapeStackOverflow');
         }
 
         async function scrapeNews() {
-            setButtonLoading('btnScrapeNews', true);
             const keywords = loadKeywords();
-            
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
-            }
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            console.log('Starting Google News scraper...');
-            if (keywords && keywords.length > 0) {
-                addLog(`📰 Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`📰 Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/news?query=${encodeURIComponent(combinedQuery)}&limit=50`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping News: ${errorMsg}`, 'error');
-                    showToast(`Error scraping News: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping News: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} articles from Google News`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from Google News`, 'success');
-                } else {
-                    showToast('No new posts from Google News (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.log('Scrape cancelled by user');
-                } else {
-                    addLog(`❌ Error scraping News: ${e.message}`, 'error');
-                    showToast(`Error scraping News: ${e.message}`, 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeNews', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('news', 'Google News', combinedQuery, 50, 'btnScrapeNews');
         }
 
         async function scrapeReddit() {
-            setButtonLoading('btnScrapeReddit', true);
             const keywords = loadKeywords();
-            
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
-            }
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting Reddit scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`🔍 Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/reddit?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping Reddit: ${errorMsg}`, 'error');
-                    showToast(`Error scraping Reddit: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping Reddit: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely - check if data.added exists and is a number
-                let addedCount = 0;
-                if (data && typeof data.added === 'number') {
-                    addedCount = data.added;
-                } else if (data && data.added !== undefined) {
-                    addedCount = parseInt(data.added) || 0;
-                }
-                console.log('Reddit scrape response:', { data, addedCount, dataType: typeof data?.added, rawAdded: data?.added });
-                addLog(`✅ Successfully scraped ${addedCount} posts from Reddit`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from Reddit`, 'success');
-                } else {
-                    showToast('No new posts from Reddit (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.log('Scrape cancelled by user');
-                } else {
-                    addLog(`❌ Error scraping Reddit: ${e.message}`, 'error');
-                    showToast(`Error scraping Reddit: ${e.message}`, 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeReddit', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('reddit', 'Reddit', combinedQuery, 100, 'btnScrapeReddit');
         }
 
         async function scrapeGithub() {
-            setButtonLoading('btnScrapeGithub', true);
             const keywords = loadKeywords();
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('github', 'GitHub', combinedQuery, 100, 'btnScrapeGithub');
+        }
+
+
+        // Helper function to start a single source scraping job
+        async function startSingleSourceJob(source, sourceDisplayName, query, limit, buttonId) {
+            setButtonLoading(buttonId, true);
             
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
+            // Stop any existing job polling
+            if (jobStatusInterval) {
+                clearInterval(jobStatusInterval);
+                jobStatusInterval = null;
             }
             
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
+            // Show progress bar immediately
+            const progressContainer = document.getElementById('scrapingProgressContainer');
+            const progressBar = document.getElementById('scrapingProgressBar');
+            const progressText = document.getElementById('scrapingProgressText');
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+                progressContainer.setAttribute('data-status', 'pending');
+                progressContainer.setAttribute('data-percentage', '0%');
+            }
+            if (progressBar) {
+                progressBar.style.width = '0%';
+                progressBar.setAttribute('aria-valuenow', 0);
+            }
+            if (progressText) {
+                progressText.textContent = `Initializing ${sourceDisplayName} scraper...`;
+            }
             
-            addLog('🔄 Starting GitHub scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
+            addLog(`🔄 Starting ${sourceDisplayName} scraper...`, 'info');
+            if (query && query.trim()) {
+                addLog(`🔍 Searching for: ${query}`, 'info');
             } else {
                 addLog(`🔍 Using base keywords from Settings`, 'info');
             }
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/github?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                // Launch background job
+                const response = await fetch(`${API_BASE}/scrape/${source}/job?query=${encodeURIComponent(query || '')}&limit=${limit}`, {
                     method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping GitHub: ${errorMsg}`, 'error');
-                    showToast(`Error scraping GitHub: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping GitHub: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} issues/discussions from GitHub`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from GitHub`, 'success');
-                } else {
-                    showToast('No new posts from GitHub (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.log('Scrape cancelled by user');
-                } else {
-                    addLog(`❌ Error scraping GitHub: ${e.message}`, 'error');
-                    showToast(`Error scraping GitHub: ${e.message}`, 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeGithub', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
-        }
-
-
-        async function scrapeTrustpilot() {
-            setButtonLoading('btnScrapeTrustpilot', true);
-            const keywords = loadKeywords();
-            
-            // Combine keywords with AND, or use empty string to trigger base keywords usage
-            let combinedQuery = '';
-            if (keywords && keywords.length > 0) {
-                combinedQuery = keywords.join(' ');
-                console.log('Using custom keywords:', keywords);
-            } else {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-                // Empty string will trigger backend to use base keywords
-                combinedQuery = '';
-            }
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting Trustpilot scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`⭐ Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`⭐ Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                // Create a timeout controller for long-running requests (Trustpilot can take time with pagination)
-                const timeoutController = new AbortController();
-                const timeoutId = setTimeout(() => timeoutController.abort(), 300000); // 5 minutes timeout
-                
-                // Combine abort signals
-                const combinedSignal = currentAbortController.signal;
-                if (timeoutController.signal.aborted) {
-                    combinedSignal.abort();
-                }
-                timeoutController.signal.addEventListener('abort', () => {
-                    if (!combinedSignal.aborted) {
-                        currentAbortController.abort();
-                    }
-                });
-                
-                const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=500`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal,
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 });
                 
-                clearTimeout(timeoutId);
                 if (!response.ok) {
                     const errorData = await parseJsonResponse(response);
                     const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping Trustpilot: ${errorMsg}`, 'error');
-                    showToast(`Error scraping Trustpilot: ${errorMsg}`, 'error');
+                    addLog(`❌ Failed to start job: ${errorMsg}`, 'error');
+                    showToast(`Failed to start ${sourceDisplayName} scraping: ${errorMsg}`, 'error');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    setButtonLoading(buttonId, false);
                     return;
                 }
                 
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping Trustpilot: ${data.error}`, 'error');
-                    return;
-                }
+                const data = await response.json();
+                currentJobId = data.job_id;
                 
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} reviews from Trustpilot`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from Trustpilot`, 'success');
-                } else {
-                    showToast('No new posts from Trustpilot (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
+                addLog(`✅ ${sourceDisplayName} job started! Job ID: ${currentJobId.substring(0, 8)}...`, 'success');
+                addLog('💡 The scraping is running in the background. You can continue using the app.', 'info');
+                
+                // Enable cancel button
+                showCancelBtn(true);
+                
+                // Start polling job status
+                pollJobStatus(currentJobId, sourceDisplayName);
+                
+                // Re-enable button immediately (job is running in background)
+                setButtonLoading(buttonId, false);
+                
             } catch (e) {
-                if (e.name === 'AbortError') {
-                    console.log('Scrape cancelled by user');
-                    addLog('⏹️ Scraping cancelled by user', 'info');
-                } else if (e.name === 'TypeError' && e.message.includes('fetch')) {
-                    // Network error
-                    addLog(`❌ Network error: Unable to connect to server. Please check your connection and try again.`, 'error');
-                    showToast(`Network error: Unable to connect to server`, 'error');
-                } else if (e.message && e.message.includes('NetworkError')) {
-                    addLog(`❌ Network error: ${e.message}. The request may have timed out (Trustpilot scraping can take several minutes).`, 'error');
-                    showToast(`Network error: Request may have timed out`, 'error');
-                } else {
-                    addLog(`❌ Error scraping Trustpilot: ${e.message || e.toString()}`, 'error');
-                    showToast(`Error scraping Trustpilot: ${e.message || e.toString()}`, 'error');
+                console.error(`Error starting ${sourceDisplayName} scraping job: ${e.message}`);
+                addLog(`❌ Error starting job: ${e.message}`, 'error');
+                showToast(`Error: ${e.message}`, 'error');
+                setButtonLoading(buttonId, false);
+                if (progressContainer) {
+                    progressContainer.style.display = 'none';
                 }
-            } finally {
-                setButtonLoading('btnScrapeTrustpilot', false);
-                showCancelBtn(false);
-                currentAbortController = null;
             }
+        }
+
+        async function scrapeTrustpilot() {
+            const keywords = loadKeywords();
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('trustpilot', 'Trustpilot', combinedQuery, 500, 'btnScrapeTrustpilot');
         }
 
         async function scrapeAllSources() {
@@ -4523,7 +4175,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             }
         }
         
-        async function pollJobStatus(jobId) {
+        async function pollJobStatus(jobId, sourceName = '') {
             if (jobStatusInterval) {
                 clearInterval(jobStatusInterval);
             }
@@ -4541,6 +4193,9 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             if (progressBar) {
                 progressBar.style.width = '0%';
                 progressBar.setAttribute('aria-valuenow', 0);
+            }
+            if (progressText && sourceName) {
+                progressText.textContent = `Initializing ${sourceName} scraper...`;
             }
             
             jobStatusInterval = setInterval(async () => {
@@ -4599,11 +4254,23 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     if (progressText) {
                         if (total > 0) {
                             const percentage = Math.round((completed / total) * 100);
-                            progressText.textContent = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
+                            if (sourceName) {
+                                progressText.textContent = `Scraping ${sourceName}: ${completed}/${total} tasks completed (${percentage}%)`;
+                            } else {
+                                progressText.textContent = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
+                            }
                         } else if (status === 'running' || status === 'pending') {
-                            progressText.textContent = 'Scraping job initialized... Calculating tasks...';
+                            if (sourceName) {
+                                progressText.textContent = `Scraping ${sourceName}...`;
+                            } else {
+                                progressText.textContent = 'Scraping job initialized... Calculating tasks...';
+                            }
                         } else {
-                            progressText.textContent = 'Scraping job initialized...';
+                            if (sourceName) {
+                                progressText.textContent = `Initializing ${sourceName} scraper...`;
+                            } else {
+                                progressText.textContent = 'Scraping job initialized...';
+                            }
                         }
                     }
                     
@@ -4636,11 +4303,20 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                             progressContainer.setAttribute('data-status', 'completed');
                         }
                         if (progressText) {
-                            progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                            if (sourceName) {
+                                progressText.textContent = `${sourceName} scraping complete! Added ${totalAdded} new posts.`;
+                            } else {
+                                progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                            }
                         }
                         
-                        addLog(`✅ Scraping job completed! Added ${totalAdded} new posts.`, 'success');
-                        showToast(`Scraping complete! ${totalAdded} new posts added`, 'success');
+                        if (sourceName) {
+                            addLog(`✅ ${sourceName} scraping completed! Added ${totalAdded} new posts.`, 'success');
+                            showToast(`${sourceName} complete! ${totalAdded} new posts added`, 'success');
+                        } else {
+                            addLog(`✅ Scraping job completed! Added ${totalAdded} new posts.`, 'success');
+                            showToast(`Scraping complete! ${totalAdded} new posts added`, 'success');
+                        }
                         
                         // Hide progress bar after 3 seconds
                         setTimeout(() => {
@@ -4686,216 +4362,21 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         }
 
         async function scrapeOvhForum() {
-            setButtonLoading('btnScrapeOvhForum', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
-            
-            const combinedQuery = keywords.join(' ');
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting OVH Forum scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`🔍 Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/ovh-forum?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping OVH Forum: ${errorMsg}`, 'error');
-                    showToast(`Error scraping OVH Forum: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping OVH Forum: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} posts from OVH Forum`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from OVH Forum`, 'success');
-                } else {
-                    showToast('No new posts from OVH Forum (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    addLog(`❌ Error scraping OVH Forum: ${e.message}`, 'error');
-                    showToast('Error scraping OVH Forum', 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeOvhForum', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('ovh-forum', 'OVH Forum', combinedQuery, 100, 'btnScrapeOvhForum');
         }
 
         async function scrapeMastodon() {
-            setButtonLoading('btnScrapeMastodon', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
-            
-            const combinedQuery = keywords.join(' ');
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting Mastodon scraper...', 'info');
-            if (keywords && keywords.length > 0) {
-                addLog(`🔍 Searching for (AND): ${keywords.join(' + ')}`, 'info');
-            } else {
-                addLog(`🔍 Using base keywords from Settings`, 'info');
-            }
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/mastodon?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping Mastodon: ${errorMsg}`, 'error');
-                    showToast(`Error scraping Mastodon: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping Mastodon: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`✅ Successfully scraped ${addedCount} posts from Mastodon`, 'success');
-                if (addedCount > 0) {
-                    showToast(`${addedCount} new posts from Mastodon`, 'success');
-                } else {
-                    showToast('No new posts from Mastodon (may be duplicates or filtered)', 'info');
-                }
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    addLog(`❌ Error scraping Mastodon: ${e.message}`, 'error');
-                    showToast('Error scraping Mastodon', 'error');
-                }
-            } finally {
-                setButtonLoading('btnScrapeMastodon', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('mastodon', 'Mastodon', combinedQuery, 100, 'btnScrapeMastodon');
         }
 
         async function scrapeG2Crowd() {
-            setButtonLoading('btnScrapeG2', true);
             const keywords = loadKeywords();
-            // No default custom keywords - base keywords (from Settings) will be used automatically by backend
-            if (!keywords || keywords.length === 0) {
-                console.log('No custom keywords - backend will use base keywords from Settings');
-            }
-            
-            const combinedQuery = keywords.join(' ');
-            
-            const gallery = document.getElementById('gallery');
-            gallery.innerHTML = '';
-            showCancelBtn(true);
-            currentAbortController = new AbortController();
-            
-            addLog('🔄 Starting G2 Crowd scraper...', 'info');
-            addLog(`🔍 Query: "${combinedQuery}"`, 'info');
-            addLog(`📊 Limit: 100 reviews`, 'info');
-            addLog(`🌐 Target URL: https://www.g2.com/products/ovhcloud/reviews`, 'info');
-            addLog('⏳ Fetching page...', 'info');
-            
-            const startTime = Date.now();
-            
-            try {
-                const response = await fetch(`${API_BASE}/scrape/g2-crowd?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
-                    method: 'POST',
-                    signal: currentAbortController.signal
-                });
-                
-                const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-                addLog(`⏱️ Request completed in ${elapsed}s`, 'info');
-                addLog(`📡 Response status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
-                
-                if (!response.ok) {
-                    const errorData = await parseJsonResponse(response);
-                    const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
-                    addLog(`❌ Error scraping G2 Crowd: ${errorMsg}`, 'error');
-                    showToast(`Error scraping G2 Crowd: ${errorMsg}`, 'error');
-                    return;
-                }
-                
-                const data = await parseJsonResponse(response);
-                if (data.error) {
-                    addLog(`❌ Error parsing response: ${data.error}`, 'error');
-                    showToast(`Error scraping G2 Crowd: ${data.error}`, 'error');
-                    return;
-                }
-                
-                // Extract added count safely using utility function
-                const addedCount = extractAddedCount(data);
-                addLog(`📦 Items returned by scraper: ${addedCount}`, addedCount > 0 ? 'success' : 'warning');
-                
-                if (addedCount === 0) {
-                    addLog('⚠️ No posts found. Possible reasons:', 'warning');
-                    addLog('   • G2 Crowd may be blocking the scraper (403 Forbidden)', 'info');
-                    addLog('   • The page structure may have changed', 'info');
-                    addLog('   • No reviews match the search criteria', 'info');
-                    addLog('   • Check backend logs for detailed error messages', 'info');
-                } else {
-                    addLog(`✅ Successfully scraped ${addedCount} reviews from G2 Crowd`, 'success');
-                }
-                
-                showToast(`${addedCount} new posts from G2 Crowd`, addedCount > 0 ? 'success' : 'warning');
-                await loadPostsFromDB();
-                renderGallery();
-            } catch (e) {
-                if (e.name !== 'AbortError') {
-                    addLog(`❌ Network/Request Error: ${e.message}`, 'error');
-                    addLog(`📋 Error type: ${e.name}`, 'error');
-                    if (e.stack) {
-                        addLog(`📋 Stack trace: ${e.stack.substring(0, 200)}...`, 'error');
-                    }
-                    showToast('Error scraping G2 Crowd', 'error');
-                } else {
-                    addLog('⛔ Scraping cancelled by user', 'info');
-                }
-            } finally {
-                const totalTime = ((Date.now() - startTime) / 1000).toFixed(2);
-                addLog(`⏱️ Total time: ${totalTime}s`, 'info');
-                setButtonLoading('btnScrapeG2', false);
-                showCancelBtn(false);
-                currentAbortController = null;
-            }
+            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
+            await startSingleSourceJob('g2-crowd', 'G2 Crowd', combinedQuery, 100, 'btnScrapeG2');
         }
 
         async function scrapeLinkedIn() {
