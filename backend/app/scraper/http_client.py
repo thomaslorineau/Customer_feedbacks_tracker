@@ -18,8 +18,8 @@ class AsyncHTTPClient:
     
     def __init__(
         self,
-        timeout: float = 15.0,
-        connect_timeout: float = 5.0,
+        timeout: float = 30.0,  # Increased from 15.0 for Trustpilot pagination
+        connect_timeout: float = 10.0,  # Increased from 5.0
         max_connections: int = 20,
         max_keepalive_connections: int = 10,
         max_retries: int = 3,

@@ -4372,10 +4372,30 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             }
             
             try {
+                // Create a timeout controller for long-running requests (Trustpilot can take time with pagination)
+                const timeoutController = new AbortController();
+                const timeoutId = setTimeout(() => timeoutController.abort(), 300000); // 5 minutes timeout
+                
+                // Combine abort signals
+                const combinedSignal = currentAbortController.signal;
+                if (timeoutController.signal.aborted) {
+                    combinedSignal.abort();
+                }
+                timeoutController.signal.addEventListener('abort', () => {
+                    if (!combinedSignal.aborted) {
+                        currentAbortController.abort();
+                    }
+                });
+                
                 const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=500`, {
                     method: 'POST',
-                    signal: currentAbortController.signal
+                    signal: currentAbortController.signal,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
+                
+                clearTimeout(timeoutId);
                 if (!response.ok) {
                     const errorData = await parseJsonResponse(response);
                     const errorMsg = errorData.detail || errorData.error || `HTTP ${response.status}: ${response.statusText}`;
@@ -4404,9 +4424,17 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             } catch (e) {
                 if (e.name === 'AbortError') {
                     console.log('Scrape cancelled by user');
+                    addLog('⏹️ Scraping cancelled by user', 'info');
+                } else if (e.name === 'TypeError' && e.message.includes('fetch')) {
+                    // Network error
+                    addLog(`❌ Network error: Unable to connect to server. Please check your connection and try again.`, 'error');
+                    showToast(`Network error: Unable to connect to server`, 'error');
+                } else if (e.message && e.message.includes('NetworkError')) {
+                    addLog(`❌ Network error: ${e.message}. The request may have timed out (Trustpilot scraping can take several minutes).`, 'error');
+                    showToast(`Network error: Request may have timed out`, 'error');
                 } else {
-                    addLog(`❌ Error scraping Trustpilot: ${e.message}`, 'error');
-                    showToast(`Error scraping Trustpilot: ${e.message}`, 'error');
+                    addLog(`❌ Error scraping Trustpilot: ${e.message || e.toString()}`, 'error');
+                    showToast(`Error scraping Trustpilot: ${e.message || e.toString()}`, 'error');
                 }
             } finally {
                 setButtonLoading('btnScrapeTrustpilot', false);

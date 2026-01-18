@@ -93,9 +93,11 @@ class TrustpilotScraper(BaseScraper):
             self.logger.log("info", f"Scraping page {page}: {url}")
             
             try:
+                # Use longer timeout for Trustpilot (pagination can be slow)
                 response = await self._fetch_get(
                     url,
-                    headers=DEFAULT_HEADERS
+                    headers=DEFAULT_HEADERS,
+                    timeout=60.0  # 60 seconds timeout for Trustpilot requests
                 )
                 
                 self.logger.log("info", f"Got response: {response.status_code}, length: {len(response.text)}")
