@@ -1,0 +1,376 @@
+/* Shared Theme CSS - Applied to all pages */
+:root {
+    /* Light Mode (default) */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f7fa;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f0f4f8;
+    --text-primary: #1a1a1a;
+    --text-secondary: #4a5568;
+    --text-muted: #718096;
+    --border-color: #e2e8f0;
+    --shadow: rgba(0, 0, 0, 0.08);
+    --accent-primary: #0099ff;
+    --accent-secondary: #00d4ff;
+    --accent-ovh: #123f6d;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --input-bg: #ffffff;
+    --modal-bg: rgba(255, 255, 255, 0.98);
+    
+    /* ============================================
+       SYSTÈME DE DESIGN UNIFIÉ
+       ============================================ */
+    
+    /* Typographie standardisée (rem pour meilleure accessibilité) */
+    --font-size-xs: 0.75rem;    /* 12px */
+    --font-size-sm: 0.875rem;   /* 14px */
+    --font-size-base: 1rem;     /* 16px */
+    --font-size-lg: 1.125rem;   /* 18px */
+    --font-size-xl: 1.25rem;    /* 20px */
+    --font-size-2xl: 1.5rem;    /* 24px */
+    --font-size-3xl: 2rem;      /* 32px */
+    --font-size-4xl: 2.5rem;    /* 40px */
+    
+    /* Font weights standardisés */
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    
+    /* Largeurs maximales standardisées */
+    --max-width-sm: 1200px;
+    --max-width-md: 1400px;
+    --max-width-lg: 1600px;
+    
+    /* Espacement standardisé */
+    --spacing-xs: 0.5rem;   /* 8px */
+    --spacing-sm: 1rem;     /* 16px */
+    --spacing-md: 1.5rem;   /* 24px */
+    --spacing-lg: 2rem;     /* 32px */
+    --spacing-xl: 2.5rem;   /* 40px */
+    --spacing-2xl: 3rem;    /* 48px */
+}
+
+body.dark-mode {
+    /* Dark Mode */
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-card: #0f3460;
+    --bg-card-hover: #1a4d7a;
+    --text-primary: #ffffff;
+    --text-secondary: #aaa;
+    --text-muted: #666;
+    --border-color: #333;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --accent-primary: #00d4ff;
+    --accent-secondary: #0099ff;
+    --accent-ovh: #4a9eff;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --error: #ef4444;
+    --input-bg: #0f3460;
+    --modal-bg: rgba(15, 52, 96, 0.98);
+}
+
+/* Prevent transition artifacts when switching themes */
+body,
+body * {
+    /* Disable transitions for color-related properties during theme switch */
+    transition-property: transform, opacity, box-shadow, border-color, filter;
+    transition-duration: 0.2s;
+    transition-timing-function: ease;
+}
+
+/* Re-enable transitions for specific elements that need smooth color transitions */
+body.dark-mode-transitioning,
+body.dark-mode-transitioning * {
+    transition-property: background-color, color, border-color, box-shadow, transform, opacity, filter;
+    transition-duration: 0.15s;
+    transition-timing-function: ease-out;
+}
+
+/* Remove transitioning class after transition completes */
+body.dark-mode-transitioning {
+    transition: none;
+}
+
+/* Help Menu Styles */
+.help-menu {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px var(--shadow);
+    z-index: 10001;
+    min-width: 300px;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    display: none;
+    padding: 20px;
+}
+
+.help-menu.active {
+    display: block;
+}
+
+.help-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.help-menu-header h2 {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.help-menu-close {
+    background: var(--error);
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    color: white;
+    cursor: pointer;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.help-menu-close:hover {
+    background: #dc2626;
+    transform: scale(1.1);
+}
+
+.help-menu-content {
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+.help-menu-content h3 {
+    color: var(--accent-primary);
+    font-size: 1.1em;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.help-menu-content p,
+.help-menu-content li {
+    margin-bottom: 8px;
+}
+
+.help-menu-content ul,
+.help-menu-content ol {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.help-menu-content strong {
+    color: var(--text-primary);
+}
+
+
+/* Spinner for loading states */
+.spinner {
+    border: 3px solid var(--border-color);
+    border-top: 3px solid var(--accent-primary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modern Navigation Styles - Applied to all pages */
+.nav-menu {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.nav-logo {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-logo img.ovh-logo,
+.nav-logo .ovh-logo {
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.nav-logo:hover img.ovh-logo,
+.nav-logo:hover .ovh-logo {
+    /* Removed transform scale to prevent layout shift */
+    filter: drop-shadow(0 4px 8px rgba(0, 212, 255, 0.3));
+}
+
+/* Modern tab styles */
+.nav-tab {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.nav-tab::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%) scaleX(0);
+    width: 80%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    transition: transform 0.3s ease;
+    border-radius: 2px 2px 0 0;
+}
+
+.nav-tab:hover::before {
+    transform: translateX(-50%) scaleX(1);
+}
+
+.nav-tab.active {
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+    /* Removed transform to prevent layout shift */
+}
+
+.nav-tab.active::before {
+    display: none;
+}
+
+/* ============================================
+   TYPOGRAPHIE STANDARDISÉE
+   ============================================ */
+
+h1 {
+    font-size: var(--font-size-4xl);
+    font-weight: var(--font-weight-bold);
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+h2 {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-bold);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+}
+
+h3 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.4;
+}
+
+h4 {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.4;
+}
+
+/* Typographie pour éléments spécifiques */
+.nav-logo {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+}
+
+.nav-tab {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.search-input-prominent {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+}
+
+.panel-header h2 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.stats-banner-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+/* ============================================
+   LARGEURS MAXIMALES STANDARDISÉES
+   ============================================ */
+
+.dashboard-main,
+.improvements-container,
+.settings-container,
+.container {
+    max-width: var(--max-width-md);
+    margin: 0 auto;
+}
+
+/* ============================================
+   ESPACEMENT STANDARDISÉ
+   ============================================ */
+
+.dashboard-main {
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.improvements-container {
+    padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.settings-container {
+    padding: var(--spacing-lg);
+}
+
+.panel,
+.settings-section {
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.search-section {
+    padding: var(--spacing-lg) var(--spacing-xl);
+    margin: var(--spacing-md) auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .dashboard-main,
+    .improvements-container,
+    .settings-container {
+        padding: var(--spacing-md);
+    }
+}
+
+@media (max-width: 768px) {
+    h1 { font-size: var(--font-size-3xl); }
+    h2 { font-size: var(--font-size-xl); }
+    h3 { font-size: var(--font-size-lg); }
+    
+    .dashboard-main,
+    .improvements-container,
+    .settings-container {
+        padding: var(--spacing-sm);
+    }
+    
+    .panel,
+    .settings-section {
+        padding: var(--spacing-sm);
+    }
+}
+

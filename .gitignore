@@ -1,0 +1,88 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Database files - CRITICAL: Never commit database files!
+*.db
+*.duckdb
+*.duckdb.wal
+*.duckdb.backup
+backend/data.db
+backend/data.duckdb
+backend/data_staging.duckdb
+backend/data_staging.duckdb.wal
+backend/data.duckdb.backup
+backend/data_staging.duckdb.backup
+backend/*.db
+backend/*.duckdb
+backend/*.duckdb.wal
+backend/*.duckdb.backup
+backend/ovh_posts.db
+# Backup directories
+backend/backups/
+backups/
+
+# Logs
+*.log
+backend/*.log
+backend.log
+logs/
+*.log.*
+
+# Environment variables - CRITICAL: Never commit secrets!
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+*.env
+!.env.example
+
+# Configuration (local)
+backend/.app_config
+.host_alias
+backup.sh
+configure_cors.sh
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+.update_backup/
+
+# Temporary files
+*.tmp
+*.temp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
