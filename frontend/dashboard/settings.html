@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - API Configuration</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
+    <link rel="stylesheet" href="/dashboard/css/styles.css">
+    <link rel="stylesheet" href="/dashboard/css/navigation.css">
+    <link rel="stylesheet" href="/css/modern-enhancements.css">
+    <style>
+        .settings-container {
+            max-width: var(--max-width-md);
+            margin: 0 auto;
+            padding: var(--spacing-lg);
+        }
+
+        .settings-header {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .settings-header h1 {
+            font-size: var(--font-size-3xl);
+            font-weight: var(--font-weight-bold);
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .settings-header p {
+            color: var(--text-secondary);
+            font-size: var(--font-size-base);
+        }
+
+        .settings-section {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            box-shadow: 0 2px 8px var(--shadow);
+        }
+
+        .section-title {
+            font-size: var(--font-size-2xl);
+            font-weight: var(--font-weight-bold);
+            color: var(--text-primary);
+            margin-bottom: var(--spacing-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .section-title svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .api-key-card {
+            background: var(--card-bg, #f8f9fa);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .api-key-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .api-key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .api-key-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .api-key-title h3 {
+            margin: 0;
+            font-size: 1.125rem;
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .status-badge.configured {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.not-configured {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .api-key-value {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .key-display {
+            flex: 1;
+            background: var(--input-bg, #fff);
+            border: 1px solid var(--border-color, #ced4da);
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .key-display.hidden {
+            letter-spacing: 0.2em;
+        }
+
+        .key-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-icon {
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-icon:active {
+            transform: translateY(0);
+        }
+
+        .btn-icon.secondary {
+            background: #6c757d;
+        }
+
+        .btn-icon.secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-icon.success {
+            background: #28a745;
+        }
+
+        .btn-icon svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .api-key-info {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem 1.25rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: start;
+            gap: 0.75rem;
+        }
+
+        .security-notice svg {
+            width: 20px;
+            height: 20px;
+            color: #856404;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        .security-notice-content {
+            flex: 1;
+        }
+
+        .security-notice-content strong {
+            display: block;
+            color: #856404;
+            margin-bottom: 0.35rem;
+        }
+
+        .security-notice-content p {
+            margin: 0;
+            color: #856404;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .copy-feedback {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #28a745;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .copy-feedback svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .rate-limit-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-card {
+            background: var(--card-bg, #f8f9fa);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .info-card-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .info-card-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .skeleton-loader {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+            border-radius: 4px;
+            height: 20px;
+        }
+
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .api-key-form-container {
+            padding: 1.5rem;
+            background: var(--bg-secondary, #f8f9fa);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+
+        .api-key-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .input-with-button {
+            display: flex;
+            gap: 0.5rem;
+            align-items: stretch;
+        }
+
+        .api-key-input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+            background: var(--input-bg, #ffffff);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: var(--accent-primary, #0099ff);
+            box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+        }
+
+        .btn-toggle-visibility {
+            padding: 0.75rem;
+            background: var(--bg-card, #ffffff);
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .btn-toggle-visibility:hover {
+            background: var(--bg-card-hover, #f0f4f8);
+        }
+
+        .btn-toggle-visibility svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .btn-save-key {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent-primary, #0099ff);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-save-key:hover {
+            background: var(--accent-hover, #0088ee);
+            transform: translateY(-1px);
+        }
+
+        .btn-save-key:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-save-key svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .btn-get-key {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            color: var(--accent-primary, #0099ff);
+            border: 1px solid var(--accent-primary, #0099ff);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-get-key:hover {
+            background: var(--accent-primary, #0099ff);
+            color: white;
+        }
+
+        .btn-get-key svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Logo Upload Styles - Compact */
+        .logo-upload-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .logo-preview-section {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .logo-preview {
+            width: 120px;
+            height: 120px;
+            min-width: 120px;
+            min-height: 120px;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--card-bg);
+            padding: 0.5rem;
+            flex-shrink: 0;
+        }
+
+        .logo-preview img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .logo-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .logo-placeholder svg {
+            width: 32px;
+            height: 32px;
+            opacity: 0.5;
+        }
+
+        .logo-placeholder p {
+            margin: 0;
+            font-size: 0.75rem;
+        }
+
+        .logo-info {
+            flex: 1;
+            padding: 0.75rem;
+            background: var(--card-bg);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .logo-status {
+            margin: 0;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .logo-status.success {
+            color: #28a745;
+        }
+
+        .logo-status.error {
+            color: #dc3545;
+        }
+
+        .logo-upload-form {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .upload-label {
+            cursor: pointer;
+        }
+
+        .upload-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--accent-color, #007bff);
+            color: white;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .upload-button:hover {
+            background: var(--accent-hover, #0056b3);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .upload-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .upload-submit-btn {
+            padding: 0.5rem 1rem;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .upload-submit-btn:hover:not(:disabled) {
+            background: #218838;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .upload-submit-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .upload-hint {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* Base Keywords Styles */
+        .base-keywords-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .keywords-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-family: 'Courier New', monospace;
+            background: var(--input-bg, #ffffff);
+            color: var(--text-primary);
+            resize: vertical;
+            min-height: 80px;
+            transition: all 0.2s ease;
+        }
+
+        .keywords-textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary, #0099ff);
+            box-shadow: 0 0 0 3px rgba(0, 153, 255, 0.1);
+        }
+
+        body.dark-mode .keywords-textarea {
+            background: var(--input-bg, #1e293b);
+            border-color: var(--border-color, #334155);
+        }
+    </style>
+</head>
+<body class="has-nav-menu">
+    <!-- Navigation Menu -->
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/dashboard" class="nav-logo">
+                <img src="" alt="OVHcloud" class="ovh-logo" style="width: 40px; height: 40px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)); display: none;" onerror="this.style.display='none';">
+                <svg class="ovh-logo" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                    <circle cx="60" cy="60" r="55" fill="none" stroke="#123f6d" stroke-width="4"/>
+                    <path d="M 35 60 Q 60 35, 85 60 Q 60 85, 35 60" fill="#123f6d"/>
+                    <path d="M 25 60 Q 35 50, 45 60 Q 55 70, 65 60 Q 75 50, 85 60 Q 95 70, 105 60" 
+                          stroke="#00d4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+                <span>Customer Feedbacks Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/dashboard" class="nav-tab">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">📥</span>
+                    <span>Feedbacks Collection</span>
+                </a>
+                <a href="/logs" class="nav-tab">
+                    <span class="nav-tab-icon">📋</span>
+                    <span>Scraping Logs</span>
+                </a>
+                <a href="/settings" class="nav-tab active">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <span class="beta-badge" title="Application en version beta">BETA</span>
+            <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
+            <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
+        </div>
+    </nav>
+
+    <div class="settings-container">
+        <!-- Header -->
+        <div class="settings-header">
+            <h1>🔐 API Configuration & Settings</h1>
+            <p>Manage your API keys and application configuration securely</p>
+        </div>
+
+        <!-- Security Notice -->
+        <div class="security-notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <div class="security-notice-content">
+                <strong>⚠️ Security Notice</strong>
+                <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
+                   The "Reveal" button temporarily shows the full key for copying - use it carefully and only when needed.</p>
+            </div>
+        </div>
+
+        <!-- Logo Upload Section -->
+        <div class="settings-section">
+            <div class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                Logo OVHcloud
+            </div>
+            <div class="logo-upload-container">
+                <div class="logo-preview-section">
+                    <div class="logo-preview">
+                        <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+                        <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            <p>Aucun logo</p>
+                        </div>
+                    </div>
+                    <div class="logo-info" id="logoInfo">
+                        <p class="logo-status">Chargement...</p>
+                    </div>
+                </div>
+                <div class="logo-upload-form">
+                    <label for="logoFileInput" class="upload-label">
+                        <input type="file" id="logoFileInput" accept=".svg,.png,.jpg,.jpeg" style="display: none;">
+                        <span class="upload-button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Choisir un fichier
+                        </span>
+                    </label>
+                    <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
+                        <span class="btn-text">Uploader le logo</span>
+                        <span class="btn-spinner" style="display:none;"></span>
+                    </button>
+                    <p class="upload-hint">
+                        Formats acceptés : SVG (recommandé), PNG, JPG, JPEG<br>
+                        Taille maximale : 5MB
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Keys Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                API Keys
+            </h2>
+
+            <div id="apiKeysContainer">
+                <!-- Loading skeleton -->
+                <div class="api-key-card">
+                    <div class="skeleton-loader"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limiting Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                </svg>
+                Rate Limiting
+            </h2>
+
+            <div class="rate-limit-info" id="rateLimitInfo">
+                <div class="info-card">
+                    <div class="info-card-label">Requests per Window</div>
+                    <div class="info-card-value">--</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-label">Window Duration</div>
+                    <div class="info-card-value">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Base Keywords Section -->
+        <div class="settings-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    <line x1="9" y1="9" x2="15" y2="9"/>
+                    <line x1="9" y1="13" x2="15" y2="13"/>
+                </svg>
+                Base Keywords (Fixed)
+            </h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                These keywords are always used for scraping, even if you don't add custom keywords. 
+                They include OVH brands, products, common problems, and leadership mentions. 
+                You can edit them here, but they will always be included in scraping operations.
+            </p>
+
+            <div id="baseKeywordsContainer">
+                <!-- Loading skeleton -->
+                <div class="api-key-card">
+                    <div class="skeleton-loader"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy Success Feedback -->
+    <div class="copy-feedback" id="copyFeedback">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>API key copied to clipboard!</span>
+    </div>
+
+    <!-- Help Menu -->
+    <div class="help-menu" id="helpMenu">
+        <div class="help-menu-header">
+            <h2>📖 Help & Information</h2>
+            <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
+        </div>
+        <div class="help-menu-content">
+            <h3>💬 Customer Feedbacks Tracker</h3>
+            <p>
+                <strong>Settings</strong> allows you to configure API keys and manage application settings securely.
+            </p>
+
+            <h3>🔐 API Configuration</h3>
+            <ul>
+                <li><strong>OpenAI API Key:</strong> Required for AI-powered features like recommended actions and insights</li>
+                <li><strong>Anthropic API Key:</strong> Alternative LLM provider for AI features</li>
+                <li><strong>Google API Key:</strong> Used for Google News scraping</li>
+                <li><strong>GitHub API Key:</strong> Required for GitHub issues and discussions scraping</li>
+                <li><strong>Trustpilot API Key:</strong> Used for Trustpilot reviews scraping</li>
+            </ul>
+
+            <h3>🔒 Security</h3>
+            <ul>
+                <li><strong>Never share API keys:</strong> Keep your keys private and secure</li>
+                <li><strong>Reveal button:</strong> Temporarily shows the full key for copying - use carefully</li>
+                <li><strong>Keys are stored:</strong> Securely in the backend database</li>
+            </ul>
+
+            <h3>⚙️ Rate Limiting</h3>
+            <ul>
+                <li><strong>Configure limits:</strong> Set maximum requests per minute for each API</li>
+                <li><strong>Prevent abuse:</strong> Rate limiting protects against excessive API usage</li>
+                <li><strong>Window duration:</strong> Time window for rate limit calculations</li>
+            </ul>
+
+            <h3>📥 Feedbacks Collection</h3>
+            <p>
+                After configuring API keys, go to <strong>Feedbacks Collection</strong> to:
+            </p>
+            <ul>
+                <li>Configure keywords for scraping</li>
+                <li>Launch scrapers to collect feedback</li>
+                <li>View scraping logs</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="/dashboard/js/settings.js"></script>
+    <script>
+        // Logo Upload Functionality
+        const API_BASE = window.location.origin;
+        let selectedFile = null;
+
+        // Check logo status on page load
+        async function checkLogoStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/logo-status`);
+                const data = await response.json();
+                
+                const logoInfo = document.getElementById('logoInfo');
+                const logoPreview = document.getElementById('logoPreview');
+                const logoPlaceholder = document.getElementById('logoPlaceholder');
+                
+                if (data.exists) {
+                    logoInfo.innerHTML = `
+                        <p class="logo-status success">
+                            ✅ Logo actuel : ${data.filename}<br>
+                            <small>Taille : ${(data.size / 1024).toFixed(2)} KB</small>
+                        </p>
+                    `;
+                    if (logoPreview) {
+                        logoPreview.src = data.path + '?t=' + Date.now(); // Cache bust
+                        logoPreview.style.display = 'block';
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                    }
+                } else {
+                    logoInfo.innerHTML = `
+                        <p class="logo-status">
+                            ℹ️ Aucun logo uploadé.
+                        </p>
+                    `;
+                    if (logoPreview) logoPreview.style.display = 'none';
+                    if (logoPlaceholder) logoPlaceholder.style.display = 'flex';
+                }
+            } catch (error) {
+                console.error('Error checking logo status:', error);
+                const logoInfoEl = document.getElementById('logoInfo');
+                if (logoInfoEl) {
+                    logoInfoEl.innerHTML = `
+                        <p class="logo-status error">❌ Erreur lors de la vérification du logo</p>
+                    `;
+                }
+            }
+        }
+
+        // File input change handler
+        const logoFileInput = document.getElementById('logoFileInput');
+        if (logoFileInput) {
+            logoFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    selectedFile = file;
+                    const uploadBtn = document.getElementById('uploadLogoBtn');
+                    if (uploadBtn) uploadBtn.disabled = false;
+                    
+                    // Preview image
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const logoPreview = document.getElementById('logoPreview');
+                        const logoPlaceholder = document.getElementById('logoPlaceholder');
+                        if (logoPreview) {
+                            logoPreview.src = e.target.result;
+                            logoPreview.style.display = 'block';
+                        }
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Upload button click handler
+        const uploadLogoBtn = document.getElementById('uploadLogoBtn');
+        if (uploadLogoBtn) {
+            uploadLogoBtn.addEventListener('click', async function() {
+                if (!selectedFile) return;
+                
+                const btn = this;
+                const btnText = btn.querySelector('.btn-text');
+                const btnSpinner = btn.querySelector('.btn-spinner');
+                
+                btn.disabled = true;
+                if (btnText) btnText.textContent = 'Upload en cours...';
+                if (btnSpinner) btnSpinner.style.display = 'inline-block';
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    
+                    const response = await fetch(`${API_BASE}/api/upload-logo`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok && data.success) {
+                        // Show success message
+                        const logoInfo = document.getElementById('logoInfo');
+                        if (logoInfo) {
+                            logoInfo.innerHTML = `
+                                <p class="logo-status success">
+                                    ✅ ${data.message}<br>
+                                    <small>Le logo est maintenant actif</small>
+                                </p>
+                            `;
+                        }
+                        
+                        // Update preview
+                        const logoPreview = document.getElementById('logoPreview');
+                        if (logoPreview) {
+                            logoPreview.src = data.path + '?t=' + Date.now();
+                            logoPreview.style.display = 'block';
+                            logoPreview.onerror = function() {
+                                this.style.display = 'none';
+                                const placeholder = document.getElementById('logoPlaceholder');
+                                if (placeholder) placeholder.style.display = 'flex';
+                            };
+                        }
+                        const logoPlaceholder = document.getElementById('logoPlaceholder');
+                        if (logoPlaceholder) logoPlaceholder.style.display = 'none';
+                        
+                        // Store in localStorage for other pages FIRST
+                        localStorage.setItem('logoPath', data.path);
+                        localStorage.setItem('logoUpdated', Date.now().toString());
+                        
+                        // Update logo in navigation across all pages - FORCE RELOAD
+                        if (window.updateLogoInNavigation) {
+                            // Force reload to replace old logo with new one
+                            window.updateLogoInNavigation(data.path, true);
+                        } else {
+                            // If function not available, force reload logo-updater
+                            const logoUpdaterScript = document.createElement('script');
+                            logoUpdaterScript.src = '/js/logo-updater.js?t=' + Date.now();
+                            logoUpdaterScript.onload = function() {
+                                if (window.updateLogoInNavigation) {
+                                    window.updateLogoInNavigation(data.path, true);
+                                }
+                            };
+                            document.head.appendChild(logoUpdaterScript);
+                        }
+                        
+                        // Re-check logo status to ensure it's saved and persisted
+                        // Use longer delay to avoid conflict with checkLogoUpdate interval
+                        setTimeout(() => {
+                            // Force reload when checking status after upload
+                            if (typeof checkLogoStatus === 'function') {
+                                checkLogoStatus(true);
+                            }
+                            // Force update again after a short delay to ensure persistence - FORCE RELOAD
+                            setTimeout(() => {
+                                if (window.updateLogoInNavigation) {
+                                    window.updateLogoInNavigation(data.path, true);
+                                }
+                            }, 1000);
+                        }, 1500);
+                        
+                        // Reset form
+                        if (logoFileInput) logoFileInput.value = '';
+                        selectedFile = null;
+                        btn.disabled = true;
+                        
+                        // Show toast notification
+                        showToast('Logo uploadé avec succès !', 'success');
+                    } else {
+                        throw new Error(data.detail || 'Erreur lors de l\'upload');
+                    }
+                } catch (error) {
+                    console.error('Error uploading logo:', error);
+                    const logoInfo = document.getElementById('logoInfo');
+                    if (logoInfo) {
+                        logoInfo.innerHTML = `
+                            <p class="logo-status error">❌ Erreur : ${error.message}</p>
+                        `;
+                    }
+                    showToast('Erreur lors de l\'upload du logo', 'error');
+                } finally {
+                    if (btnText) btnText.textContent = 'Uploader le logo';
+                    if (btnSpinner) btnSpinner.style.display = 'none';
+                }
+            });
+        }
+
+        // Logo updater is handled by /js/logo-updater.js
+        // The function window.updateLogoInNavigation is available globally
+
+        // Simple toast notification function
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `copy-feedback ${type}`;
+            toast.textContent = message;
+            toast.style.background = type === 'success' ? '#28a745' : type === 'error' ? '#dc3545' : '#007bff';
+            document.body.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (document.body.contains(toast)) {
+                        document.body.removeChild(toast);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkLogoStatus();
+        });
+
+        // Define toggleHelpMenu function for settings page
+        window.toggleHelpMenu = function() {
+            const menu = document.getElementById('helpMenu');
+            if (menu) {
+                menu.classList.toggle('active');
+            }
+        };
+
+        // Close help menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const helpMenu = document.getElementById('helpMenu');
+            const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
+            if (helpMenu && helpTab && 
+                !helpMenu.contains(e.target) && 
+                !helpTab.contains(e.target) &&
+                helpMenu.classList.contains('active')) {
+                helpMenu.classList.remove('active');
+            }
+        });
+    </script>
+    <script type="module" src="/dashboard/js/version-loader.js"></script>
+    <script src="/js/logo-updater.js"></script>
+</body>
+</html>

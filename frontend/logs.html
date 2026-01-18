@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scraping Logs - OVH Tracker</title>
+    <link rel="stylesheet" href="/css/shared-theme.css">
+    <link rel="stylesheet" href="/dashboard/css/navigation.css">
+    <style>
+        /* Initialize theme immediately to prevent flash */
+        html {
+            color-scheme: light;
+        }
+        html.dark-mode {
+            color-scheme: dark;
+        }
+        :root {
+            /* Light Mode (default - matching other pages) */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f7fa;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f0f4f8;
+            --text-primary: #1a1a1a;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --shadow: rgba(0, 0, 0, 0.08);
+            --accent-primary: #0099ff;
+            --accent-secondary: #00d4ff;
+            --accent-ovh: #123f6d;
+            --success: #34d399;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --input-bg: #ffffff;
+            --modal-bg: rgba(255, 255, 255, 0.98);
+        }
+
+        body.dark-mode {
+            /* Dark Mode (matching other pages) */
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #0f3460;
+            --bg-card-hover: #1a4d7a;
+            --text-primary: #ffffff;
+            --text-secondary: #aaa;
+            --text-muted: #666;
+            --border-color: #333;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --accent-primary: #00d4ff;
+            --accent-secondary: #0099ff;
+            --accent-ovh: #4a9eff;
+            --success: #34d399;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --input-bg: #0f3460;
+            --modal-bg: rgba(15, 52, 96, 0.98);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 0;
+            margin: 0;
+            padding-top: 60px; /* Space for fixed navigation menu */
+            min-height: 100vh;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        
+        /* Navigation menu spacing */
+        .nav-menu {
+            margin-bottom: 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            margin-top: 0;
+            box-shadow: 0 2px 8px var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        /* Navigation menu styles */
+        .nav-menu-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .theme-toggle {
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .version-badge {
+            background: rgba(0, 212, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+
+        .filters {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-group label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        select, input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #0099ff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0088ee;
+        }
+
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .logs-container {
+            background: var(--bg-primary);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .logs-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 120px 100px 150px 1fr auto;
+            gap: 15px;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .log-entry:hover {
+            background: var(--bg-secondary);
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-timestamp {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .log-level {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .log-level.info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .log-level.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .log-level.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .log-level.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .log-source {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .log-message {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .log-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+
+        .log-details:hover {
+            color: var(--text-primary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .auto-refresh input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        @media (max-width: 768px) {
+            .log-entry {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav-menu">
+        <div class="nav-menu-left">
+            <a href="/" class="nav-logo">
+                <svg width="40" height="40" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="45" fill="#123f6d"/>
+                    <text x="50" y="65" font-size="40" fill="#00d4ff" text-anchor="middle" font-weight="bold">O</text>
+                </svg>
+                <span>Customer Feedbacks Tracker</span>
+            </a>
+            <div class="nav-tabs">
+                <a href="/dashboard" class="nav-tab">
+                    <span class="nav-tab-icon">📊</span>
+                    <span>Dashboard Analytics</span>
+                </a>
+                <a href="/improvements" class="nav-tab">
+                    <span class="nav-tab-icon">💡</span>
+                    <span>Improvements Opportunities</span>
+                </a>
+                <a href="/scraping" class="nav-tab">
+                    <span class="nav-tab-icon">📥</span>
+                    <span>Feedbacks Collection</span>
+                </a>
+                <a href="/logs" class="nav-tab active">
+                    <span class="nav-tab-icon">📋</span>
+                    <span>Scraping Logs</span>
+                </a>
+                <a href="/settings" class="nav-tab">
+                    <span class="nav-tab-icon">⚙️</span>
+                    <span>Settings</span>
+                </a>
+            </div>
+        </div>
+        <div class="nav-menu-right">
+            <span class="beta-badge" title="Application en version beta">BETA</span>
+            <span class="version-badge" id="versionBadge">v1.0.1</span>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Dark/Light Mode">🌓</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header>
+            <h1>📋 Scraping Logs</h1>
+            <p>Surveillance en temps réel des opérations de scraping</p>
+        </header>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label>Source</label>
+                <select id="filterSource">
+                    <option value="">Toutes les sources</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Niveau</label>
+                <select id="filterLevel">
+                    <option value="">Tous les niveaux</option>
+                    <option value="info">Info</option>
+                    <option value="success">Success</option>
+                    <option value="warning">Warning</option>
+                    <option value="error">Error</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Limite</label>
+                <input type="number" id="filterLimit" value="100" min="10" max="1000" step="10">
+            </div>
+        </div>
+
+        <div class="actions">
+            <button class="btn-primary" onclick="loadLogs()">🔄 Actualiser</button>
+            <button class="btn-danger" onclick="clearLogs()">🗑️ Effacer</button>
+            <div class="auto-refresh">
+                <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" checked>
+                <label for="autoRefresh">Actualisation auto (2s)</label>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Total Logs</h3>
+                <div class="value" id="statTotal">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Erreurs</h3>
+                <div class="value" id="statErrors" style="color: var(--error)">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Succès</h3>
+                <div class="value" id="statSuccess" style="color: var(--success)">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Sources actives</h3>
+                <div class="value" id="statSources">0</div>
+            </div>
+        </div>
+
+        <div class="logs-container">
+            <div class="logs-header">
+                <h2>Logs récents</h2>
+                <span id="lastUpdate"></span>
+            </div>
+            <div class="logs-list" id="logsList">
+                <div class="loading">Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let autoRefreshInterval = null;
+        let sources = new Set();
+
+        async function loadLogs() {
+            const source = document.getElementById('filterSource').value;
+            const level = document.getElementById('filterLevel').value;
+            const limit = parseInt(document.getElementById('filterLimit').value) || 100;
+
+            try {
+                const params = new URLSearchParams();
+                if (source) params.append('source', source);
+                if (level) params.append('level', level);
+                params.append('limit', limit);
+
+                const response = await fetch(`${API_BASE}/api/logs?${params}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                
+                // Handle both {logs: [...]} and [...] formats
+                const logs = Array.isArray(data) ? data : (data.logs || []);
+                
+                displayLogs(logs);
+                updateStats(logs);
+                document.getElementById('lastUpdate').textContent = `Dernière mise à jour: ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error loading logs:', error);
+                const errorMsg = error.message || 'Erreur lors du chargement des logs';
+                document.getElementById('logsList').innerHTML = `<div class="empty">❌ ${errorMsg}</div>`;
+            }
+        }
+
+        function displayLogs(logs) {
+            const container = document.getElementById('logsList');
+            
+            if (logs.length === 0) {
+                container.innerHTML = '<div class="empty">Aucun log disponible</div>';
+                return;
+            }
+
+            container.innerHTML = logs.map(log => {
+                const timestamp = new Date(log.timestamp).toLocaleString('fr-FR');
+                
+                // Handle details - can be string (JSON) or object
+                let detailsStr = '';
+                if (log.details) {
+                    if (typeof log.details === 'string') {
+                        try {
+                            const parsed = JSON.parse(log.details);
+                            detailsStr = JSON.stringify(parsed, null, 2);
+                        } catch {
+                            detailsStr = log.details;
+                        }
+                    } else {
+                        detailsStr = JSON.stringify(log.details, null, 2);
+                    }
+                }
+                
+                return `
+                    <div class="log-entry">
+                        <div class="log-timestamp">${timestamp}</div>
+                        <div class="log-level ${log.level}">${log.level}</div>
+                        <div class="log-source">${log.source || 'N/A'}</div>
+                        <div class="log-message">${escapeHtml(log.message || '')}</div>
+                        ${detailsStr ? `<div class="log-details" onclick="showDetails('${escapeHtml(detailsStr)}')">📄</div>` : '<div></div>'}
+                    </div>
+                `;
+            }).join('');
+
+            // Update sources dropdown
+            logs.forEach(log => {
+                if (log.source && !sources.has(log.source)) {
+                    sources.add(log.source);
+                    const option = document.createElement('option');
+                    option.value = log.source;
+                    option.textContent = log.source;
+                    document.getElementById('filterSource').appendChild(option);
+                }
+            });
+        }
+
+        function updateStats(logs) {
+            document.getElementById('statTotal').textContent = logs.length;
+            document.getElementById('statErrors').textContent = logs.filter(l => l.level === 'error').length;
+            document.getElementById('statSuccess').textContent = logs.filter(l => l.level === 'success').length;
+            
+            const uniqueSources = new Set(logs.map(l => l.source).filter(Boolean));
+            document.getElementById('statSources').textContent = uniqueSources.size;
+        }
+
+        function showDetails(details) {
+            alert('Détails:\n\n' + details);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function clearLogs() {
+            if (!confirm('Êtes-vous sûr de vouloir effacer tous les logs ?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/logs`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadLogs();
+                } else {
+                    alert('Erreur lors de l\'effacement des logs');
+                }
+            } catch (error) {
+                console.error('Error clearing logs:', error);
+                alert('Erreur lors de l\'effacement des logs');
+            }
+        }
+
+        function toggleAutoRefresh() {
+            const enabled = document.getElementById('autoRefresh').checked;
+            
+            if (enabled) {
+                // Intervalle réduit à 2 secondes pour un meilleur temps réel
+                autoRefreshInterval = setInterval(loadLogs, 2000);
+            } else {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+        }
+        
+        // Démarrer l'actualisation automatique par défaut
+        function startAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            if (!checkbox.checked) {
+                checkbox.checked = true;
+            }
+            toggleAutoRefresh();
+        }
+
+        function toggleTheme() {
+            const body = document.body;
+            const html = document.documentElement;
+            const isDark = body.classList.contains('dark-mode');
+            
+            if (isDark) {
+                body.classList.remove('dark-mode');
+                html.classList.remove('dark-mode');
+                html.classList.add('light-mode');
+                localStorage.setItem('theme', 'light');
+            } else {
+                body.classList.add('dark-mode');
+                html.classList.add('dark-mode');
+                html.classList.remove('light-mode');
+                localStorage.setItem('theme', 'dark');
+            }
+        }
+
+        function initializeTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const body = document.body;
+            const html = document.documentElement;
+            
+            // Light mode par défaut (comme le reste de l'application)
+            if (savedTheme === 'dark') {
+                body.classList.add('dark-mode');
+                html.classList.add('dark-mode');
+                html.classList.remove('light-mode');
+            } else {
+                // Light mode par défaut
+                body.classList.remove('dark-mode');
+                html.classList.remove('dark-mode');
+                html.classList.add('light-mode');
+            }
+        }
+
+        async function loadVersion() {
+            try {
+                const response = await fetch(`${API_BASE}/api/version`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const versionBadge = document.getElementById('versionBadge');
+                    if (versionBadge) {
+                        versionBadge.textContent = `v${data.version}`;
+                        if (data.build_date) {
+                            versionBadge.title = `Version ${data.version} - Build: ${new Date(data.build_date).toLocaleDateString()}`;
+                        } else {
+                            versionBadge.title = `Version ${data.version}`;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load version:', error);
+            }
+        }
+
+        // Initialize theme IMMEDIATELY to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            const html = document.documentElement;
+            // Light mode par défaut (comme le reste de l'application)
+            if (savedTheme === 'dark') {
+                html.classList.add('dark-mode');
+            } else {
+                html.classList.add('light-mode');
+            }
+        })();
+
+        // Load logs on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initializeTheme();
+                loadLogs();
+                // Démarrer l'actualisation automatique par défaut
+                startAutoRefresh();
+            });
+        } else {
+            initializeTheme();
+            loadLogs();
+            // Démarrer l'actualisation automatique par défaut
+            startAutoRefresh();
+        }
+
+        // Update filters trigger reload
+        document.getElementById('filterSource').addEventListener('change', loadLogs);
+        document.getElementById('filterLevel').addEventListener('change', loadLogs);
+        document.getElementById('filterLimit').addEventListener('change', loadLogs);
+    </script>
+    <script type="module" src="/dashboard/js/version-loader.js"></script>
+</body>
+</html>
