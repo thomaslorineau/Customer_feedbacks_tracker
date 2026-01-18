@@ -109,13 +109,35 @@ class TrustpilotScraper(BaseScraper):
                 self.logger.log("info", f"Found {len(all_cards)} total article cards on page {page}")
                 
                 # Filter to only cards with review text (skip carousel cards)
+                # Use multiple selectors to be more robust
                 review_cards = []
                 for card in all_cards:
-                    text_elem = card.find('p', {'data-service-review-text-typography': True})
-                    if text_elem and text_elem.get_text(strip=True):
-                        review_cards.append(card)
+                    # Try multiple ways to find review text
+                    text_elem = (card.find('p', {'data-service-review-text-typography': True}) or
+                               card.find('div', {'data-service-review-text-typography': True}) or
+                               card.find('p', class_=re.compile(r'review.*text|text.*review', re.I)) or
+                               card.find('div', class_=re.compile(r'review.*content|content.*review', re.I)) or
+                               card.find('p', class_=re.compile(r'review__text')))
+                    
+                    if text_elem:
+                        review_text = text_elem.get_text(strip=True)
+                        if review_text:
+                            review_cards.append(card)
+                        else:
+                            # Try to find text in any paragraph or div within the card
+                            all_text_elements = card.find_all(['p', 'div'], string=re.compile(r'.{20,}'))
+                            if all_text_elements:
+                                review_cards.append(card)
                 
                 self.logger.log("info", f"Filtered to {len(review_cards)} cards with review text on page {page}")
+                
+                # Debug: log if no cards found on first page
+                if page == 1 and len(review_cards) == 0:
+                    self.logger.log("warning", f"No review cards found on first page. Total cards: {len(all_cards)}")
+                    # Log a sample of the HTML structure for debugging
+                    if all_cards:
+                        sample_card = all_cards[0]
+                        self.logger.log("debug", f"Sample card HTML structure: {str(sample_card)[:500]}")
                 
                 # If no review cards found, we've reached the end
                 if not review_cards:
@@ -140,20 +162,42 @@ class TrustpilotScraper(BaseScraper):
                                 if match:
                                     rating = int(match.group(1))
                         
-                        # Extract review text
-                        text_elem = card.find('p', {'data-service-review-text-typography': True}) or \
-                                   card.find('div', class_=re.compile(r'review-content')) or \
-                                   card.find('p', class_=re.compile(r'review__text'))
+                        # Extract review text - use multiple selectors for robustness
+                        text_elem = (card.find('p', {'data-service-review-text-typography': True}) or
+                                   card.find('div', {'data-service-review-text-typography': True}) or
+                                   card.find('p', class_=re.compile(r'review.*text|text.*review', re.I)) or
+                                   card.find('div', class_=re.compile(r'review.*content|content.*review', re.I)) or
+                                   card.find('p', class_=re.compile(r'review__text')))
+                        
                         review_text = text_elem.get_text(strip=True) if text_elem else ""
                         
+                        # If still no text, try to find any substantial text in the card
                         if not review_text:
+                            # Look for any paragraph or div with substantial text (at least 20 chars)
+                            all_text_elements = card.find_all(['p', 'div'], string=re.compile(r'.{20,}'))
+                            if all_text_elements:
+                                review_text = ' '.join([elem.get_text(strip=True) for elem in all_text_elements[:3]])
+                        
+                        if not review_text or len(review_text.strip()) < 10:
                             skipped_count += 1
+                            self.logger.log("debug", f"Skipped card: no review text found (author: {author if 'author' in locals() else 'unknown'})")
                             continue
                         
-                        # Extract author
-                        author_elem = card.find('span', {'data-consumer-name-typography': True}) or \
-                                     card.find('div', class_=re.compile(r'consumer-name'))
+                        # Extract author - try multiple selectors
+                        author_elem = (card.find('span', {'data-consumer-name-typography': True}) or
+                                     card.find('div', {'data-consumer-name-typography': True}) or
+                                     card.find('span', class_=re.compile(r'consumer.*name|name.*consumer', re.I)) or
+                                     card.find('div', class_=re.compile(r'consumer.*name|name.*consumer', re.I)) or
+                                     card.find('a', class_=re.compile(r'consumer.*name|name.*consumer', re.I)))
                         author = author_elem.get_text(strip=True) if author_elem else "Client"
+                        
+                        # If author is still "Client", try to find any name-like text in the card header
+                        if author == "Client":
+                            header = card.find('header') or card.find('div', class_=re.compile(r'header|review.*header', re.I))
+                            if header:
+                                name_candidates = header.find_all(['span', 'div', 'a'], string=re.compile(r'^[A-Z][a-z]+'))
+                                if name_candidates:
+                                    author = name_candidates[0].get_text(strip=True)
                         
                         # Extract date
                         date_elem = card.find('time')
@@ -161,13 +205,21 @@ class TrustpilotScraper(BaseScraper):
                         if date_elem and date_elem.get('datetime'):
                             created_at = date_elem['datetime']
                         
-                        # Extract review-specific URL
+                        # Extract review-specific URL - try multiple selectors
                         review_url = TRUSTPILOT_WEB  # fallback to general page
-                        review_link = card.find('a', {'data-review-title-typography': True})
+                        review_link = (card.find('a', {'data-review-title-typography': True}) or
+                                     card.find('a', href=re.compile(r'/review/|/users/', re.I)) or
+                                     card.find('a', class_=re.compile(r'review.*link|link.*review', re.I)))
+                        
                         if review_link and review_link.get('href'):
                             # Convert relative URL to absolute
                             relative_url = review_link['href']
-                            review_url = f"https://fr.trustpilot.com{relative_url}"
+                            if relative_url.startswith('http'):
+                                review_url = relative_url
+                            elif relative_url.startswith('/'):
+                                review_url = f"https://fr.trustpilot.com{relative_url}"
+                            else:
+                                review_url = f"https://fr.trustpilot.com/{relative_url}"
                         
                         # Map rating to sentiment
                         if rating >= 4:
@@ -190,6 +242,10 @@ class TrustpilotScraper(BaseScraper):
                         }
                         reviews.append(post)
                         parsed_count += 1
+                        
+                        # Log first review for debugging
+                        if page == 1 and parsed_count == 1:
+                            self.logger.log("info", f"First review parsed: Author={author}, Rating={rating}, URL={review_url}, Content preview={review_text[:100]}")
                         
                     except Exception as e:
                         self.logger.log("warning", f"Could not parse review card: {e}")
