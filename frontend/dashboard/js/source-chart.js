@@ -39,9 +39,12 @@ function updateSourceChartFromState(state) {
     
     posts.forEach(post => {
         // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
+        // Normalize Mastodon sources: Mastodon (instance) → Mastodon
         let source = post.source || 'Unknown';
         if (source === 'GitHub Issues' || source === 'GitHub Discussions') {
             source = 'GitHub';
+        } else if (source && source.startsWith('Mastodon (')) {
+            source = 'Mastodon';
         }
         const sentiment = post.sentiment_label || 'neutral';
         

@@ -14,10 +14,14 @@ async function initAPI() {
             console.warn('Could not import API module, using fetch directly:', error);
             // Fallback: use fetch directly
             api = {
-                getVersion: async () => {
+                getVersion: async (timestamp = null) => {
                     try {
                         const baseURL = window.location.protocol + '//' + window.location.hostname + (window.location.port ? ':' + window.location.port : ':8000');
-                        const response = await fetch(`${baseURL}/api/version`);
+                        let url = `${baseURL}/api/version`;
+                        if (timestamp) {
+                            url += `?t=${timestamp}`;
+                        }
+                        const response = await fetch(url);
                         if (!response.ok) {
                             throw new Error(`Failed to get version: ${response.statusText}`);
                         }
@@ -32,11 +36,13 @@ async function initAPI() {
     }
 }
 
-// Load and display version
+// Load and display version with cache-busting
 export async function loadVersion() {
     try {
         await initAPI();
-        const response = await api.getVersion();
+        // Add cache-busting timestamp to request
+        const timestamp = new Date().getTime();
+        const response = await api.getVersion(timestamp);
         if (response && response.version) {
             const versionBadge = document.getElementById('versionBadge');
             if (versionBadge) {
@@ -63,4 +69,32 @@ if (document.readyState === 'loading') {
 } else {
     loadVersion();
 }
+
+// Auto-refresh version every 30 seconds
+let versionRefreshInterval = null;
+
+function startVersionAutoRefresh() {
+    // Clear existing interval if any
+    if (versionRefreshInterval) {
+        clearInterval(versionRefreshInterval);
+    }
+    // Refresh every 30 seconds (30000 ms)
+    versionRefreshInterval = setInterval(() => {
+        loadVersion();
+    }, 30000);
+}
+
+// Start auto-refresh when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startVersionAutoRefresh);
+} else {
+    startVersionAutoRefresh();
+}
+
+// Cleanup interval on page unload
+window.addEventListener('beforeunload', () => {
+    if (versionRefreshInterval) {
+        clearInterval(versionRefreshInterval);
+    }
+});
 

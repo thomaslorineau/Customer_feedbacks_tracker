@@ -58,7 +58,7 @@ backend/
 ├── app/                    # Code source de l'application
 │   ├── main.py            # Point d'entrée FastAPI (routes, scheduler)
 │   ├── config.py          # Configuration (clés API, variables d'env)
-│   ├── db.py              # Gestion base de données SQLite
+│   ├── db.py              # Gestion base de données DuckDB
 │   │
 │   ├── scraper/           # Modules de scraping
 │   │   ├── x_scraper.py   # X/Twitter (via Nitter)
@@ -81,12 +81,24 @@ backend/
 │       └── helpers.py
 │
 ├── requirements.txt        # Dépendances Python
-├── scripts/               # Scripts backend (tests E2E)
+├── scripts/               # Scripts backend (tests E2E, maintenance)
 │   ├── e2e_test_real_server.py
+│   ├── e2e_full_test.py
 │   ├── ci_test_endpoints.py
-│   └── ci_test_job_persistence.py
+│   ├── ci_test_job_persistence.py
+│   ├── test_validation_features.py  # Tests de validation des nouvelles fonctionnalités
+│   ├── backup_db.py       # Sauvegarde de la base de données
+│   └── check_db_integrity.py  # Vérification intégrité DB
 │
-└── data.db               # Base de données SQLite (générée)
+├── tests/                 # Tests unitaires et d'intégration
+│   ├── test_e2e_scrapers.py
+│   ├── test_e2e_ui.py
+│   └── test_scrapers_async.py
+│
+├── backups/              # Backups de la base de données (5 derniers conservés)
+│   └── production_data_*.duckdb
+│
+└── data.duckdb           # Base de données DuckDB (générée automatiquement)
 ```
 
 **Points d'entrée:**
@@ -112,33 +124,42 @@ Documentation complète du projet, organisée par catégorie.
 ```
 docs/
 ├── guides/                # Guides d'utilisation
-│   ├── QUICK_START.md     # Guide de démarrage rapide
+│   ├── QUICK_START.md     # Guide de démarrage rapide (consolidé)
 │   ├── GUIDE_API_KEYS.md  # Configuration des clés API
 │   ├── GUIDE_TEST.md      # Guide de test
+│   ├── GUIDE_E2E_TESTS.md # Guide des tests E2E
 │   ├── QUICK_START_LLM.md # Configuration LLM
 │   ├── GET_API_KEY.md     # Obtenir les clés API
-│   └── ANTI_BOT_GUIDE.md  # Guide anti-bot
+│   ├── ANTI_BOT_GUIDE.md  # Guide anti-bot
+│   ├── VERSIONING.md      # Système de versioning automatique
+│   └── ...
 │
 ├── architecture/          # Documentation technique
 │   ├── ARCHITECTURE.md    # Architecture détaillée
 │   ├── SECURITY_OVERVIEW.md # Vue d'ensemble sécurité
 │   └── IMPLEMENTATION.md  # Détails d'implémentation
 │
-├── audits/               # Rapports d'audit
+├── audits/               # Rapports d'audit (actuels)
 │   ├── SECURITY_AUDIT.md  # Audit de sécurité
 │   ├── SECURITY_AUDIT_PHASE2.md
-│   ├── AUDIT.md
 │   ├── AUDIT_SCRAPERS.md  # Audit des scrapers
 │   ├── AUDIT_PRE_DEMO.md  # Audit pré-démo
 │   └── FIXES_SCRAPERS.md  # Correctifs scrapers
 │
-├── changelog/            # Historique des changements
+├── changelog/            # Historique des changements (actuels)
 │   ├── STATUS.md         # Statut actuel du projet
 │   ├── CHANGES_APPLIED.md # Changements appliqués
-│   ├── PHASE1_COMPLETE.md
-│   ├── PHASE2_COMPLETE.md
 │   ├── CLEANUP_LOG.md    # Log de nettoyage
 │   └── ...
+│
+├── migration/            # Documents de migration (actuels)
+│   └── ...
+│
+├── archive/              # Documents archivés (historique)
+│   ├── migration/        # Migrations terminées (SQLite → DuckDB)
+│   ├── changelog/        # Changelogs historiques (PHASE*.md)
+│   ├── guides/           # Anciens guides consolidés
+│   └── audits/           # Anciens audits
 │
 └── screenshots/          # Captures d'écran
     └── README.md
@@ -218,10 +239,25 @@ ovh-complaints-tracker/
 
 ## 📝 Notes
 
-- Les fichiers de base de données (`*.db`) sont générés automatiquement
-- Les fichiers de log (`*.log`) sont dans `backend/logs/`
-- Les fichiers de configuration (`.env`) sont dans `backend/` et ne sont **pas** commités
-- Les caches Python (`__pycache__/`) sont ignorés par Git
+- **Base de données** : DuckDB (`data.duckdb`) - migration complète depuis SQLite (janvier 2026)
+- **Backups** : Les 5 derniers backups sont conservés dans `backend/backups/`
+- **Fichiers de log** : `backend.log` et logs dans `backend/logs/`
+- **Configuration** : Fichiers `.env` dans `backend/` (non commités, voir `.gitignore`)
+- **Caches** : `__pycache__/` et fichiers temporaires ignorés par Git
+- **Documentation** : Documents obsolètes archivés dans `docs/archive/`
+
+## 🗂️ Organisation des scripts
+
+Les scripts sont organisés par fonction dans `backend/scripts/` :
+- **Tests** : `e2e_*.py`, `ci_test_*.py`, `test_*.py`
+- **Maintenance** : `backup_db.py`, `check_db_integrity.py`, `fix_duckdb_sequences.py`
+- **Migration** : `migrate_github_sources.py`
+- **Rapports** : `generate_final_report.py`, `test_scrapers_report.py`
+
+## 📋 Scripts à la racine (conservés)
+
+- `update.sh`, `update.ps1` - Scripts de mise à jour
+- `install.sh`, `install.ps1` - Scripts d'installation
 
 ---
 

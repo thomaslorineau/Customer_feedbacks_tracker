@@ -65,9 +65,14 @@ export class State {
                 return false;
             }
             
-            // Source filter (normalize GitHub sources)
+            // Source filter (normalize GitHub and Mastodon sources)
             if (this.filters.source) {
-                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                let normalizedSource = post.source;
+                if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
+                    normalizedSource = 'GitHub';
+                } else if (post.source && post.source.startsWith('Mastodon (')) {
+                    normalizedSource = 'Mastodon';
+                }
                 if (normalizedSource !== this.filters.source && post.source !== this.filters.source) {
                     return false;
                 }

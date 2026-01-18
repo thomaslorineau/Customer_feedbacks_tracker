@@ -2371,22 +2371,34 @@
         }
         
         async function cleanupDuplicates() {
-            const confirmed = confirm(
-                '🔄 Remove Duplicate Posts\n\n' +
-                'This will remove duplicate posts identified by:\n' +
-                '• Same URL\n' +
-                '• Same content + author + source\n\n' +
-                '✅ The oldest post (lowest ID) is kept\n' +
-                '❌ Duplicates are deleted\n\n' +
-                'This action is IRREVERSIBLE.\n\n' +
-                'Do you want to continue?'
-            );
-            
-            if (!confirmed) {
-                return;
-            }
-            
             try {
+                // First, get statistics
+                const statsResponse = await fetch(`${API_BASE}/admin/duplicates-stats`);
+                if (!statsResponse.ok) {
+                    throw new Error(`Failed to get duplicates stats: ${statsResponse.statusText}`);
+                }
+                const stats = await statsResponse.json();
+                
+                // Build confirmation message with statistics
+                let confirmMessage = '🔄 Remove Duplicate Posts\n\n';
+                confirmMessage += '📊 Statistics:\n';
+                confirmMessage += `• Duplicates by URL: ${stats.duplicates_by_url.groups} groups, ${stats.duplicates_by_url.posts_to_delete} posts to delete\n`;
+                confirmMessage += `• Duplicates by content: ${stats.duplicates_by_content.groups} groups, ${stats.duplicates_by_content.posts_to_delete} posts to delete\n`;
+                confirmMessage += `• Total: ${stats.total.duplicate_groups} duplicate groups, ${stats.total.posts_to_delete} posts will be deleted\n\n`;
+                confirmMessage += 'This will remove duplicate posts identified by:\n';
+                confirmMessage += '• Same URL\n';
+                confirmMessage += '• Same content + author + source\n\n';
+                confirmMessage += '✅ The oldest post (lowest ID) is kept\n';
+                confirmMessage += '❌ Duplicates are deleted\n\n';
+                confirmMessage += 'This action is IRREVERSIBLE.\n\n';
+                confirmMessage += 'Do you want to continue?';
+                
+                const confirmed = confirm(confirmMessage);
+                
+                if (!confirmed) {
+                    return;
+                }
+                
                 console.log('Cleaning up duplicate posts...');
                 showToast('Removing duplicate posts from database...', 'info');
                 
@@ -2826,7 +2838,13 @@
                     postUrl.includes(searchTerm);
                     
                 // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
-                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                // Normalize Mastodon sources: Mastodon (instance) → Mastodon
+                let normalizedSource = post.source;
+                if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
+                    normalizedSource = 'GitHub';
+                } else if (post.source && post.source.startsWith('Mastodon (')) {
+                    normalizedSource = 'Mastodon';
+                }
                 const matchesSource = !sourceFilter || normalizedSource === sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
@@ -2952,7 +2970,15 @@
                                 ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
                                 ${post.sentiment_label.toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
                             </span>
-                            <span class="relevance-badge ${relevanceClass}" title="Relevance Score: ${relevanceScore.toFixed(2)}">
+                            <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
+
+Calculé à partir de :
+• Marques OVH (40%) : OVH, OVHCloud, Kimsufi, etc.
+• URLs OVH (30%) : Liens vers ovh.com, ovhcloud.com
+• Direction OVH (20%) : Mentions de dirigeants OVH
+• Produits OVH (10%) : VPS, hosting, domain, etc.
+
+Les posts avec un score < 30% sont automatiquement filtrés.">
                                 ${relevanceIcon} ${(relevanceScore * 100).toFixed(0)}%
                             </span>
                         </div>
@@ -3802,7 +3828,13 @@
                     postAuthor.includes(searchTerm) ||
                     postUrl.includes(searchTerm);
                 // Normalize GitHub sources: GitHub Issues and GitHub Discussions → GitHub
-                const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+                // Normalize Mastodon sources: Mastodon (instance) → Mastodon
+                let normalizedSource = post.source;
+                if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
+                    normalizedSource = 'GitHub';
+                } else if (post.source && post.source.startsWith('Mastodon (')) {
+                    normalizedSource = 'Mastodon';
+                }
                 const matchesSource = !sourceFilter || normalizedSource === sourceFilter || post.source === sourceFilter;
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
@@ -4340,7 +4372,7 @@
             }
             
             try {
-                const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=100`, {
+                const response = await fetch(`${API_BASE}/scrape/trustpilot?query=${encodeURIComponent(combinedQuery)}&limit=500`, {
                     method: 'POST',
                     signal: currentAbortController.signal
                 });

@@ -76,104 +76,142 @@ class TrustpilotScraper(BaseScraper):
             return []
     
     async def _scrape_html(self, limit: int = 20) -> List[Dict[str, Any]]:
-        """Scrape Trustpilot reviews directly from HTML page."""
-        self.logger.log("info", f"Starting HTML scrape of {TRUSTPILOT_WEB}", url=TRUSTPILOT_WEB)
-        
-        response = await self._fetch_get(
-            TRUSTPILOT_WEB,
-            headers=DEFAULT_HEADERS
-        )
-        
-        self.logger.log("info", f"Got response: {response.status_code}, length: {len(response.text)}")
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
+        """Scrape Trustpilot reviews directly from HTML page with pagination."""
         reviews = []
+        page = 1
+        max_pages = (limit // 20) + 2  # Estimate pages needed, add buffer
         
-        # Find ALL review cards - Trustpilot uses article tags with data-service-review-card-paper
-        all_cards = soup.find_all('article', {'data-service-review-card-paper': True})
+        self.logger.log("info", f"Starting HTML scrape with pagination (limit: {limit}, max_pages: {max_pages})")
         
-        self.logger.log("info", f"Found {len(all_cards)} total article cards")
-        
-        # Filter to only cards with review text (skip carousel cards)
-        review_cards = []
-        for card in all_cards:
-            text_elem = card.find('p', {'data-service-review-text-typography': True})
-            if text_elem and text_elem.get_text(strip=True):
-                review_cards.append(card)
-        
-        self.logger.log("info", f"Filtered to {len(review_cards)} cards with review text")
-        
-        parsed_count = 0
-        skipped_count = 0
-        
-        for card in review_cards[:limit]:
+        while len(reviews) < limit and page <= max_pages:
+            # Build URL with pagination
+            if page == 1:
+                url = TRUSTPILOT_WEB
+            else:
+                url = f"{TRUSTPILOT_WEB}?page={page}"
+            
+            self.logger.log("info", f"Scraping page {page}: {url}")
+            
             try:
-                # Extract rating (stars)
-                rating_elem = card.find('div', {'data-service-review-rating': True})
-                rating = 3  # default neutral
-                if rating_elem:
-                    rating_img = rating_elem.find('img')
-                    if rating_img and rating_img.get('alt'):
-                        # Extract "Noté 5 sur 5 étoiles" -> 5
-                        match = re.search(r'(\d+)', rating_img['alt'])
-                        if match:
-                            rating = int(match.group(1))
+                response = await self._fetch_get(
+                    url,
+                    headers=DEFAULT_HEADERS
+                )
                 
-                # Extract review text
-                text_elem = card.find('p', {'data-service-review-text-typography': True}) or \
-                           card.find('div', class_=re.compile(r'review-content')) or \
-                           card.find('p', class_=re.compile(r'review__text'))
-                review_text = text_elem.get_text(strip=True) if text_elem else ""
+                self.logger.log("info", f"Got response: {response.status_code}, length: {len(response.text)}")
+                response.raise_for_status()
                 
-                if not review_text:
-                    skipped_count += 1
-                    continue
+                soup = BeautifulSoup(response.text, 'html.parser')
                 
-                # Extract author
-                author_elem = card.find('span', {'data-consumer-name-typography': True}) or \
-                             card.find('div', class_=re.compile(r'consumer-name'))
-                author = author_elem.get_text(strip=True) if author_elem else "Client"
+                # Find ALL review cards - Trustpilot uses article tags with data-service-review-card-paper
+                all_cards = soup.find_all('article', {'data-service-review-card-paper': True})
                 
-                # Extract date
-                date_elem = card.find('time')
-                created_at = datetime.now().isoformat()
-                if date_elem and date_elem.get('datetime'):
-                    created_at = date_elem['datetime']
+                self.logger.log("info", f"Found {len(all_cards)} total article cards on page {page}")
                 
-                # Extract review-specific URL
-                review_url = TRUSTPILOT_WEB  # fallback to general page
-                review_link = card.find('a', {'data-review-title-typography': True})
-                if review_link and review_link.get('href'):
-                    # Convert relative URL to absolute
-                    relative_url = review_link['href']
-                    review_url = f"https://fr.trustpilot.com{relative_url}"
+                # Filter to only cards with review text (skip carousel cards)
+                review_cards = []
+                for card in all_cards:
+                    text_elem = card.find('p', {'data-service-review-text-typography': True})
+                    if text_elem and text_elem.get_text(strip=True):
+                        review_cards.append(card)
                 
-                # Map rating to sentiment
-                if rating >= 4:
-                    sentiment_label = "positive"
-                elif rating >= 3:
-                    sentiment_label = "neutral"
-                else:
-                    sentiment_label = "negative"
+                self.logger.log("info", f"Filtered to {len(review_cards)} cards with review text on page {page}")
                 
-                sentiment_score = (rating - 3) / 2  # 1-5 scale -> -1 to 1
+                # If no review cards found, we've reached the end
+                if not review_cards:
+                    self.logger.log("info", f"No more reviews found on page {page}, stopping pagination")
+                    break
                 
-                post = {
-                    "source": "Trustpilot",
-                    "author": author,
-                    "content": review_text[:500],
-                    "url": review_url,
-                    "created_at": created_at,
-                    "sentiment_score": sentiment_score,
-                    "sentiment_label": sentiment_label,
-                }
-                reviews.append(post)
-                parsed_count += 1
+                parsed_count = 0
+                skipped_count = 0
+                
+                for card in review_cards:
+                    if len(reviews) >= limit:
+                        break
+                    try:
+                        # Extract rating (stars)
+                        rating_elem = card.find('div', {'data-service-review-rating': True})
+                        rating = 3  # default neutral
+                        if rating_elem:
+                            rating_img = rating_elem.find('img')
+                            if rating_img and rating_img.get('alt'):
+                                # Extract "Noté 5 sur 5 étoiles" -> 5
+                                match = re.search(r'(\d+)', rating_img['alt'])
+                                if match:
+                                    rating = int(match.group(1))
+                        
+                        # Extract review text
+                        text_elem = card.find('p', {'data-service-review-text-typography': True}) or \
+                                   card.find('div', class_=re.compile(r'review-content')) or \
+                                   card.find('p', class_=re.compile(r'review__text'))
+                        review_text = text_elem.get_text(strip=True) if text_elem else ""
+                        
+                        if not review_text:
+                            skipped_count += 1
+                            continue
+                        
+                        # Extract author
+                        author_elem = card.find('span', {'data-consumer-name-typography': True}) or \
+                                     card.find('div', class_=re.compile(r'consumer-name'))
+                        author = author_elem.get_text(strip=True) if author_elem else "Client"
+                        
+                        # Extract date
+                        date_elem = card.find('time')
+                        created_at = datetime.now().isoformat()
+                        if date_elem and date_elem.get('datetime'):
+                            created_at = date_elem['datetime']
+                        
+                        # Extract review-specific URL
+                        review_url = TRUSTPILOT_WEB  # fallback to general page
+                        review_link = card.find('a', {'data-review-title-typography': True})
+                        if review_link and review_link.get('href'):
+                            # Convert relative URL to absolute
+                            relative_url = review_link['href']
+                            review_url = f"https://fr.trustpilot.com{relative_url}"
+                        
+                        # Map rating to sentiment
+                        if rating >= 4:
+                            sentiment_label = "positive"
+                        elif rating >= 3:
+                            sentiment_label = "neutral"
+                        else:
+                            sentiment_label = "negative"
+                        
+                        sentiment_score = (rating - 3) / 2  # 1-5 scale -> -1 to 1
+                        
+                        post = {
+                            "source": "Trustpilot",
+                            "author": author,
+                            "content": review_text[:500],
+                            "url": review_url,
+                            "created_at": created_at,
+                            "sentiment_score": sentiment_score,
+                            "sentiment_label": sentiment_label,
+                        }
+                        reviews.append(post)
+                        parsed_count += 1
+                        
+                    except Exception as e:
+                        self.logger.log("warning", f"Could not parse review card: {e}")
+                        skipped_count += 1
+                        continue
+                
+                self.logger.log("info", f"Page {page}: parsed {parsed_count} reviews (skipped {skipped_count})")
+                
+                # Wait 1 second between pages to avoid rate limiting
+                if page < max_pages and len(reviews) < limit:
+                    await asyncio.sleep(1)
+                
+                page += 1
                 
             except Exception as e:
-                self.logger.log("warning", f"Could not parse review card: {e}")
+                self.logger.log("warning", f"Error scraping page {page}: {e}")
+                # Continue to next page even if this one fails
+                page += 1
                 continue
+        
+        self.logger.log("success", f"Successfully parsed {len(reviews)} reviews from {page - 1} page(s)")
+        return reviews[:limit]  # Ensure we don't exceed limit
         
         self.logger.log("success", f"Successfully parsed {len(reviews)} reviews (skipped {skipped_count})")
         return reviews

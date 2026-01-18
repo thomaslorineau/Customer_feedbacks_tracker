@@ -515,7 +515,7 @@
                         <div class="log-level ${log.level}">${log.level}</div>
                         <div class="log-source">${log.source || 'N/A'}</div>
                         <div class="log-message">${escapeHtml(log.message || '')}</div>
-                        ${detailsStr ? `<div class="log-details" onclick="showDetails('${escapeHtml(detailsStr)}')">📄</div>` : '<div></div>'}
+                        ${detailsStr ? `<div class="log-details" onclick="showDetails(${JSON.stringify(detailsStr)})">📄</div>` : '<div></div>'}
                     </div>
                 `;
             }).join('');
@@ -542,7 +542,121 @@
         }
 
         function showDetails(details) {
-            alert('Détails:\n\n' + details);
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            `;
+            
+            // Create modal content
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: var(--bg-card);
+                border-radius: 12px;
+                padding: 24px;
+                max-width: 80%;
+                max-height: 80vh;
+                overflow: auto;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                border: 1px solid var(--border-color);
+            `;
+            
+            // Create header
+            const header = document.createElement('div');
+            header.style.cssText = `
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 1px solid var(--border-color);
+            `;
+            
+            const title = document.createElement('h3');
+            title.textContent = '📄 Détails du log';
+            title.style.cssText = 'margin: 0; color: var(--text-primary);';
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✕';
+            closeBtn.style.cssText = `
+                background: transparent;
+                border: none;
+                font-size: 24px;
+                cursor: pointer;
+                color: var(--text-secondary);
+                padding: 0;
+                width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 4px;
+                transition: all 0.2s ease;
+            `;
+            closeBtn.onmouseover = () => {
+                closeBtn.style.background = 'var(--bg-secondary)';
+                closeBtn.style.color = 'var(--text-primary)';
+            };
+            closeBtn.onmouseout = () => {
+                closeBtn.style.background = 'transparent';
+                closeBtn.style.color = 'var(--text-secondary)';
+            };
+            closeBtn.onclick = () => modal.remove();
+            
+            // Create content area
+            const pre = document.createElement('pre');
+            pre.textContent = details;
+            pre.style.cssText = `
+                background: var(--bg-secondary);
+                padding: 16px;
+                border-radius: 8px;
+                overflow-x: auto;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+                margin: 0;
+                color: var(--text-primary);
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            `;
+            
+            // Assemble modal
+            header.appendChild(title);
+            header.appendChild(closeBtn);
+            content.appendChild(header);
+            content.appendChild(pre);
+            modal.appendChild(content);
+            
+            // Close on overlay click
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            };
+            
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    modal.remove();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+            
+            // Add to DOM
+            document.body.appendChild(modal);
+            
+            // Focus close button for accessibility
+            closeBtn.focus();
         }
 
         function escapeHtml(text) {

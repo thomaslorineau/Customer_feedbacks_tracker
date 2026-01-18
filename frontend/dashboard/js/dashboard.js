@@ -1925,12 +1925,42 @@ function scrollToPostsSection() {
     const postsSection = document.getElementById('postsSection');
     if (postsSection) {
         postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Update posts display when scrolling to section
         setTimeout(() => {
             updatePostsDisplay();
+            const backBtn = document.getElementById('backToSearchBtn');
+            if (backBtn) {
+                backBtn.style.display = 'block';
+            }
         }, 500);
     }
 }
+
+function scrollToSearch() {
+    const searchSection = document.querySelector('.search-section-with-kpi');
+    if (searchSection) {
+        searchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+            const backBtn = document.getElementById('backToSearchBtn');
+            if (backBtn) {
+                backBtn.style.display = 'none';
+            }
+        }, 500);
+    }
+}
+
+// Hide back button when manually scrolling back to search
+window.addEventListener('scroll', () => {
+    const backBtn = document.getElementById('backToSearchBtn');
+    if (backBtn && backBtn.style.display === 'block') {
+        const searchSection = document.querySelector('.search-section-with-kpi');
+        if (searchSection) {
+            const searchTop = searchSection.getBoundingClientRect().top;
+            if (searchTop >= 0 && searchTop < 100) {
+                backBtn.style.display = 'none';
+            }
+        }
+    }
+});
 
 function updatePostsDisplay() {
     if (!state || !state.posts) {
@@ -2039,7 +2069,15 @@ function updatePostsDisplay() {
                             ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
                             ${(post.sentiment_label || 'neutral').toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
                         </span>
-                        <span class="relevance-badge ${relevanceClass}" title="Relevance Score: ${relevanceScore.toFixed(2)}">
+                        <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
+
+Calculé à partir de :
+• Marques OVH (40%) : OVH, OVHCloud, Kimsufi, etc.
+• URLs OVH (30%) : Liens vers ovh.com, ovhcloud.com
+• Direction OVH (20%) : Mentions de dirigeants OVH
+• Produits OVH (10%) : VPS, hosting, domain, etc.
+
+Les posts avec un score < 30% sont automatiquement filtrés.">
                             ${relevanceIcon} ${(relevanceScore * 100).toFixed(0)}%
                         </span>
                     </div>
@@ -2097,7 +2135,12 @@ function updatePostsSourceFilter() {
     const sources = new Set();
     state.posts.forEach(post => {
         if (post.source) {
-            const normalized = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
+            let normalized = post.source;
+            if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
+                normalized = 'GitHub';
+            } else if (post.source.startsWith('Mastodon (')) {
+                normalized = 'Mastodon';
+            }
             sources.add(normalized);
         }
     });

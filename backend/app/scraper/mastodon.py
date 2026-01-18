@@ -77,7 +77,7 @@ class MastodonScraper(BaseScraper):
                                 created_at = status.get('created_at', datetime.now().isoformat())
                                 
                                 post = {
-                                    'source': f'Mastodon ({instance.split("//")[1].split("/")[0]})',
+                                    'source': 'Mastodon',
                                     'author': author,
                                     'content': content[:500],
                                     'url': post_url,
@@ -130,15 +130,15 @@ class MastodonScraper(BaseScraper):
                                     
                                     created_at = status.get('created_at', datetime.now().isoformat())
                                     
-                                    post = {
-                                        'source': f'Mastodon ({instance.split("//")[1].split("/")[0]})',
-                                        'author': author,
-                                        'content': content[:500],
-                                        'url': post_url,
-                                        'created_at': created_at,
-                                        'sentiment_score': 0.0,
-                                        'sentiment_label': 'neutral',
-                                    }
+                                post = {
+                                    'source': 'Mastodon',
+                                    'author': author,
+                                    'content': content[:500],
+                                    'url': post_url,
+                                    'created_at': created_at,
+                                    'sentiment_score': 0.0,
+                                    'sentiment_label': 'neutral',
+                                }
                                     all_posts.append(post)
                                 except Exception as e:
                                     self.logger.log("warning", f"Error parsing Mastodon search result: {e}")
@@ -249,7 +249,7 @@ def _scrape_mastodon_sync(query: str = "OVH", limit: int = 50):
                                 created_at = status.get('created_at', datetime.now().isoformat())
                                 
                                 post = {
-                                    'source': f'Mastodon ({instance.split("//")[1].split("/")[0]})',
+                                    'source': 'Mastodon',
                                     'author': author,
                                     'content': content[:500],
                                     'url': post_url,
@@ -305,15 +305,15 @@ def _scrape_mastodon_sync(query: str = "OVH", limit: int = 50):
                                     
                                     created_at = status.get('created_at', datetime.now().isoformat())
                                     
-                                    post = {
-                                        'source': f'Mastodon ({instance.split("//")[1].split("/")[0]})',
-                                        'author': author,
-                                        'content': content[:500],
-                                        'url': post_url,
-                                        'created_at': created_at,
-                                        'sentiment_score': 0.0,
-                                        'sentiment_label': 'neutral',
-                                    }
+                                post = {
+                                    'source': 'Mastodon',
+                                    'author': author,
+                                    'content': content[:500],
+                                    'url': post_url,
+                                    'created_at': created_at,
+                                    'sentiment_score': 0.0,
+                                    'sentiment_label': 'neutral',
+                                }
                                     all_posts.append(post)
                                     logger.info(f"✓ Mastodon: {author} - {content[:50]}")
                                     

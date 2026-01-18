@@ -17,12 +17,15 @@
     min-height: 60px;
     height: 60px;
     box-sizing: border-box;
+    overflow: hidden; /* Prevent horizontal scroll */
 }
 
 .nav-menu-left {
     display: flex;
     align-items: center;
-    gap: 32px;
+    gap: 16px; /* Reduced from 32px to prevent overflow */
+    flex: 1;
+    min-width: 0; /* Allow shrinking */
 }
 
 .nav-logo {
@@ -93,6 +96,12 @@
     white-space: nowrap;
     overflow-x: auto;
     overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.nav-tabs::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
 }
 
 .nav-tab {
@@ -103,7 +112,7 @@
     color: var(--text-secondary);
     text-decoration: none;
     font-weight: var(--font-weight-medium);
-    font-size: var(--font-size-sm);
+    font-size: clamp(0.75rem, 1.2vw, 0.9rem); /* Adaptive font size */
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     display: flex;
@@ -158,6 +167,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0; /* Prevent button from overlapping menu */
 }
 
 /* Adjust body padding to account for fixed nav */
@@ -225,5 +235,48 @@ body.v1-page {
     background: var(--accent-primary);
     color: white;
     border-color: var(--accent-primary);
+}
+
+/* Scrape button compact styling */
+.btn-scrape-compact {
+    padding: 6px 12px !important; /* Reduced from 8px 16px */
+    font-size: 0.8em !important; /* Reduced font size */
+}
+
+/* Media queries for responsive navigation */
+@media (max-width: 1200px) {
+    /* Hide tab text on smaller screens, show only icons */
+    .nav-tab span:not(.nav-tab-icon) {
+        display: none;
+    }
+    
+    .nav-tab {
+        padding: 10px 12px; /* Reduce padding when text is hidden */
+    }
+    
+    .nav-menu-left {
+        gap: 12px; /* Further reduce gap */
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-menu {
+        padding: 10px 16px; /* Reduce horizontal padding */
+    }
+    
+    .nav-tab {
+        padding: 8px 10px; /* Further reduce padding */
+    }
+    
+    .beta-badge,
+    .version-badge {
+        font-size: 0.7em; /* Smaller badges */
+        padding: 3px 8px;
+    }
+    
+    .btn-scrape-compact {
+        padding: 5px 10px !important;
+        font-size: 0.75em !important;
+    }
 }
 

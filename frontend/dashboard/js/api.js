@@ -68,9 +68,14 @@ export class API {
         return response.json();
     }
     
-    async getVersion() {
+    async getVersion(timestamp = null) {
         try {
-            const response = await fetch(`${this.baseURL}/api/version`);
+            // Add cache-busting timestamp to URL if provided
+            let url = `${this.baseURL}/api/version`;
+            if (timestamp) {
+                url += `?t=${timestamp}`;
+            }
+            const response = await fetch(url);
             if (!response.ok) {
                 throw new Error(`Failed to get version: ${response.statusText}`);
             }

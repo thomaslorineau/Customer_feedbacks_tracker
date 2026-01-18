@@ -372,6 +372,53 @@ def get_job_record(job_id: str):
     }
 
 
+def get_all_jobs(status: Optional[str] = None, limit: int = 100):
+    """
+    Get all jobs from the database with optional filtering.
+    
+    Args:
+        status: Optional status filter (e.g., 'running', 'completed', 'failed', 'pending')
+        limit: Limit on number of results (default: 100)
+    
+    Returns:
+        List of job records
+    """
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        query = 'SELECT job_id, status, progress_total, progress_completed, results, errors, cancelled, error, created_at, updated_at FROM jobs'
+        params = []
+        
+        if status:
+            query += ' WHERE status = ?'
+            params.append(status)
+        
+        query += ' ORDER BY created_at DESC LIMIT ?'
+        params.append(limit)
+        
+        c.execute(query, params)
+        rows = c.fetchall()
+        
+        jobs = []
+        for row in rows:
+            jobs.append({
+                'id': row[0],
+                'status': row[1],
+                'progress': {'total': row[2], 'completed': row[3]},
+                'results': json.loads(row[4] or '[]'),
+                'errors': json.loads(row[5] or '[]'),
+                'cancelled': bool(row[6]),
+                'error': row[7],
+                'created_at': row[8],
+                'updated_at': row[9],
+            })
+        
+        return jobs
+    finally:
+        conn.close()
+
+
 def save_queries(keywords: list):
     """Replace saved queries with provided list (order preserved)."""
     # SECURITY: Validate input

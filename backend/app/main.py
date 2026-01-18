@@ -53,9 +53,21 @@ def should_insert_post(post: dict) -> tuple:
     """
     Détermine si un post doit être inséré en base selon son score de pertinence.
     
+    Special case: All Trustpilot posts from ovhcloud.com are considered relevant
+    (no relevance filtering applied).
+    
     Returns:
         (should_insert: bool, relevance_score: float)
     """
+    # Special handling for Trustpilot: all posts from ovhcloud.com are relevant
+    source = post.get('source', '').lower()
+    url = post.get('url', '')
+    
+    if source == 'trustpilot' or 'trustpilot.com/review/ovhcloud.com' in url.lower():
+        # All Trustpilot posts from ovhcloud.com are considered relevant
+        return True, 1.0
+    
+    # For other sources, apply normal relevance filtering
     relevance_score = relevance_scorer.calculate_relevance_score(post)
     is_relevant = relevance_scorer.is_relevant(post, threshold=RELEVANCE_THRESHOLD)
     
@@ -1174,6 +1186,26 @@ async def start_keyword_scrape(payload: KeywordsPayload, limit: int = 50, concur
     return {'job_id': job_id, 'total_keywords': len(all_keywords), 'base_keywords': len(keywords_base.get_all_base_keywords()), 'user_keywords': len(user_keywords)}
 
 
+@app.get('/scrape/jobs')
+async def get_all_jobs_endpoint(status: Optional[str] = None, limit: int = 100):
+    """
+    Get all scraping jobs with optional filters.
+    
+    Query parameters:
+    - status: Filter by status (pending, running, completed, failed)
+    - limit: Limit number of results (default: 100)
+    """
+    try:
+        jobs = db.get_all_jobs(status=status, limit=limit)
+        return {
+            'jobs': jobs,
+            'total': len(jobs)
+        }
+    except Exception as e:
+        logger.error(f"Error getting jobs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get('/scrape/jobs/{job_id}')
 async def get_job_status(job_id: str):
     job = JOBS.get(job_id)
@@ -1204,6 +1236,58 @@ async def cancel_job(job_id: str):
     try:
         db.append_job_error(job_id, 'cancelled by user')
         db.finalize_job(job_id, 'cancelled', 'cancelled by user')
+    except Exception:
+        pass
+    return {'cancelled': True}
+
+
+@app.post('/scrape/jobs/cancel-all')
+async def cancel_all_jobs():
+    """
+    Cancel all running jobs.
+    """
+    try:
+        cancelled_count = 0
+        
+        # Cancel jobs in memory
+        for job_id, job in list(JOBS.items()):
+            if job.get('status') in ['running', 'pending']:
+                job['cancelled'] = True
+                job['status'] = 'cancelled'
+                try:
+                    db.append_job_error(job_id, 'cancelled by user (cancel-all)')
+                    db.finalize_job(job_id, 'cancelled', 'cancelled by user (cancel-all)')
+                except Exception:
+                    pass
+                cancelled_count += 1
+        
+        # Cancel jobs in database
+        all_jobs = db.get_all_jobs(status='running')
+        for job in all_jobs:
+            try:
+                db.append_job_error(job['id'], 'cancelled by user (cancel-all)')
+                db.finalize_job(job['id'], 'cancelled', 'cancelled by user (cancel-all)')
+                cancelled_count += 1
+            except Exception:
+                pass
+        
+        # Also check pending jobs
+        pending_jobs = db.get_all_jobs(status='pending')
+        for job in pending_jobs:
+            try:
+                db.append_job_error(job['id'], 'cancelled by user (cancel-all)')
+                db.finalize_job(job['id'], 'cancelled', 'cancelled by user (cancel-all)')
+                cancelled_count += 1
+            except Exception:
+                pass
+        
+        return {
+            'cancelled': cancelled_count,
+            'message': f'Successfully cancelled {cancelled_count} job(s)'
+        }
+    except Exception as e:
+        logger.error(f"Error cancelling all jobs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception:
         pass
     return {'cancelled': True}
@@ -1838,6 +1922,87 @@ async def cleanup_hackernews_posts():
             'message': f'Successfully removed {deleted_count} Hacker News posts from database'
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get('/admin/duplicates-stats')
+async def get_duplicates_stats():
+    """
+    Get statistics about duplicate posts before deletion.
+    Returns counts of duplicates by URL and by content+author+source.
+    """
+    try:
+        conn, is_duckdb = db.get_db_connection()
+        c = conn.cursor()
+        
+        # Count duplicates by URL
+        if is_duckdb:
+            url_duplicates_query = """
+                SELECT url, COUNT(*) as count
+                FROM posts
+                WHERE url IS NOT NULL AND url != ''
+                GROUP BY url
+                HAVING COUNT(*) > 1
+            """
+        else:
+            url_duplicates_query = """
+                SELECT url, COUNT(*) as count
+                FROM posts
+                WHERE url IS NOT NULL AND url != ''
+                GROUP BY url
+                HAVING COUNT(*) > 1
+            """
+        
+        c.execute(url_duplicates_query)
+        url_duplicates = c.fetchall()
+        url_duplicates_count = sum(count - 1 for _, count in url_duplicates)  # -1 to keep one
+        
+        # Count duplicates by content+author+source
+        if is_duckdb:
+            content_duplicates_query = """
+                SELECT content, author, source, COUNT(*) as count
+                FROM posts
+                WHERE content IS NOT NULL AND content != ''
+                GROUP BY content, author, source
+                HAVING COUNT(*) > 1
+            """
+        else:
+            content_duplicates_query = """
+                SELECT content, author, source, COUNT(*) as count
+                FROM posts
+                WHERE content IS NOT NULL AND content != ''
+                GROUP BY content, author, source
+                HAVING COUNT(*) > 1
+            """
+        
+        c.execute(content_duplicates_query)
+        content_duplicates = c.fetchall()
+        content_duplicates_count = sum(count - 1 for _, _, _, count in content_duplicates)  # -1 to keep one
+        
+        # Total unique duplicate groups
+        total_duplicate_groups = len(url_duplicates) + len(content_duplicates)
+        
+        # Total posts that would be deleted
+        total_to_delete = url_duplicates_count + content_duplicates_count
+        
+        conn.close()
+        
+        return {
+            'duplicates_by_url': {
+                'groups': len(url_duplicates),
+                'posts_to_delete': url_duplicates_count
+            },
+            'duplicates_by_content': {
+                'groups': len(content_duplicates),
+                'posts_to_delete': content_duplicates_count
+            },
+            'total': {
+                'duplicate_groups': total_duplicate_groups,
+                'posts_to_delete': total_to_delete
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting duplicates stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -3217,16 +3382,84 @@ class LLMConfigResponse(BaseModel):
     status: str = Field(..., description="Configuration status")
 
 def get_version():
-    """Read version from VERSION file."""
+    """
+    Get application version with automatic MINOR and PATCH calculation.
+    
+    Format: MAJOR.MINOR.PATCH
+    - MAJOR: Read from VERSION file (manual update for breaking changes)
+    - MINOR: Count of Git tags matching vMAJOR.* pattern (e.g., v1.0, v1.1, etc.)
+    - PATCH: Count of commits from git rev-list --count HEAD
+    
+    Returns:
+        Version string in format "MAJOR.MINOR.PATCH" (e.g., "1.5.77")
+    """
+    import subprocess
+    
+    # Read MAJOR from VERSION file
     version_path = Path(__file__).resolve().parents[2] / "VERSION"
     try:
         if version_path.exists():
             with open(version_path, "r", encoding="utf-8") as f:
-                version = f.read().strip()
-                return version if version else "1.0.0"
-        return "1.0.0"
+                major = f.read().strip()
+                if not major:
+                    major = "1"
+        else:
+            major = "1"
     except Exception:
-        return "1.0.0"
+        major = "1"
+    
+    # Calculate MINOR from Git tags (Option A - recommended)
+    minor = "0"
+    try:
+        # Get all tags matching vMAJOR.* pattern
+        result = subprocess.run(
+            ["git", "tag", "-l", f"v{major}.*"],
+            capture_output=True,
+            text=True,
+            cwd=version_path.parent,
+            timeout=5
+        )
+        if result.returncode == 0:
+            tags = [tag for tag in result.stdout.strip().split('\n') if tag]
+            # Count unique MINOR versions (e.g., v1.0, v1.1, v1.2 -> 3)
+            minor_versions = set()
+            for tag in tags:
+                # Extract MINOR from tag like v1.5.10 -> 5
+                parts = tag.replace(f"v{major}.", "").split(".")
+                if parts:
+                    try:
+                        minor_versions.add(int(parts[0]))
+                    except ValueError:
+                        pass
+            # MINOR is the count of unique minor versions, or max + 1
+            if minor_versions:
+                minor = str(max(minor_versions) + 1)
+            else:
+                minor = "0"
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+        logger.debug(f"Could not calculate MINOR from Git tags: {e}")
+        minor = "0"
+    
+    # Calculate PATCH from commit count
+    patch = "0"
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=version_path.parent,
+            timeout=5
+        )
+        if result.returncode == 0:
+            patch = result.stdout.strip()
+            if not patch:
+                patch = "0"
+    except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+        logger.debug(f"Could not calculate PATCH from Git commits: {e}")
+        patch = "0"
+    
+    # Return format: MAJOR.MINOR.PATCH
+    return f"{major}.{minor}.{patch}"
 
 @app.get("/api/version")
 async def get_app_version():
