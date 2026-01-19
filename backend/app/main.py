@@ -3504,14 +3504,44 @@ class LLMConfigResponse(BaseModel):
     llm_provider: str = Field(..., description="Current LLM provider")
     status: str = Field(..., description="Configuration status")
 
+
+# Email notification models
+class NotificationTriggerCreate(BaseModel):
+    """Request model for creating a notification trigger."""
+    name: str = Field(..., min_length=1, max_length=100)
+    enabled: bool = Field(default=True)
+    conditions: dict = Field(..., description="Trigger conditions (JSON)")
+    emails: List[str] = Field(..., min_items=1, max_items=50, description="List of recipient emails")
+    cooldown_minutes: int = Field(default=60, ge=1, le=1440, description="Cooldown in minutes")
+    max_posts_per_email: int = Field(default=10, ge=1, le=50, description="Max posts per email")
+
+
+class NotificationTriggerUpdate(BaseModel):
+    """Request model for updating a notification trigger."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    enabled: Optional[bool] = None
+    conditions: Optional[dict] = None
+    emails: Optional[List[str]] = Field(None, min_items=1, max_items=50)
+    cooldown_minutes: Optional[int] = Field(None, ge=1, le=1440)
+    max_posts_per_email: Optional[int] = Field(None, ge=1, le=50)
+
+
+class EmailConfigResponse(BaseModel):
+    """Response model for email configuration status."""
+    smtp_configured: bool = Field(..., description="Whether SMTP is configured")
+    smtp_host: Optional[str] = Field(None, description="SMTP host (masked)")
+    smtp_port: Optional[int] = None
+    from_email: Optional[str] = Field(None, description="From email address")
+    from_name: Optional[str] = None
+
 def get_version():
     """
     Get application version with automatic MINOR and PATCH calculation.
     
     Format: MAJOR.MINOR.PATCH
     - MAJOR: Read from VERSION file (manual update for breaking changes)
-    - MINOR: Count of Git tags matching vMAJOR.* pattern (e.g., v1.0, v1.1, etc.)
-    - PATCH: Count of commits from git rev-list --count HEAD
+    - MINOR: Read from .version_minor file (auto-incremented on push)
+    - PATCH: Last 2 digits of commit count (to keep version short)
     
     Returns:
         Version string in format "MAJOR.MINOR.PATCH" (e.g., "1.5.77")
@@ -3531,40 +3561,23 @@ def get_version():
     except Exception:
         major = "1"
     
-    # Calculate MINOR from Git tags (Option A - recommended)
+    # Read MINOR from .version_minor file (auto-incremented on push)
     minor = "0"
+    version_minor_path = version_path.parent / ".version_minor"
     try:
-        # Get all tags matching vMAJOR.* pattern
-        result = subprocess.run(
-            ["git", "tag", "-l", f"v{major}.*"],
-            capture_output=True,
-            text=True,
-            cwd=version_path.parent,
-            timeout=5
-        )
-        if result.returncode == 0:
-            tags = [tag for tag in result.stdout.strip().split('\n') if tag]
-            # Count unique MINOR versions (e.g., v1.0, v1.1, v1.2 -> 3)
-            minor_versions = set()
-            for tag in tags:
-                # Extract MINOR from tag like v1.5.10 -> 5
-                parts = tag.replace(f"v{major}.", "").split(".")
-                if parts:
-                    try:
-                        minor_versions.add(int(parts[0]))
-                    except ValueError:
-                        pass
-            # MINOR is the count of unique minor versions, or max + 1
-            if minor_versions:
-                minor = str(max(minor_versions) + 1)
-            else:
-                minor = "0"
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
-        logger.debug(f"Could not calculate MINOR from Git tags: {e}")
+        if version_minor_path.exists():
+            with open(version_minor_path, "r", encoding="utf-8") as f:
+                minor = f.read().strip()
+                if not minor or not minor.isdigit():
+                    minor = "0"
+        else:
+            minor = "0"
+    except Exception as e:
+        logger.debug(f"Could not read MINOR from .version_minor: {e}")
         minor = "0"
     
-    # Calculate PATCH from commit count
-    patch = "0"
+    # Calculate PATCH from commit count (last 2 digits to keep it short)
+    patch = "00"
     try:
         result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
@@ -3574,12 +3587,17 @@ def get_version():
             timeout=5
         )
         if result.returncode == 0:
-            patch = result.stdout.strip()
-            if not patch:
-                patch = "0"
+            commit_count = result.stdout.strip()
+            if commit_count and commit_count.isdigit():
+                # Prendre les 2 derniers chiffres (ex: 177 -> 77, 5 -> 05)
+                patch = str(int(commit_count) % 100).zfill(2)
+            else:
+                patch = "00"
+        else:
+            patch = "00"
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
         logger.debug(f"Could not calculate PATCH from Git commits: {e}")
-        patch = "0"
+        patch = "00"
     
     # Return format: MAJOR.MINOR.PATCH
     return f"{major}.{minor}.{patch}"
@@ -4107,3 +4125,217 @@ Format as bullet points, professional and executive-friendly."""
     except Exception as e:
         logger.error(f"Error generating PowerPoint report: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+
+
+# ============================================================================
+# Email Notification Endpoints
+# ============================================================================
+
+@app.get("/api/email/triggers")
+async def get_email_triggers():
+    """Get all notification triggers."""
+    try:
+        triggers = db.get_all_notification_triggers()
+        return {"triggers": triggers, "total": len(triggers)}
+    except Exception as e:
+        logger.error(f"Error getting triggers: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/email/triggers/{trigger_id}")
+async def get_email_trigger(trigger_id: int):
+    """Get a specific notification trigger by ID."""
+    try:
+        trigger = db.get_notification_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(status_code=404, detail="Trigger not found")
+        return trigger
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting trigger {trigger_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/email/triggers", response_model=dict)
+async def create_email_trigger(trigger: NotificationTriggerCreate):
+    """Create a new notification trigger."""
+    try:
+        import re
+        # Validate email addresses
+        email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        for email in trigger.emails:
+            if not email_pattern.match(email):
+                raise HTTPException(status_code=400, detail=f"Invalid email address: {email}")
+        
+        trigger_id = db.create_notification_trigger(
+            name=trigger.name,
+            conditions=trigger.conditions,
+            emails=trigger.emails,
+            cooldown_minutes=trigger.cooldown_minutes,
+            max_posts_per_email=trigger.max_posts_per_email,
+            enabled=trigger.enabled
+        )
+        return {"id": trigger_id, "message": "Trigger created successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating trigger: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/email/triggers/{trigger_id}", response_model=dict)
+async def update_email_trigger(trigger_id: int, trigger: NotificationTriggerUpdate):
+    """Update a notification trigger."""
+    try:
+        # Validate email addresses if provided
+        if trigger.emails:
+            import re
+            email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+            for email in trigger.emails:
+                if not email_pattern.match(email):
+                    raise HTTPException(status_code=400, detail=f"Invalid email address: {email}")
+        
+        success = db.update_notification_trigger(
+            trigger_id=trigger_id,
+            name=trigger.name,
+            conditions=trigger.conditions,
+            emails=trigger.emails,
+            cooldown_minutes=trigger.cooldown_minutes,
+            max_posts_per_email=trigger.max_posts_per_email,
+            enabled=trigger.enabled
+        )
+        if not success:
+            raise HTTPException(status_code=404, detail="Trigger not found")
+        return {"message": "Trigger updated successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating trigger {trigger_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/email/triggers/{trigger_id}", response_model=dict)
+async def delete_email_trigger(trigger_id: int):
+    """Delete a notification trigger."""
+    try:
+        success = db.delete_notification_trigger(trigger_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Trigger not found")
+        return {"message": "Trigger deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting trigger {trigger_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/email/triggers/{trigger_id}/toggle", response_model=dict)
+async def toggle_email_trigger(trigger_id: int):
+    """Toggle enable/disable status of a trigger."""
+    try:
+        trigger = db.get_notification_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(status_code=404, detail="Trigger not found")
+        
+        new_status = not trigger['enabled']
+        success = db.update_notification_trigger(trigger_id, enabled=new_status)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update trigger")
+        
+        return {"enabled": new_status, "message": f"Trigger {'enabled' if new_status else 'disabled'}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error toggling trigger {trigger_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/email/config", response_model=EmailConfigResponse)
+async def get_email_config():
+    """Get email configuration status (without exposing sensitive data)."""
+    from .notifications.email_sender import EmailSender
+    sender = EmailSender()
+    
+    # Mask SMTP host if configured
+    smtp_host_masked = None
+    if sender.smtp_host:
+        parts = sender.smtp_host.split('.')
+        if len(parts) >= 2:
+            smtp_host_masked = f"{parts[0][:2]}***.{'.'.join(parts[1:])}"
+        else:
+            smtp_host_masked = f"{sender.smtp_host[:2]}***"
+    
+    return EmailConfigResponse(
+        smtp_configured=sender.is_configured(),
+        smtp_host=smtp_host_masked,
+        smtp_port=sender.smtp_port if sender.is_configured() else None,
+        from_email=sender.from_email if sender.is_configured() else None,
+        from_name=sender.from_name if sender.is_configured() else None
+    )
+
+
+class EmailTestRequest(BaseModel):
+    """Request model for testing email."""
+    recipient_email: str = Field(..., description="Email address to send test email to")
+
+@app.post("/api/email/test", response_model=dict)
+async def test_email_connection(request: EmailTestRequest):
+    """Test SMTP connection and send a test email."""
+    try:
+        from .notifications.email_sender import EmailSender
+        import re
+        
+        # Validate email format
+        email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+        if not email_pattern.match(request.recipient_email):
+            raise HTTPException(status_code=400, detail="Invalid email address format")
+        
+        sender = EmailSender()
+        
+        if not sender.is_configured():
+            raise HTTPException(status_code=400, detail="SMTP not configured. Set SMTP_HOST, SMTP_USER, SMTP_PASSWORD in .env")
+        
+        # Test connection
+        success, error = sender.test_connection()
+        if not success:
+            raise HTTPException(status_code=500, detail=f"SMTP connection test failed: {error}")
+        
+        # Send test email to specified recipient
+        test_posts = [{
+            'id': 0,
+            'source': 'Test',
+            'author': 'System',
+            'content': 'This is a test email to verify email notifications are working correctly.',
+            'url': 'http://localhost:8000/dashboard',
+            'created_at': datetime.datetime.now().isoformat(),
+            'sentiment_label': 'neutral',
+            'relevance_score': 1.0
+        }]
+        
+        success, error = sender.send_negative_posts_notification(
+            to_emails=[request.recipient_email],
+            posts=test_posts,
+            trigger_name="Test Notification"
+        )
+        
+        if not success:
+            raise HTTPException(status_code=500, detail=f"Failed to send test email: {error}")
+        
+        return {"message": f"Test email sent successfully to {request.recipient_email}"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error testing email: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/email/notifications")
+async def get_email_notifications(limit: int = 50, offset: int = 0):
+    """Get email notification history."""
+    try:
+        notifications = db.get_email_notifications(limit=limit, offset=offset)
+        return {"notifications": notifications, "total": len(notifications)}
+    except Exception as e:
+        logger.error(f"Error getting email notifications: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

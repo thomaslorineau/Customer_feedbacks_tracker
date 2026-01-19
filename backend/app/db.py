@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 import datetime
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 import logging
 
 # Import DuckDB
@@ -191,12 +191,57 @@ def init_db():
             except Exception:
                 pass
     
+    # Email notifications tables
+    c.execute("CREATE SEQUENCE IF NOT EXISTS email_notifications_id_seq START 1")
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS email_notifications (
+            id BIGINT PRIMARY KEY DEFAULT nextval('email_notifications_id_seq'),
+            trigger_id BIGINT,
+            post_ids TEXT NOT NULL,  -- JSON array des IDs de posts inclus dans l'email
+            recipient_emails TEXT NOT NULL,  -- JSON array des emails destinataires
+            sent_at TEXT,
+            status TEXT,  -- 'sent', 'failed', 'pending'
+            error_message TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    c.execute("CREATE SEQUENCE IF NOT EXISTS notification_triggers_id_seq START 1")
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notification_triggers (
+            id BIGINT PRIMARY KEY DEFAULT nextval('notification_triggers_id_seq'),
+            name TEXT NOT NULL,
+            enabled BOOLEAN DEFAULT TRUE,
+            conditions TEXT NOT NULL,  -- JSON: {"sentiment": "negative", "relevance_score_min": 0.5, "sources": ["Trustpilot", "Reddit"]}
+            emails TEXT NOT NULL,  -- JSON array: ["email1@example.com", "email2@example.com"]
+            cooldown_minutes INTEGER DEFAULT 60,  -- Éviter spam si plusieurs posts similaires
+            max_posts_per_email INTEGER DEFAULT 10,  -- Nombre max de posts par email
+            last_notification_sent_at TEXT,  -- Timestamp de la dernière notification envoyée (pour cooldown)
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Index for email notifications
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_email_notifications_trigger 
+        ON email_notifications(trigger_id)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_email_notifications_created 
+        ON email_notifications(created_at DESC)
+    ''')
+    
     conn.commit()
     conn.close()
 
 
 def insert_post(post: dict):
-    """Insert post with validation and proper error handling."""
+    """Insert post with validation and proper error handling.
+    
+    Returns:
+        int: ID of the inserted post, or None if insertion failed (duplicate)
+    """
     # SECURITY: Validate post data before insertion
     if not isinstance(post, dict):
         raise ValueError("post must be a dictionary")
@@ -211,6 +256,15 @@ def insert_post(post: dict):
     c = conn.cursor()
     
     try:
+        # Check for duplicate URL first
+        url = str(post.get('url', ''))[:500]
+        if url:
+            c.execute("SELECT id FROM posts WHERE url = ?", (url,))
+            existing = c.fetchone()
+            if existing:
+                conn.close()
+                return None  # Duplicate detected
+        
         # SECURITY: Use parameterized query to prevent SQL injection
         # DuckDB: use nextval for auto-increment
         c.execute(
@@ -220,7 +274,7 @@ def insert_post(post: dict):
                 str(post.get('source'))[:100],  # Limit length
                 str(post.get('author', 'unknown'))[:100],
                 str(post.get('content', ''))[:10000],  # Limit content length
-                str(post.get('url', ''))[:500],
+                url,
                 post.get('created_at'),
                 float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
                 str(post.get('sentiment_label', 'neutral'))[:20],
@@ -228,7 +282,401 @@ def insert_post(post: dict):
                 float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
             ),
         )
+        # Insert post and get the ID
+        # DuckDB supports RETURNING clause
+        c.execute('''
+            INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score)
+            VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+        ''', (
+            str(post.get('source'))[:100],  # Limit length
+            str(post.get('author', 'unknown'))[:100],
+            str(post.get('content', ''))[:10000],  # Limit content length
+            url,
+            post.get('created_at'),
+            float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+            str(post.get('sentiment_label', 'neutral'))[:20],
+            str(post.get('language', 'unknown'))[:20],
+            float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
+        ))
+        result = c.fetchone()
+        post_id = result[0] if result else None
         conn.commit()
+        
+        # Trigger notification check in background (non-blocking)
+        try:
+            from ..notifications import notification_manager
+            notification_manager.check_and_send_notifications(post_id)
+        except Exception as e:
+            logger.warning(f"Failed to trigger notification check for post {post_id}: {e}")
+            # Don't fail the insertion if notification check fails
+        
+        return post_id
+    except Exception as e:
+        logger.error(f"Error inserting post: {e}")
+        conn.rollback()
+        return None
+    finally:
+        conn.close()
+
+
+def get_post_by_id(post_id: int) -> Optional[dict]:
+    """Get a single post by ID."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT id, source, author, content, url, created_at, 
+                   sentiment_score, sentiment_label, language, country, relevance_score
+            FROM posts WHERE id = ?
+        ''', (post_id,))
+        
+        row = c.fetchone()
+        if not row:
+            return None
+        
+        return {
+            'id': row[0],
+            'source': row[1],
+            'author': row[2],
+            'content': row[3],
+            'url': row[4],
+            'created_at': row[5],
+            'sentiment_score': row[6],
+            'sentiment_label': row[7],
+            'language': row[8],
+            'country': row[9],
+            'relevance_score': row[10] if len(row) > 10 else 0.0
+        }
+    finally:
+        conn.close()
+
+
+def get_recent_posts(hours: int = 24, limit: int = 100) -> List[dict]:
+    """Get recent posts from the last N hours."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        # Calculate cutoff time
+        from datetime import datetime, timedelta
+        cutoff = (datetime.now() - timedelta(hours=hours)).isoformat()
+        
+        c.execute('''
+            SELECT id, source, author, content, url, created_at, 
+                   sentiment_score, sentiment_label, language, country, relevance_score
+            FROM posts 
+            WHERE created_at >= ?
+            ORDER BY created_at DESC
+            LIMIT ?
+        ''', (cutoff, limit))
+        
+        posts = []
+        for row in c.fetchall():
+            posts.append({
+                'id': row[0],
+                'source': row[1],
+                'author': row[2],
+                'content': row[3],
+                'url': row[4],
+                'created_at': row[5],
+                'sentiment_score': row[6],
+                'sentiment_label': row[7],
+                'language': row[8],
+                'country': row[9],
+                'relevance_score': row[10] if len(row) > 10 else 0.0
+            })
+        
+        return posts
+    finally:
+        conn.close()
+
+
+def get_active_notification_triggers() -> List[dict]:
+    """Get all active notification triggers."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT id, name, enabled, conditions, emails, cooldown_minutes, 
+                   max_posts_per_email, last_notification_sent_at, created_at, updated_at
+            FROM notification_triggers
+            WHERE enabled = TRUE
+            ORDER BY created_at DESC
+        ''')
+        
+        triggers = []
+        for row in c.fetchall():
+            triggers.append({
+                'id': row[0],
+                'name': row[1],
+                'enabled': bool(row[2]),
+                'conditions': row[3],
+                'emails': row[4],
+                'cooldown_minutes': row[5],
+                'max_posts_per_email': row[6],
+                'last_notification_sent_at': row[7],
+                'created_at': row[8],
+                'updated_at': row[9]
+            })
+        
+        return triggers
+    finally:
+        conn.close()
+
+
+def update_trigger_last_notification_time(trigger_id: int):
+    """Update the last notification sent time for a trigger."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        from datetime import datetime
+        now = datetime.now().isoformat()
+        
+        c.execute('''
+            UPDATE notification_triggers
+            SET last_notification_sent_at = ?, updated_at = ?
+            WHERE id = ?
+        ''', (now, now, trigger_id))
+        
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def log_email_notification(
+    trigger_id: int,
+    post_ids: List[int],
+    recipient_emails: List[str],
+    status: str,
+    error_message: Optional[str] = None
+):
+    """Log an email notification attempt."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        import json
+        from datetime import datetime
+        
+        post_ids_json = json.dumps(post_ids)
+        emails_json = json.dumps(recipient_emails)
+        sent_at = datetime.now().isoformat() if status == 'sent' else None
+        
+        c.execute('''
+            INSERT INTO email_notifications 
+            (trigger_id, post_ids, recipient_emails, sent_at, status, error_message)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (trigger_id, post_ids_json, emails_json, sent_at, status, error_message))
+        
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def create_notification_trigger(
+    name: str,
+    conditions: dict,
+    emails: List[str],
+    cooldown_minutes: int = 60,
+    max_posts_per_email: int = 10,
+    enabled: bool = True
+) -> int:
+    """Create a new notification trigger."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        import json
+        from datetime import datetime
+        
+        conditions_json = json.dumps(conditions)
+        emails_json = json.dumps(emails)
+        now = datetime.now().isoformat()
+        
+        c.execute('''
+            INSERT INTO notification_triggers 
+            (name, enabled, conditions, emails, cooldown_minutes, max_posts_per_email, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
+        ''', (name, enabled, conditions_json, emails_json, cooldown_minutes, max_posts_per_email, now, now))
+        
+        trigger_id = c.fetchone()[0]
+        conn.commit()
+        return trigger_id
+    finally:
+        conn.close()
+
+
+def get_notification_trigger(trigger_id: int) -> Optional[dict]:
+    """Get a notification trigger by ID."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT id, name, enabled, conditions, emails, cooldown_minutes, 
+                   max_posts_per_email, last_notification_sent_at, created_at, updated_at
+            FROM notification_triggers
+            WHERE id = ?
+        ''', (trigger_id,))
+        
+        row = c.fetchone()
+        if not row:
+            return None
+        
+        return {
+            'id': row[0],
+            'name': row[1],
+            'enabled': bool(row[2]),
+            'conditions': row[3],
+            'emails': row[4],
+            'cooldown_minutes': row[5],
+            'max_posts_per_email': row[6],
+            'last_notification_sent_at': row[7],
+            'created_at': row[8],
+            'updated_at': row[9]
+        }
+    finally:
+        conn.close()
+
+
+def get_all_notification_triggers() -> List[dict]:
+    """Get all notification triggers (active and inactive)."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT id, name, enabled, conditions, emails, cooldown_minutes, 
+                   max_posts_per_email, last_notification_sent_at, created_at, updated_at
+            FROM notification_triggers
+            ORDER BY created_at DESC
+        ''')
+        
+        triggers = []
+        for row in c.fetchall():
+            triggers.append({
+                'id': row[0],
+                'name': row[1],
+                'enabled': bool(row[2]),
+                'conditions': row[3],
+                'emails': row[4],
+                'cooldown_minutes': row[5],
+                'max_posts_per_email': row[6],
+                'last_notification_sent_at': row[7],
+                'created_at': row[8],
+                'updated_at': row[9]
+            })
+        
+        return triggers
+    finally:
+        conn.close()
+
+
+def update_notification_trigger(
+    trigger_id: int,
+    name: Optional[str] = None,
+    conditions: Optional[dict] = None,
+    emails: Optional[List[str]] = None,
+    cooldown_minutes: Optional[int] = None,
+    max_posts_per_email: Optional[int] = None,
+    enabled: Optional[bool] = None
+) -> bool:
+    """Update a notification trigger."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        import json
+        from datetime import datetime
+        
+        updates = []
+        params = []
+        
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+        
+        if conditions is not None:
+            updates.append("conditions = ?")
+            params.append(json.dumps(conditions))
+        
+        if emails is not None:
+            updates.append("emails = ?")
+            params.append(json.dumps(emails))
+        
+        if cooldown_minutes is not None:
+            updates.append("cooldown_minutes = ?")
+            params.append(cooldown_minutes)
+        
+        if max_posts_per_email is not None:
+            updates.append("max_posts_per_email = ?")
+            params.append(max_posts_per_email)
+        
+        if enabled is not None:
+            updates.append("enabled = ?")
+            params.append(enabled)
+        
+        if not updates:
+            return False
+        
+        updates.append("updated_at = ?")
+        params.append(datetime.now().isoformat())
+        params.append(trigger_id)
+        
+        query = f"UPDATE notification_triggers SET {', '.join(updates)} WHERE id = ?"
+        c.execute(query, params)
+        conn.commit()
+        
+        return c.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_notification_trigger(trigger_id: int) -> bool:
+    """Delete a notification trigger."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute("DELETE FROM notification_triggers WHERE id = ?", (trigger_id,))
+        conn.commit()
+        return c.rowcount > 0
+    finally:
+        conn.close()
+
+
+def get_email_notifications(limit: int = 50, offset: int = 0) -> List[dict]:
+    """Get email notification history."""
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        c.execute('''
+            SELECT id, trigger_id, post_ids, recipient_emails, sent_at, status, error_message, created_at
+            FROM email_notifications
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        ''', (limit, offset))
+        
+        notifications = []
+        for row in c.fetchall():
+            notifications.append({
+                'id': row[0],
+                'trigger_id': row[1],
+                'post_ids': row[2],
+                'recipient_emails': row[3],
+                'sent_at': row[4],
+                'status': row[5],
+                'error_message': row[6],
+                'created_at': row[7]
+            })
+        
+        return notifications
     finally:
         conn.close()
 

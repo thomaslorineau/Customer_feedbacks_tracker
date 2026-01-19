@@ -1,4 +1,6 @@
-# Architecture Overview
+# Architecture Overview - OVH Customer Feedbacks Tracker
+
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant la puissance de l'assistance IA pour créer des applications complètes et professionnelles.
 
 ## System Diagram
 
@@ -579,6 +581,81 @@ POST /scrape/jobs/{job_id}/cancel
 4. Results and errors persisted to database
 5. Frontend polls job status every 2 seconds
 
+## Email Notification System
+
+The application includes a comprehensive email notification system for alerting users about problematic posts.
+
+### Architecture
+
+```
+New Post Inserted
+    ↓
+db.insert_post() → Returns post_id
+    ↓
+notification_manager.check_and_send_notifications(post_id)
+    ↓ (background thread)
+Get post from DB
+    ↓
+For each active trigger:
+    ↓
+Check if post matches trigger conditions
+    ↓
+Check cooldown (avoid spam)
+    ↓
+Get recent problematic posts (24h) matching trigger
+    ↓
+Send email via SMTP
+    ↓
+Log notification in email_notifications table
+```
+
+### Components
+
+**`backend/app/notifications/email_sender.py`**
+- SMTP email sending with HTML/text templates
+- Connection testing
+- Error handling and retry logic
+
+**`backend/app/notifications/trigger_checker.py`**
+- Condition matching (sentiment, relevance, sources, language)
+- Priority score calculation
+- Cooldown management
+
+**`backend/app/notifications/notification_manager.py`**
+- Orchestrates notification flow
+- Background thread execution (non-blocking)
+- Post aggregation and email grouping
+
+### Database Tables
+
+**`notification_triggers`**
+- Stores trigger configurations
+- Conditions as JSON
+- Email addresses as JSON array
+- Cooldown and limits
+
+**`email_notifications`**
+- Logs all notification attempts
+- Tracks success/failure
+- Stores post IDs and recipient emails
+
+### API Endpoints
+
+- `GET /api/email/triggers` - List all triggers
+- `POST /api/email/triggers` - Create trigger
+- `PUT /api/email/triggers/{id}` - Update trigger
+- `DELETE /api/email/triggers/{id}` - Delete trigger
+- `POST /api/email/triggers/{id}/toggle` - Enable/disable
+- `GET /api/email/config` - SMTP configuration status
+- `POST /api/email/test` - Test email sending
+- `GET /api/email/notifications` - Notification history
+
+### Configuration
+
+SMTP settings via environment variables:
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`
+- `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME`
+
 ## Error Handling Strategy
 
 ### Scraper Level
@@ -613,7 +690,7 @@ POST /scrape/jobs/{job_id}/cancel
 - [ ] Complaint category detection (pricing, support, UX, delivery, etc.)
 - [x] Priority scoring: `sentiment * keyword_relevance * recency` ✅ Implemented
 - [ ] Admin dashboard with trend charts and heatmaps
-- [ ] Email/Slack alerts for critical complaints
+- [x] Email alerts for critical complaints ✅ Implemented
 - [ ] Manual tagging and flagging by support team
 - [ ] Duplicate detection across platforms
 - [ ] RateCard strategy optimization based on competitor pricing mentions

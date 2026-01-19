@@ -4,6 +4,8 @@
 
 Ce guide explique comment implémenter **proprement** la gestion des clés API pour les services LLM (OpenAI, Anthropic, Google, etc.) dans votre application.
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ---
 
 ## ✅ Bonnes pratiques implémentées

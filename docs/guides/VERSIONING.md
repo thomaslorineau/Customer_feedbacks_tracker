@@ -1,19 +1,20 @@
 # Système de Versioning Automatique
 
-Ce projet utilise un système de versioning automatique basé sur Git qui calcule automatiquement MINOR et PATCH.
+Ce projet utilise un système de versioning automatique qui incrémente MINOR automatiquement lors d'un push.
 
 ## Format de Version
 
 Le format utilisé est **Semantic Versioning** : `MAJOR.MINOR.PATCH` (3 numéros)
 - **MAJOR** : Changements incompatibles avec les versions précédentes (modifié manuellement dans `VERSION`)
-- **MINOR** : Nombre de push (calculé depuis les tags Git de format `vMAJOR.*`)
-- **PATCH** : Nombre de commits (calculé depuis `git rev-list --count HEAD`)
+- **MINOR** : Incrémenté automatiquement à chaque push (stocké dans `.version_minor`)
+- **PATCH** : 2 derniers chiffres du nombre de commits (pour garder la version courte)
 
-## Fichier de Version
+## Fichiers de Version
 
-Le fichier `VERSION` à la racine du projet contient uniquement le numéro **MAJOR** (ex: `1`).
+- Le fichier `VERSION` à la racine contient uniquement le numéro **MAJOR** (ex: `1`)
+- Le fichier `.version_minor` contient le numéro **MINOR** (auto-incrémenté lors du push)
 
-Les numéros **MINOR** et **PATCH** sont calculés automatiquement par la fonction `get_version()` dans `backend/app/main.py`.
+Les numéros sont lus par la fonction `get_version()` dans `backend/app/main.py`.
 
 ## Calcul Automatique
 
@@ -21,27 +22,23 @@ Les numéros **MINOR** et **PATCH** sont calculés automatiquement par la foncti
 - Lu depuis le fichier `VERSION` à la racine
 - Modifié manuellement lors de changements incompatibles
 
-### MINOR (Option A - Recommandée)
-- Calculé depuis les tags Git de format `vMAJOR.*` (ex: `v1.0`, `v1.1`, `v1.2`)
-- Le système compte les tags uniques et utilise le maximum + 1
-- Pour incrémenter MINOR, créer un tag : `git tag v1.5` puis `git push --tags`
-
-### MINOR (Option B - Alternative)
-- Utiliser un hook Git pre-push qui incrémente MINOR dans un fichier `.version_minor`
-- Moins recommandé car nécessite configuration manuelle
+### MINOR
+- Lu depuis le fichier `.version_minor`
+- **Incrémenté automatiquement** lors d'un push via le script `scripts/utils/push.sh`
+- S'incrémente de 1 à chaque push (ex: 0 → 1 → 2 → 3...)
 
 ### PATCH
 - Calculé automatiquement depuis `git rev-list --count HEAD`
-- Représente le nombre total de commits dans le repository
-- S'incrémente automatiquement à chaque commit
+- Prend les **2 derniers chiffres** du nombre de commits (ex: 177 commits → PATCH = 77)
+- Permet de garder la version courte et lisible
 
 ## Exemple
 
 Si `VERSION` contient `1` et que :
-- Il y a 3 tags Git : `v1.0`, `v1.1`, `v1.2` → MINOR = 3
-- Il y a 77 commits → PATCH = 77
+- `.version_minor` contient `5` → MINOR = 5
+- Il y a 177 commits → PATCH = 77 (2 derniers chiffres)
 
-La version affichée sera : `1.3.77`
+La version affichée sera : `1.5.77`
 
 ## Affichage dans l'UI
 
@@ -68,14 +65,13 @@ Réponse :
 
 1. Faire vos modifications
 2. Commit vos changements : `git commit -m "feat: nouvelle fonctionnalité"`
-   - PATCH s'incrémente automatiquement
-3. Pour incrémenter MINOR (nouvelles fonctionnalités) :
-   ```bash
-   git tag v1.5
-   git push --tags
-   ```
-4. Push : `git push`
+   - PATCH s'incrémente automatiquement (basé sur le nombre de commits)
+3. Push via le script : `bash scripts/utils/push.sh`
+   - **MINOR s'incrémente automatiquement** avant le push
+   - Un commit automatique est créé pour mettre à jour `.version_minor`
    - La version sera automatiquement calculée et visible dans l'interface utilisateur
+
+**Note :** Si vous utilisez `git push` directement au lieu du script, MINOR ne s'incrémentera pas automatiquement. Utilisez toujours `bash scripts/utils/push.sh` pour bénéficier de l'incrémentation automatique.
 
 ## Fallback
 

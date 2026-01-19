@@ -2242,19 +2242,19 @@
             
             let score = 0.0;
             
-            // 1. Marques OVH (40% du score) - Check in content, url, and author
+            // 1. Marques OVH (35% du score) - Check in content, url, and author
             const brand_matches_content = OVH_BRANDS.filter(brand => content.includes(brand)).length;
             const brand_matches_url = OVH_BRANDS.filter(brand => url.includes(brand)).length;
             const brand_matches_author = OVH_BRANDS.filter(brand => author.includes(brand)).length;
             const total_brand_matches = brand_matches_content + brand_matches_url + brand_matches_author;
             
             if (total_brand_matches > 0) {
-                score += 0.4 * Math.min(total_brand_matches / 2, 1.0);
+                score += 0.35 * Math.min(total_brand_matches / 2, 1.0);
             }
             
-            // 2. URL OVH (30% du score)
+            // 2. URL OVH (25% du score)
             if (brand_matches_url > 0) {
-                score += 0.3;
+                score += 0.25;
             }
             
             // 3. Direction OVH (20% du score)
@@ -2272,10 +2272,10 @@
                 score += 0.1 * Math.min(leadership_score, 1.0);
             }
             
-            // 4. Produits OVH (10% du score)
+            // 4. Produits OVH (20% du score)
             const product_matches = OVH_PRODUCTS.filter(product => content.includes(product)).length;
             if (product_matches > 0 && total_brand_matches > 0) {
-                score += 0.1 * Math.min(product_matches / 3, 1.0);
+                score += 0.2 * Math.min(product_matches / 3, 1.0);
             }
             
             // Ensure minimum score if OVH is mentioned anywhere

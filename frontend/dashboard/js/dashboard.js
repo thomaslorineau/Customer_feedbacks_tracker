@@ -2564,15 +2564,15 @@ function calculateRelevanceScore(post) {
     const OVH_LEADERSHIP_NAMES = ['michel paulin', 'michel-paulin', 'octave klaba', 'octave-klaba', 'henryk klaba', 'henryk-klaba', 'klaba family', 'famille klaba'];
     const OVH_LEADERSHIP_TITLES = ['ceo ovh', 'ovh ceo', 'pdg ovh', 'ovh pdg', 'founder ovh', 'ovh founder', 'fondateur ovh', 'ovh management', 'ovh direction', 'ovh executives', 'ovh leadership', 'dirigeant ovh', 'ovh dirigeant'];
 
-    // 1. OVH Brands (40% of score)
+    // 1. OVH Brands (35% of score)
     const brand_matches = OVH_BRANDS.filter(brand => content.includes(brand)).length;
     if (brand_matches > 0) {
-        score += 0.4 * Math.min(brand_matches / 2, 1.0);
+        score += 0.35 * Math.min(brand_matches / 2, 1.0);
     }
 
-    // 2. OVH URL (30% of score)
+    // 2. OVH URL (25% of score)
     if (OVH_BRANDS.some(brand => url.includes(brand))) {
-        score += 0.3;
+        score += 0.25;
     }
 
     // 3. OVH Leadership (20% of score)
@@ -2590,10 +2590,10 @@ function calculateRelevanceScore(post) {
         score += 0.1 * Math.min(leadership_score, 1.0);
     }
 
-    // 4. OVH Products (10% of score)
+    // 4. OVH Products (20% of score)
     const product_matches = OVH_PRODUCTS.filter(product => content.includes(product)).length;
     if (product_matches > 0 && brand_matches > 0) {
-        score += 0.1 * Math.min(product_matches / 3, 1.0);
+        score += 0.2 * Math.min(product_matches / 3, 1.0);
     }
 
     // Ensure a minimum score if OVH is mentioned at all

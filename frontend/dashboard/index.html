@@ -453,96 +453,15 @@
             <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
         </div>
         <div class="help-menu-content">
-            <h3>💬 Customer Feedbacks Tracker</h3>
-            <p>
-                <strong>Dashboard Analytics</strong> provides visual insights and real-time analysis of customer feedback across all OVH products and services.
-            </p>
-
-                <h3>📊 Dashboard Sections</h3>
-                <ul>
-                    <li><strong>📈 Statistics Banner:</strong> Overview of total posts, positive, negative, and neutral feedback</li>
-                    <li><strong>⚠️ What's Happening:</strong> Real-time alerts, insights, and AI-generated recommended actions</li>
-                    <li><strong>📅 Timeline:</strong> Visual timeline of feedback over time with interactive filtering</li>
-                    <li><strong>📊 Distribution per Product:</strong> Breakdown of feedback by OVH product category</li>
-                    <li><strong>📝 Priority Posts:</strong> Critical and recent posts requiring attention</li>
-                </ul>
-
-                <h3>🎯 Interactive Features</h3>
-                <ul>
-                    <li><strong>Timeline Click:</strong> Click on a bar to filter posts by that date</li>
-                    <li><strong>Timeline Double-Click:</strong> Double-click a bar to filter by date AND the most frequent product for that date</li>
-                    <li><strong>Product Click:</strong> Click on a product in "Distribution per Product" to filter all posts by that product</li>
-                    <li><strong>Clear Filters:</strong> Use the "Clear Product Filter" button or reset filters to remove active filters</li>
-                    <li><strong>Critical Posts:</strong> Click "Open critical posts (X)" to view negative posts from the last 7 days, sorted by score (most negative) and date (most recent)</li>
-                </ul>
-
-                <h3>🔍 Filtering Options</h3>
-                <ul>
-                    <li><strong>Global Search:</strong> Search across all post content (supports multiple keywords separated by spaces)</li>
-                    <li><strong>Sentiment Filter:</strong> Filter by positive, negative, or neutral sentiment</li>
-                    <li><strong>Language Filter:</strong> Filter by French, English, or other languages</li>
-                    <li><strong>Product Filter:</strong> Filter by specific OVH product categories</li>
-                    <li><strong>Date Range:</strong> Use timeline interaction or date inputs to filter by date</li>
-                    <li><strong>Sort Options:</strong> Sort posts by date, sentiment, or source</li>
-                </ul>
-
-                <h3>🤖 AI-Powered Features</h3>
-                <p>
-                    If LLM API keys are configured (in Feedbacks Collection page):
-                </p>
-                <ul>
-                    <li><strong>Recommended Actions:</strong> AI-generated actionable recommendations based on recent feedback patterns</li>
-                    <li><strong>Priority Levels:</strong> Actions are prioritized as High, Medium, or Low based on impact</li>
-                    <li><strong>Dynamic Insights:</strong> Real-time analysis of feedback trends and spikes</li>
-                </ul>
-
-                <h3>📊 What's Happening Section</h3>
-                <ul>
-                    <li><strong>Alerts:</strong> Automatic detection of negative feedback spikes (230%+ increase)</li>
-                    <li><strong>Insights:</strong> Identification of top impacted products and most frequent issues</li>
-                    <li><strong>Recommended Actions:</strong> AI-generated or rule-based improvement suggestions</li>
-                    <li><strong>Critical Posts Button:</strong> Quick access to view negative posts from the last 7 days, sorted by sentiment score (highest first) and date (most recent first)</li>
-                </ul>
-
-                <h3>📈 Charts & Visualizations</h3>
-                <ul>
-                    <li><strong>Timeline Chart:</strong> Bar chart showing post distribution over time</li>
-                    <li><strong>Product Distribution:</strong> Pie/bar chart showing feedback distribution across products</li>
-                    <li><strong>Interactive Tooltips:</strong> Hover over chart elements for detailed information</li>
-                    <li><strong>Show More Products:</strong> Expand to see all products beyond the top 5</li>
-                </ul>
-
-                <h3>🎨 Navigation</h3>
-                <ul>
-                    <li><strong>📥 Feedbacks Collection:</strong> Manage keywords, LLM settings, and launch scrapers</li>
-                    <li><strong>📊 Dashboard Analytics:</strong> Current page - visual analytics and insights</li>
-                    <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis and opportunity scoring</li>
-                    <li><strong>❓ Help:</strong> This menu - access help and documentation</li>
-                    <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
-                </ul>
-
-                <h3>🔍 Recherche et Filtres</h3>
-                <ul>
-                    <li><strong>Barre de recherche centrale :</strong> Recherchez par produit, mot-clé, avis, post ou source</li>
-                    <li><strong>Filtres multiples :</strong> Combinez sentiment, langue, produit et dates pour une analyse précise</li>
-                    <li><strong>Timeline interactive :</strong> Cliquez ou glissez-déposez pour filtrer par période</li>
-                    <li><strong>Distribution par produit :</strong> Cliquez sur un produit pour filtrer automatiquement</li>
-                </ul>
-
-                <h3>💡 Pro Tips</h3>
-                <ul>
-                    <li>Utilisez la timeline pour identifier les tendances et pics de feedback</li>
-                    <li>Configurez les clés LLM pour débloquer les actions recommandées par IA</li>
-                    <li>Le bouton "Critical Posts" affiche les posts négatifs des 7 derniers jours, triés par score (plus négatif) et date (plus récent)</li>
-                    <li>Les filtres s'appliquent simultanément (logique ET)</li>
-                    <li>Explorez les opportunités d'amélioration dans la page dédiée</li>
-                </ul>
-            </div>
+            <!-- Content loaded dynamically by help-menu-loader.js -->
+            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading help content...</p>
+        </div>
         </div>
     </div>
     
     <!-- Modules -->
     <script src="/js/logo-updater.js"></script>
+    <script src="/js/help-menu-loader.js"></script>
     <script type="module" src="/dashboard/js/api.js"></script>
     <script type="module" src="/dashboard/js/state.js"></script>
     <!-- Filtered Posts Drawer -->

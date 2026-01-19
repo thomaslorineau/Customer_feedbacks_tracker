@@ -49,10 +49,10 @@ def calculate_relevance_score(post: Dict) -> float:
     Calcule un score de pertinence 0-1 pour déterminer si un post parle vraiment d'OVHCloud.
     
     Critères:
-    - Présence de marques OVH (40% du score)
-    - URL OVH (30% du score)
-    - Direction OVH (20% du score) - NOUVEAU
-    - Produits OVH (10% du score)
+    - Présence de marques OVH (35% du score)
+    - URL OVH (25% du score)
+    - Direction OVH (20% du score)
+    - Produits OVH (20% du score)
     
     Args:
         post: Dict avec 'content', 'url', 'author'
@@ -66,16 +66,16 @@ def calculate_relevance_score(post: Dict) -> float:
     
     score = 0.0
     
-    # 1. Marques OVH (40% du score)
+    # 1. Marques OVH (35% du score)
     brand_matches = sum(1 for brand in OVH_BRANDS if brand in content)
     if brand_matches > 0:
-        score += 0.4 * min(brand_matches / 2, 1.0)  # Max 0.4
+        score += 0.35 * min(brand_matches / 2, 1.0)  # Max 0.35
     
-    # 2. URL OVH (30% du score)
+    # 2. URL OVH (25% du score)
     if any(brand in url for brand in OVH_BRANDS):
-        score += 0.3
+        score += 0.25
     
-    # 3. Direction OVH (20% du score) - NOUVEAU
+    # 3. Direction OVH (20% du score)
     leadership_score = 0.0
     
     # Noms de dirigeants
@@ -95,10 +95,10 @@ def calculate_relevance_score(post: Dict) -> float:
         # Mention direction seule = modérément pertinent
         score += 0.1 * min(leadership_score, 1.0)
     
-    # 4. Produits OVH (10% du score)
+    # 4. Produits OVH (20% du score)
     product_matches = sum(1 for product in OVH_PRODUCTS if product in content)
     if product_matches > 0 and brand_matches > 0:  # Produit + marque = plus pertinent
-        score += 0.1 * min(product_matches / 3, 1.0)
+        score += 0.2 * min(product_matches / 3, 1.0)
     
     return min(score, 1.0)
 

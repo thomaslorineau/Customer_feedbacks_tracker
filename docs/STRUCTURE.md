@@ -2,6 +2,8 @@
 
 Ce document explique l'organisation des dossiers du projet pour faciliter la navigation.
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ---
 
 ## 🎯 Vue d'ensemble
@@ -75,7 +77,13 @@ backend/
 │   │
 │   ├── analysis/          # Analyse de données
 │   │   ├── sentiment.py   # Analyse de sentiment (VADER)
-│   │   └── country_detection.py # Détection de pays
+│   │   ├── country_detection.py # Détection de pays
+│   │   └── relevance_scorer.py  # Score de pertinence
+│   │
+│   ├── notifications/     # Système de notifications email ⭐ NOUVEAU
+│   │   ├── email_sender.py      # Envoi d'emails SMTP
+│   │   ├── trigger_checker.py   # Vérification des conditions
+│   │   └── notification_manager.py  # Orchestration
 │   │
 │   └── utils/             # Utilitaires
 │       └── helpers.py
@@ -114,6 +122,8 @@ backend/
 - `GET /api/pain-points` - Points de douleur récurrents
 - `GET /api/product-opportunities` - Opportunités par produit
 - `GET /api/logs` - Logs de scraping
+- `GET /api/email/triggers` - Gestion des triggers de notification email ⭐ NOUVEAU
+- `POST /api/email/test` - Tester l'envoi d'email ⭐ NOUVEAU
 
 ---
 
@@ -240,6 +250,7 @@ ovh-complaints-tracker/
 ## 📝 Notes
 
 - **Base de données** : DuckDB (`data.duckdb`) - migration complète depuis SQLite (janvier 2026)
+- **Notifications email** : Système complet avec triggers configurables et templates HTML ⭐ NOUVEAU
 - **Backups** : Les 5 derniers backups sont conservés dans `backend/backups/`
 - **Fichiers de log** : `backend.log` et logs dans `backend/logs/`
 - **Configuration** : Fichiers `.env` dans `backend/` (non commités, voir `.gitignore`)

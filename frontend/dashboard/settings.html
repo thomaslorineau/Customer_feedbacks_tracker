@@ -892,6 +892,193 @@
             transform: translateX(22px);
         }
 
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .modal-close:hover {
+            background: var(--bg-secondary);
+        }
+
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.625rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn-modal {
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-modal-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-modal-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .btn-modal-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .btn-modal-secondary:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .email-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .email-tag {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .email-tag-remove {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .email-tag-remove:hover {
+            color: var(--text-primary);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .settings-container {
@@ -908,6 +1095,11 @@
 
             .api-keys-groups {
                 gap: 1rem;
+            }
+
+            .modal {
+                width: 95%;
+                padding: 1.5rem;
             }
         }
     </style>
@@ -947,7 +1139,7 @@
                     <span class="nav-tab-icon">⚙️</span>
                     <span>Settings</span>
                 </a>
-                <a href="#" class="nav-tab" onclick="event.preventDefault(); toggleHelpMenu(); return false;">
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); window.toggleHelpMenu(); return false;">
                     <span class="nav-tab-icon">❓</span>
                     <span>Help</span>
                 </a>
@@ -964,7 +1156,7 @@
         <!-- Header -->
         <div class="settings-header">
             <h1>Settings</h1>
-            <p>Configurez votre application</p>
+            <p>Configure your application</p>
         </div>
 
         <!-- Section 1: LLM (Priorité Haute) -->
@@ -989,6 +1181,78 @@
                         <!-- Loading skeleton -->
                         <div class="api-key-card">
                             <div class="skeleton-loader"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section Email Notifications -->
+        <div class="accordion" data-accordion="email-notifications">
+            <div class="accordion-header" onclick="toggleAccordion('email-notifications')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">📧</span>
+                    <span>Email Notifications</span>
+                    <span class="accordion-badge" id="emailNotificationsBadge">--</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <!-- Email Configuration Status -->
+                    <div id="emailConfigStatus" style="margin-bottom: 1.5rem;">
+                        <!-- Email config status will be rendered here -->
+                    </div>
+
+                    <!-- Explanation -->
+                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 2rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 How it works</h4>
+                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                            <strong>Notification triggers</strong> automatically send emails when problematic posts are detected.
+                            Configure rules (negative sentiment, relevance score, sources, etc.) and emails will be sent to the addresses you specify.
+                        </p>
+                    </div>
+
+                    <!-- Notification Triggers -->
+                    <div style="margin-bottom: 2rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                                Notification Triggers
+                            </h3>
+                            <button onclick="openTriggerModal()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                + Add Trigger
+                            </button>
+                        </div>
+                        <div id="triggersContainer">
+                            <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Loading...</p>
+                        </div>
+                    </div>
+
+                    <!-- Email Configuration & Test -->
+                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                            Test Email Sending
+                        </h3>
+                        <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9em; line-height: 1.6;">
+                            Test your SMTP configuration by sending a test email. Make sure SMTP settings are configured in your <code style="background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4px;">.env</code> file.
+                        </p>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <input type="email" id="testEmailInput" placeholder="email@example.com" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;">
+                            <button onclick="testEmailConnection()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                Send Test Email
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Notification History -->
+                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                            Notification History
+                        </h3>
+                        <div id="notificationsHistory">
+                            <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">Loading...</p>
                         </div>
                     </div>
                 </div>
@@ -1045,9 +1309,9 @@
             <div class="accordion-content">
                 <div class="settings-section">
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
-                        Ces mots-clés sont toujours utilisés pour le scraping, même si vous n'ajoutez pas de mots-clés personnalisés. 
-                        Ils incluent les marques OVH, les produits, les problèmes courants et les mentions de la direction. 
-                        Vous pouvez les modifier ici, mais ils seront toujours inclus dans les opérations de scraping.
+                        These keywords are always used for scraping, even if you don't add custom keywords. 
+                        They include OVH brands, products, common problems, and leadership mentions. 
+                        You can modify them here, but they will always be included in scraping operations.
                     </p>
 
                     <div id="baseKeywordsContainer">
@@ -1073,20 +1337,20 @@
             </div>
             <div class="accordion-content">
                 <div class="settings-section">
-                    <!-- Explication améliorée -->
+                    <!-- Improved explanation -->
                     <div class="rate-limit-explanation">
-                        <h3>Qu'est-ce que le Rate Limiting ?</h3>
+                        <h3>What is Rate Limiting?</h3>
                         <p>
-                            Le rate limiting limite le nombre de requêtes API par minute pour éviter de dépasser les quotas et protéger contre les abus.
-                            Ces paramètres contrôlent la fréquence des appels API lors du scraping.
+                            Rate limiting limits the number of API requests per minute to avoid exceeding quotas and protect against abuse.
+                            These settings control the frequency of API calls during scraping.
                         </p>
                         <p>
-                            <strong>Pourquoi c'est important ?</strong><br>
-                            Les APIs externes (GitHub, Trustpilot, etc.) imposent des limites sur le nombre de requêtes que vous pouvez effectuer.
-                            Sans rate limiting, vous risquez de dépasser ces limites et de voir vos requêtes bloquées temporairement.
+                            <strong>Why is it important?</strong><br>
+                            External APIs (GitHub, Trustpilot, etc.) impose limits on the number of requests you can make.
+                            Without rate limiting, you risk exceeding these limits and having your requests temporarily blocked.
                         </p>
                         <div class="rate-limit-example">
-                            <strong>Exemple :</strong> 100 requêtes par 60 secondes = maximum 1.67 requêtes/seconde
+                            <strong>Example:</strong> 100 requests per 60 seconds = maximum 1.67 requests/second
                         </div>
                     </div>
 
@@ -1120,8 +1384,8 @@
                     <div class="appearance-options">
                         <div class="appearance-option">
                             <div class="appearance-option-label">
-                                <strong>Mode sombre</strong>
-                                <span>Basculer entre le thème clair et sombre</span>
+                                <strong>Dark Mode</strong>
+                                <span>Toggle between light and dark theme</span>
                             </div>
                             <div class="appearance-toggle" id="themeToggle" onclick="toggleThemeFromSettings()">
                             </div>
@@ -1131,7 +1395,7 @@
                     <!-- Logo Upload Section -->
                     <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
                         <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
-                            Logo OVHcloud
+                            OVHcloud Logo
                         </h3>
                         <div class="logo-upload-container">
                             <div class="logo-preview-section">
@@ -1143,7 +1407,7 @@
                                             <circle cx="8.5" cy="8.5" r="1.5"/>
                                             <polyline points="21 15 16 10 5 21"/>
                                         </svg>
-                                        <p>Aucun logo</p>
+                                        <p>No logo</p>
                                     </div>
                                 </div>
                                 <div class="logo-info" id="logoInfo">
@@ -1159,16 +1423,16 @@
                                             <polyline points="17 8 12 3 7 8"/>
                                             <line x1="12" y1="3" x2="12" y2="15"/>
                                         </svg>
-                                        Choisir un fichier
+                                        Choose File
                                     </span>
                                 </label>
                                 <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
-                                    <span class="btn-text">Uploader le logo</span>
+                                    <span class="btn-text">Upload Logo</span>
                                     <span class="btn-spinner" style="display:none;"></span>
                                 </button>
                                 <p class="upload-hint">
-                                    Formats acceptés : SVG (recommandé), PNG, JPG, JPEG<br>
-                                    Taille maximale : 5MB
+                                    Accepted formats: SVG (recommended), PNG, JPG, JPEG<br>
+                                    Maximum size: 5MB
                                 </p>
                             </div>
                         </div>
@@ -1207,53 +1471,104 @@
         <span>API key copied to clipboard!</span>
     </div>
 
+    <!-- Trigger Modal -->
+    <div class="modal-overlay" id="triggerModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Create Trigger</h3>
+                <button class="modal-close" onclick="window.closeTriggerModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="triggerForm" onsubmit="window.saveTrigger(event); return false;">
+                    <div class="form-group">
+                        <label for="triggerName">Trigger Name *</label>
+                        <input type="text" id="triggerName" required placeholder="e.g., Negative Trustpilot Posts">
+                        <small>A descriptive name to identify this trigger</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="triggerSentiment">Sentiment *</label>
+                            <select id="triggerSentiment" required>
+                                <option value="all">All</option>
+                                <option value="negative" selected>Negative</option>
+                                <option value="positive">Positive</option>
+                                <option value="neutral">Neutral</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="triggerRelevance">Minimum Relevance Score</label>
+                            <input type="number" id="triggerRelevance" min="0" max="1" step="0.1" value="0.3">
+                            <small>0.0 to 1.0 (default: 0.3)</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="triggerSources">Sources (optional)</label>
+                        <input type="text" id="triggerSources" placeholder="e.g., Trustpilot, Reddit (comma-separated)">
+                        <small>Leave empty for all sources. Examples: Trustpilot, Reddit, X/Twitter</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="triggerLanguage">Language (optional)</label>
+                        <select id="triggerLanguage">
+                            <option value="all">All</option>
+                            <option value="fr">French</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="triggerEmails">Recipient Emails *</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="email" id="triggerEmailInput" placeholder="email@example.com" style="flex: 1;">
+                            <button type="button" onclick="window.addEmail()" class="btn-modal btn-modal-secondary" style="white-space: nowrap;">Add</button>
+                        </div>
+                        <div id="emailTags" class="email-tags"></div>
+                        <small>Add email addresses that will receive notifications</small>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="triggerCooldown">Cooldown between notifications (minutes)</label>
+                            <input type="number" id="triggerCooldown" min="1" value="60">
+                            <small>Prevents spam (default: 60 min)</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="triggerMaxPosts">Max posts per email</label>
+                            <input type="number" id="triggerMaxPosts" min="1" max="50" value="10">
+                            <small>Maximum number of posts included (default: 10)</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" id="triggerEnabled" checked>
+                            <span>Enable this trigger</span>
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" onclick="window.closeTriggerModal()" class="btn-modal btn-modal-secondary">Cancel</button>
+                <button type="button" onclick="document.getElementById('triggerForm').dispatchEvent(new Event('submit', {cancelable: true}))" class="btn-modal btn-modal-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Help Menu -->
     <div class="help-menu" id="helpMenu">
         <div class="help-menu-header">
             <h2>📖 Help & Information</h2>
-            <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
+            <button class="help-menu-close" onclick="window.toggleHelpMenu()">×</button>
         </div>
         <div class="help-menu-content">
-            <h3>💬 Customer Feedbacks Tracker</h3>
-            <p>
-                <strong>Settings</strong> allows you to configure API keys and manage application settings securely.
-            </p>
-
-            <h3>🔐 API Configuration</h3>
-            <ul>
-                <li><strong>OpenAI API Key:</strong> Required for AI-powered features like recommended actions and insights</li>
-                <li><strong>Anthropic API Key:</strong> Alternative LLM provider for AI features</li>
-                <li><strong>Google API Key:</strong> Used for Google News scraping</li>
-                <li><strong>GitHub API Key:</strong> Required for GitHub issues and discussions scraping</li>
-                <li><strong>Trustpilot API Key:</strong> Used for Trustpilot reviews scraping</li>
-            </ul>
-
-            <h3>🔒 Security</h3>
-            <ul>
-                <li><strong>Never share API keys:</strong> Keep your keys private and secure</li>
-                <li><strong>Reveal button:</strong> Temporarily shows the full key for copying - use carefully</li>
-                <li><strong>Keys are stored:</strong> Securely in the backend database</li>
-            </ul>
-
-            <h3>⚙️ Rate Limiting</h3>
-            <ul>
-                <li><strong>Configure limits:</strong> Set maximum requests per minute for each API</li>
-                <li><strong>Prevent abuse:</strong> Rate limiting protects against excessive API usage</li>
-                <li><strong>Window duration:</strong> Time window for rate limit calculations</li>
-            </ul>
-
-            <h3>📥 Feedbacks Collection</h3>
-            <p>
-                After configuring API keys, go to <strong>Feedbacks Collection</strong> to:
-            </p>
-            <ul>
-                <li>Configure keywords for scraping</li>
-                <li>Launch scrapers to collect feedback</li>
-                <li>View scraping logs</li>
-            </ul>
+            <!-- Content loaded dynamically by help-menu-loader.js -->
+            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading help content...</p>
         </div>
     </div>
 
+    <script src="/js/help-menu-loader.js"></script>
     <script src="/dashboard/js/settings.js"></script>
     <script>
         // Logo Upload Functionality
@@ -1273,8 +1588,8 @@
                 if (data.exists) {
                     logoInfo.innerHTML = `
                         <p class="logo-status success">
-                            ✅ Logo actuel : ${data.filename}<br>
-                            <small>Taille : ${(data.size / 1024).toFixed(2)} KB</small>
+                            ✅ Current logo: ${data.filename}<br>
+                            <small>Size: ${(data.size / 1024).toFixed(2)} KB</small>
                         </p>
                     `;
                     if (logoPreview) {
@@ -1285,7 +1600,7 @@
                 } else {
                     logoInfo.innerHTML = `
                         <p class="logo-status">
-                            ℹ️ Aucun logo uploadé.
+                            ℹ️ No logo uploaded.
                         </p>
                     `;
                     if (logoPreview) logoPreview.style.display = 'none';
@@ -1296,7 +1611,7 @@
                 const logoInfoEl = document.getElementById('logoInfo');
                 if (logoInfoEl) {
                     logoInfoEl.innerHTML = `
-                        <p class="logo-status error">❌ Erreur lors de la vérification du logo</p>
+                        <p class="logo-status error">❌ Error checking logo</p>
                     `;
                 }
             }
@@ -1339,7 +1654,7 @@
                 const btnSpinner = btn.querySelector('.btn-spinner');
                 
                 btn.disabled = true;
-                if (btnText) btnText.textContent = 'Upload en cours...';
+                if (btnText) btnText.textContent = 'Uploading...';
                 if (btnSpinner) btnSpinner.style.display = 'inline-block';
                 
                 try {
@@ -1360,7 +1675,7 @@
                             logoInfo.innerHTML = `
                                 <p class="logo-status success">
                                     ✅ ${data.message}<br>
-                                    <small>Le logo est maintenant actif</small>
+                                    <small>Logo is now active</small>
                                 </p>
                             `;
                         }
@@ -1420,21 +1735,21 @@
                         btn.disabled = true;
                         
                         // Show toast notification
-                        showToast('Logo uploadé avec succès !', 'success');
+                        showToast('Logo uploaded successfully!', 'success');
                     } else {
-                        throw new Error(data.detail || 'Erreur lors de l\'upload');
+                        throw new Error(data.detail || 'Error uploading logo');
                     }
                 } catch (error) {
                     console.error('Error uploading logo:', error);
                     const logoInfo = document.getElementById('logoInfo');
                     if (logoInfo) {
                         logoInfo.innerHTML = `
-                            <p class="logo-status error">❌ Erreur : ${error.message}</p>
+                            <p class="logo-status error">❌ Error: ${error.message}</p>
                         `;
                     }
-                    showToast('Erreur lors de l\'upload du logo', 'error');
+                    showToast('Error uploading logo', 'error');
                 } finally {
-                    if (btnText) btnText.textContent = 'Uploader le logo';
+                    if (btnText) btnText.textContent = 'Upload Logo';
                     if (btnSpinner) btnSpinner.style.display = 'none';
                 }
             });
@@ -1465,7 +1780,453 @@
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             checkLogoStatus();
+            loadEmailNotifications();
         });
+
+        // ============================================================================
+        // Email Notifications Management
+        // ============================================================================
+        const API_BASE = window.location.origin;
+
+        async function loadEmailNotifications() {
+            try {
+                // Load email config
+                const configRes = await fetch(`${API_BASE}/api/email/config`);
+                if (configRes.ok) {
+                    const config = await configRes.json();
+                    const statusEl = document.getElementById('emailConfigStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = `
+                            <div style="padding: 1rem; background: ${config.smtp_configured ? '#d4edda' : '#f8d7da'}; border-radius: 8px; border-left: 4px solid ${config.smtp_configured ? '#28a745' : '#dc3545'};">
+                                <strong>${config.smtp_configured ? '✅ SMTP Configured' : '❌ SMTP Not Configured'}</strong>
+                                ${config.smtp_configured ? `
+                                    <p style="margin: 0.5rem 0 0 0; font-size: 0.9em; color: #155724;">
+                                        Host: ${config.smtp_host || 'N/A'}<br>
+                                        Port: ${config.smtp_port || 'N/A'}<br>
+                                        From: ${config.smtp_from_email || 'N/A'}
+                                    </p>
+                                ` : '<p style="margin: 0.5rem 0 0 0; font-size: 0.9em; color: #721c24;">Configure SMTP in .env file</p>'}
+                            </div>
+                        `;
+                    }
+                } else {
+                    const statusEl = document.getElementById('emailConfigStatus');
+                    if (statusEl) {
+                        statusEl.innerHTML = '<p style="color: #dc3545;">Error loading configuration</p>';
+                    }
+                }
+
+                // Load triggers
+                const triggersRes = await fetch(`${API_BASE}/api/email/triggers`);
+                if (triggersRes.ok) {
+                    const data = await triggersRes.json();
+                    const triggers = Array.isArray(data) ? data : (data.triggers || []);
+                    renderTriggers(triggers);
+                    
+                    // Update badge
+                    const badge = document.getElementById('emailNotificationsBadge');
+                    if (badge) {
+                        const activeCount = triggers.filter(t => t.enabled).length;
+                        badge.textContent = `${activeCount}/${triggers.length}`;
+                    }
+                } else {
+                    const container = document.getElementById('triggersContainer');
+                    if (container) {
+                        container.innerHTML = '<p style="color: #dc3545;">Error loading triggers</p>';
+                    }
+                }
+
+                // Load notification history
+                const historyRes = await fetch(`${API_BASE}/api/email/notifications?limit=10`);
+                if (historyRes.ok) {
+                    const historyData = await historyRes.json();
+                    // API returns {notifications: [...], total: ...}
+                    const notifications = historyData.notifications || [];
+                    renderNotificationHistory(notifications);
+                } else {
+                    const container = document.getElementById('notificationsHistory');
+                    if (container) {
+                        container.innerHTML = '<p style="color: #dc3545;">Error loading history</p>';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading email notifications:', error);
+                showToast('Error loading data', 'error');
+            }
+        }
+
+        function renderTriggers(triggers) {
+            const container = document.getElementById('triggersContainer');
+            if (!container) return;
+
+            if (triggers.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No triggers configured. Click "Add Trigger" to create one.</p>';
+                return;
+            }
+
+            container.innerHTML = triggers.map(trigger => {
+                try {
+                    const conditions = typeof trigger.conditions === 'string' ? JSON.parse(trigger.conditions || '{}') : (trigger.conditions || {});
+                    const emails = typeof trigger.emails === 'string' ? JSON.parse(trigger.emails || '[]') : (trigger.emails || []);
+                    const statusClass = trigger.enabled ? '#28a745' : '#ffc107';
+                    const statusText = trigger.enabled ? 'Enabled' : 'Disabled';
+                    const statusIcon = trigger.enabled ? '✅' : '⏸️';
+
+                    const sourcesText = conditions.sources && conditions.sources.length > 0 
+                        ? conditions.sources.join(', ') 
+                        : 'All sources';
+
+                    const sentimentText = conditions.sentiment === 'negative' ? 'Negative' 
+                        : conditions.sentiment === 'positive' ? 'Positive' 
+                        : conditions.sentiment === 'neutral' ? 'Neutral' 
+                        : 'All';
+
+                    return `
+                        <div style="background: var(--bg-card); padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+                                <div>
+                                    <h4 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">${escapeHtml(trigger.name)}</h4>
+                                    <span style="padding: 0.25rem 0.75rem; background: ${statusClass}; color: white; border-radius: 12px; font-size: 0.85em; font-weight: 500;">${statusIcon} ${statusText}</span>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                    <button onclick="editTrigger(${trigger.id})" style="padding: 0.4rem 0.8rem; background: var(--accent-primary); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Edit</button>
+                                    <button onclick="toggleTrigger(${trigger.id}, ${!trigger.enabled})" style="padding: 0.4rem 0.8rem; background: ${trigger.enabled ? '#dc3545' : '#28a745'}; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">${trigger.enabled ? 'Disable' : 'Enable'}</button>
+                                    <button onclick="deleteTrigger(${trigger.id})" style="padding: 0.4rem 0.8rem; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em;">Delete</button>
+                                </div>
+                            </div>
+                            <div style="color: var(--text-secondary); font-size: 0.9em; line-height: 1.6;">
+                                <div><strong>Conditions:</strong> Sentiment: ${sentimentText}, Relevance: ≥${(conditions.relevance_score_min || 0).toFixed(2)}, Sources: ${escapeHtml(sourcesText)}</div>
+                                <div><strong>Emails:</strong> ${emails.map(e => escapeHtml(e)).join(', ') || 'None'}</div>
+                                <div><strong>Cooldown:</strong> ${trigger.cooldown_minutes} minutes | <strong>Max posts:</strong> ${trigger.max_posts_per_email}</div>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    console.error('Error rendering trigger:', e, trigger);
+                    return '';
+                }
+            }).filter(Boolean).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderNotificationHistory(notifications) {
+            const container = document.getElementById('notificationsHistory');
+            if (!container) return;
+
+            if (notifications.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 1rem;">No notifications sent yet.</p>';
+                return;
+            }
+
+            container.innerHTML = notifications.map(notif => {
+                try {
+                    const postIds = typeof notif.post_ids === 'string' ? JSON.parse(notif.post_ids || '[]') : (notif.post_ids || []);
+                    const emails = typeof notif.recipient_emails === 'string' ? JSON.parse(notif.recipient_emails || '[]') : (notif.recipient_emails || []);
+                    const statusClass = notif.status === 'sent' ? '#28a745' : '#dc3545';
+                    const statusIcon = notif.status === 'sent' ? '✅' : '❌';
+                    const statusText = notif.status === 'sent' ? 'Sent' : 'Failed';
+
+                    const date = notif.sent_at || notif.created_at;
+                    const dateStr = date ? new Date(date).toLocaleString('en-US') : 'Unknown date';
+
+                    return `
+                        <div style="background: var(--bg-card); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; border-left: 4px solid ${statusClass};">
+                            <div style="display: flex; justify-content: space-between; align-items: start;">
+                                <div>
+                                    <div style="font-weight: 500; color: var(--text-primary);">${statusIcon} ${statusText}</div>
+                                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        ${postIds.length} post${postIds.length !== 1 ? 's' : ''} sent to ${emails.length} recipient${emails.length !== 1 ? 's' : ''}<br>
+                                        ${dateStr}
+                                        ${notif.error_message ? `<br><span style="color: #dc3545;">Error: ${escapeHtml(notif.error_message)}</span>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } catch (e) {
+                    console.error('Error rendering notification:', e, notif);
+                    return '';
+                }
+            }).filter(Boolean).join('');
+        }
+
+        let currentTriggerId = null;
+        let emailList = [];
+
+        // Make functions globally available
+        window.openTriggerModal = function(triggerId = null) {
+            currentTriggerId = triggerId;
+            const modal = document.getElementById('triggerModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('triggerForm');
+            
+            // Reset form
+            form.reset();
+            emailList = [];
+            updateEmailTags();
+
+            if (triggerId) {
+                // Edit mode - load trigger data
+                title.textContent = 'Edit Trigger';
+                loadTriggerData(triggerId);
+            } else {
+                // Create mode
+                title.textContent = 'Create Trigger';
+                // Set defaults
+                document.getElementById('triggerSentiment').value = 'negative';
+                document.getElementById('triggerRelevance').value = '0.3';
+                document.getElementById('triggerCooldown').value = '60';
+                document.getElementById('triggerMaxPosts').value = '10';
+                document.getElementById('triggerEnabled').checked = true;
+            }
+
+            modal.classList.add('active');
+        };
+
+        window.closeTriggerModal = function() {
+            document.getElementById('triggerModal').classList.remove('active');
+            currentTriggerId = null;
+            emailList = [];
+        };
+
+        window.addEmail = function() {
+            const input = document.getElementById('triggerEmailInput');
+            const email = input.value.trim();
+            
+            if (!email) return;
+            
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showToast('Invalid email address', 'error');
+                return;
+            }
+
+            if (emailList.includes(email)) {
+                showToast('This email is already added', 'error');
+                return;
+            }
+
+            emailList.push(email);
+            input.value = '';
+            updateEmailTags();
+        };
+
+        window.removeEmail = function(email) {
+            emailList = emailList.filter(e => e !== email);
+            updateEmailTags();
+        };
+
+        async function loadTriggerData(triggerId) {
+            try {
+                const res = await fetch(`${API_BASE}/api/email/triggers/${triggerId}`);
+                if (!res.ok) throw new Error('Error loading trigger');
+                
+                const trigger = await res.json();
+                const conditions = typeof trigger.conditions === 'string' ? JSON.parse(trigger.conditions) : trigger.conditions;
+                const emails = typeof trigger.emails === 'string' ? JSON.parse(trigger.emails) : trigger.emails;
+
+                document.getElementById('triggerName').value = trigger.name || '';
+                document.getElementById('triggerSentiment').value = conditions.sentiment || 'all';
+                document.getElementById('triggerRelevance').value = conditions.relevance_score_min || 0.3;
+                document.getElementById('triggerSources').value = conditions.sources ? conditions.sources.join(', ') : '';
+                document.getElementById('triggerLanguage').value = conditions.language || 'all';
+                document.getElementById('triggerCooldown').value = trigger.cooldown_minutes || 60;
+                document.getElementById('triggerMaxPosts').value = trigger.max_posts_per_email || 10;
+                document.getElementById('triggerEnabled').checked = trigger.enabled !== false;
+
+                emailList = Array.isArray(emails) ? emails : [];
+                updateEmailTags();
+            } catch (error) {
+                showToast('Error loading trigger', 'error');
+                console.error(error);
+            }
+        }
+
+
+        function updateEmailTags() {
+            const container = document.getElementById('emailTags');
+            if (!container) return;
+
+            if (emailList.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = emailList.map(email => `
+                <span class="email-tag">
+                    ${escapeHtml(email)}
+                    <button type="button" class="email-tag-remove" onclick="removeEmail('${escapeHtml(email)}')" title="Retirer">×</button>
+                </span>
+            `).join('');
+        }
+
+        window.saveTrigger = async function(event) {
+            event.preventDefault();
+
+            if (emailList.length === 0) {
+                showToast('Add at least one email address', 'error');
+                return;
+            }
+
+            const conditions = {
+                sentiment: document.getElementById('triggerSentiment').value,
+                relevance_score_min: parseFloat(document.getElementById('triggerRelevance').value) || 0.3
+            };
+
+            const sources = document.getElementById('triggerSources').value.trim();
+            if (sources) {
+                conditions.sources = sources.split(',').map(s => s.trim()).filter(Boolean);
+            }
+
+            const language = document.getElementById('triggerLanguage').value;
+            if (language !== 'all') {
+                conditions.language = language;
+            }
+
+            const triggerData = {
+                name: document.getElementById('triggerName').value.trim(),
+                conditions: conditions,
+                emails: emailList,
+                cooldown_minutes: parseInt(document.getElementById('triggerCooldown').value) || 60,
+                max_posts_per_email: parseInt(document.getElementById('triggerMaxPosts').value) || 10,
+                enabled: document.getElementById('triggerEnabled').checked
+            };
+
+            try {
+                const url = currentTriggerId 
+                    ? `${API_BASE}/api/email/triggers/${currentTriggerId}`
+                    : `${API_BASE}/api/email/triggers`;
+                const method = currentTriggerId ? 'PUT' : 'POST';
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(triggerData)
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'Error saving trigger');
+                }
+
+                showToast(currentTriggerId ? 'Trigger updated successfully' : 'Trigger created successfully', 'success');
+                window.closeTriggerModal();
+                loadEmailNotifications();
+            } catch (error) {
+                showToast(error.message || 'Error saving trigger', 'error');
+                console.error(error);
+            }
+        };
+
+        // Setup modal event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Close modal on overlay click
+            const modal = document.getElementById('triggerModal');
+            if (modal) {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        window.closeTriggerModal();
+                    }
+                });
+            }
+
+            // Allow Enter key in email input to add email
+            const emailInput = document.getElementById('triggerEmailInput');
+            if (emailInput) {
+                emailInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        window.addEmail();
+                    }
+                });
+            }
+        });
+
+        window.toggleTrigger = async function(triggerId, newStatus) {
+            try {
+                const res = await fetch(`${API_BASE}/api/email/triggers/${triggerId}/toggle`, { method: 'POST' });
+                if (res.ok) {
+                    showToast(`Trigger ${newStatus ? 'enabled' : 'disabled'}`, 'success');
+                    loadEmailNotifications();
+                } else {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'Error updating trigger');
+                }
+            } catch (error) {
+                showToast(error.message || 'Error updating trigger', 'error');
+                console.error(error);
+            }
+        };
+
+        window.deleteTrigger = async function(triggerId) {
+            if (!confirm('Are you sure you want to delete this trigger?')) return;
+            
+            try {
+                const res = await fetch(`${API_BASE}/api/email/triggers/${triggerId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    showToast('Trigger deleted', 'success');
+                    loadEmailNotifications();
+                } else {
+                    const error = await res.json();
+                    throw new Error(error.detail || 'Error deleting trigger');
+                }
+            } catch (error) {
+                showToast(error.message || 'Error deleting trigger', 'error');
+                console.error(error);
+            }
+        };
+
+        window.editTrigger = async function(triggerId) {
+            openTriggerModal(triggerId);
+        };
+
+        window.testEmailConnection = async function() {
+            const input = document.getElementById('testEmailInput');
+            const email = input ? input.value.trim() : '';
+            
+            if (!email) {
+                showToast('Please enter an email address', 'error');
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showToast('Invalid email address', 'error');
+                return;
+            }
+
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+
+            try {
+                const res = await fetch(`${API_BASE}/api/email/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipient_email: email })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    showToast(data.message || 'Test email sent successfully!', 'success');
+                    if (input) input.value = ''; // Clear input on success
+                } else {
+                    throw new Error(data.detail || 'Test failed');
+                }
+            } catch (error) {
+                showToast(`Test failed: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        };
 
         // Define toggleHelpMenu function for settings page
         window.toggleHelpMenu = function() {
@@ -1521,14 +2282,16 @@
             }
         };
 
-        // Close help menu when clicking outside
+        // Close help menu when clicking outside (only if menu is open)
         document.addEventListener('click', (e) => {
             const helpMenu = document.getElementById('helpMenu');
+            if (!helpMenu) return;
+            
             const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
-            if (helpMenu && helpTab && 
-                !helpMenu.contains(e.target) && 
-                !helpTab.contains(e.target) &&
-                helpMenu.classList.contains('active')) {
+            const isClickInsideMenu = helpMenu.contains(e.target);
+            const isClickOnTab = helpTab && helpTab.contains(e.target);
+            
+            if (helpMenu.classList.contains('active') && !isClickInsideMenu && !isClickOnTab) {
                 helpMenu.classList.remove('active');
             }
         });

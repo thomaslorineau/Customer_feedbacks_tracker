@@ -75,6 +75,46 @@ fi
 info "Branche actuelle : $BRANCH"
 echo ""
 
+# Incrémenter MINOR automatiquement avant le push
+VERSION_MINOR_FILE=".version_minor"
+VERSION_FILE="VERSION"
+
+if [ -f "$VERSION_FILE" ]; then
+    MAJOR=$(cat "$VERSION_FILE" 2>/dev/null | tr -d '[:space:]' || echo "1")
+else
+    MAJOR="1"
+fi
+
+if [ -f "$VERSION_MINOR_FILE" ]; then
+    MINOR=$(cat "$VERSION_MINOR_FILE" 2>/dev/null | tr -d '[:space:]' || echo "0")
+    # Vérifier que c'est un nombre
+    if ! [[ "$MINOR" =~ ^[0-9]+$ ]]; then
+        MINOR=0
+    fi
+else
+    MINOR=0
+fi
+
+# Incrémenter MINOR
+MINOR=$((MINOR + 1))
+echo "$MINOR" > "$VERSION_MINOR_FILE"
+
+# Ajouter le fichier au staging et créer un commit si nécessaire
+if ! git diff --staged --quiet "$VERSION_MINOR_FILE" 2>/dev/null; then
+    # Le fichier est déjà dans le staging, pas besoin de l'ajouter
+    :
+elif git diff --quiet "$VERSION_MINOR_FILE" 2>/dev/null; then
+    # Le fichier n'a pas changé, pas besoin de commit
+    :
+else
+    # Le fichier a changé, l'ajouter et créer un commit
+    git add "$VERSION_MINOR_FILE" 2>/dev/null || true
+    git commit -m "chore: bump version to $MAJOR.$MINOR.x" --no-verify 2>/dev/null || true
+fi
+
+info "Version incrémentée : $MAJOR.$MINOR.x"
+echo ""
+
 # Menu de choix
 # Si un choix est passé en paramètre (2ème argument), l'utiliser
 if [ -n "$2" ]; then

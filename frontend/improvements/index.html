@@ -580,121 +580,13 @@
             <button class="help-menu-close" onclick="toggleHelpMenu()">×</button>
         </div>
         <div class="help-menu-content">
-            <h3>💡 Improvements Opportunities</h3>
-            <p>
-                This page helps you <strong>identify customer pain points</strong> and <strong>prioritize improvement opportunities</strong> by analyzing persistent feedback patterns across OVH products.
-            </p>
-
-            <h3>📊 Page Sections</h3>
-            <ul>
-                <li><strong>💸 Recurring Pain Points:</strong> Top 5 most frequent customer issues from the last 30 days, with post counts and descriptions</li>
-                <li><strong>📈 Distribution by Product:</strong> Opportunity scores for each product, ranked by improvement potential</li>
-                <li><strong>📝 Posts to Review for Improvement:</strong> Posts ranked by opportunity score, ready for action</li>
-            </ul>
-
-            <h3>🎯 Recurring Pain Points</h3>
-            <p>
-                Automatically detected pain points based on keyword analysis of negative feedback:
-            </p>
-            <ul>
-                <li><strong>Refund Delays:</strong> Late or pending refunds</li>
-                <li><strong>Billing Clarity:</strong> Confusing invoices and charges</li>
-                <li><strong>HTTPS/SSL Renewal:</strong> SSL certificate renewal issues</li>
-                <li><strong>Support Response Time:</strong> Slow or unresponsive support</li>
-                <li><strong>VPS Backups:</strong> Backup errors and failures</li>
-                <li><strong>Domain Issues:</strong> Domain registration and DNS problems</li>
-                <li><strong>Email Problems:</strong> Email delivery and configuration issues</li>
-            </ul>
-            <p style="margin-top: 10px;">
-                <strong>💡 Tip:</strong> Click "View All X Pain Points" to see the complete list.
-            </p>
-
-            <h3>📊 Opportunity Score Explained</h3>
-            <p>
-                The <strong>Opportunity Score (0-100)</strong> indicates the priority for product improvement. Higher scores mean higher priority.
-            </p>
-            <p>
-                <strong>Score Calculation:</strong>
-            </p>
-            <ul>
-                <li><strong>Negative Feedback Frequency (40%):</strong> Ratio of negative posts to total posts for the product</li>
-                <li><strong>Recency (30%):</strong> Weight given to recent negative feedback (last 30 days)</li>
-                <li><strong>Engagement Level (30%):</strong> Views, comments, and reactions indicate issue visibility</li>
-            </ul>
-            <p style="margin-top: 10px;">
-                <strong>Example:</strong> A product with 80% negative posts, many from the last week, and high engagement = High Opportunity Score (80-100)
-            </p>
-
-            <h3>📈 Product Distribution Chart</h3>
-            <ul>
-                <li><strong>Horizontal Bars:</strong> Visual representation of opportunity scores</li>
-                <li><strong>Color Coding:</strong> Each product has a unique color for easy identification</li>
-                <li><strong>Bar Segments:</strong> Shows ratio of negative (colored) vs positive/neutral (gray) feedback</li>
-                <li><strong>Show More:</strong> Click "+X Other Products" to expand and see all products</li>
-            </ul>
-
-            <h3>📝 Posts to Review</h3>
-            <p>
-                Posts are automatically ranked by their individual opportunity score:
-            </p>
-            <ul>
-                <li><strong>Post Opportunity Score:</strong> Combines sentiment (50%), recency (30%), and engagement (20%)</li>
-                <li><strong>Critical Posts:</strong> High-scoring negative posts from recent dates</li>
-                <li><strong>Engagement Metrics:</strong> Views, comments, and reactions displayed for each post</li>
-                <li><strong>Tags:</strong> "New" for recent posts, "Negative" for negative sentiment</li>
-            </ul>
-
-            <h3>🔍 Filtering & Search</h3>
-            <ul>
-                <li><strong>Search Bar:</strong> Search for specific keywords in post content</li>
-                <li><strong>Date Filter:</strong> Filter posts by creation date</li>
-                <li><strong>Language Filter:</strong> Filter by French or English</li>
-                <li><strong>Source Filter:</strong> Filter by data source (X, Reddit, Trustpilot, etc.)</li>
-                <li><strong>Sort Options:</strong> Sort by Opportunity Score, Recent, or Engagement</li>
-            </ul>
-
-            <h3>🎫 Create Improvement Tickets</h3>
-            <p>
-                Click <strong>"+ Create Improvement Ticket"</strong> on any post to:
-            </p>
-            <ul>
-                <li>Track the post for product improvement</li>
-                <li>Prioritize actions based on opportunity score</li>
-                <li>Link feedback to specific product areas</li>
-            </ul>
-            <p style="margin-top: 10px; padding: 10px; background: rgba(0, 212, 255, 0.1); border-left: 4px solid var(--accent-primary); border-radius: 4px;">
-                <strong>💡 Note:</strong> Ticket creation functionality can be integrated with your project management system (Jira, GitHub Issues, etc.)
-            </p>
-
-            <h3>📊 Understanding the Data</h3>
-            <ul>
-                <li><strong>Pain Points:</strong> Based on keyword matching in negative posts from the last 30 days</li>
-                <li><strong>Product Detection:</strong> Automatic categorization based on content keywords (billing, domain, vps, etc.)</li>
-                <li><strong>Recency Weight:</strong> Recent issues are prioritized over older ones</li>
-                <li><strong>Engagement Metrics:</strong> Posts with more visibility indicate broader impact</li>
-            </ul>
-
-            <h3>🎨 Navigation</h3>
-            <ul>
-                <li><strong>📥 Feedbacks Collection:</strong> Manage keywords, LLM settings, and launch scrapers</li>
-                <li><strong>📊 Dashboard Analytics:</strong> Visual analytics with charts and insights</li>
-                <li><strong>💡 Improvements Opportunities:</strong> Current page - pain points and opportunity analysis</li>
-                <li><strong>❓ Help:</strong> This menu - access help and documentation</li>
-                <li><strong>🌓 Theme Toggle:</strong> Switch between light and dark mode</li>
-            </ul>
-
-            <h3>💡 Pro Tips</h3>
-            <ul>
-                <li>Focus on products with opportunity scores above 70 for maximum impact</li>
-                <li>Review pain points with high post counts (>50) as they affect many customers</li>
-                <li>Use date filters to identify recent trends and emerging issues</li>
-                <li>Combine product filter with date range to analyze specific time periods</li>
-                <li>Export high-priority posts to CSV for detailed analysis</li>
-            </ul>
+            <!-- Content loaded dynamically by help-menu-loader.js -->
+            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading help content...</p>
         </div>
     </div>
 
     <script src="/js/logo-updater.js"></script>
+    <script src="/js/help-menu-loader.js"></script>
     <script type="module" src="/dashboard/js/version-loader.js"></script>
     <script type="module">
         import { API } from '/dashboard/js/api.js';

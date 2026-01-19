@@ -1,0 +1,10 @@
+* [33m55ea478[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m feat: Amélioration design sources, tri par relevancy, affichage produit dans drawers, filtrage Critical Posts par recherche globale
+* [33me636933[m[33m ([m[1;31morigin/develop[m[33m, [m[1;32mdevelop[m[33m)[m Uniformiser le design des cartes de posts et ajouter label 'Pertinence' explicite
+* [33m62c6348[m fix: Amélioration barre de progression - synchronisation DB, polling plus fréquent (500ms), logs de debug heartbeat
+* [33m637a7db[m fix: Nettoyage automatique des doublons après scraping individuel
+* [33m56f5229[m feat: Amélioration granularité progression scrapers, correction débordement bouton Scrape, synchronisation recherche globale avec filtres All Posts et visibilité bouton Back to Search
+* [33m2eafffa[m feat: Implémentation barres de progression pour tous les scrapers
+* [33mb44ae39[m fix: Augmentation timeouts pour Trustpilot et amélioration gestion erreurs réseau
+* [33mafa2aaa[m fix: Amélioration parsing Trustpilot pour mieux détecter les avis (sélecteurs multiples, logging amélioré)
+* [33m11d069b[m fix: Correction deuxième erreur syntaxe dans mastodon.py (ligne 308, indentation bloc try/except)
+* [33ma239041[m fix: Correction erreur syntaxe dans mastodon.py (indentation du bloc try/except)

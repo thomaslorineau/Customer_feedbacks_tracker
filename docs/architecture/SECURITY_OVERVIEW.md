@@ -4,6 +4,8 @@
 
 **Une analyse de sécurité complète a été effectuée sur l'application OVH Complaints Tracker.**
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ### Résultats:
 
 ```

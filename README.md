@@ -4,6 +4,9 @@
 
 [![Version](https://img.shields.io/badge/version-1.0.8-blue.svg)](VERSION)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](docs/changelog/STATUS.md)
+[![VibeCoding](https://img.shields.io/badge/made%20with-VibeCoding-00D9FF.svg)](https://cursor.sh)
+
+> **💡 Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant la puissance de l'assistance IA pour créer des applications complètes et professionnelles.
 
 ---
 
@@ -135,8 +138,9 @@ ovh-complaints-tracker/
 2. **Relevance Scoring** filtre les posts non pertinents (< 30%)
 3. **Analyse de sentiment** (VADER) classe chaque post
 4. **Base de données** stocke les posts avec métadonnées (relevance_score inclus)
-5. **API REST** expose les données au frontend
-6. **Dashboard** visualise les données avec Chart.js et sections interactives
+5. **Notifications email** vérifient les triggers et envoient des alertes si nécessaire
+6. **API REST** expose les données au frontend
+7. **Dashboard** visualise les données avec Chart.js et sections interactives
 
 📖 **Architecture détaillée:** [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)
 
@@ -157,6 +161,8 @@ ovh-complaints-tracker/
 - ✅ **Logs persistants** : Suivi détaillé des opérations de scraping
 - ✅ **Détection de pays** : Identification du pays depuis le contenu
 - ✅ **Actions recommandées** : Suggestions basées sur l'IA (OpenAI/Anthropic)
+- ✅ **Notifications email** : Alertes automatiques par email pour les posts problématiques (négatifs) avec système de triggers configurables
+- ✅ **Système de jobs asynchrones** : Scraping en arrière-plan avec suivi de progression en temps réel
 
 ---
 
@@ -211,6 +217,14 @@ ANTHROPIC_API_KEY=sk-ant-...
 GITHUB_TOKEN=ghp_...
 TRUSTPILOT_API_KEY=...
 
+# Email Notifications (optionnel)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=votre_email@gmail.com
+SMTP_PASSWORD=votre_mot_de_passe_app
+SMTP_FROM_EMAIL=votre_email@gmail.com
+SMTP_FROM_NAME=OVH Feedbacks Tracker
+
 # Configuration
 ENVIRONMENT=development
 CORS_ORIGINS=http://localhost:3000,http://localhost:8080
@@ -237,9 +251,22 @@ python scripts/e2e_test_real_server.py
 - ✅ **Phase 1** : Sécurité critique - Terminée
 - ✅ **Phase 2** : Sécurité avancée - Terminée
 - ✅ **Nettoyage** : Projet professionnel - Terminé
+- ✅ **Notifications email** : Système complet avec triggers configurables - Terminé
 - 🚧 **Version** : 1.0.8 (Beta)
 
 📖 **Statut détaillé:** [docs/changelog/STATUS.md](docs/changelog/STATUS.md)
+
+## 🎨 Développement avec VibeCoding
+
+Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant comment l'assistance IA peut accélérer le développement d'applications complètes :
+
+- **Architecture complète** : Backend FastAPI, Frontend vanilla JS, base de données DuckDB
+- **10 sources de scraping** : Implémentation de scrapers avec fallbacks intelligents
+- **Système de notifications** : Email notifications avec triggers configurables
+- **Analyse IA** : Intégration OpenAI/Anthropic pour recommandations et insights
+- **Interface moderne** : Dashboard interactif avec visualisations Chart.js
+
+**Technologies utilisées :** Python, FastAPI, DuckDB, HTML/CSS/JS, SMTP, VADER Sentiment, Chart.js
 
 ---
 
@@ -255,4 +282,4 @@ Projet interne OVH.
 
 ---
 
-**Dernière mise à jour:** 2026-01-XX
+**Dernière mise à jour:** Janvier 2026

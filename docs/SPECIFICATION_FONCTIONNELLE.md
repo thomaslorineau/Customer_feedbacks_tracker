@@ -4,6 +4,8 @@
 **Date:** Janvier 2026  
 **Statut:** Beta
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant la puissance de l'assistance IA pour créer des applications complètes et professionnelles.
+
 ---
 
 ## 🎯 Vue d'ensemble
@@ -143,6 +145,11 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 - **Configuration API Keys** : OpenAI, Anthropic, Google, GitHub, Trustpilot
 - **Sélection provider LLM** : OpenAI ou Anthropic
 - **Gestion Base Keywords** : Édition des keywords de base (brands, products, problems, leadership)
+- **Email Notifications** : Configuration des triggers de notification par email pour les posts problématiques
+  - Création/édition de triggers avec conditions personnalisables
+  - Configuration des emails destinataires directement dans les triggers
+  - Test de connexion SMTP
+  - Historique des notifications envoyées
 
 #### 3.5 Page "Scraping Logs" (`/logs`)
 - **Affichage logs** : Liste des opérations de scraping
@@ -183,6 +190,28 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 - `errors` : JSON (erreurs rencontrées)
 - `created_at` : TEXT
 - `updated_at` : TEXT
+
+**Table `notification_triggers`** :
+- `id` : BIGINT PRIMARY KEY
+- `name` : TEXT (nom du trigger)
+- `enabled` : BOOLEAN (actif/inactif)
+- `conditions` : TEXT JSON (sentiment, relevance_score_min, sources, language, etc.)
+- `emails` : TEXT JSON (liste des emails destinataires)
+- `cooldown_minutes` : INTEGER (délai minimum entre notifications)
+- `max_posts_per_email` : INTEGER (nombre max de posts par email)
+- `last_notification_sent_at` : TEXT (timestamp dernière notification)
+- `created_at` : TEXT
+- `updated_at` : TEXT
+
+**Table `email_notifications`** :
+- `id` : BIGINT PRIMARY KEY
+- `trigger_id` : BIGINT (référence au trigger)
+- `post_ids` : TEXT JSON (IDs des posts inclus dans l'email)
+- `recipient_emails` : TEXT JSON (emails destinataires)
+- `sent_at` : TEXT (timestamp d'envoi)
+- `status` : TEXT (sent/failed/pending)
+- `error_message` : TEXT (message d'erreur si échec)
+- `created_at` : TEXT
 
 #### 4.2 Index
 - `idx_posts_source` : Sur `source`
@@ -226,14 +255,65 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 - `GET /settings/base-keywords` : Keywords de base ⭐ **NOUVEAU**
 - `POST /settings/base-keywords` : Sauvegarder keywords de base ⭐ **NOUVEAU**
 
-#### 5.5 Endpoints utilitaires
+#### 5.5 Endpoints de notifications email
+- `GET /api/email/triggers` : Liste tous les triggers
+- `GET /api/email/triggers/{id}` : Détails d'un trigger
+- `POST /api/email/triggers` : Créer un trigger
+- `PUT /api/email/triggers/{id}` : Modifier un trigger
+- `DELETE /api/email/triggers/{id}` : Supprimer un trigger
+- `POST /api/email/triggers/{id}/toggle` : Activer/désactiver un trigger
+- `GET /api/email/config` : Statut de la configuration SMTP
+- `POST /api/email/test` : Tester l'envoi d'email
+- `GET /api/email/notifications` : Historique des notifications
+
+#### 5.6 Endpoints utilitaires
 - `GET /health` : Health check avec vérifications DB
 - `GET /api/version` : Version de l'application
 - `GET /api/logs` : Logs de scraping
 
 ---
 
-### 6. Intégration LLM
+### 6. Notifications Email
+
+#### 6.1 Système de triggers
+Les triggers permettent de configurer des alertes automatiques par email lorsque des posts problématiques sont détectés.
+
+**Conditions supportées :**
+- **Sentiment** : All, Negative, Positive, Neutral
+- **Score de pertinence minimum** : 0.0 à 1.0
+- **Sources** : Filtre par sources spécifiques (X/Twitter, Reddit, GitHub, etc.)
+- **Langue** : All, French, English, etc.
+- **Score de priorité minimum** : Optionnel (0.0 à 1.0)
+
+**Configuration :**
+- **Emails destinataires** : Liste d'emails (max 50) configurés directement dans le trigger
+- **Cooldown** : Délai minimum entre notifications (défaut: 60 minutes) pour éviter le spam
+- **Max posts par email** : Nombre maximum de posts inclus dans un email (défaut: 10)
+
+**Fonctionnement :**
+1. Lorsqu'un nouveau post est inséré en base de données
+2. Le système vérifie tous les triggers actifs
+3. Si le post correspond aux conditions d'un trigger
+4. Vérification du cooldown (évite les notifications trop fréquentes)
+5. Récupération des posts problématiques récents (24h) correspondant au trigger
+6. Envoi d'un email groupé avec les posts les plus prioritaires
+7. Logging de la notification dans `email_notifications`
+
+**Configuration SMTP :**
+Les paramètres SMTP sont configurés via variables d'environnement :
+- `SMTP_HOST` : Serveur SMTP (ex: smtp.gmail.com)
+- `SMTP_PORT` : Port SMTP (ex: 587)
+- `SMTP_USER` : Utilisateur SMTP
+- `SMTP_PASSWORD` : Mot de passe SMTP
+- `SMTP_FROM_EMAIL` : Email expéditeur
+- `SMTP_FROM_NAME` : Nom expéditeur
+
+**Template d'email :**
+- Format HTML avec en-tête, contenu des posts, et footer
+- Format texte alternatif pour compatibilité
+- Inclut : source, auteur, date, contenu (tronqué), score de pertinence, lien vers le post
+
+### 7. Intégration LLM
 
 #### 6.1 Providers supportés
 - **OpenAI** : GPT-4o-mini (par défaut)
@@ -286,7 +366,8 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 4. **Relevance Scoring** → Filtrage automatique (< 30%)
 5. **Sentiment Analysis** → Classification automatique
 6. **Insertion DB** → Stockage avec métadonnées
-7. **Frontend affiche** → Dashboard avec visualisations
+7. **Notifications email** → Vérification des triggers et envoi d'alertes si nécessaire
+8. **Frontend affiche** → Dashboard avec visualisations
 
 ---
 

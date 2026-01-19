@@ -2,6 +2,8 @@
 
 Ce guide vous explique comment tester le projet étape par étape.
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ## Prérequis
 
 - Python 3.11 ou supérieur

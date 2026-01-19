@@ -2,6 +2,8 @@
 
 Ce guide vous explique **étape par étape** comment démarrer l'application, même si vous n'avez jamais utilisé Python.
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ---
 
 ## ✅ Prérequis

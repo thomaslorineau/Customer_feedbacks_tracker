@@ -3,6 +3,8 @@
 **Date:** 2026-01-XX  
 **Version:** 1.0.9
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ---
 
 ## 📈 Vue d'ensemble

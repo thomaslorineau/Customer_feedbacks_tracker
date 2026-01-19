@@ -2,6 +2,8 @@
 
 Guide complet pour démarrer et utiliser l'application, du débutant à l'utilisateur avancé.
 
+> **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
+
 ---
 
 ## ✅ Prérequis

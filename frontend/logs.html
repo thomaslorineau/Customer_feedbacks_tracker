@@ -371,6 +371,10 @@
                     <span class="nav-tab-icon">⚙️</span>
                     <span>Settings</span>
                 </a>
+                <a href="#" class="nav-tab" onclick="event.preventDefault(); window.toggleHelpMenu(); return false;">
+                    <span class="nav-tab-icon">❓</span>
+                    <span>Help</span>
+                </a>
             </div>
         </div>
         <div class="nav-menu-right">
@@ -802,7 +806,29 @@
         document.getElementById('filterSource').addEventListener('change', loadLogs);
         document.getElementById('filterLevel').addEventListener('change', loadLogs);
         document.getElementById('filterLimit').addEventListener('change', loadLogs);
+
+        // Help menu function
+        window.toggleHelpMenu = function() {
+            const menu = document.getElementById('helpMenu');
+            if (menu) {
+                menu.classList.toggle('active');
+            }
+        };
     </script>
+    
+    <!-- Help Menu -->
+    <div class="help-menu" id="helpMenu">
+        <div class="help-menu-header">
+            <h2>📖 Help & Information</h2>
+            <button class="help-menu-close" onclick="window.toggleHelpMenu()">×</button>
+        </div>
+        <div class="help-menu-content">
+            <!-- Content loaded dynamically by help-menu-loader.js -->
+            <p style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading help content...</p>
+        </div>
+    </div>
+
+    <script src="/js/help-menu-loader.js"></script>
     <script type="module" src="/dashboard/js/version-loader.js"></script>
     <script type="module">
         import { API } from '/dashboard/js/api.js';
@@ -836,6 +862,21 @@
                 }
             });
         }
+    </script>
+    <script>
+        // Close help menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const helpMenu = document.getElementById('helpMenu');
+            if (!helpMenu) return;
+            
+            const helpTab = document.querySelector('.nav-tab[onclick*="toggleHelpMenu"]');
+            const isClickInsideMenu = helpMenu.contains(e.target);
+            const isClickOnTab = helpTab && helpTab.contains(e.target);
+            
+            if (helpMenu.classList.contains('active') && !isClickInsideMenu && !isClickOnTab) {
+                helpMenu.classList.remove('active');
+            }
+        });
     </script>
 </body>
 </html>
