@@ -72,7 +72,7 @@ const HELP_MENU_CONTENT = `
 <h3>🔑 Keywords System</h3>
 <p><strong>Two types of keywords work together:</strong></p>
 <ul>
-    <li><strong>Base Keywords (Settings → Base Keywords):</strong>
+    <li><strong>Base Keywords:</strong> <a href="/settings#base-keywords" style="color: var(--accent-primary); text-decoration: underline;">Configure in Settings</a>
         <ul>
             <li><strong>Brands:</strong> OVH, OVHCloud, Kimsufi, etc.</li>
             <li><strong>Products:</strong> OVH domain, OVH hosting, OVH VPS, etc.</li>
@@ -138,6 +138,7 @@ const HELP_MENU_CONTENT = `
     <li>Configure default keywords that are always used in scraping</li>
     <li>Organized by categories: Brands, Products, Problems, Leadership</li>
     <li>These are combined with your custom keywords automatically</li>
+    <li><a href="/settings#base-keywords" style="color: var(--accent-primary); text-decoration: underline;">Go to Base Keywords settings →</a></li>
 </ul>
 
 <h4>⏱️ Rate Limiting</h4>

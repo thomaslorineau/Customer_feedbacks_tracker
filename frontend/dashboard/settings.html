@@ -1296,7 +1296,7 @@
         </div>
 
         <!-- Section 2: Base Keywords (Priorité Haute) -->
-        <div class="accordion" data-accordion="keywords">
+        <div class="accordion" data-accordion="keywords" id="base-keywords">
             <div class="accordion-header" onclick="toggleAccordion('keywords')">
                 <div class="accordion-title">
                     <span class="accordion-title-icon">🔍</span>
@@ -1781,6 +1781,35 @@
         document.addEventListener('DOMContentLoaded', function() {
             checkLogoStatus();
             loadEmailNotifications();
+            
+            // Open accordion if hash is present in URL (e.g., /settings#base-keywords)
+            if (window.location.hash) {
+                const hash = window.location.hash.substring(1); // Remove #
+                // Map hash to accordion ID
+                const hashToAccordion = {
+                    'base-keywords': 'keywords',
+                    'email-notifications': 'email-notifications',
+                    'llm': 'llm',
+                    'scrapers-api-keys': 'scrapers-api-keys',
+                    'rate-limiting': 'rate-limiting',
+                    'appearance': 'appearance',
+                    'environment': 'environment'
+                };
+                const accordionId = hashToAccordion[hash];
+                if (accordionId) {
+                    // Small delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (window.toggleAccordion) {
+                            window.toggleAccordion(accordionId);
+                        }
+                        // Scroll to the section
+                        const element = document.getElementById(hash);
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }, 100);
+                }
+            }
         });
 
         // ============================================================================
