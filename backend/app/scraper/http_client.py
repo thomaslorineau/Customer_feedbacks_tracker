@@ -71,12 +71,15 @@ class AsyncHTTPClient:
                 # Try to access a property to see if client is still valid
                 # If it fails, the client is likely closed
                 _ = self._client.timeout
-            except (RuntimeError, AttributeError):
+            except (RuntimeError, AttributeError, Exception) as e:
                 # Client is closed or invalid, create a new one
+                logger.debug(f"[HTTPClient] Client invalid, recreating: {e}")
                 try:
-                    await self._client.aclose()
+                    if not self._client.is_closed:
+                        await self._client.aclose()
                 except Exception:
                     pass  # Ignore errors when closing
+                self._client = None  # Clear reference
                 self._client = httpx.AsyncClient(
                     timeout=self.timeout,
                     limits=self.limits,
@@ -144,6 +147,23 @@ class AsyncHTTPClient:
             except CircuitBreakerOpenError:
                 # Circuit breaker is open, don't retry
                 raise
+            except RuntimeError as e:
+                # Handle event loop shutdown errors
+                if "shutdown" in str(e).lower() or "closed" in str(e).lower():
+                    logger.warning(f"[HTTPClient:{source_name}] Event loop shutdown detected, recreating client...")
+                    try:
+                        self._client = None
+                        await self._ensure_client()
+                        if attempt < self.max_retries - 1:
+                            wait_time = self.retry_delay * (self.backoff_factor ** attempt)
+                            await asyncio.sleep(wait_time)
+                            continue
+                    except Exception as recreate_error:
+                        logger.error(f"[HTTPClient:{source_name}] Failed to recreate client: {recreate_error}")
+                        last_error = e
+                        break
+                else:
+                    raise
             except (httpx.NetworkError, httpx.ConnectError, httpx.ReadTimeout) as e:
                 last_error = e
                 if attempt < self.max_retries - 1:
@@ -206,13 +226,30 @@ class AsyncHTTPClient:
         circuit_breaker = get_circuit_breaker(source_name)
         
         async def _make_request():
-            return await self._client.post(
-                url,
-                headers=headers,
-                json=json,
-                data=data,
-                **kwargs
-            )
+            # Ensure client is still valid before making request
+            try:
+                await self._ensure_client()
+                return await self._client.post(
+                    url,
+                    headers=headers,
+                    json=json,
+                    data=data,
+                    **kwargs
+                )
+            except RuntimeError as e:
+                if "shutdown" in str(e).lower() or "closed" in str(e).lower():
+                    # Client was closed, recreate it
+                    logger.warning(f"[HTTPClient:{source_name}] Client was closed, recreating...")
+                    self._client = None
+                    await self._ensure_client()
+                    return await self._client.post(
+                        url,
+                        headers=headers,
+                        json=json,
+                        data=data,
+                        **kwargs
+                    )
+                raise
         
         last_error = None
         

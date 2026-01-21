@@ -1032,7 +1032,7 @@
             <button class="btn-scrape-compact" id="scrapeAllBtn" title="Scrape new data from all sources">
                 🆕 Scrape
             </button>
-            <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScraping()" title="Cancel current scraping job">
+            <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScrape()" title="Cancel current scraping job">
                 ❌ Cancel
             </button>
             <span class="beta-badge" title="Application en version beta">BETA</span>
@@ -1139,7 +1139,12 @@
                 
                 <!-- Scraping Progress Bar -->
                 <div id="scrapingProgressContainer" style="display: none; margin-bottom: 24px; padding-bottom: 24px; border-bottom: 1px solid var(--border-color);" data-status="running" data-percentage="0%">
-                    <span id="scrapingProgressText" style="display: block; text-align: center; margin-bottom: 12px; color: var(--text-secondary); font-size: 0.9em;">Initializing scraping job...</span>
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span id="scrapingProgressText" style="display: block; text-align: left; color: var(--text-secondary); font-size: 0.9em; flex: 1;">Initializing scraping job...</span>
+                        <button id="cancelProgressBtn" onclick="cancelScrape()" style="display: none; padding: 6px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.85em; transition: all 0.2s ease; white-space: nowrap;" title="Cancel current scraping job">
+                            ❌ Cancel
+                        </button>
+                    </div>
                     <div style="width: 100%; height: 8px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
                         <div id="scrapingProgressBar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="height: 100%; background: linear-gradient(90deg, #00d4ff, #0099ff); width: 0%; transition: width 0.3s ease;"></div>
                     </div>
@@ -2054,6 +2059,54 @@
         // Initialize theme on page load (for toggle functionality)
         // Version loading is handled by version-loader.js module
         if (document.readyState === 'loading') {
+            // Auto-cleanup stale jobs on page load - FORCE CLEANUP
+            (function autoCleanupStaleJobs() {
+                try {
+                    const lastJobId = localStorage.getItem('ovh_last_job');
+                    if (lastJobId) {
+                        // FORCE cleanup of the problematic job ID
+                        if (lastJobId.includes('84d4fd06-ae2e-43a1-9387-e037a668f75a')) {
+                            console.warn('🧹 FORCE CLEANUP: Removing stale job from localStorage');
+                            localStorage.removeItem('ovh_last_job');
+                            localStorage.removeItem('ovh_last_job_source');
+                            
+                            // Stop ALL intervals aggressively
+                            for (let i = 1; i < 10000; i++) {
+                                try {
+                                    clearInterval(i);
+                                    clearTimeout(i);
+                                } catch (e) {
+                                    // Ignore
+                                }
+                            }
+                            
+                            // Stop specific intervals
+                            if (window.jobPollInterval) {
+                                clearInterval(window.jobPollInterval);
+                                window.jobPollInterval = null;
+                            }
+                            if (window.jobStatusInterval) {
+                                clearInterval(window.jobStatusInterval);
+                                window.jobStatusInterval = null;
+                            }
+                            
+                            // Prevent any further polling
+                            window.jobPollInterval = null;
+                            window.jobStatusInterval = null;
+                            window.currentJobId = null;
+                            
+                            console.warn('✅ Stale job cleaned up. Page will reload in 1 second...');
+                            setTimeout(() => {
+                                window.location.reload(true);
+                            }, 1000);
+                            return;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error in auto-cleanup:', e);
+                }
+            })();
+            
             document.addEventListener('DOMContentLoaded', () => {
                 initializeTheme();
             });
@@ -3725,6 +3778,16 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             if (cancelBtn) {
                 cancelBtn.style.display = show ? 'inline-block' : 'none';
             }
+            // Also show/hide the compact cancel button in navigation
+            const cancelScrapingBtn = document.getElementById('cancelScrapingBtn');
+            if (cancelScrapingBtn) {
+                cancelScrapingBtn.style.display = show ? 'inline-block' : 'none';
+            }
+            // Also show/hide the cancel button in progress bar
+            const cancelProgressBtn = document.getElementById('cancelProgressBtn');
+            if (cancelProgressBtn) {
+                cancelProgressBtn.style.display = show ? 'inline-block' : 'none';
+            }
         }
 
         function setButtonLoading(buttonId, loading) {
@@ -3744,33 +3807,63 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         }
 
         async function cancelScrape() {
+            console.log('Cancel button clicked, currentJobId:', currentJobId);
+            
             // Cancel background job if running
             if (currentJobId) {
                 try {
+                    console.log(`Attempting to cancel job: ${currentJobId}`);
                     const response = await fetch(`${API_BASE}/scrape/jobs/${currentJobId}/cancel`, {
                         method: 'POST'
                     });
                     if (response.ok) {
+                        const result = await response.json();
+                        console.log('Cancel response:', result);
                         addLog('⛔ Job cancellation requested...', 'warning');
                         showToast('Job cancellation requested', 'info');
+                        
+                        // Update progress text
+                        const progressText = document.getElementById('scrapingProgressText');
+                        if (progressText) {
+                            progressText.textContent = 'Cancelling job...';
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        console.error(`Cancel failed: ${response.status} - ${errorText}`);
+                        addLog(`❌ Cancel failed: ${errorText}`, 'error');
+                        showToast('Cancel failed', 'error');
                     }
                 } catch (e) {
-                    console.error(`Error cancelling job: ${e.message}`);
+                    console.error(`Error cancelling job: ${e.message}`, e);
+                    addLog(`❌ Error cancelling job: ${e.message}`, 'error');
+                    showToast(`Error: ${e.message}`, 'error');
                 }
                 
-                // Stop polling
+                // Stop polling immediately
                 if (jobStatusInterval) {
                     clearInterval(jobStatusInterval);
                     jobStatusInterval = null;
+                    console.log('Polling stopped');
                 }
+                if (jobPollInterval) {
+                    clearInterval(jobPollInterval);
+                    jobPollInterval = null;
+                }
+                
+                // Clear job ID and localStorage
+                persistLastJob(null);
                 currentJobId = null;
                 showCancelBtn(false);
                 
-                // Hide progress bar
-                const progressContainer = document.getElementById('scrapingProgressContainer');
-                if (progressContainer) {
-                    progressContainer.style.display = 'none';
-                }
+                // Hide progress bar after a short delay
+                setTimeout(() => {
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                }, 2000);
+            } else {
+                console.warn('No currentJobId to cancel');
             }
             
             // Cancel direct requests if any
@@ -4167,10 +4260,23 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
 
         async function scrapeAllSources() {
             const keywords = loadKeywords();
+            
+            // Remove default keywords if they exist (legacy cleanup)
+            const isDefaultSet1 = keywords && keywords.length === 2 && keywords.includes('OVH') && keywords.includes('OVHCloud');
+            const isDefaultSet2 = keywords && keywords.length === 1 && keywords.includes('OVH');
+            if (isDefaultSet1 || isDefaultSet2) {
+                console.log('Removing default keywords from localStorage');
+                saveKeywords([]);
+                keywords = [];
+            }
+            
+            // No custom keywords - base keywords (from Settings) will be used automatically by backend
             if (!keywords || keywords.length === 0) {
-                addLog('⚠️ No keywords configured. Add keywords first!', 'error');
-                showToast('Please add keywords before scraping', 'error');
-                return;
+                console.log('No custom keywords found - backend will use base keywords from Settings');
+                addLog('🔍 Using base keywords from Settings (no custom keywords configured)', 'info');
+            } else {
+                console.log('Loaded custom keywords from localStorage:', keywords);
+                addLog(`📝 Custom keywords: ${keywords.join(', ')}`, 'info');
             }
             
             // Stop any existing job polling
@@ -4199,7 +4305,10 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             try {
                 // Launch background job
                 addLog('🚀 Launching background scraping job...', 'info');
-                addLog(`📝 Keywords: ${keywords.join(', ')}`, 'info');
+                if (keywords && keywords.length > 0) {
+                    addLog(`📝 Custom keywords: ${keywords.join(', ')}`, 'info');
+                }
+                addLog('💡 Base keywords from Settings will be combined automatically', 'info');
                 showToast('Scraping job started! You can continue using the app.', 'info');
                 
                 const response = await fetch(`${API_BASE}/scrape/keywords?limit=50&concurrency=2&delay=0.5`, {
@@ -4288,6 +4397,25 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                                 progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
                             }
                         }
+                    } else if (response.status === 404) {
+                        // Job doesn't exist (server restarted or job expired)
+                        console.warn(`Job ${jobId.substring(0, 8)}... not found (404), stopping polling and cleaning up`);
+                        if (jobStatusInterval) {
+                            clearInterval(jobStatusInterval);
+                            jobStatusInterval = null;
+                        }
+                        currentJobId = null;
+                        // Clean up localStorage
+                        persistLastJob(null);
+                        if (progressContainer) {
+                            progressContainer.style.display = 'none';
+                        }
+                        const jobPanel = document.getElementById('jobPanel');
+                        if (jobPanel) {
+                            jobPanel.style.display = 'none';
+                        }
+                        showCancelBtn(false);
+                        return;
                     }
                 } catch (e) {
                     console.error('Error in immediate poll:', e);
@@ -4300,12 +4428,17 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     if (!response.ok) {
                         if (response.status === 404) {
                             // Job doesn't exist (server restarted or job expired)
-                            console.warn(`Job ${jobId.substring(0, 8)}... not found (404), stopping polling`);
+                            console.warn(`Job ${jobId.substring(0, 8)}... not found (404), stopping polling and cleaning up`);
                             clearInterval(jobStatusInterval);
                             jobStatusInterval = null;
                             currentJobId = null;
+                            // Clean up localStorage
+                            persistLastJob(null);
                             if (progressContainer) {
                                 progressContainer.style.display = 'none';
+                            }
+                            if (jobPanel) {
+                                jobPanel.style.display = 'none';
                             }
                             showCancelBtn(false);
                             return;
@@ -4320,23 +4453,29 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     const completed = progress.completed || 0;
                     const total = progress.total || 0;
                     
+                    // Re-fetch elements in case DOM changed (more robust)
+                    const currentProgressBar = document.getElementById('scrapingProgressBar');
+                    const currentProgressText = document.getElementById('scrapingProgressText');
+                    const currentProgressContainer = document.getElementById('scrapingProgressContainer');
+                    
                     // Debug logs - more detailed
                     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-                    const oldWidth = progressBar ? progressBar.style.width : '0%';
+                    const oldWidth = currentProgressBar ? currentProgressBar.style.width : '0%';
                     console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${percentage}%)`, {
                         job: job,
                         progress: progress,
-                        progressBarExists: !!progressBar,
+                        progressBarExists: !!currentProgressBar,
                         currentWidth: oldWidth
                     });
                     
                     // Always update progress bar if we have progress data (even if total is 0 initially)
-                    if (progressBar) {
+                    if (currentProgressBar) {
                         if (total > 0) {
                             const percentage = Math.round((completed / total) * 100);
                             const newWidth = `${percentage}%`;
-                            progressBar.style.width = newWidth;
-                            progressBar.setAttribute('aria-valuenow', percentage);
+                            // Force update even if value is the same (ensures visual update)
+                            currentProgressBar.style.width = newWidth;
+                            currentProgressBar.setAttribute('aria-valuenow', percentage);
                             
                             // Log if progress actually changed
                             if (oldWidth !== newWidth) {
@@ -4344,25 +4483,25 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                             }
                             
                             // Update container attributes
-                            if (progressContainer) {
-                                progressContainer.setAttribute('data-percentage', `${percentage}%`);
-                                progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
+                            if (currentProgressContainer) {
+                                currentProgressContainer.setAttribute('data-percentage', `${percentage}%`);
+                                currentProgressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
                             }
                         } else if (status === 'running' || status === 'pending') {
                             // Show indeterminate progress when job is running but total not yet calculated
-                            progressBar.style.width = '10%';
-                            progressBar.setAttribute('aria-valuenow', 0);
-                            if (progressContainer) {
-                                progressContainer.setAttribute('data-percentage', '...');
-                                progressContainer.setAttribute('data-status', 'running');
+                            currentProgressBar.style.width = '10%';
+                            currentProgressBar.setAttribute('aria-valuenow', 0);
+                            if (currentProgressContainer) {
+                                currentProgressContainer.setAttribute('data-percentage', '...');
+                                currentProgressContainer.setAttribute('data-status', 'running');
                             }
                         }
                     } else {
                         console.warn('[Progress] ⚠️ progressBar element not found!');
                     }
                     
-                    // Update progress text
-                    if (progressText) {
+                    // Update progress text (use re-fetched element)
+                    if (currentProgressText) {
                         if (total > 0) {
                             const percentage = Math.round((completed / total) * 100);
                             let statusText = '';
@@ -4401,25 +4540,26 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                                 statusText = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
                             }
                             if (statusText) {
-                                progressText.textContent = statusText;
+                                currentProgressText.textContent = statusText;
                             }
                         } else if (status === 'running' || status === 'pending') {
                             if (sourceName) {
-                                progressText.textContent = `Scraping ${sourceName}...`;
+                                currentProgressText.textContent = `Scraping ${sourceName}...`;
                             } else {
-                                progressText.textContent = 'Scraping job initialized... Calculating tasks...';
+                                currentProgressText.textContent = 'Scraping job initialized... Calculating tasks...';
                             }
                         } else {
                             if (sourceName) {
-                                progressText.textContent = `Initializing ${sourceName} scraper...`;
+                                currentProgressText.textContent = `Initializing ${sourceName} scraper...`;
                             } else {
-                                progressText.textContent = 'Scraping job initialized...';
+                                currentProgressText.textContent = 'Scraping job initialized...';
                             }
                         }
                     }
                     
-                    // Also log progress
-                    if (completed !== (progressBar ? parseInt(progressBar.getAttribute('aria-valuenow') || '0') : 0)) {
+                    // Also log progress (use re-fetched element)
+                    const currentProgressBarForLog = document.getElementById('scrapingProgressBar');
+                    if (completed !== (currentProgressBarForLog ? parseInt(currentProgressBarForLog.getAttribute('aria-valuenow') || '0') : 0)) {
                         const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
                         addLog(`📊 Progress: ${completed}/${total} tasks completed (${percentage}%)`, 'info');
                     }
@@ -4428,6 +4568,11 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     if (status === 'completed' || status === 'failed' || status === 'cancelled') {
                         clearInterval(jobStatusInterval);
                         jobStatusInterval = null;
+                        
+                        // Re-fetch elements one more time before final update
+                        const finalProgressBar = document.getElementById('scrapingProgressBar');
+                        const finalProgressText = document.getElementById('scrapingProgressText');
+                        const finalProgressContainer = document.getElementById('scrapingProgressContainer');
                         
                         // Calculate total added
                         const results = job.results || [];
@@ -4438,19 +4583,19 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                         
                         // Update progress bar to 100% if completed
                         if (status === 'completed') {
-                            if (progressBar) {
-                                progressBar.style.width = '100%';
-                                progressBar.setAttribute('aria-valuenow', 100);
+                            if (finalProgressBar) {
+                                finalProgressBar.style.width = '100%';
+                                finalProgressBar.setAttribute('aria-valuenow', 100);
                             }
-                            if (progressContainer) {
-                                progressContainer.setAttribute('data-percentage', '100%');
-                                progressContainer.setAttribute('data-status', 'completed');
+                            if (finalProgressContainer) {
+                                finalProgressContainer.setAttribute('data-percentage', '100%');
+                                finalProgressContainer.setAttribute('data-status', 'completed');
                             }
-                            if (progressText) {
+                            if (finalProgressText) {
                                 if (sourceName) {
-                                    progressText.textContent = `${sourceName} scraping complete! Added ${totalAdded} new posts.`;
+                                    finalProgressText.textContent = `${sourceName} scraping complete! Added ${totalAdded} new posts.`;
                                 } else {
-                                    progressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
+                                    finalProgressText.textContent = `Scraping complete! Added ${totalAdded} new posts.`;
                                 }
                             }
                         }
@@ -4480,8 +4625,9 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                         
                         // Hide progress bar after 5 seconds (longer to see completion)
                         setTimeout(() => {
-                            if (progressContainer) {
-                                progressContainer.style.display = 'none';
+                            const hideProgressContainer = document.getElementById('scrapingProgressContainer');
+                            if (hideProgressContainer) {
+                                hideProgressContainer.style.display = 'none';
                             }
                             showCancelBtn(false);
                         }, 5000);
@@ -4497,20 +4643,26 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                         jobStatusInterval = null;
                         currentJobId = null;
                         
+                        // Re-fetch elements for error state
+                        const errorProgressBar = document.getElementById('scrapingProgressBar');
+                        const errorProgressText = document.getElementById('scrapingProgressText');
+                        const errorProgressContainer = document.getElementById('scrapingProgressContainer');
+                        
                         const errorMsg = job.error || 'Unknown error';
-                        if (progressContainer) {
-                            progressContainer.setAttribute('data-status', 'failed');
+                        if (errorProgressContainer) {
+                            errorProgressContainer.setAttribute('data-status', 'failed');
                         }
-                        if (progressText) {
-                            progressText.textContent = `Job ${status}: ${errorMsg}`;
+                        if (errorProgressText) {
+                            errorProgressText.textContent = `Job ${status}: ${errorMsg}`;
                         }
                         addLog(`❌ Job ${status}: ${errorMsg}`, 'error');
                         showToast(`Job ${status}`, 'error');
                         
                         // Hide progress bar after 5 seconds
                         setTimeout(() => {
-                            if (progressContainer) {
-                                progressContainer.style.display = 'none';
+                            const hideErrorProgressContainer = document.getElementById('scrapingProgressContainer');
+                            if (hideErrorProgressContainer) {
+                                hideErrorProgressContainer.style.display = 'none';
                             }
                         }, 5000);
                         
@@ -5397,9 +5549,20 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         }
 
         function loadLastJob() {
+            const jobId = localStorage.getItem('ovh_last_job');
+            const sourceName = localStorage.getItem('ovh_last_job_source') || '';
+            
+            // Auto-cleanup: if job ID matches the problematic one, remove it immediately
+            if (jobId && jobId.includes('84d4fd06-ae2e-43a1-9387-e037a668f75a')) {
+                console.warn('🧹 Auto-cleaning stale job ID from localStorage');
+                localStorage.removeItem('ovh_last_job');
+                localStorage.removeItem('ovh_last_job_source');
+                return { jobId: null, sourceName: '' };
+            }
+            
             return {
-                jobId: localStorage.getItem('ovh_last_job'),
-                sourceName: localStorage.getItem('ovh_last_job_source') || ''
+                jobId: jobId,
+                sourceName: sourceName
             };
         }
         
@@ -5499,7 +5662,10 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
 
         async function startBackgroundJob() {
             const keywords = loadKeywords();
-            if (!keywords || keywords.length === 0) { showToast('No keywords to start job', 'error'); return; }
+            // No custom keywords - base keywords (from Settings) will be used automatically by backend
+            if (!keywords || keywords.length === 0) {
+                console.log('No custom keywords - backend will use base keywords from Settings');
+            }
             const limit = Math.max(1, Math.min(500, Number(document.getElementById('keywordLimit').value || 50)));
             const concurrency = 2;
             const delay = 0.5;
@@ -5550,8 +5716,20 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                             clearInterval(jobPollInterval);
                             jobPollInterval = null;
                         }
+                        if (jobStatusInterval) {
+                            clearInterval(jobStatusInterval);
+                            jobStatusInterval = null;
+                        }
                         persistLastJob(null);
-                        document.getElementById('jobPanel').style.display = 'none';
+                        currentJobId = null;
+                        const jobPanelEl = document.getElementById('jobPanel');
+                        if (jobPanelEl) {
+                            jobPanelEl.style.display = 'none';
+                        }
+                        const progressContainer = document.getElementById('scrapingProgressContainer');
+                        if (progressContainer) {
+                            progressContainer.style.display = 'none';
+                        }
                         return;
                     }
                     addLog(`❌ Could not fetch job ${jobId}: ${resp.statusText}`, 'error');
@@ -5640,34 +5818,68 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
 
         // On load, if there's a recent job, resume polling (but stop if job doesn't exist)
         (function resumeLastJob() {
+            // First, stop any existing polling intervals that might be running
+            if (jobPollInterval) {
+                clearInterval(jobPollInterval);
+                jobPollInterval = null;
+            }
+            if (jobStatusInterval) {
+                clearInterval(jobStatusInterval);
+                jobStatusInterval = null;
+            }
+            
             const lastJob = loadLastJob();
             if (lastJob && lastJob.jobId) {
-                // Show progress bar immediately if it exists
-                const progressContainer = document.getElementById('scrapingProgressContainer');
-                if (progressContainer) {
-                    progressContainer.style.display = 'block';
-                }
-                const jobPanel = document.getElementById('jobPanel');
-                if (jobPanel) {
-                    jobPanel.style.display = 'block';
+                // Validate job ID format first
+                const jobId = lastJob.jobId.trim();
+                if (!jobId || jobId.length < 10) {
+                    console.warn('Invalid job ID format, clearing localStorage');
+                    persistLastJob(null);
+                    return;
                 }
                 
                 // Try to fetch job status first, if 404, clear localStorage and don't start polling
-                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(lastJob.jobId)}`)
+                // Don't show UI elements until we confirm the job exists
+                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(jobId)}`)
                     .then(resp => {
+                        if (resp.status === 404) {
+                            // Job doesn't exist, clean up immediately
+                            console.warn(`Job ${jobId.substring(0, 8)}... not found (404), cleaning up`);
+                            persistLastJob(null);
+                            if (jobPollInterval) {
+                                clearInterval(jobPollInterval);
+                                jobPollInterval = null;
+                            }
+                            if (jobStatusInterval) {
+                                clearInterval(jobStatusInterval);
+                                jobStatusInterval = null;
+                            }
+                            return; // Don't continue
+                        }
                         if (resp.ok) {
                             return resp.json().then(job => {
                                 // Job exists, check if still running
                                 if (job.status === 'running' || job.status === 'pending') {
                                     // Job still running, resume polling
-                                    console.log(`Resuming job ${lastJob.jobId.substring(0, 8)}... after page navigation`);
-                                    currentJobId = lastJob.jobId;
+                                    console.log(`Resuming job ${jobId.substring(0, 8)}... after page navigation`);
+                                    currentJobId = jobId;
+                                    
+                                    // Show UI elements only after confirming job exists
+                                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                                    if (progressContainer) {
+                                        progressContainer.style.display = 'block';
+                                    }
+                                    const jobPanel = document.getElementById('jobPanel');
                                     if (jobPanel) {
-                                        jobPollInterval = setInterval(() => pollJobStatus(lastJob.jobId), 2000);
-                                        pollJobStatus(lastJob.jobId);
+                                        jobPanel.style.display = 'block';
+                                    }
+                                    
+                                    if (jobPanel) {
+                                        jobPollInterval = setInterval(() => pollJobStatus(jobId), 2000);
+                                        pollJobStatus(jobId);
                                     } else {
                                         // Use the main polling function
-                                        pollJobStatus(lastJob.jobId, lastJob.sourceName);
+                                        pollJobStatus(jobId, lastJob.sourceName);
                                     }
                                 } else {
                                     // Job finished, show notification and clean up
@@ -5692,8 +5904,8 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                                 }
                             });
                         } else if (resp.status === 404) {
-                            // Job doesn't exist, clean up
-                            console.log('Previous job not found, cleaning up localStorage');
+                            // Job doesn't exist (server restarted or job expired)
+                            console.warn(`Job ${jobId.substring(0, 8)}... not found (404), clearing persisted job`);
                             persistLastJob(null);
                             if (progressContainer) {
                                 progressContainer.style.display = 'none';
@@ -5701,6 +5913,16 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                             if (jobPanel) {
                                 jobPanel.style.display = 'none';
                             }
+                            // Clear any polling intervals that might be running
+                            if (jobPollInterval) {
+                                clearInterval(jobPollInterval);
+                                jobPollInterval = null;
+                            }
+                            if (jobStatusInterval) {
+                                clearInterval(jobStatusInterval);
+                                jobStatusInterval = null;
+                            }
+                            currentJobId = null;
                         }
                     })
                     .catch(err => {
@@ -5712,6 +5934,16 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                         if (jobPanel) {
                             jobPanel.style.display = 'none';
                         }
+                        // Clear any polling intervals that might be running
+                        if (jobPollInterval) {
+                            clearInterval(jobPollInterval);
+                            jobPollInterval = null;
+                        }
+                        if (jobStatusInterval) {
+                            clearInterval(jobStatusInterval);
+                            jobStatusInterval = null;
+                        }
+                        currentJobId = null;
                     });
             }
         })();

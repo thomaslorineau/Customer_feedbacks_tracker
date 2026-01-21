@@ -22,6 +22,28 @@ export function initWorldMap() {
         return;
     }
 
+    // Wait for Leaflet to be available
+    if (typeof L === 'undefined') {
+        console.warn('Leaflet not loaded yet, waiting...');
+        // Retry after a short delay
+        setTimeout(() => {
+            if (typeof L !== 'undefined') {
+                initWorldMap();
+            } else {
+                console.error('Leaflet failed to load. Make sure the Leaflet script is included in the HTML.');
+                mapContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted);">
+                        <div style="text-align: center;">
+                            <p>⚠️ Leaflet library not loaded</p>
+                            <p style="font-size: 0.9em;">Please refresh the page</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }, 100);
+        return;
+    }
+
     // Initialize Leaflet map
     map = L.map('worldMap', {
         center: [20, 0],
@@ -126,6 +148,12 @@ async function loadGeoJSONAndRender(countryData, countryNames) {
             sample_properties: geojson.features?.[0]?.properties
         });
         
+        // Check if Leaflet is available
+        if (typeof L === 'undefined') {
+            console.error('Leaflet not available when loading GeoJSON');
+            return;
+        }
+        
         // Clear existing layers
         Object.values(countryLayers).forEach(layer => {
             if (map) {
@@ -157,6 +185,11 @@ async function loadGeoJSONAndRender(countryData, countryNames) {
             if (countryCode) {
                 if (count > 0) {
                     matchedCount++;
+                }
+                
+                if (typeof L === 'undefined' || !L.geoJSON) {
+                    console.error('Leaflet geoJSON not available');
+                    return;
                 }
                 
                 const layer = L.geoJSON(feature, {
@@ -198,11 +231,12 @@ async function loadGeoJSONAndRender(countryData, countryNames) {
                                     color: '#00d4ff',
                                     fillOpacity: 0.8
                                 });
-                                if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                                if (typeof L !== 'undefined' && L.Browser && !L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
                                     layer.bringToFront();
                                 }
                             },
                             mouseout: function(e) {
+                                const layer = e.target;
                                 const code = feature.properties.ISO_A2 || feature.properties.iso_a2;
                                 const count = countryData[code] || 0;
                                 layer.setStyle(getCountryStyle(count, maxCount));

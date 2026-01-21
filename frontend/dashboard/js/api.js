@@ -39,19 +39,46 @@ export class API {
     async getPosts(limit = 100, offset = 0) {
         const url = `${this.baseURL}/posts?limit=${limit}&offset=${offset}`;
         console.log('API: Fetching posts from:', url);
+        console.log('API: baseURL:', this.baseURL);
+        console.log('API: window.location:', window.location.href);
+        
         try {
             const response = await fetch(url);
             console.log('API: Response status:', response.status, response.statusText);
+            console.log('API: Response headers:', Object.fromEntries(response.headers.entries()));
+            
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('API: Error response:', errorText);
-                throw new Error(`Failed to fetch posts: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch posts: ${response.status} ${response.statusText}. ${errorText}`);
             }
+            
+            const contentType = response.headers.get('content-type');
+            console.log('API: Content-Type:', contentType);
+            
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('API: Unexpected content type. Response:', text.substring(0, 200));
+                throw new Error(`Unexpected content type: ${contentType}`);
+            }
+            
             const data = await response.json();
             console.log('API: Received', data?.length || 0, 'posts');
+            console.log('API: Data type:', Array.isArray(data) ? 'Array' : typeof data);
+            
+            if (!Array.isArray(data)) {
+                console.error('API: Expected array but got:', typeof data, data);
+                throw new Error('API returned non-array data');
+            }
+            
             return data;
         } catch (error) {
             console.error('API: Fetch error:', error);
+            console.error('API: Error name:', error.name);
+            console.error('API: Error message:', error.message);
+            if (error.cause) {
+                console.error('API: Error cause:', error.cause);
+            }
             throw error;
         }
     }
@@ -159,7 +186,10 @@ export class API {
     async getJobStatus(jobId) {
         const response = await fetch(`${this.baseURL}/scrape/jobs/${jobId}`);
         if (!response.ok) {
-            throw new Error(`Failed to get job status: ${response.statusText}`);
+            const error = new Error(`Failed to get job status: ${response.statusText}`);
+            error.status = response.status;
+            error.statusText = response.statusText;
+            throw error;
         }
         return response.json();
     }

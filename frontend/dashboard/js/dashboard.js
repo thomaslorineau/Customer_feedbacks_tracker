@@ -32,7 +32,10 @@ export function initDashboard(appState) {
 }
 
 function initializeDefaultDateRange() {
-    if (!state) return;
+    if (!state) {
+        console.warn('initializeDefaultDateRange: state not initialized yet');
+        return;
+    }
     
     // Only set default if no dates are already set
     const hasDateFrom = state.filters?.dateFrom && state.filters.dateFrom !== '';
@@ -47,6 +50,12 @@ function initializeDefaultDateRange() {
         const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
         const dateToStr = now.toISOString().split('T')[0];
         
+        console.log('initializeDefaultDateRange: Setting default date range', {
+            dateFrom: dateFromStr,
+            dateTo: dateToStr,
+            postsCount: state.posts?.length || 0
+        });
+        
         // Update date filters
         const dateFromInput = document.getElementById('dateFrom');
         const dateToInput = document.getElementById('dateTo');
@@ -58,11 +67,13 @@ function initializeDefaultDateRange() {
         if (globalDateFrom) globalDateFrom.value = dateFromStr;
         if (globalDateTo) globalDateTo.value = dateToStr;
         
-        // Update state
+        // Update state (this will trigger filtering)
         state.setFilter('dateFrom', dateFromStr);
         state.setFilter('dateTo', dateToStr);
         
-        console.log('Default date range initialized: last 12 months');
+        console.log('Default date range initialized: last 12 months. Filtered posts:', state.filteredPosts?.length || 0);
+    } else {
+        console.log('initializeDefaultDateRange: Dates already set, skipping default initialization');
     }
 }
 
@@ -557,10 +568,15 @@ let showAllProducts = false;
 
 function updateProductDistribution() {
     const productList = document.getElementById('productList');
-    if (!productList || !state) return;
+    if (!productList || !state) {
+        console.warn('updateProductDistribution: productList or state not available', { productList: !!productList, state: !!state });
+        return;
+    }
     
-    const posts = state.filteredPosts;
+    const posts = state.filteredPosts || [];
     const productCounts = {};
+    
+    console.log('updateProductDistribution: Processing posts', { totalPosts: posts.length });
     
     posts.forEach(post => {
         // Get product label (simplified - you may need to import getProductLabel from v1)
@@ -569,6 +585,8 @@ function updateProductDistribution() {
             productCounts[productLabel] = (productCounts[productLabel] || 0) + 1;
         }
     });
+    
+    console.log('updateProductDistribution: Products detected', { productCounts, totalProducts: Object.keys(productCounts).length });
     
     // Sort by count
     const allProducts = Object.entries(productCounts)
@@ -580,6 +598,21 @@ function updateProductDistribution() {
     
     const total = posts.length;
     const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
+    
+    // Show message if no products detected or no posts
+    if (sortedProducts.length === 0) {
+        if (total === 0) {
+            productList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No posts available. Try adjusting your filters.</div>';
+        } else {
+            productList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No products detected in ${total} post${total > 1 ? 's' : ''}. Products are detected automatically from post content.</div>`;
+        }
+        // Hide "Show More" button when no products
+        const showMoreProductsBtn = document.getElementById('showMoreProductsBtn');
+        if (showMoreProductsBtn) {
+            showMoreProductsBtn.style.display = 'none';
+        }
+        return;
+    }
     
     // Calculate max count for relative scaling (makes bars longer)
     const maxCount = sortedProducts.length > 0 ? sortedProducts[0][1] : 1;
@@ -1030,9 +1063,36 @@ function persistLastJob(jobId, sourceName = '') {
 }
 
 function loadLastJob() {
+    const jobId = localStorage.getItem('ovh_last_job');
+    const sourceName = localStorage.getItem('ovh_last_job_source') || '';
+    
+    // Auto-cleanup: if job ID matches the problematic one, remove it immediately
+    if (jobId && jobId.includes('84d4fd06-ae2e-43a1-9387-e037a668f75a')) {
+        console.warn('🧹 Auto-cleaning stale job ID from localStorage');
+        localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
+        return { jobId: null, sourceName: '' };
+    }
+    
+    // Validate that jobId is a string (not an object that was stringified)
+    if (jobId && typeof jobId !== 'string') {
+        console.warn('loadLastJob: Invalid jobId type, clearing localStorage');
+        localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
+        return { jobId: null, sourceName: '' };
+    }
+    
+    // Check if jobId looks like it might be a stringified object
+    if (jobId && (jobId.startsWith('{') || jobId.startsWith('['))) {
+        console.warn('loadLastJob: jobId appears to be a stringified object, clearing localStorage');
+        localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
+        return { jobId: null, sourceName: '' };
+    }
+    
     return {
-        jobId: localStorage.getItem('ovh_last_job'),
-        sourceName: localStorage.getItem('ovh_last_job_source') || ''
+        jobId: jobId,
+        sourceName: sourceName
     };
 }
 
@@ -2175,8 +2235,10 @@ function scrollToPostsSection() {
 }
 
 function scrollToSearch() {
+    console.log('scrollToSearch() called');
     const searchSection = document.querySelector('.search-section-with-kpi');
     if (searchSection) {
+        console.log('Found search section, scrolling...');
         searchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => {
             const backBtn = document.getElementById('backToSearchBtn');
@@ -2184,6 +2246,33 @@ function scrollToSearch() {
                 backBtn.style.display = 'none';
             }
         }, 500);
+    } else {
+        console.warn('Search section not found, trying alternative selectors...');
+        // Try alternative selectors
+        const altSearchSection = document.querySelector('.search-section') || 
+                                 document.getElementById('searchSection') ||
+                                 document.querySelector('section:has(.search-input)') ||
+                                 document.querySelector('section:has([id*="search"])');
+        if (altSearchSection) {
+            console.log('Found alternative search section, scrolling...');
+            altSearchSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => {
+                const backBtn = document.getElementById('backToSearchBtn');
+                if (backBtn) {
+                    backBtn.style.display = 'none';
+                }
+            }, 500);
+        } else {
+            console.error('No search section found!');
+            // Fallback: scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setTimeout(() => {
+                const backBtn = document.getElementById('backToSearchBtn');
+                if (backBtn) {
+                    backBtn.style.display = 'none';
+                }
+            }, 500);
+        }
     }
 }
 
@@ -2615,6 +2704,7 @@ window.cancelScraping = cancelScraping;
 window.openPost = openPost;
 window.clearCriticalFilter = clearCriticalFilter;
 window.scrollToPostsSection = scrollToPostsSection;
+window.scrollToSearch = scrollToSearch;
 window.updatePostsDisplay = updatePostsDisplay;
 window.loadMorePosts = loadMorePosts;
 window.clearPostsFilters = clearPostsFilters;
@@ -2622,37 +2712,92 @@ window.clearPostsFilters = clearPostsFilters;
 // Ensure button event listener is set up after DOM is ready
 // Resume last job on page load (so jobs continue even if user navigates away)
 (function resumeLastJob() {
-    const lastJobId = loadLastJob();
-    if (lastJobId) {
+    try {
+        // Auto-cleanup problematic job ID before loading
+        const storedJobId = localStorage.getItem('ovh_last_job');
+        if (storedJobId && storedJobId.includes('84d4fd06-ae2e-43a1-9387-e037a668f75a')) {
+            console.warn('🧹 Auto-cleaning problematic job ID on page load');
+            localStorage.removeItem('ovh_last_job');
+            localStorage.removeItem('ovh_last_job_source');
+            // Stop any running intervals
+            if (typeof jobStatusInterval !== 'undefined' && jobStatusInterval) {
+                clearInterval(jobStatusInterval);
+                jobStatusInterval = null;
+            }
+            return; // Don't resume this job
+        }
+        
+        const lastJob = loadLastJob();
+        const lastJobId = lastJob?.jobId;
+        
+        // Validate that lastJobId is a string and not an object
+        if (!lastJobId || typeof lastJobId !== 'string' || lastJobId.trim() === '' || lastJobId === '[object Object]' || lastJobId.startsWith('{') || lastJobId.startsWith('[')) {
+            if (lastJobId) {
+                console.warn('ResumeLastJob: Invalid jobId detected, clearing localStorage:', lastJobId);
+                localStorage.removeItem('ovh_last_job');
+                localStorage.removeItem('ovh_last_job_source');
+            }
+            return;
+        }
+        
+        console.log('ResumeLastJob: Found valid job ID:', lastJobId.substring(0, 8) + '...');
         // Try to fetch job status first, if 404, clear localStorage and don't start polling
         api.getJobStatus(lastJobId)
             .then(job => {
-                // Job exists and is still running, resume polling
-                console.log(`Resuming job ${lastJobId.substring(0, 8)}... after page navigation`);
-                currentJobId = lastJobId;
-                
-                // Show progress bar
-                const progressContainer = document.getElementById('scrapingProgressContainer');
-                if (progressContainer) {
-                    progressContainer.style.display = 'block';
+                // Job exists, check if still running
+                if (job.status === 'running' || job.status === 'pending') {
+                    // Job still running, resume polling
+                    console.log(`Resuming job ${lastJobId.substring(0, 8)}... after page navigation`);
+                    currentJobId = lastJobId;
+                    
+                    // Show progress bar
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'block';
+                    }
+                    
+                    // Show cancel button
+                    showCancelButton(true);
+                    
+                    // Start polling
+                    pollJobStatus(lastJobId);
+                } else {
+                    // Job finished, clean up
+                    console.log(`Job ${lastJobId.substring(0, 8)}... is ${job.status}, cleaning up`);
+                    persistLastJob(null);
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    showCancelButton(false);
                 }
-                
-                // Show cancel button
-                showCancelButton(true);
-                
-                // Start polling
-                pollJobStatus(lastJobId);
             })
             .catch(error => {
                 // Job doesn't exist (404) or error, clean up
-                if (error.status === 404 || (error.message && error.message.includes('404'))) {
-                    console.log('Previous job not found, cleaning up localStorage');
+                if (error.status === 404 || (error.message && error.message.includes('404')) || (error.message && error.message.includes('not found'))) {
+                    console.warn(`Job ${lastJobId.substring(0, 8)}... not found (404), clearing persisted job`);
                     persistLastJob(null);
+                    // Clear any polling intervals
+                    if (jobStatusInterval) {
+                        clearInterval(jobStatusInterval);
+                        jobStatusInterval = null;
+                    }
+                    currentJobId = null;
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    showCancelButton(false);
                 } else {
                     console.warn('Could not check job status on page load:', error);
                     persistLastJob(null);
                 }
             });
+    } catch (error) {
+        console.error('ResumeLastJob: Error in resumeLastJob function:', error);
+        // Clean up localStorage on any error
+        localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
     }
 })();
 
@@ -2665,8 +2810,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Also try to resume job on DOMContentLoaded (in case the IIFE ran too early)
-    const lastJobId = loadLastJob();
-    if (lastJobId && !currentJobId) {
+    try {
+        const lastJob = loadLastJob();
+        const lastJobId = lastJob?.jobId;
+        
+        // Validate that lastJobId is a string and not an object
+        if (!lastJobId || typeof lastJobId !== 'string' || lastJobId.trim() === '' || lastJobId === '[object Object]' || lastJobId.startsWith('{') || lastJobId.startsWith('[') || currentJobId) {
+            if (lastJobId && lastJobId !== '[object Object]') {
+                console.warn('DOMContentLoaded: Invalid jobId detected, clearing localStorage:', lastJobId);
+                localStorage.removeItem('ovh_last_job');
+                localStorage.removeItem('ovh_last_job_source');
+            }
+            return;
+        }
+        
+        console.log('DOMContentLoaded: Found valid job ID:', lastJobId.substring(0, 8) + '...');
         api.getJobStatus(lastJobId)
             .then(job => {
                 if (job.status === 'running' || job.status === 'pending') {
@@ -2678,11 +2836,42 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     showCancelButton(true);
                     pollJobStatus(lastJobId);
+                } else {
+                    // Job finished, clean up
+                    console.log(`Job ${lastJobId.substring(0, 8)}... is ${job.status}, cleaning up`);
+                    persistLastJob(null);
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    showCancelButton(false);
                 }
             })
-            .catch(() => {
-                persistLastJob(null);
+            .catch(error => {
+                // Job doesn't exist (404) or error, clean up
+                if (error.status === 404 || (error.message && error.message.includes('404')) || (error.message && error.message.includes('not found'))) {
+                    console.warn(`Job ${lastJobId.substring(0, 8)}... not found (404), clearing persisted job`);
+                    persistLastJob(null);
+                    if (jobStatusInterval) {
+                        clearInterval(jobStatusInterval);
+                        jobStatusInterval = null;
+                    }
+                    currentJobId = null;
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                    showCancelButton(false);
+                } else {
+                    console.warn('Could not check job status on DOMContentLoaded:', error);
+                    persistLastJob(null);
+                }
             });
+    } catch (error) {
+        console.error('DOMContentLoaded: Error in resume job function:', error);
+        // Clean up localStorage on any error
+        localStorage.removeItem('ovh_last_job');
+        localStorage.removeItem('ovh_last_job_source');
     }
 });
 

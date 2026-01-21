@@ -8,9 +8,7 @@
     <link rel="stylesheet" href="/dashboard/css/styles.css">
     <link rel="stylesheet" href="/dashboard/css/navigation.css">
     <link rel="stylesheet" href="/css/modern-enhancements.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="has-nav-menu">
     <!-- Navigation Menu -->
@@ -66,6 +64,13 @@
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
         </div>
     </nav>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10000; background: var(--bg-primary); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); text-align: center;">
+        <div style="font-size: 2em; margin-bottom: 10px;">⏳</div>
+        <div style="font-weight: 600; margin-bottom: 5px;">Loading Dashboard...</div>
+        <div style="font-size: 0.9em; color: var(--text-secondary);">Fetching data from API</div>
+    </div>
 
     <!-- Main Dashboard -->
     <main class="dashboard-main">
@@ -313,20 +318,6 @@
             </div>
         </section>
 
-        <!-- World Map Panel (Hidden by default, can be toggled) -->
-        <section class="panel-map" style="display: none;">
-            <div class="panel-header">
-                <h2>🌍 Posts by Country</h2>
-                <div class="panel-actions">
-                    <div class="map-legend" id="mapLegend">
-                        <!-- Will be populated by JS -->
-                    </div>
-                </div>
-            </div>
-            <div class="map-container" id="worldMap">
-                <!-- Leaflet map will be rendered here -->
-            </div>
-        </section>
 
         <!-- Posts Section with Filters -->
         <section id="postsSection" class="panel-posts-section" style="grid-column: 1 / 3;">
@@ -477,10 +468,23 @@
     <script type="module" src="/dashboard/js/version-loader.js"></script>
     <script type="module" src="/dashboard/js/dashboard.js"></script>
     <script type="module" src="/dashboard/js/charts.js?v=2.0"></script>
-    <script type="module" src="/dashboard/js/world-map.js?v=2.0"></script>
     <script type="module" src="/dashboard/js/version-switch.js?v=2.0"></script>
     <script type="module" src="/dashboard/js/app.js?v=2.0"></script>
     <script>
+        // Clean up localStorage if invalid job data is stored
+        (function() {
+            try {
+                const storedJob = localStorage.getItem('ovh_last_job');
+                if (storedJob && (storedJob.startsWith('{') || storedJob.startsWith('[') || storedJob === '[object Object]')) {
+                    console.warn('Cleaning up invalid job data from localStorage');
+                    localStorage.removeItem('ovh_last_job');
+                    localStorage.removeItem('ovh_last_job_source');
+                }
+            } catch (e) {
+                console.warn('Error checking localStorage:', e);
+            }
+        })();
+        
         // Close help menu when clicking outside
         document.addEventListener('click', (e) => {
             const helpMenu = document.getElementById('helpMenu');
@@ -495,7 +499,7 @@
     </script>
     
     <!-- Back to Search Button (floating) -->
-    <div id="backToSearchBtn" style="display: none; position: fixed; bottom: 24px; right: 24px; z-index: 9999; padding: 12px 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0, 153, 255, 0.4); transition: all 0.3s ease;" onclick="scrollToSearch()">
+    <div id="backToSearchBtn" style="display: none; position: fixed; bottom: 24px; right: 24px; z-index: 9999; padding: 12px 20px; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); color: white; border: none; border-radius: 12px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0, 153, 255, 0.4); transition: all 0.3s ease;" onclick="if(typeof scrollToSearch === 'function') { scrollToSearch(); } else { console.error('scrollToSearch function not found'); window.scrollTo({top: 0, behavior: 'smooth'}); }">
         🔍 Back to Search
     </div>
 </body>

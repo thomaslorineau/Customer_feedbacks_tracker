@@ -1,5 +1,5 @@
 """
-Configuration management with secure API key handling.
+Configuration management with secure API key handling using Pydantic Settings.
 
 Best practices implemented:
 - Environment variables for secrets
@@ -12,61 +12,154 @@ import os
 import logging
 from typing import Optional
 from pathlib import Path
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
 
 logger = logging.getLogger(__name__)
 
-# Load .env file (should be in backend/ directory)
-env_path = Path(__file__).resolve().parents[1] / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
-    logger.info(f"[OK] Loaded environment from {env_path}")
-else:
-    logger.warning(f"[WARNING] No .env file found at {env_path}")
 
-
-class Config:
-    """Application configuration with secure API key management."""
+class Config(BaseSettings):
+    """Application configuration with secure API key management using Pydantic Settings."""
+    
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
     
     # Environment
-    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
-    DEBUG: bool = ENVIRONMENT == "development"
+    environment: str = Field(default="development", description="Application environment")
+    debug: bool = Field(default=True, description="Debug mode")
     
     # Logging
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "DEBUG" if DEBUG else "INFO")
+    log_level: str = Field(default="DEBUG", description="Logging level")
     
     # LLM Provider Configuration
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai").lower()
+    llm_provider: str = Field(default="openai", description="LLM provider to use")
     
     # API Keys (private - never log these!)
-    _OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    _ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
-    _GOOGLE_API_KEY: Optional[str] = os.getenv("GOOGLE_API_KEY")
-    _TRUSTPILOT_API_KEY: Optional[str] = os.getenv("TRUSTPILOT_API_KEY")
-    _GITHUB_TOKEN: Optional[str] = os.getenv("GITHUB_TOKEN")
+    openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
+    anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
+    google_api_key: Optional[str] = Field(default=None, description="Google API key")
+    trustpilot_api_key: Optional[str] = Field(default=None, description="Trustpilot API key")
+    github_token: Optional[str] = Field(default=None, description="GitHub token")
     
     # Third-party API credentials (optional - user provides their own)
-    _LINKEDIN_CLIENT_ID: Optional[str] = os.getenv("LINKEDIN_CLIENT_ID")
-    _LINKEDIN_CLIENT_SECRET: Optional[str] = os.getenv("LINKEDIN_CLIENT_SECRET")
-    _TWITTER_BEARER_TOKEN: Optional[str] = os.getenv("TWITTER_BEARER_TOKEN")
-    _TWITTER_API_KEY: Optional[str] = os.getenv("TWITTER_API_KEY")
-    _TWITTER_API_SECRET: Optional[str] = os.getenv("TWITTER_API_SECRET")
+    linkedin_client_id: Optional[str] = Field(default=None, description="LinkedIn client ID")
+    linkedin_client_secret: Optional[str] = Field(default=None, description="LinkedIn client secret")
+    twitter_bearer_token: Optional[str] = Field(default=None, description="Twitter bearer token")
+    twitter_api_key: Optional[str] = Field(default=None, description="Twitter API key")
+    twitter_api_secret: Optional[str] = Field(default=None, description="Twitter API secret")
     
     # Rate limiting
-    RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
-    RATE_LIMIT_WINDOW: int = int(os.getenv("RATE_LIMIT_WINDOW", "60"))
+    rate_limit_requests: int = Field(default=100, description="Rate limit requests per window")
+    rate_limit_window: int = Field(default=60, description="Rate limit window in seconds")
     
     # Database - DuckDB is now the default and only database
-    USE_DUCKDB: bool = os.getenv("USE_DUCKDB", "true").lower() == "true"
+    use_duckdb: bool = Field(default=True, description="Use DuckDB database")
     
-    # Environment-specific database paths (DuckDB only)
-    if ENVIRONMENT == "staging":
-        DB_PATH: Path = Path(__file__).resolve().parents[1] / "data_staging.duckdb"
-    else:
-        DB_PATH: Path = Path(__file__).resolve().parents[1] / "data.duckdb"
-    
+    @field_validator('debug', mode='before')
     @classmethod
-    def get_api_key(cls, provider: str) -> Optional[str]:
+    def set_debug_from_environment(cls, v, info):
+        """Set debug mode based on environment if not explicitly set."""
+        if v is None:
+            env = info.data.get('environment', 'development')
+            return env == "development"
+        return v
+    
+    @field_validator('log_level', mode='before')
+    @classmethod
+    def set_log_level_from_debug(cls, v, info):
+        """Set log level based on debug mode if not explicitly set."""
+        if v is None:
+            debug = info.data.get('debug', True)
+            return "DEBUG" if debug else "INFO"
+        return v
+    
+    @property
+    def db_path(self) -> Path:
+        """Get database path based on environment."""
+        if self.environment == "staging":
+            return Path(__file__).resolve().parents[1] / "data_staging.duckdb"
+        else:
+            return Path(__file__).resolve().parents[1] / "data.duckdb"
+    
+    # Backward compatibility properties
+    @property
+    def ENVIRONMENT(self) -> str:
+        return self.environment
+    
+    @property
+    def DEBUG(self) -> bool:
+        return self.debug
+    
+    @property
+    def LOG_LEVEL(self) -> str:
+        return self.log_level
+    
+    @property
+    def LLM_PROVIDER(self) -> str:
+        return self.llm_provider.lower()
+    
+    @property
+    def RATE_LIMIT_REQUESTS(self) -> int:
+        return self.rate_limit_requests
+    
+    @property
+    def RATE_LIMIT_WINDOW(self) -> int:
+        return self.rate_limit_window
+    
+    @property
+    def USE_DUCKDB(self) -> bool:
+        return self.use_duckdb
+    
+    @property
+    def DB_PATH(self) -> Path:
+        return self.db_path
+    
+    # Private API key properties for backward compatibility
+    @property
+    def _OPENAI_API_KEY(self) -> Optional[str]:
+        return self.openai_api_key
+    
+    @property
+    def _ANTHROPIC_API_KEY(self) -> Optional[str]:
+        return self.anthropic_api_key
+    
+    @property
+    def _GOOGLE_API_KEY(self) -> Optional[str]:
+        return self.google_api_key
+    
+    @property
+    def _TRUSTPILOT_API_KEY(self) -> Optional[str]:
+        return self.trustpilot_api_key
+    
+    @property
+    def _GITHUB_TOKEN(self) -> Optional[str]:
+        return self.github_token
+    
+    @property
+    def _LINKEDIN_CLIENT_ID(self) -> Optional[str]:
+        return self.linkedin_client_id
+    
+    @property
+    def _LINKEDIN_CLIENT_SECRET(self) -> Optional[str]:
+        return self.linkedin_client_secret
+    
+    @property
+    def _TWITTER_BEARER_TOKEN(self) -> Optional[str]:
+        return self.twitter_bearer_token
+    
+    @property
+    def _TWITTER_API_KEY(self) -> Optional[str]:
+        return self.twitter_api_key
+    
+    @property
+    def _TWITTER_API_SECRET(self) -> Optional[str]:
+        return self.twitter_api_secret
+    
+    def get_api_key(self, provider: str) -> Optional[str]:
         """
         Get API key for a specific provider.
         
@@ -81,18 +174,18 @@ class Config:
         """
         provider = provider.lower()
         key_map = {
-            "openai": cls._OPENAI_API_KEY,
-            "anthropic": cls._ANTHROPIC_API_KEY,
-            "google": cls._GOOGLE_API_KEY,
-            "trustpilot": cls._TRUSTPILOT_API_KEY,
-            "github": cls._GITHUB_TOKEN,
+            "openai": self._OPENAI_API_KEY,
+            "anthropic": self._ANTHROPIC_API_KEY,
+            "google": self._GOOGLE_API_KEY,
+            "trustpilot": self._TRUSTPILOT_API_KEY,
+            "github": self._GITHUB_TOKEN,
             # Third-party APIs (optional)
-            "linkedin_client_id": cls._LINKEDIN_CLIENT_ID,
-            "linkedin_client_secret": cls._LINKEDIN_CLIENT_SECRET,
-            "twitter_bearer": cls._TWITTER_BEARER_TOKEN,
-            "twitter_bearer_token": cls._TWITTER_BEARER_TOKEN,
-            "twitter_api_key": cls._TWITTER_API_KEY,
-            "twitter_api_secret": cls._TWITTER_API_SECRET,
+            "linkedin_client_id": self._LINKEDIN_CLIENT_ID,
+            "linkedin_client_secret": self._LINKEDIN_CLIENT_SECRET,
+            "twitter_bearer": self._TWITTER_BEARER_TOKEN,
+            "twitter_bearer_token": self._TWITTER_BEARER_TOKEN,
+            "twitter_api_key": self._TWITTER_API_KEY,
+            "twitter_api_secret": self._TWITTER_API_SECRET,
         }
         
         key = key_map.get(provider)
@@ -105,8 +198,7 @@ class Config:
         
         return key
     
-    @classmethod
-    def validate_required_keys(cls) -> dict:
+    def validate_required_keys(self) -> dict:
         """
         Validate that required API keys are configured.
         
@@ -120,16 +212,16 @@ class Config:
         }
         
         # Check LLM provider key
-        llm_key = cls.get_api_key(cls.LLM_PROVIDER)
+        llm_key = self.get_api_key(self.LLM_PROVIDER)
         if not llm_key:
             results["errors"].append(
-                f"❌ Missing API key for LLM provider '{cls.LLM_PROVIDER}'. "
-                f"Set {cls.LLM_PROVIDER.upper()}_API_KEY in .env"
+                f"❌ Missing API key for LLM provider '{self.LLM_PROVIDER}'. "
+                f"Set {self.LLM_PROVIDER.upper()}_API_KEY in .env"
             )
             results["valid"] = False
         elif len(llm_key) < 10:
             results["warnings"].append(
-                f"⚠️ API key for {cls.LLM_PROVIDER} seems too short (might be placeholder)"
+                f"⚠️ API key for {self.LLM_PROVIDER} seems too short (might be placeholder)"
             )
         elif llm_key == "your_openai_api_key_here" or llm_key.startswith("sk-proj-"):
             if llm_key.startswith("sk-proj-hiswP"):
@@ -144,20 +236,19 @@ class Config:
                 )
         
         # Optional but recommended keys
-        if not cls.get_api_key("github"):
+        if not self.get_api_key("github"):
             results["warnings"].append(
                 "ℹ️ GitHub token not configured. API rate limits will be lower."
             )
         
-        if not cls.get_api_key("trustpilot"):
+        if not self.get_api_key("trustpilot"):
             results["warnings"].append(
                 "ℹ️ Trustpilot API key not configured. Will use web scraping (slower)."
             )
         
         return results
     
-    @classmethod
-    def is_api_key_valid_format(cls, provider: str) -> bool:
+    def is_api_key_valid_format(self, provider: str) -> bool:
         """
         Check if API key has valid format (basic validation).
         
@@ -167,7 +258,7 @@ class Config:
         Returns:
             True if format looks valid, False otherwise
         """
-        key = cls.get_api_key(provider)
+        key = self.get_api_key(provider)
         if not key:
             return False
         
@@ -192,8 +283,8 @@ class Config:
         
         return len(key) > 10
     
-    @classmethod
-    def mask_api_key(cls, key: str) -> str:
+    @staticmethod
+    def mask_api_key(key: str) -> str:
         """
         Mask an API key for safe logging.
         
@@ -212,8 +303,7 @@ class Config:
         
         return f"{key[:prefix_len]}...{key[-suffix_len:]}"
     
-    @classmethod
-    def get_config_summary(cls) -> str:
+    def get_config_summary(self) -> str:
         """
         Get a summary of current configuration (safe for logging).
         
@@ -224,19 +314,19 @@ class Config:
         summary.append("=" * 50)
         summary.append("🔧 APPLICATION CONFIGURATION")
         summary.append("=" * 50)
-        summary.append(f"Environment: {cls.ENVIRONMENT}")
-        summary.append(f"Debug mode: {cls.DEBUG}")
-        summary.append(f"Log level: {cls.LOG_LEVEL}")
-        summary.append(f"LLM Provider: {cls.LLM_PROVIDER}")
+        summary.append(f"Environment: {self.ENVIRONMENT}")
+        summary.append(f"Debug mode: {self.DEBUG}")
+        summary.append(f"Log level: {self.LOG_LEVEL}")
+        summary.append(f"LLM Provider: {self.LLM_PROVIDER}")
         summary.append("")
         summary.append("🔑 API Keys Status:")
         
         providers = ["openai", "anthropic", "google", "github", "trustpilot"]
         for provider in providers:
-            key = cls.get_api_key(provider)
+            key = self.get_api_key(provider)
             if key:
-                masked = cls.mask_api_key(key)
-                valid = "✅" if cls.is_api_key_valid_format(provider) else "⚠️"
+                masked = self.mask_api_key(key)
+                valid = "✅" if self.is_api_key_valid_format(provider) else "⚠️"
                 summary.append(f"  {valid} {provider:12s}: {masked}")
             else:
                 summary.append(f"  ❌ {provider:12s}: Not configured")
@@ -250,17 +340,17 @@ class Config:
             ("twitter_bearer", "Twitter Bearer Token"),
         ]
         for provider_key, provider_name in third_party_providers:
-            key = cls.get_api_key(provider_key)
+            key = self.get_api_key(provider_key)
             if key:
-                masked = cls.mask_api_key(key)
-                valid = "✅" if cls.is_api_key_valid_format(provider_key) else "⚠️"
+                masked = self.mask_api_key(key)
+                valid = "✅" if self.is_api_key_valid_format(provider_key) else "⚠️"
                 summary.append(f"  {valid} {provider_name:20s}: {masked}")
             else:
                 summary.append(f"  ⚪ {provider_name:20s}: Not configured (optional)")
         
         summary.append("")
-        summary.append(f"🛡️ Rate Limiting: {cls.RATE_LIMIT_REQUESTS} req/{cls.RATE_LIMIT_WINDOW}s")
-        summary.append(f"💾 Database: {cls.DB_PATH}")
+        summary.append(f"🛡️ Rate Limiting: {self.RATE_LIMIT_REQUESTS} req/{self.RATE_LIMIT_WINDOW}s")
+        summary.append(f"💾 Database: {self.DB_PATH}")
         summary.append("=" * 50)
         
         return "\n".join(summary)

@@ -1571,6 +1571,15 @@
     <script src="/js/help-menu-loader.js"></script>
     <script src="/dashboard/js/settings.js"></script>
     <script>
+        // Define toggleHelpMenu function immediately (before DOMContentLoaded)
+        // This ensures it's available when the navigation link is clicked
+        window.toggleHelpMenu = function() {
+            const menu = document.getElementById('helpMenu');
+            if (menu) {
+                menu.classList.toggle('active');
+            }
+        };
+
         // Logo Upload Functionality
         const API_BASE = window.location.origin;
         let selectedFile = null;
@@ -2257,13 +2266,7 @@
             }
         };
 
-        // Define toggleHelpMenu function for settings page
-        window.toggleHelpMenu = function() {
-            const menu = document.getElementById('helpMenu');
-            if (menu) {
-                menu.classList.toggle('active');
-            }
-        };
+        // toggleHelpMenu is already defined above (before DOMContentLoaded)
 
         // Make toggleAccordion available globally
         window.toggleAccordion = function(id) {

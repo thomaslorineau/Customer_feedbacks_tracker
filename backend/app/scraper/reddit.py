@@ -239,12 +239,18 @@ def _scrape_reddit_with_api(query: str, limit: int) -> list:
     after = None  # Reddit pagination token
     page = 0
     
+    # Improved User-Agent to avoid 403 blocks
     headers = {
-        'User-Agent': 'OVH-Tracker-Bot/1.0 (Feedback Monitor)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
     }
     
     session = requests.Session()
-    retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
+    retry = Retry(total=3, backoff_factor=1.0, status_forcelist=[429, 500, 502, 503, 504])
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
@@ -265,7 +271,17 @@ def _scrape_reddit_with_api(query: str, limit: int) -> list:
         logger.info(f"[REDDIT API] Fetching page {page} (after={after[:10] if after else 'None'}...)")
         
         try:
+            # Add delay between requests to avoid rate limiting
+            if page > 1:
+                time.sleep(2.0)  # Increased delay to avoid 403
+            
             response = session.get(url, headers=headers, params=params, timeout=15)
+            
+            # Handle 403 specifically - fall back to RSS immediately
+            if response.status_code == 403:
+                logger.warning(f"[REDDIT API] 403 Blocked on page {page}, falling back to RSS")
+                raise requests.exceptions.HTTPError("403 Blocked - falling back to RSS")
+            
             response.raise_for_status()
             data = response.json()
             
@@ -331,6 +347,16 @@ def _scrape_reddit_with_api(query: str, limit: int) -> list:
             if len(all_posts) < limit:
                 time.sleep(0.5)
         
+        except requests.exceptions.HTTPError as e:
+            if e.response and e.response.status_code == 403:
+                logger.warning(f"[REDDIT API] 403 Blocked on page {page}, falling back to RSS")
+                if page == 1:
+                    raise  # Let fallback handle it
+                break
+            logger.warning(f"[REDDIT API] HTTP error on page {page}: {e}")
+            if page == 1:
+                raise
+            break
         except requests.exceptions.RequestException as e:
             logger.warning(f"[REDDIT API] Request error on page {page}: {e}")
             if page == 1:
@@ -353,7 +379,10 @@ def _scrape_reddit_with_rss(query: str, limit: int) -> list:
             
             # Reddit RSS search endpoint - searches across all Reddit
             # Sort by new to get recent posts
-            url = f"https://www.reddit.com/search.rss?q={query}&sort=new&limit={min(limit, 100)}"
+            # Use URL encoding for query to handle special characters
+            import urllib.parse
+            encoded_query = urllib.parse.quote(query)
+            url = f"https://www.reddit.com/search.rss?q={encoded_query}&sort=new&limit={min(limit, 100)}"
             
             logger.info(f"[REDDIT RSS] Fetching RSS feed: {url}")
             
@@ -366,7 +395,10 @@ def _scrape_reddit_with_rss(query: str, limit: int) -> list:
             
             # Set user agent - Reddit requires a proper user agent
             headers = {
-                'User-Agent': 'OVH-Tracker-Bot/1.0 (Feedback Monitor)'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Connection': 'keep-alive'
             }
             
             # Fetch the RSS feed with timeout

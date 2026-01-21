@@ -73,7 +73,7 @@ class ScrapingLogger:
         
         full_message = " ".join(parts)
         
-        # Log to console
+        # Log to Python logger
         level_emoji = {
             "info": "ℹ️",
             "success": "✅",
@@ -81,9 +81,6 @@ class ScrapingLogger:
             "error": "❌"
         }.get(level, "📝")
         
-        print(f"{level_emoji} [{self.source_name}] {full_message}")
-        
-        # Log to Python logger
         log_func = {
             "info": logger.info,
             "success": logger.info,
@@ -91,7 +88,7 @@ class ScrapingLogger:
             "error": logger.error
         }.get(level, logger.info)
         
-        log_func(f"[{self.source_name}] {full_message}")
+        log_func(f"{level_emoji} [{self.source_name}] {full_message}")
         
         # Build details dict for DB
         db_details = details or {}

@@ -61,7 +61,7 @@ def check_db_integrity(db_path: Path) -> Tuple[bool, str]:
         return False, str(e)
 
 
-def backup_database(db_path: Path, environment: str, keep_backups: int = DEFAULT_KEEP_BACKUPS) -> bool:
+def backup_database(db_path: Path, environment: str, keep_backups: int = DEFAULT_KEEP_BACKUPS, backup_type: str = "hourly") -> bool:
     """
     Sauvegarde une base de données DuckDB.
     
@@ -83,9 +83,9 @@ def backup_database(db_path: Path, environment: str, keep_backups: int = DEFAULT
         logger.error(f"❌ Base de données corrompue, sauvegarde annulée: {error_msg}")
         return False
     
-    # Créer le nom de sauvegarde avec timestamp
+    # Créer le nom de sauvegarde avec timestamp et type
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_filename = f"{environment}_data_{timestamp}.duckdb"
+    backup_filename = f"{environment}_data_{backup_type}_{timestamp}.duckdb"
     backup_path = BACKUP_DIR / backup_filename
     
     try:
@@ -104,8 +104,8 @@ def backup_database(db_path: Path, environment: str, keep_backups: int = DEFAULT
         size_mb = backup_path.stat().st_size / (1024 * 1024)
         logger.info(f"✅ Sauvegarde créée: {backup_filename} ({size_mb:.2f} MB)")
         
-        # Nettoyer les anciennes sauvegardes
-        cleanup_old_backups(environment, keep_backups)
+        # Nettoyer les anciennes sauvegardes du même type
+        cleanup_old_backups(environment, keep_backups, backup_type)
         
         return True
         
@@ -114,13 +114,17 @@ def backup_database(db_path: Path, environment: str, keep_backups: int = DEFAULT
         return False
 
 
-def cleanup_old_backups(environment: str, keep_backups: int):
+def cleanup_old_backups(environment: str, keep_backups: int, backup_type: str = None):
     """
     Supprime les anciennes sauvegardes, en gardant seulement les N plus récentes.
+    Si backup_type est spécifié, ne nettoie que ce type de backup.
     """
     try:
-        # Lister toutes les sauvegardes pour cet environnement
-        pattern = f"{environment}_data_*.duckdb"
+        # Lister toutes les sauvegardes pour cet environnement et type
+        if backup_type:
+            pattern = f"{environment}_data_{backup_type}_*.duckdb"
+        else:
+            pattern = f"{environment}_data_*.duckdb"
         backups = sorted(BACKUP_DIR.glob(pattern), key=lambda p: p.stat().st_mtime, reverse=True)
         
         if len(backups) > keep_backups:

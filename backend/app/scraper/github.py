@@ -257,13 +257,30 @@ def scrape_github_issues(query="OVH", limit=20):
     Returns a list of issue/discussion dictionaries ready for insertion.
     """
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        # Try to get the current event loop
+        try:
+            loop = asyncio.get_running_loop()
+            # If we're in a running loop, use sync fallback
             return _scrape_github_sync(query, limit)
-        else:
-            return loop.run_until_complete(scrape_github_issues_async(query, limit))
-    except RuntimeError:
-        return asyncio.run(scrape_github_issues_async(query, limit))
+        except RuntimeError:
+            # No running loop, try to get or create one
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    # Loop is closed, create new one
+                    return asyncio.run(scrape_github_issues_async(query, limit))
+                elif loop.is_running():
+                    # Loop is running, use sync fallback
+                    return _scrape_github_sync(query, limit)
+                else:
+                    # Loop exists but not running, use it
+                    return loop.run_until_complete(scrape_github_issues_async(query, limit))
+            except RuntimeError:
+                # No event loop available, create new one
+                return asyncio.run(scrape_github_issues_async(query, limit))
+    except Exception as e:
+        logger.warning(f"[GitHub] Error in sync wrapper: {e}, using sync fallback")
+        return _scrape_github_sync(query, limit)
 
 
 def _scrape_github_sync(query="OVH", limit=20):

@@ -271,9 +271,6 @@ class TrustpilotScraper(BaseScraper):
         
         self.logger.log("success", f"Successfully parsed {len(reviews)} reviews from {page - 1} page(s)")
         return reviews[:limit]  # Ensure we don't exceed limit
-        
-        self.logger.log("success", f"Successfully parsed {len(reviews)} reviews (skipped {skipped_count})")
-        return reviews
     
     async def _scrape_api(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """Scrape using Trustpilot API (requires API key)."""

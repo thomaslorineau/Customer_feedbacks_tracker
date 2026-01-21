@@ -1,13 +1,13 @@
 """Helper functions to reduce code duplication and improve maintainability."""
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Callable
 from .. import db
 from ..analysis import sentiment
 
 logger = logging.getLogger(__name__)
 
 
-def process_and_save_items(items: List[Dict[str, Any]], source_name: str = None) -> int:
+def process_and_save_items(items: List[Dict[str, Any]], source_name: Optional[str] = None) -> int:
     """
     Process sentiment analysis and save items to database.
     
@@ -71,7 +71,12 @@ def process_and_save_items(items: List[Dict[str, Any]], source_name: str = None)
     return added
 
 
-def safe_scrape(scraper_func, query: str, limit: int, source_name: str) -> int:
+def safe_scrape(
+    scraper_func: Callable[[str, int], List[Dict[str, Any]]], 
+    query: str, 
+    limit: int, 
+    source_name: str
+) -> int:
     """
     Safely execute a scraper function and save results.
     

@@ -1,0 +1,144 @@
+"""Scheduled background jobs."""
+import time
+import logging
+import sys
+from pathlib import Path
+
+from .. import db
+from ..config import keywords_base
+from ..routers.scraping import _run_scrape_for_source
+
+logger = logging.getLogger(__name__)
+
+# Import backup function
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.backup_db import backup_database
+
+
+def auto_scrape_job():
+    """Scheduled job to scrape all sources automatically.
+
+    Uses base keywords (fixed) + user keywords (saved queries) from the DB.
+    Adds small sleeps to avoid hammering third-party endpoints (basic throttling).
+    Verifies relevance score and filters non-OVH posts.
+    Uses keyword expansion for better coverage (same as manual scraping).
+    Reuses existing scraping logic to avoid code duplication.
+    """
+    logger.info("🔄 Running scheduled scrape...")
+
+    # Get user keywords (saved queries)
+    user_keywords = db.get_saved_queries()
+    
+    # Combine base keywords (fixed) + user keywords
+    all_keywords = keywords_base.get_all_keywords(user_keywords)
+    
+    if not all_keywords:
+        # Fallback si vraiment rien
+        all_keywords = keywords_base.get_all_base_keywords()
+    
+    queries = all_keywords
+
+    # Configuration pour le scraping automatique
+    per_query_limit = 50  # Augmenté pour meilleure couverture
+    use_keyword_expansion = True  # Activer l'expansion (comme scraping manuel)
+    
+    # Toutes les sources disponibles (aligné avec scraping manuel)
+    sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 
+               'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+    
+    total_added = 0
+    total_errors = 0
+    
+    for qi, query in enumerate(queries):
+        logger.info(f"[AUTO SCRAPE] Query {qi+1}/{len(queries)}: {query}")
+        
+        for source in sources:
+            try:
+                # Utiliser la même logique que le scraping manuel
+                # Cette fonction gère déjà : expansion, pertinence, doublons, etc.
+                added = _run_scrape_for_source(source, query, per_query_limit, use_keyword_expansion)
+                
+                if added > 0:
+                    logger.info(f"  ✓ {source}: {added} posts added")
+                    total_added += added
+                else:
+                    logger.debug(f"  - {source}: no new posts")
+                
+                # Pause entre sources pour éviter de surcharger les APIs
+                time.sleep(0.5)
+                
+            except Exception as e:
+                total_errors += 1
+                logger.error(f"  ✗ {source}: Error ({type(e).__name__}): {e}")
+                # Continue avec les autres sources même en cas d'erreur
+        
+        # Pause entre queries pour éviter les bursts
+        if qi < len(queries) - 1:  # Pas de pause après la dernière query
+            time.sleep(1.0)
+    
+    # Nettoyer les doublons à la fin du job automatique
+    try:
+        deleted_duplicates = db.delete_duplicate_posts()
+        if deleted_duplicates > 0:
+            logger.info(f"🧹 [AUTO SCRAPE] Cleaned up {deleted_duplicates} duplicate post(s)")
+    except Exception as e:
+        logger.warning(f"⚠️ [AUTO SCRAPE] Warning: Could not clean duplicates: {e}")
+    
+    logger.info(f"✅ Scheduled scrape completed: {total_added} total posts added, {total_errors} errors")
+
+
+def auto_backup_job():
+    """Scheduled job to backup the database automatically.
+    
+    Creates regular backups with integrity checks:
+    - Hourly backups: kept for 24 hours (24 backups)
+    - Daily backups: kept for 30 days (30 backups)
+    - Weekly backups: kept for 12 weeks (12 backups)
+    """
+    logger.info("💾 Running scheduled database backup...")
+    
+    try:
+        backend_dir = Path(__file__).resolve().parents[2]
+        db_path = backend_dir / "data.duckdb"
+        
+        if not db_path.exists():
+            logger.warning("⚠️  Database file not found, skipping backup")
+            return
+        
+        # Create backup with integrity check
+        # Keep 24 hourly backups (1 day)
+        success = backup_database(db_path, "production", keep_backups=24, backup_type="hourly")
+        
+        if success:
+            logger.info("✅ Scheduled backup completed successfully")
+        else:
+            logger.error("❌ Scheduled backup failed - database may be corrupted")
+            
+    except Exception as e:
+        logger.error(f"❌ Error during scheduled backup: {e}", exc_info=True)
+
+
+def daily_backup_job():
+    """Daily backup job - creates a backup that will be kept longer."""
+    logger.info("💾 Running daily database backup...")
+    
+    try:
+        backend_dir = Path(__file__).resolve().parents[2]
+        db_path = backend_dir / "data.duckdb"
+        
+        if not db_path.exists():
+            logger.warning("⚠️  Database file not found, skipping backup")
+            return
+        
+        # Create daily backup - keep 30 days
+        success = backup_database(db_path, "production", keep_backups=30, backup_type="daily")
+        
+        if success:
+            logger.info("✅ Daily backup completed successfully")
+        else:
+            logger.error("❌ Daily backup failed - database may be corrupted")
+            
+    except Exception as e:
+        logger.error(f"❌ Error during daily backup: {e}", exc_info=True)
+
+
