@@ -303,15 +303,32 @@ async def scrape_reddit_endpoint(
 
 
 @router.post("/scrape/ovh-forum", response_model=ScrapeResult)
-async def scrape_ovh_forum_endpoint(request: Request, query: str = "OVH", limit: int = 50):
-    """Scrape OVH Community Forum for customer feedback and discussions."""
+async def scrape_ovh_forum_endpoint(
+    request: Request, 
+    query: str = "OVH", 
+    limit: int = 50,
+    languages: str = None
+):
+    """Scrape OVH Community Forum for customer feedback and discussions.
+    
+    Args:
+        query: Search query
+        limit: Maximum number of posts to scrape
+        languages: Comma-separated list of language codes (e.g., 'en,fr'). 
+                   Defaults to scraping both English and French forums.
+    """
     source_name = "OVH Forum"
     query = get_query_with_base_keywords(query, source_name)
     
-    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
+    # Parse languages parameter
+    language_list = None
+    if languages:
+        language_list = [lang.strip() for lang in languages.split(',') if lang.strip()]
+    
+    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}, languages={language_list}")
     items = []
     try:
-        items = ovh_forum.scrape_ovh_forum(query, limit=limit)
+        items = ovh_forum.scrape_ovh_forum(query, limit=limit, languages=language_list)
         if items is None:
             items = []
         log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
@@ -470,7 +487,7 @@ async def scrape_news_endpoint(request: Request, query: str = "OVH", limit: int 
 async def scrape_trustpilot_endpoint(
     request: Request, 
     query: str = Query("OVH domain", description="Search query for Trustpilot reviews", example="OVH domain"),
-    limit: int = Query(50, description="Maximum number of reviews to scrape", ge=1, le=100, example=50)
+    limit: int = Query(200, description="Maximum number of reviews to scrape", ge=1, le=1000, example=200)
 ):
     """Scrape Trustpilot customer reviews about OVH."""
     source_name = "Trustpilot"

@@ -51,65 +51,74 @@ Format your response as a JSON array with this structure:
 
 Focus on actionable improvements that address real customer pain points. Be specific and practical."""
 
-    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
     
-    if not api_key and llm_provider in ['openai', 'anthropic']:
+    # Determine which provider to use
+    # Priority: LLM_PROVIDER env var > available API keys
+    if not openai_key and not anthropic_key:
         return generate_ideas_fallback(posts, max_ideas)
     
     try:
-        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    'https://api.openai.com/v1/chat/completions',
-                    headers={
-                        'Authorization': f'Bearer {api_key}',
-                        'Content-Type': 'application/json'
-                    },
-                    json={
-                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                        'messages': [
-                            {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
-                            {'role': 'user', 'content': prompt}
-                        ],
-                        'temperature': 0.7,
-                        'max_tokens': 2000
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    ideas_data = json.loads(json_match.group())
-                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+            # Use Anthropic
+            api_key = anthropic_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 2000,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['content'][0]['text']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        ideas_data = json.loads(json_match.group())
+                        return [ImprovementIdea(**idea) for idea in ideas_data]
         
-        elif llm_provider == 'anthropic':
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    'https://api.anthropic.com/v1/messages',
-                    headers={
-                        'x-api-key': api_key,
-                        'anthropic-version': '2023-06-01',
-                        'Content-Type': 'application/json'
-                    },
-                    json={
-                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                        'max_tokens': 2000,
-                        'messages': [
-                            {'role': 'user', 'content': prompt}
-                        ]
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                content = result['content'][0]['text']
-                
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    ideas_data = json.loads(json_match.group())
-                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            # Use OpenAI
+            api_key = openai_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        ideas_data = json.loads(json_match.group())
+                        return [ImprovementIdea(**idea) for idea in ideas_data]
     
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
@@ -227,67 +236,74 @@ Use appropriate emojis:
 
 Be specific and reference actual content from the posts when possible."""
 
-    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
     
-    if not api_key and llm_provider in ['openai', 'anthropic']:
+    if not openai_key and not anthropic_key:
         logger.info("[Recommended Actions] No LLM API key configured, returning empty list")
         return []
     
     try:
-        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    'https://api.openai.com/v1/chat/completions',
-                    headers={
-                        'Authorization': f'Bearer {api_key}',
-                        'Content-Type': 'application/json'
-                    },
-                    json={
-                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                        'messages': [
-                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
-                            {'role': 'user', 'content': prompt}
-                        ],
-                        'temperature': 0.7,
-                        'max_tokens': 1500
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                content = result['choices'][0]['message']['content']
-                
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    actions_data = json.loads(json_match.group())
-                    return [RecommendedAction(**action) for action in actions_data]
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+            # Use Anthropic
+            api_key = anthropic_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 1500,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'system': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['content'][0]['text']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        actions_data = json.loads(json_match.group())
+                        return [RecommendedAction(**action) for action in actions_data]
         
-        elif llm_provider == 'anthropic':
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    'https://api.anthropic.com/v1/messages',
-                    headers={
-                        'x-api-key': api_key,
-                        'anthropic-version': '2023-06-01',
-                        'Content-Type': 'application/json'
-                    },
-                    json={
-                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                        'max_tokens': 1500,
-                        'messages': [
-                            {'role': 'user', 'content': prompt}
-                        ],
-                        'system': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'
-                    }
-                )
-                response.raise_for_status()
-                result = response.json()
-                content = result['content'][0]['text']
-                
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    actions_data = json.loads(json_match.group())
-                    return [RecommendedAction(**action) for action in actions_data]
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            # Use OpenAI
+            api_key = openai_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 1500
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        actions_data = json.loads(json_match.group())
+                        return [RecommendedAction(**action) for action in actions_data]
     
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
@@ -424,40 +440,17 @@ Identified opportunities:
 
 Generate a sentence in English that summarizes the top improvement ideas in a clear and actionable way. Generate ONLY the sentence, without JSON formatting or quotes."""
         
-        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        openai_key = os.getenv('OPENAI_API_KEY')
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        llm_provider = os.getenv('LLM_PROVIDER', '').lower()
         
-        if api_key:
-            try:
-                if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-                    try:
-                        async with httpx.AsyncClient(timeout=30.0) as client:
-                            response = await client.post(
-                                'https://api.openai.com/v1/chat/completions',
-                                headers={
-                                    'Authorization': f'Bearer {api_key}',
-                                    'Content-Type': 'application/json'
-                                },
-                                json={
-                                    'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                                    'messages': [
-                                        {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
-                                        {'role': 'user', 'content': prompt}
-                                    ],
-                                    'temperature': 0.7,
-                                    'max_tokens': 150
-                                }
-                            )
-                            response.raise_for_status()
-                            result = response.json()
-                            summary = result['choices'][0]['message']['content'].strip()
-                            summary = summary.strip('"').strip("'")
-                            return {"summary": summary}
-                    except Exception as e:
-                        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback summary.")
-                        return {"summary": "Analyzing improvement opportunities..."}
-                
-                elif llm_provider == 'anthropic':
+        # Determine which provider to use
+        # Priority: LLM_PROVIDER env var > available API keys
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+            # Use Anthropic
+            api_key = anthropic_key
+            if api_key:
+                try:
                     async with httpx.AsyncClient(timeout=30.0) as client:
                         response = await client.post(
                             'https://api.anthropic.com/v1/messages',
@@ -479,13 +472,46 @@ Generate a sentence in English that summarizes the top improvement ideas in a cl
                         summary = result['content'][0]['text'].strip()
                         summary = summary.strip('"').strip("'")
                         return {"summary": summary}
-            except Exception as e:
-                logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback summary.")
-                return {"summary": "Analyzing improvement opportunities..."}
+                except Exception as e:
+                    logger.warning(f"Anthropic API error: {type(e).__name__}: {e}. Using fallback summary.")
+                    return {"summary": "Analyzing improvement opportunities..."}
+        
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            # Use OpenAI
+            api_key = openai_key
+            if api_key:
+                try:
+                    async with httpx.AsyncClient(timeout=30.0) as client:
+                        response = await client.post(
+                            'https://api.openai.com/v1/chat/completions',
+                            headers={
+                                'Authorization': f'Bearer {api_key}',
+                                'Content-Type': 'application/json'
+                            },
+                            json={
+                                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                                'messages': [
+                                    {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
+                                    {'role': 'user', 'content': prompt}
+                                ],
+                                'temperature': 0.7,
+                                'max_tokens': 150
+                            }
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        summary = result['choices'][0]['message']['content'].strip()
+                        summary = summary.strip('"').strip("'")
+                        return {"summary": summary}
+                except Exception as e:
+                    logger.warning(f"OpenAI API error: {type(e).__name__}: {e}. Using fallback summary.")
+                    return {"summary": "Analyzing improvement opportunities..."}
         
         return {"summary": "Analyzing improvement opportunities..."}
     except Exception as e:
         logger.error(f"Error generating improvements summary: {e}", exc_info=True)
         return {"summary": "Analyzing improvement opportunities..."}
+
+
 
 

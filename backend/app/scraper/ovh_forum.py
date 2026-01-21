@@ -17,15 +17,46 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
-# OVH Community Forum base URL
-OVH_FORUM_BASE = "https://community.ovh.com"
+# OVH Community Forum base URL (nouveau domaine)
+OVH_FORUM_BASE = "https://community.ovhcloud.com/community"
 
 
-def scrape_ovh_forum(query: str = "OVH", limit: int = 50):
+def scrape_ovh_forum(query: str = "OVH", limit: int = 50, languages: list = None):
     """Scrape OVH Community Forum for customer feedback and discussions.
     
     Searches the OVH community forum for posts related to the query.
     Uses HTML scraping as the forum doesn't have a public API.
+    
+    Args:
+        query: Search query
+        limit: Maximum number of posts to scrape
+        languages: List of language codes to scrape (e.g., ['en', 'fr']). 
+                   Defaults to ['en', 'fr'] to scrape both English and French forums.
+    
+    Returns list of dicts: source, author, content, url, created_at
+    """
+    if languages is None:
+        languages = ['en', 'fr']  # Par défaut, scraper les deux langues
+    
+    all_posts = []
+    posts_per_language = max(limit // len(languages), 10) if languages else limit
+    
+    for language in languages:
+        if len(all_posts) >= limit:
+            break
+        posts = _scrape_ovh_forum_single_language(query, posts_per_language, language)
+        all_posts.extend(posts)
+    
+    return all_posts[:limit]
+
+
+def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, language: str = "en"):
+    """Scrape OVH Community Forum for a single language.
+    
+    Args:
+        query: Search query
+        limit: Maximum number of posts to scrape
+        language: Language code ('en', 'fr', etc.)
     
     Returns list of dicts: source, author, content, url, created_at
     """
@@ -42,10 +73,10 @@ def scrape_ovh_forum(query: str = "OVH", limit: int = 50):
             return []
         try:
             # OVH Forum - Try multiple strategies
-            # Strategy 1: Try main forum page (more reliable than search)
-            main_url = f"{OVH_FORUM_BASE}/"
+            # Strategy 1: Try main forum page with language (more reliable than search)
+            main_url = f"{OVH_FORUM_BASE}/{language}/"
             
-            logger.info(f"[OVH Forum] Attempt {attempt + 1}/{MAX_RETRIES} - Searching for: {query}")
+            logger.info(f"[OVH Forum] Attempt {attempt + 1}/{MAX_RETRIES} - Searching for: {query} (language: {language})")
             
             # Create stealth session with realistic headers
             session = create_stealth_session()
@@ -136,12 +167,23 @@ def scrape_ovh_forum(query: str = "OVH", limit: int = 50):
                         continue
                     
                     # Make absolute URL
-                    if href.startswith('/'):
-                        full_url = f"{OVH_FORUM_BASE}{href}"
-                    elif href.startswith('http'):
+                    if href.startswith('http'):
+                        # URL absolue complète
                         full_url = href
+                    elif href.startswith('/'):
+                        # URL relative - peut être /community/... ou /en/... ou /fr/...
+                        if href.startswith('/community/'):
+                            # URL déjà complète avec /community/
+                            full_url = f"https://community.ovhcloud.com{href}"
+                        elif href.startswith(f'/{language}/'):
+                            # URL commence par /en/ ou /fr/ - déjà correcte
+                            full_url = f"{OVH_FORUM_BASE}{href}"
+                        else:
+                            # URL relative sans préfixe de langue - ajouter la langue
+                            full_url = f"{OVH_FORUM_BASE}/{language}{href}"
                     else:
-                        continue
+                        # URL relative sans slash initial
+                        full_url = f"{OVH_FORUM_BASE}/{language}/{href}"
                     
                     # Skip if already seen
                     if full_url in seen_urls:
