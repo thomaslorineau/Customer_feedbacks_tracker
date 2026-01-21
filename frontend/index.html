@@ -1249,10 +1249,10 @@
 
         <!-- 4. Stats -->
         <!-- Global Stats (all posts in DB) -->
-        <div class="stats" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
-            <h3 style="color: var(--accent-primary); margin: 0 0 20px 0; font-size: 1.2em; text-align: center;">
-                📊 DATABASE STATS (Global)
-                <span onclick="openStatsInfoModal()" style="cursor: pointer; background: rgba(0, 212, 255, 0.2); padding: 4px 8px; border-radius: 50%; font-size: 0.9em; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-left: 8px;" onmouseover="this.style.background='rgba(0, 212, 255, 0.4)'; this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(0, 212, 255, 0.2)'; this.style.transform='scale(1)'" title="Cliquez pour plus d'informations">ℹ️</span>
+        <div class="stats-container" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
+            <h3 style="color: var(--accent-primary); margin: 0 0 20px 0; font-size: 1.2em; text-align: center; min-height: 32px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <span>📊 DATABASE STATS (Global)</span>
+                <span onclick="openStatsInfoModal()" style="cursor: pointer; background: rgba(0, 212, 255, 0.2); padding: 4px 8px; border-radius: 50%; font-size: 0.9em; transition: all 0.3s ease; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0;" onmouseover="this.style.background='rgba(0, 212, 255, 0.4)'; this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(0, 212, 255, 0.2)'; this.style.transform='scale(1)'" title="Cliquez pour plus d'informations">ℹ️</span>
             </h3>
             <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
                 <div class="stat-card" style="cursor: default;" title="Total posts dans la base de données">
@@ -1275,8 +1275,10 @@
         </div>
 
         <!-- Filtered Stats (current view) -->
-        <div class="stats" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
-            <h3 style="color: var(--accent-primary); margin: 0 0 20px 0; font-size: 1.2em; text-align: center;">📈 FILTERED STATS (Current View)</h3>
+        <div class="stats-container" style="margin-bottom: 30px; background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow);">
+            <h3 style="color: var(--accent-primary); margin: 0 0 20px 0; font-size: 1.2em; text-align: center; min-height: 32px; display: flex; align-items: center; justify-content: center;">
+                📈 FILTERED STATS (Current View)
+            </h3>
             <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap;">
                 <div class="stat-card" onclick="filterBySentiment('', event)" title="Posts affichés après filtrage">
                     <strong id="totalPosts">0</strong>
