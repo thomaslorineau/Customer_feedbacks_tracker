@@ -3063,6 +3063,7 @@ function setupModalHandlers() {
 }
 
 window.openPostPreview = openPostPreview;
+window.addPostToBacklog = addPostToBacklog;
 window.updatePostsDisplay = updatePostsDisplay;
 
 export { updateProductDistribution, updatePostsList };
