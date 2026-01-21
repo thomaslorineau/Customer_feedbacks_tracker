@@ -109,6 +109,37 @@ if ! "$APP_DIR/venv/bin/python" -c "import uvicorn" 2>/dev/null; then
     exit 1
 fi
 
+# Vérifier que email-validator est installé (requis pour Pydantic EmailStr)
+if ! "$APP_DIR/venv/bin/python" -c "import email_validator" 2>/dev/null; then
+    echo "⚠️  email-validator n'est pas installé, installation automatique..."
+    # Utiliser directement le pip du venv pour éviter les problèmes d'activation
+    if "$APP_DIR/venv/bin/pip" install email-validator>=2.0.0 2>&1; then
+        # Attendre un peu pour que l'installation se termine
+        sleep 2
+        # Vérifier à nouveau
+        if ! "$APP_DIR/venv/bin/python" -c "import email_validator" 2>/dev/null; then
+            echo "❌ Erreur: email-validator installé mais import échoué"
+            echo "   Tentative de réinstallation..."
+            "$APP_DIR/venv/bin/pip" install --force-reinstall email-validator>=2.0.0 2>&1
+            sleep 2
+            if ! "$APP_DIR/venv/bin/python" -c "import email_validator" 2>/dev/null; then
+                echo "❌ Erreur: Impossible d'installer email-validator"
+                echo "   Installez manuellement avec:"
+                echo "   source $APP_DIR/venv/bin/activate"
+                echo "   pip install email-validator"
+                exit 1
+            fi
+        fi
+        echo "✅ email-validator installé avec succès"
+    else
+        echo "❌ Erreur: Échec de l'installation de email-validator"
+        echo "   Installez manuellement avec:"
+        echo "   source $APP_DIR/venv/bin/activate"
+        echo "   pip install email-validator"
+        exit 1
+    fi
+fi
+
 # Vérifier que le module app.main existe
 if [ ! -f "$APP_DIR/backend/app/main.py" ]; then
     echo "❌ Erreur: Module app.main introuvable"

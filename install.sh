@@ -251,6 +251,30 @@ else
     fi
 fi
 
+# Vérifier que email-validator est bien installé (requis pour Pydantic EmailStr)
+info "Vérification de l'installation de email-validator..."
+if python -c "import email_validator" 2>/dev/null; then
+    success "email-validator installé"
+else
+    warning "email-validator n'est pas installé, tentative d'installation..."
+    log_command "python -m pip install email-validator>=2.0.0"
+    if python -m pip install email-validator>=2.0.0; then
+        sleep 1
+        if python -c "import email_validator" 2>/dev/null; then
+            success "email-validator installé avec succès"
+        else
+            error "email-validator installé mais import échoué"
+            echo "   Essayez de réinstaller avec: python -m pip install --force-reinstall email-validator"
+        fi
+    else
+        error "Échec de l'installation de email-validator"
+        echo "   Le serveur ne pourra pas démarrer sans cette dépendance"
+        echo "   Pour installer email-validator manuellement:"
+        echo "   source venv/bin/activate"
+        echo "   pip install email-validator"
+    fi
+fi
+
 success "Dépendances installées"
 echo ""
 
