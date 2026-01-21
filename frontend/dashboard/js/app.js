@@ -181,6 +181,40 @@ class App {
         }, 500);
     }
     
+    // Helper function to filter valid posts (exclude samples and relevance_score = 0)
+    // Same logic as in data collection page (index.html) and dashboard.js
+    filterValidPosts(posts) {
+        return posts.filter(post => {
+            // Filter out sample posts
+            const url = post.url || '';
+            const isSample = (
+                url.includes('/sample') || 
+                url.includes('example.com') ||
+                url.includes('/status/174') ||
+                url === 'https://trustpilot.com/sample'
+            );
+            if (isSample) return false;
+            
+            // Filter out posts with relevance_score = 0
+            // Calculate relevance score (same logic as calculateRelevanceScore)
+            let relevanceScore = post.relevance_score;
+            if (relevanceScore === undefined || relevanceScore === null || relevanceScore <= 0) {
+                // Calculate on frontend if not stored
+                const content = (post.content || '').toLowerCase();
+                const urlLower = (post.url || '').toLowerCase();
+                const OVH_BRANDS = ['ovh', 'ovhcloud', 'ovh cloud', 'kimsufi', 'ovh.com', 'ovhcloud.com'];
+                const hasBrand = OVH_BRANDS.some(brand => content.includes(brand) || urlLower.includes(brand));
+                relevanceScore = hasBrand ? 0.5 : 0.0; // Simple check, full calculation is in dashboard.js
+            }
+            
+            if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
+                return false;
+            }
+            
+            return true;
+        });
+    }
+
     async loadPosts() {
         try {
             console.log('App: Loading posts from API...');
@@ -208,8 +242,12 @@ class App {
                 return;
             }
             
+            // Filter valid posts (exclude samples and relevance_score = 0) to match data collection page
+            const validPosts = this.filterValidPosts(posts);
+            console.log('App: Valid posts (after filtering samples and relevance_score=0):', validPosts?.length || 0, 'posts');
+            
             console.log('App: Setting posts in state...');
-            this.state.setPosts(posts);
+            this.state.setPosts(validPosts);
             console.log('App: Posts set in state. Total posts:', this.state.posts?.length || 0);
             console.log('App: Filtered posts:', this.state.filteredPosts?.length || 0);
             

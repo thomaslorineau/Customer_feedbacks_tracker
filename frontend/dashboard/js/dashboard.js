@@ -444,6 +444,30 @@ function setupEventListeners() {
     });
 }
 
+// Helper function to filter valid posts (exclude samples and relevance_score = 0)
+// Same logic as in data collection page (index.html)
+function filterValidPosts(posts) {
+    return posts.filter(post => {
+        // Filter out sample posts
+        const url = post.url || '';
+        const isSample = (
+            url.includes('/sample') || 
+            url.includes('example.com') ||
+            url.includes('/status/174') ||
+            url === 'https://trustpilot.com/sample'
+        );
+        if (isSample) return false;
+        
+        // Filter out posts with relevance_score = 0
+        const relevanceScore = calculateRelevanceScore(post);
+        if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
+            return false;
+        }
+        
+        return true;
+    });
+}
+
 async function loadDashboardData() {
     try {
         console.log('Loading dashboard data...');
@@ -460,9 +484,13 @@ async function loadDashboardData() {
             return;
         }
         
+        // Filter valid posts (exclude samples and relevance_score = 0) to match data collection page
+        const validPosts = filterValidPosts(posts);
+        console.log('Valid posts (after filtering samples and relevance_score=0):', validPosts?.length || 0, 'posts');
+        
         // Load posts first - don't apply date filter on initial load
         // The default 12 months filter will only be applied when clicking "Clear Filter"
-        state.setPosts(posts);
+        state.setPosts(validPosts);
         console.log('Posts set in state. Filtered posts:', state.filteredPosts?.length || 0);
         updateDashboard();
     } catch (error) {

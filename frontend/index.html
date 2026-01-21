@@ -2462,8 +2462,9 @@
                 const response = await fetch(`${API_BASE}/posts?limit=1000`);
                 if (response.ok) {
                     const posts = await response.json();
-                    // Filter out sample posts
+                    // Filter out sample posts AND posts with relevance_score = 0 (same as dashboard)
                     allPosts = posts.filter(post => {
+                        // Filter out sample posts
                         const url = post.url || '';
                         const isSample = (
                             url.includes('/sample') || 
@@ -2471,7 +2472,15 @@
                             url.includes('/status/174') ||
                             url === 'https://trustpilot.com/sample'
                         );
-                        return !isSample;
+                        if (isSample) return false;
+                        
+                        // Filter out posts with relevance_score = 0
+                        const relevanceScore = calculateRelevanceScore(post);
+                        if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
+                            return false;
+                        }
+                        
+                        return true;
                     });
                     renderGallery();
                     updateActiveFiltersCount();
@@ -3180,7 +3189,9 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
             document.getElementById('neutralPosts').textContent = neutral;
             
             // Update GLOBAL stats (all posts in DB)
+            // Filter out samples AND posts with relevance_score = 0 (same as dashboard)
             const allRealPosts = allPosts.filter(post => {
+                // Filter out sample posts
                 const url = post.url || '';
                 const isSample = (
                     url.includes('/sample') || 
@@ -3188,7 +3199,15 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     url.includes('/status/174') ||
                     url === 'https://trustpilot.com/sample'
                 );
-                return !isSample;
+                if (isSample) return false;
+                
+                // Filter out posts with relevance_score = 0
+                const relevanceScore = calculateRelevanceScore(post);
+                if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
+                    return false;
+                }
+                
+                return true;
             });
             
             const globalTotal = allRealPosts.length;
