@@ -41,6 +41,16 @@ FALSE_POSITIVE_PATTERNS = [
     r'\bovh\b.*(?:not|isn\'t|wasn\'t).*ovh',  # "OVH is not..."
     r'(?:other|different|another).*ovh',  # "other OVH..."
     r'ovh.*(?:competitor|alternative|vs|versus)',  # Comparaisons
+    r'\b3m\b',  # 3M company (not OVH)
+    r'\bmmm\b',  # 3M stock ticker
+    r'fool\.com',  # Motley Fool website (not OVH related)
+]
+
+# Domaines à exclure (non-OVH)
+EXCLUDED_DOMAINS = [
+    'fool.com',
+    'motleyfool.com',
+    '3m.com',
 ]
 
 
@@ -137,8 +147,23 @@ def is_relevant(post: Dict, threshold: float = 0.3) -> bool:
     if is_false_positive(post):
         return False
     
+    # Exclure les domaines non-OVH
+    url = (post.get('url', '') or '').lower()
+    if any(domain in url for domain in EXCLUDED_DOMAINS):
+        return False
+    
     # Calculer le score de pertinence
     score = calculate_relevance_score(post)
+    
+    # Exiger qu'au moins une marque OVH soit présente pour être pertinent
+    # (sauf si l'URL contient déjà une marque OVH)
+    content = (post.get('content', '') or '').lower()
+    has_brand_in_content = any(brand in content for brand in OVH_BRANDS)
+    has_brand_in_url = any(brand in url for brand in OVH_BRANDS)
+    
+    # Si aucun marque OVH n'est présente, le post n'est pas pertinent
+    if not has_brand_in_content and not has_brand_in_url:
+        return False
     
     return score >= threshold
 

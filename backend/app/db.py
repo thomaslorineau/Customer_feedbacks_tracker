@@ -1312,22 +1312,33 @@ def delete_non_ovh_posts() -> int:
     """
     Delete all posts from the database that do NOT mention OVH or its brands.
     Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+    Also deletes posts from excluded domains (fool.com, 3m.com, etc.)
+    
+    Uses optimized SQL queries first, then relevance scorer for edge cases.
     
     Returns:
         Number of posts deleted
     """
+    from .analysis import relevance_scorer
+    
     conn, is_duckdb = get_db_connection()
     c = conn.cursor()
     
     try:
-        # Check if posts table has country column
-        c.execute("DESCRIBE posts")
-        columns = [row[0] for row in c.fetchall()]
-        has_country = 'country' in columns
+        deleted_count = 0
         
-        # Delete posts that don't contain OVH-related keywords
-        # Case-insensitive search for: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
-        query = '''
+        # First, delete posts from excluded domains (fast SQL query)
+        excluded_domains = ['fool.com', 'motleyfool.com', '3m.com']
+        for domain in excluded_domains:
+            c.execute('''
+                DELETE FROM posts
+                WHERE LOWER(url) LIKE ?
+            ''', (f'%{domain}%',))
+            deleted_count += c.rowcount
+        
+        # Delete posts that don't contain OVH-related keywords in content or URL
+        # (optimized SQL query for most cases)
+        c.execute('''
             DELETE FROM posts
             WHERE LOWER(content) NOT LIKE '%ovh%'
             AND LOWER(content) NOT LIKE '%ovhcloud%'
@@ -1335,11 +1346,56 @@ def delete_non_ovh_posts() -> int:
             AND LOWER(content) NOT LIKE '%kimsufi%'
             AND LOWER(content) NOT LIKE '%soyoustart%'
             AND LOWER(author) NOT LIKE '%ovh%'
-            AND (url IS NULL OR (LOWER(url) NOT LIKE '%ovh%' AND LOWER(url) NOT LIKE '%kimsufi%' AND LOWER(url) NOT LIKE '%soyoustart%'))
-        '''
+            AND (url IS NULL OR (
+                LOWER(url) NOT LIKE '%ovh%' 
+                AND LOWER(url) NOT LIKE '%kimsufi%' 
+                AND LOWER(url) NOT LIKE '%soyoustart%'
+                AND LOWER(url) NOT LIKE '%ovhcloud%'
+            ))
+        ''')
+        deleted_count += c.rowcount
         
-        c.execute(query)
-        deleted_count = c.rowcount
+        # For posts that mention OVH but might be false positives,
+        # check a sample with relevance scorer (limit to avoid timeout)
+        c.execute('''
+            SELECT id, source, author, content, url, created_at, 
+                   sentiment_score, sentiment_label, language, country, relevance_score
+            FROM posts
+            WHERE (LOWER(content) LIKE '%ovh%' OR LOWER(url) LIKE '%ovh%')
+            AND relevance_score < 0.3
+            LIMIT 1000
+        ''')
+        suspicious_posts = c.fetchall()
+        
+        false_positive_ids = []
+        for row in suspicious_posts:
+            post = {
+                'id': row[0],
+                'source': row[1],
+                'author': row[2],
+                'content': row[3],
+                'url': row[4],
+                'created_at': row[5],
+                'sentiment_score': row[6],
+                'sentiment_label': row[7],
+                'language': row[8],
+                'country': row[9],
+                'relevance_score': row[10] if len(row) > 10 else 0.0
+            }
+            
+            # Check if post is actually relevant
+            if not relevance_scorer.is_relevant(post, threshold=0.3):
+                false_positive_ids.append(row[0])
+        
+        # Delete false positives
+        if false_positive_ids:
+            placeholders = ','.join(['?'] * len(false_positive_ids))
+            c.execute(f'''
+                DELETE FROM posts
+                WHERE id IN ({placeholders})
+            ''', false_positive_ids)
+            deleted_count += c.rowcount
+        
         conn.commit()
     finally:
         conn.close()

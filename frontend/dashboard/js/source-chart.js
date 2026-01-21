@@ -172,6 +172,14 @@ function renderSourceChart(sourceData, sentimentBySource) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: {
+                    bottom: 45,
+                    top: 10,
+                    left: 10,
+                    right: 10
+                }
+            },
             plugins: {
                 legend: {
                     display: true,
@@ -229,12 +237,19 @@ function renderSourceChart(sourceData, sentimentBySource) {
             scales: {
                 x: {
                     stacked: true,
+                    categoryPercentage: 0.7,
+                    barPercentage: 0.85,
                     ticks: {
                         font: {
-                            size: 11
+                            size: 12,
+                            weight: '600',
+                            family: 'system-ui, -apple-system, sans-serif'
                         },
-                        maxRotation: 45,
-                        minRotation: 0
+                        maxRotation: 0,
+                        minRotation: 0,
+                        color: 'var(--text-primary)',
+                        padding: 12,
+                        autoSkip: false
                     },
                     grid: {
                         display: false
@@ -246,11 +261,16 @@ function renderSourceChart(sourceData, sentimentBySource) {
                     ticks: {
                         stepSize: 1,
                         font: {
-                            size: 11
-                        }
+                            size: 11,
+                            family: 'system-ui, -apple-system, sans-serif'
+                        },
+                        padding: 10,
+                        color: 'var(--text-secondary)'
                     },
                     grid: {
-                        color: 'var(--border-color)'
+                        color: 'var(--border-color)',
+                        lineWidth: 1,
+                        drawBorder: false
                     }
                 }
             },

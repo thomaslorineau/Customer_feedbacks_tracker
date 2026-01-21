@@ -78,9 +78,13 @@ export class State {
                 }
             }
             
-            // Language filter
-            if (this.filters.language && this.filters.language !== 'all' && post.language !== this.filters.language) {
-                return false;
+            // Language filter - handle null/undefined and normalize comparison
+            if (this.filters.language && this.filters.language !== 'all') {
+                const postLanguage = (post.language || '').toLowerCase();
+                const filterLanguage = (this.filters.language || '').toLowerCase();
+                if (postLanguage !== filterLanguage) {
+                    return false;
+                }
             }
             
             // Product filter - use getProductLabel

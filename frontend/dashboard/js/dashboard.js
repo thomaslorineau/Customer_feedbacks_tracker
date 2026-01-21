@@ -110,9 +110,20 @@ function setupEventListeners() {
     const languageFilter = document.getElementById('languageFilter');
     if (languageFilter) {
         languageFilter.addEventListener('change', (e) => {
-            state.setFilter('language', e.target.value);
+            const value = e.target.value;
+            state.setFilter('language', value);
+            // Sync with All Posts section filter
+            const postsLanguageFilterEl = document.getElementById('postsLanguageFilter');
+            if (postsLanguageFilterEl && postsLanguageFilterEl.value !== value) {
+                postsLanguageFilterEl.value = value;
+            }
             updateResetFiltersButtonVisibility();
             updateDashboard();
+            // Update All Posts display if it exists
+            if (document.getElementById('postsGallery')) {
+                postsCurrentOffset = 0; // Reset pagination
+                updatePostsDisplay();
+            }
         });
     }
     
@@ -620,9 +631,18 @@ function updateProductDistribution() {
     const allProducts = Object.entries(productCounts)
         .sort((a, b) => b[1] - a[1]);
     
-    // Show top 5 or all products based on state
-    const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, 5);
-    const remainingCount = allProducts.length - 5;
+    // Calculate how many products can fit in the available space
+    // Each product item: padding (6px top + 6px bottom = 12px) + gap (4px) + content (~24px) = ~40px per item
+    // The container has max-height: 280px from CSS
+    const containerMaxHeight = 280; // max-height from CSS
+    const itemHeight = 40; // Approximate height per item (padding 12px + gap 4px + content ~24px)
+    const reservedSpace = 0; // No reserved space needed as we use max-height
+    const availableHeight = containerMaxHeight - reservedSpace;
+    const maxVisibleItems = Math.max(1, Math.floor(availableHeight / itemHeight));
+    
+    // Show as many products as can fit, or all if showAllProducts is true
+    const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, maxVisibleItems);
+    const remainingCount = Math.max(0, allProducts.length - maxVisibleItems);
     
     const total = posts.length;
     const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -693,11 +713,24 @@ function updateProductDistribution() {
             showMoreProductsBtn.textContent = 'Show Less';
             showMoreProductsBtn.style.display = 'inline-block';
         } else if (remainingCount > 0) {
-            showMoreProductsBtn.textContent = `+ ${remainingCount} Other Products`;
+            const productText = remainingCount === 1 ? 'product' : 'products';
+            showMoreProductsBtn.textContent = `+ ${remainingCount} ${productText}`;
             showMoreProductsBtn.style.display = 'inline-block';
         } else {
             showMoreProductsBtn.style.display = 'none';
         }
+    }
+    
+    // Update "Top X" indicator
+    const topIndicator = document.querySelector('.top-indicator');
+    if (topIndicator && !showAllProducts) {
+        if (sortedProducts.length === allProducts.length) {
+            topIndicator.textContent = `Top ${sortedProducts.length}`;
+        } else {
+            topIndicator.textContent = `Top ${sortedProducts.length}`;
+        }
+    } else if (topIndicator && showAllProducts) {
+        topIndicator.textContent = `All ${allProducts.length}`;
     }
 }
 
@@ -2426,7 +2459,10 @@ function updatePostsDisplay() {
         const normalizedSource = (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') ? 'GitHub' : post.source;
         const matchesSource = !finalSourceFilter || finalSourceFilter === 'all' || normalizedSource === finalSourceFilter || post.source === finalSourceFilter;
         const matchesSentiment = !finalSentimentFilter || finalSentimentFilter === 'all' || post.sentiment_label === finalSentimentFilter;
-        const matchesLanguage = !finalLanguageFilter || finalLanguageFilter === 'all' || post.language === finalLanguageFilter;
+        // Language filter - handle null/undefined and normalize comparison
+        const postLanguage = (post.language || '').toLowerCase();
+        const filterLanguage = (finalLanguageFilter || '').toLowerCase();
+        const matchesLanguage = !finalLanguageFilter || finalLanguageFilter === 'all' || postLanguage === filterLanguage;
         
         // Date range filter
         let matchesDate = true;
@@ -2541,6 +2577,11 @@ function updatePostsDisplay() {
                             ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
                             ${(post.sentiment_label || 'neutral').toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
                         </span>
+                        ${post.language && post.language !== 'unknown' ? `
+                        <span class="language-badge" style="padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3);" title="Language: ${escapeHtml(post.language.toUpperCase())}">
+                            🌐 ${escapeHtml(post.language.toUpperCase())}
+                        </span>
+                        ` : ''}
                         <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
 
 Calculé à partir de :
@@ -2586,6 +2627,25 @@ function loadMorePosts() {
     updatePostsDisplay();
 }
 
+function handlePostsLanguageFilterChange() {
+    const value = document.getElementById('postsLanguageFilter')?.value || 'all';
+    // Update global state
+    if (state) {
+        state.setFilter('language', value);
+    }
+    // Sync with global filter if it exists
+    const languageFilterEl = document.getElementById('languageFilter');
+    if (languageFilterEl && languageFilterEl.value !== value) {
+        languageFilterEl.value = value;
+    }
+    // Reset pagination and update display
+    postsCurrentOffset = 0;
+    updatePostsDisplay();
+    // Update dashboard stats
+    updateDashboard();
+    updateResetFiltersButtonVisibility();
+}
+
 function clearPostsFilters() {
     document.getElementById('postsSortBy').value = 'date-desc';
     document.getElementById('postsSentimentFilter').value = 'all';
@@ -2593,8 +2653,19 @@ function clearPostsFilters() {
     document.getElementById('postsLanguageFilter').value = 'all';
     document.getElementById('postsDateFrom').value = '';
     document.getElementById('postsDateTo').value = '';
+    // Clear global state filters
+    if (state) {
+        state.setFilter('language', 'all');
+    }
+    // Sync global filter
+    const languageFilterEl = document.getElementById('languageFilter');
+    if (languageFilterEl) {
+        languageFilterEl.value = 'all';
+    }
     postsCurrentOffset = 0;
     updatePostsDisplay();
+    updateDashboard();
+    updateResetFiltersButtonVisibility();
 }
 
 function updatePostsSourceFilter() {
@@ -2736,6 +2807,7 @@ window.scrollToSearch = scrollToSearch;
 window.updatePostsDisplay = updatePostsDisplay;
 window.loadMorePosts = loadMorePosts;
 window.clearPostsFilters = clearPostsFilters;
+window.handlePostsLanguageFilterChange = handlePostsLanguageFilterChange;
 
 // Ensure button event listener is set up after DOM is ready
 // Resume last job on page load (so jobs continue even if user navigates away)
@@ -2968,7 +3040,7 @@ function openPostPreview(postId) {
             <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
                 <strong>Date:</strong> ${postDate}
             </div>
-            ${post.language ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+            ${post.language && post.language !== 'unknown' ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
                 <strong>Language:</strong> ${escapeHtml(post.language.toUpperCase())}
             </div>` : ''}
         </div>

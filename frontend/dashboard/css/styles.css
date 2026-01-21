@@ -616,31 +616,33 @@ body {
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
+    padding-bottom: 20px;
     box-shadow: 0 2px 8px var(--shadow);
     border: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    max-height: 380px;
+    min-height: 360px;
 }
 
 .panel-source {
     background: var(--bg-card);
     border-radius: 12px;
     padding: 16px;
+    padding-bottom: 20px;
     box-shadow: 0 2px 8px var(--shadow);
     border: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    max-height: 360px;
+    overflow: visible;
+    min-height: 360px;
 }
 
 .chart-container-sentiment {
     flex: 1;
-    min-height: 300px;
-    max-height: 300px;
-    height: 300px;
+    min-height: 320px;
+    max-height: 320px;
+    height: 320px;
     position: relative;
     margin-top: 8px;
     overflow: hidden;
@@ -657,18 +659,19 @@ body {
 
 .chart-container-source {
     flex: 1;
-    min-height: 350px;
-    max-height: 350px;
-    height: 350px;
+    min-height: 320px;
+    max-height: 320px;
+    height: 320px;
     position: relative;
     margin-top: 8px;
-    overflow: hidden;
+    overflow: visible;
     display: flex;
     flex-direction: column;
+    padding-bottom: 45px;
 }
 
 .chart-container-source canvas {
-    max-height: 100%;
+    max-height: calc(100% - 45px);
     width: 100% !important;
     height: auto !important;
     flex: 1;
@@ -834,7 +837,7 @@ body {
 .product-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     max-height: 280px;
     overflow-y: auto;
     padding-right: 4px;
@@ -843,8 +846,8 @@ body {
 .product-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px;
+    gap: 6px;
+    padding: 6px 8px;
     border-radius: 6px;
     background: var(--bg-secondary);
     transition: all 0.3s ease;
@@ -866,7 +869,7 @@ body {
 
 .product-bar-container {
     flex: 1 1 auto;
-    min-width: 200px;
+    min-width: 120px;
     height: 12px;
     background: var(--bg-secondary);
     border-radius: 6px;
@@ -885,9 +888,9 @@ body {
 .product-info {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-width: 120px;
-    max-width: 180px;
+    gap: 6px;
+    min-width: 140px;
+    max-width: 200px;
     font-size: 0.85em;
     flex-shrink: 0;
 }
