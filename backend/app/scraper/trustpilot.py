@@ -80,10 +80,15 @@ class TrustpilotScraper(BaseScraper):
         """Scrape Trustpilot reviews directly from HTML page with pagination."""
         reviews = []
         page = 1
-        max_pages = (limit // 20) + 2  # Estimate pages needed, add buffer
+        # Trustpilot shows ~20 reviews per page
+        # Calculate reasonable max pages: for large limits, allow more pages
+        # For example: limit=1000 -> max_pages=100 (to get ~2000 reviews, then trim to limit)
+        max_pages = max((limit // 20) + 10, 100)  # At least 100 pages (2000+ reviews) or enough to reach limit
         
         self.logger.log("info", f"Starting HTML scrape with pagination (limit: {limit}, max_pages: {max_pages})")
         
+        # Continue scraping until limit reached or no more reviews found
+        consecutive_empty_pages = 0
         while len(reviews) < limit and page <= max_pages:
             # Build URL with pagination
             if page == 1:
@@ -142,10 +147,16 @@ class TrustpilotScraper(BaseScraper):
                         sample_card = all_cards[0]
                         self.logger.log("debug", f"Sample card HTML structure: {str(sample_card)[:500]}")
                 
-                # If no review cards found, we've reached the end
+                # If no review cards found, check if we should stop
                 if not review_cards:
-                    self.logger.log("info", f"No more reviews found on page {page}, stopping pagination")
-                    break
+                    consecutive_empty_pages += 1
+                    self.logger.log("info", f"No reviews found on page {page} (consecutive empty: {consecutive_empty_pages})")
+                    # Stop if we've had 2 consecutive empty pages (likely reached the end)
+                    if consecutive_empty_pages >= 2:
+                        self.logger.log("info", f"Stopping pagination after {consecutive_empty_pages} consecutive empty pages")
+                        break
+                else:
+                    consecutive_empty_pages = 0  # Reset counter if we found reviews
                 
                 parsed_count = 0
                 skipped_count = 0
@@ -330,12 +341,12 @@ class TrustpilotScraper(BaseScraper):
 _async_scraper = TrustpilotScraper()
 
 
-async def scrape_trustpilot_reviews_async(query: str = "OVH", limit: int = 20) -> List[Dict[str, Any]]:
+async def scrape_trustpilot_reviews_async(query: str = "OVH", limit: int = 200) -> List[Dict[str, Any]]:
     """Async entry point for Trustpilot scraper."""
     return await _async_scraper.scrape(query, limit)
 
 
-def scrape_trustpilot_reviews(query="OVH", limit=20):
+def scrape_trustpilot_reviews(query="OVH", limit=200):
     """
     Synchronous wrapper for async scraper (for backward compatibility).
     

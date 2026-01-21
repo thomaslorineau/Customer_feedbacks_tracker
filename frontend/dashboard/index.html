@@ -74,6 +74,12 @@
 
     <!-- Main Dashboard -->
     <main class="dashboard-main">
+        <!-- Page Header -->
+        <header class="page-header" style="grid-column: 1 / -1; margin-bottom: 20px;">
+            <h1>📊 Dashboard Analytics</h1>
+            <p>Comprehensive analytics and insights from customer feedback data</p>
+        </header>
+        
         <!-- Search Section with KPI and Report Generator -->
         <section class="search-section-with-kpi" style="grid-column: 1 / 3;">
             <div class="search-kpi-container">
@@ -357,7 +363,7 @@
                         <select id="postsSourceFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
                             <option value="all">All Sources</option>
                         </select>
-                        <select id="postsLanguageFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
+                        <select id="postsLanguageFilter" onchange="handlePostsLanguageFilterChange()" class="filter-select" style="min-width: 150px;">
                             <option value="all">All Languages</option>
                             <option value="fr">Français</option>
                             <option value="en">English</option>
@@ -451,6 +457,7 @@
     </div>
     
     <!-- Modules -->
+    <script src="/js/post-card.js"></script>
     <script src="/js/logo-updater.js"></script>
     <script src="/js/help-menu-loader.js"></script>
     <script type="module" src="/dashboard/js/api.js"></script>

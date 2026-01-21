@@ -17,19 +17,20 @@
 
         .settings-header {
             margin-bottom: var(--spacing-xl);
-            text-align: center;
         }
 
         .settings-header h1 {
             font-size: var(--font-size-3xl);
             font-weight: var(--font-weight-bold);
             color: var(--text-primary);
-            margin-bottom: var(--spacing-xs);
+            margin-bottom: 8px;
+            margin-top: 0;
         }
 
         .settings-header p {
             color: var(--text-secondary);
             font-size: var(--font-size-base);
+            margin: 0;
         }
 
         /* Accordion System */
@@ -1153,11 +1154,11 @@
     </nav>
 
     <div class="settings-container">
-        <!-- Header -->
-        <div class="settings-header">
-            <h1>Settings</h1>
-            <p>Configure your application</p>
-        </div>
+        <!-- Page Header -->
+        <header class="page-header settings-header">
+            <h1>⚙️ Settings</h1>
+            <p>Configure your application settings and API keys</p>
+        </header>
 
         <!-- Section 1: LLM (Priorité Haute) -->
         <div class="accordion" data-accordion="llm">

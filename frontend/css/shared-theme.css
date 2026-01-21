@@ -48,6 +48,31 @@
     --spacing-xs: 0.5rem;   /* 8px */
     --spacing-sm: 1rem;     /* 16px */
     --spacing-md: 1.5rem;   /* 24px */
+}
+
+/* Page Header Style - Unified design for all pages (matching Scraping Logs design) */
+.page-header {
+    background: var(--bg-card);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    margin-top: 0;
+    box-shadow: 0 2px 8px var(--shadow);
+    border: 1px solid var(--border-color);
+}
+
+.page-header h1 {
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    margin-top: 0;
+}
+
+.page-header p {
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    margin: 0;
     --spacing-lg: 2rem;     /* 32px */
     --spacing-xl: 2.5rem;   /* 40px */
     --spacing-2xl: 3rem;    /* 48px */

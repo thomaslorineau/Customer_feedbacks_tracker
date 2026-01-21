@@ -631,26 +631,53 @@ function updateProductDistribution() {
     const allProducts = Object.entries(productCounts)
         .sort((a, b) => b[1] - a[1]);
     
+    const total = posts.length;
+    const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
+    
     // Calculate how many products can fit in the available space dynamically
-    // Use the actual container height to maximize space usage
-    let containerHeight = 400; // Default max-height from CSS (updated)
-    if (productList.parentElement) {
-        const parentHeight = productList.parentElement.clientHeight;
-        // Use parent height minus header/padding (reserve ~80px for header, title, button)
-        containerHeight = Math.max(200, parentHeight - 80);
+    // Get the panel-right container to calculate available space
+    const panelRight = productList.closest('.panel-right');
+    if (panelRight) {
+        // Use requestAnimationFrame to ensure layout is calculated
+        requestAnimationFrame(() => {
+            const panelRect = panelRight.getBoundingClientRect();
+            const header = panelRight.querySelector('.panel-header');
+            const nav = panelRight.querySelector('.product-nav');
+            const headerHeight = header ? header.getBoundingClientRect().height : 60;
+            const navHeight = nav ? nav.getBoundingClientRect().height : 50;
+            const padding = 32; // panel padding (16px top + 16px bottom)
+            
+            // Calculate available height: panel height - header - nav - padding
+            const containerHeight = Math.max(200, panelRect.height - headerHeight - navHeight - padding);
+            
+            // Each product item: padding (6px top + 6px bottom = 12px) + gap (4px) + content (~24px) = ~40px per item
+            const itemHeight = 40; // Approximate height per item
+            // Calculate max items that fit, ensuring we use the space efficiently
+            // Use all available space, show at least 5 items
+            const maxVisibleItems = Math.max(5, Math.floor(containerHeight / itemHeight));
+            
+            // Show as many products as can fit, or all if showAllProducts is true
+            const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, maxVisibleItems);
+            const remainingCount = Math.max(0, allProducts.length - maxVisibleItems);
+            
+            renderProductList(sortedProducts, remainingCount, allProducts, total, colors);
+        });
+        return; // Exit early, renderProductList will be called in requestAnimationFrame
     }
     
-    // Each product item: padding (6px top + 6px bottom = 12px) + gap (4px) + content (~24px) = ~40px per item
-    const itemHeight = 40; // Approximate height per item
-    // Calculate max items that fit, ensuring we use the space efficiently
+    // Fallback: use default calculation if panel not found
+    const containerHeight = 300;
+    const itemHeight = 40;
     const maxVisibleItems = Math.max(5, Math.floor(containerHeight / itemHeight));
-    
-    // Show as many products as can fit, or all if showAllProducts is true
     const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, maxVisibleItems);
     const remainingCount = Math.max(0, allProducts.length - maxVisibleItems);
     
-    const total = posts.length;
-    const colors = ['#0099ff', '#34d399', '#f59e0b', '#ef4444', '#8b5cf6'];
+    renderProductList(sortedProducts, remainingCount, allProducts, total, colors);
+}
+
+function renderProductList(sortedProducts, remainingCount, allProducts, total, colors) {
+    const productList = document.getElementById('productList');
+    if (!productList) return;
     
     // Show message if no products detected or no posts
     if (sortedProducts.length === 0) {
@@ -2532,81 +2559,17 @@ function updatePostsDisplay() {
     }
 
     gallery.innerHTML = paginated.map(post => {
-        // Filter out sample data
-        const isSample = post.url && (
-            post.url.includes('/sample') || 
-            post.url.includes('example.com') ||
-            post.url.includes('/status/174') ||
-            post.url === 'https://trustpilot.com/sample'
-        );
-        if (isSample) return '';
-
-        const productLabel = getProductLabel(post.id, post.content, post.language);
-        const relevanceScore = calculateRelevanceScore(post);
-        
-        // Relevance score already filtered before pagination, but double-check for safety
-        if (relevanceScore === 0 || relevanceScore === null || relevanceScore === undefined) {
-            return '';
-        }
-        
-        const relevanceClass = relevanceScore >= 0.7 ? 'relevance-high' : relevanceScore >= 0.4 ? 'relevance-medium' : 'relevance-low';
-        const relevanceIcon = relevanceScore >= 0.7 ? '✓' : relevanceScore >= 0.4 ? '~' : '?';
-
-        return `
-            <div class="post-card">
-                <div class="post-card-header">
-                    <div class="post-header-left">
-                        <span class="${getSourceClass(post.source)}">${escapeHtml(post.source || 'Unknown')}</span>
-                        ${productLabel ? `
-                            <span style="font-size:0.75em; background:linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.08) 100%); padding:5px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:5px; border:1px solid rgba(0,212,255,0.3); color:var(--accent-primary); font-weight:500;">
-                                📦 ${escapeHtml(productLabel)}
-                                <button onclick="window.editProductLabel(${post.id}, '${escapeHtml(productLabel).replace(/'/g, "\\'")}')" 
-                                        style="background:none; border:none; color:var(--accent-primary); cursor:pointer; padding:0; margin:0; font-size:0.85em; opacity:0.7; line-height:1;"
-                                        title="Edit product label">✏️</button>
-                            </span>
-                        ` : `
-                            <button onclick="window.editProductLabel(${post.id}, '')" 
-                                    style="font-size:0.75em; background:rgba(0,212,255,0.08); padding:5px 10px; border-radius:6px; border:1px dashed rgba(0,212,255,0.4); color:var(--accent-primary); cursor:pointer; font-weight:500; display:inline-flex; align-items:center; gap:4px;"
-                                    title="Add product label">+ Label</button>
-                        `}
-                    </div>
-                    <span class="post-date">${formatDate(post.created_at)}</span>
-                </div>
-                <div class="post-body">
-                    <div class="post-author">${escapeHtml(post.author || 'Unknown')}</div>
-                    <div class="post-content">${escapeHtml(post.content || '')}</div>
-                </div>
-                <div class="post-footer">
-                    <div class="post-meta-badges">
-                        <span class="sentiment ${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
-                            ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
-                            ${(post.sentiment_label || 'neutral').toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
-                        </span>
-                        ${post.language && post.language !== 'unknown' ? `
-                        <span class="language-badge" style="padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3);" title="Language: ${escapeHtml(post.language.toUpperCase())}">
-                            🌐 ${escapeHtml(post.language.toUpperCase())}
-                        </span>
-                        ` : ''}
-                        <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
-
-Calculé à partir de :
-• Marques OVH (40%) : OVH, OVHCloud, Kimsufi, etc.
-• URLs OVH (30%) : Liens vers ovh.com, ovhcloud.com
-• Direction OVH (20%) : Mentions de dirigeants OVH
-• Produits OVH (10%) : VPS, hosting, domain, etc.
-
-Les posts avec un score < 30% sont automatiquement filtrés.">
-                            ${relevanceIcon} Relevance: ${(relevanceScore * 100).toFixed(0)}%
-                        </span>
-                    </div>
-                    <div class="post-actions">
-                        <button onclick="openPostPreview(${post.id})" class="post-action-btn btn-preview">👁️ Preview</button>
-                        <a href="${escapeHtml(post.url || '#')}" target="_blank" class="post-action-btn btn-view">🔗 View</a>
-                        <button onclick="addPostToBacklog(${post.id})" class="post-action-btn btn-save">💾 Save</button>
-                    </div>
-                </div>
-            </div>
-        `;
+        // Use shared post card component
+        return renderPostCard(post, {
+            getProductLabel: getProductLabel,
+            calculateRelevanceScore: calculateRelevanceScore,
+            getSourceClass: getSourceClass,
+            getSentimentClass: getSentimentClass,
+            formatDate: formatDate,
+            escapeHtml: escapeHtml,
+            onPreviewClickName: 'openPostPreview',
+            onSaveClickName: 'addPostToBacklog'
+        });
     }).filter(html => html !== '').join('');
 
     // Update pagination

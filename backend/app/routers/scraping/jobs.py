@@ -475,37 +475,49 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     
     async def progress_heartbeat():
         nonlocal heartbeat_step, scraping_start_time
-        scraping_start_time = asyncio.get_event_loop().time()
+        import time as time_module
+        scraping_start_time = time_module.time()
         logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
         
-        target_duration = 15.0
+        target_duration = 60.0  # Increased to 60 seconds for longer scrapings (Trustpilot can take time)
         steps_to_progress = scraping_end - scraping_start
-        time_per_step = target_duration / steps_to_progress if steps_to_progress > 0 else 0.1
         
         while heartbeat_running and heartbeat_step < scraping_end:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)  # Update every 0.5 seconds
             if not heartbeat_running:
                 logger.info(f"[{source}] Heartbeat stopped (heartbeat_running=False)")
                 break
             
+            current_time = time_module.time()
             if scraping_start_time:
-                elapsed = asyncio.get_event_loop().time() - scraping_start_time
-                time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
-                time_based_step = min(time_based_step, scraping_end - 1)
-                
-                if time_based_step > heartbeat_step:
-                    heartbeat_step = time_based_step
-                elif heartbeat_step < scraping_end - 1:
-                    heartbeat_step += 1
+                elapsed = current_time - scraping_start_time
+                # Calculate progress based on elapsed time, but cap at scraping_end - 1
+                if elapsed > 0 and target_duration > 0:
+                    time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
+                    time_based_step = min(time_based_step, scraping_end - 1)
+                    
+                    # Always move forward, but use time-based if it's ahead
+                    if time_based_step > heartbeat_step:
+                        heartbeat_step = time_based_step
+                    elif heartbeat_step < scraping_end - 1:
+                        # Increment by at least 1 every 0.5 seconds to show progress
+                        heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
+                else:
+                    # Fallback: increment slowly
+                    if heartbeat_step < scraping_end - 1:
+                        heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
             else:
                 if heartbeat_step < scraping_end - 1:
                     heartbeat_step += 1
             
+            # Always update progress in memory and DB every iteration
             job['progress']['completed'] = heartbeat_step
             job['progress']['total'] = total_steps
             try:
                 db.update_job_progress(job_id, total_steps, heartbeat_step)
-                logger.info(f"[{source}] Heartbeat updated progress to {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
+                # Log every 5% to avoid spam but show progress
+                if heartbeat_step % 5 == 0 or heartbeat_step == scraping_start + 1:
+                    logger.info(f"[{source}] Heartbeat progress: {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
             except Exception as e:
                 logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
         

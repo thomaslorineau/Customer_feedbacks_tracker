@@ -86,18 +86,13 @@
             padding: 20px;
         }
 
+        /* Header style is now in shared-theme.css as .page-header */
         header {
-            background: var(--bg-card);
-            padding: 20px;
-            border-radius: 8px;
             margin-bottom: 20px;
-            margin-top: 0;
-            box-shadow: 0 2px 8px var(--shadow);
-            border: 1px solid var(--border-color);
         }
-
-        h1 {
-            margin-bottom: 20px;
+        
+        header h1 {
+            margin-bottom: 8px;
         }
 
         /* Navigation menu styles */
@@ -391,7 +386,7 @@
     </nav>
 
     <div class="container">
-        <header>
+        <header class="page-header">
             <h1>📋 Scraping Logs</h1>
             <p>Real-time monitoring of scraping operations</p>
         </header>
