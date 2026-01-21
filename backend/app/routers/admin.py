@@ -59,10 +59,8 @@ async def cleanup_hackernews_posts(
 
 
 @router.get('/admin/duplicates-stats')
-async def get_duplicates_stats(
-    current_user: TokenData = Depends(require_auth)
-):
-    """Get duplicate posts statistics. Authenticated users only."""
+async def get_duplicates_stats():
+    """Get duplicate posts statistics."""
     """
     Get statistics about duplicate posts before deletion.
     Returns counts of duplicates by URL and by content+author+source.
@@ -187,11 +185,9 @@ async def cleanup_duplicates():
 
 
 @router.post('/admin/cleanup-non-ovh-posts')
-async def cleanup_non_ovh_posts(
-    current_user: TokenData = Depends(require_admin)
-):
-    """Clean up non-OVH posts. Admin only."""
-    logger.info(f"Admin {current_user.username} triggered non-OVH posts cleanup")
+async def cleanup_non_ovh_posts():
+    """Clean up non-OVH posts."""
+    logger.info("Non-OVH posts cleanup triggered")
     """
     Delete all posts from the database that do NOT mention OVH or its brands.
     Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
