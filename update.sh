@@ -460,6 +460,12 @@ if [ -f "backend/requirements.txt" ]; then
         pip install --upgrade pip > /dev/null 2>&1
         log_command "pip install -r requirements.txt --upgrade"
         pip install -r requirements.txt --upgrade
+        # Installer email-validator explicitement (requis pour Pydantic EmailStr)
+        # même s'il n'est pas dans requirements.txt (pour compatibilité avec anciennes versions)
+        if ! python -c "import email_validator" 2>/dev/null; then
+            info "Installation de email-validator (dépendance critique)..."
+            pip install email-validator>=2.0.0
+        fi
         cd ..
         success "Dépendances mises à jour"
         
@@ -476,6 +482,49 @@ if [ -f "backend/requirements.txt" ]; then
             else
                 error "Échec de l'installation de DuckDB"
                 echo "   L'application fonctionnera en mode SQLite (fallback)"
+            fi
+        fi
+        
+        # Vérifier que email-validator est bien installé (requis pour Pydantic EmailStr)
+        info "Vérification de l'installation de email-validator..."
+        if python -c "import email_validator" 2>/dev/null; then
+            success "email-validator installé"
+        else
+            warning "email-validator n'est pas installé, tentative d'installation..."
+            # Utiliser directement venv/bin/pip pour être sûr d'installer dans le bon environnement
+            if [ -f "venv/bin/pip" ]; then
+                log_command "venv/bin/pip install email-validator>=2.0.0"
+                if venv/bin/pip install email-validator>=2.0.0 2>&1; then
+                    sleep 1
+                    if python -c "import email_validator" 2>/dev/null; then
+                        success "email-validator installé avec succès"
+                    else
+                        error "email-validator installé mais import échoué"
+                        echo "   Tentative de réinstallation..."
+                        venv/bin/pip install --force-reinstall email-validator>=2.0.0 2>&1
+                        sleep 1
+                        if python -c "import email_validator" 2>/dev/null; then
+                            success "email-validator installé avec succès (après réinstallation)"
+                        else
+                            error "Échec de l'installation de email-validator"
+                            echo "   Le serveur ne pourra pas démarrer sans cette dépendance"
+                            echo "   Installez manuellement avec:"
+                            echo "   source venv/bin/activate"
+                            echo "   pip install email-validator"
+                        fi
+                    fi
+                else
+                    error "Échec de l'installation de email-validator"
+                    echo "   Le serveur ne pourra pas démarrer sans cette dépendance"
+                    echo "   Installez manuellement avec:"
+                    echo "   source venv/bin/activate"
+                    echo "   pip install email-validator"
+                fi
+            else
+                error "venv/bin/pip introuvable"
+                echo "   Installez manuellement avec:"
+                echo "   source venv/bin/activate"
+                echo "   pip install email-validator"
             fi
         fi
     else

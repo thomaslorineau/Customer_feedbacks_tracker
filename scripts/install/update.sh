@@ -673,6 +673,22 @@ if [ -f "backend/requirements.txt" ]; then
                 echo "   L'application fonctionnera en mode SQLite (fallback)"
             fi
         fi
+        
+        # Vérifier que email-validator est bien installé (requis pour Pydantic EmailStr)
+        info "Vérification de l'installation de email-validator..."
+        if python -c "import email_validator" 2>/dev/null; then
+            success "email-validator installé"
+        else
+            warning "email-validator n'est pas installé, tentative d'installation..."
+            pip install email-validator>=2.0.0
+            if python -c "import email_validator" 2>/dev/null; then
+                success "email-validator installé avec succès"
+            else
+                error "Échec de l'installation de email-validator"
+                echo "   Le serveur ne pourra pas démarrer sans cette dépendance"
+                echo "   Installez manuellement avec: pip install email-validator"
+            fi
+        fi
     else
         warning "Environnement virtuel introuvable"
         echo "   Exécutez install.sh pour créer l'environnement"
