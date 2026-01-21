@@ -631,14 +631,19 @@ function updateProductDistribution() {
     const allProducts = Object.entries(productCounts)
         .sort((a, b) => b[1] - a[1]);
     
-    // Calculate how many products can fit in the available space
+    // Calculate how many products can fit in the available space dynamically
+    // Use the actual container height to maximize space usage
+    let containerHeight = 400; // Default max-height from CSS (updated)
+    if (productList.parentElement) {
+        const parentHeight = productList.parentElement.clientHeight;
+        // Use parent height minus header/padding (reserve ~80px for header, title, button)
+        containerHeight = Math.max(200, parentHeight - 80);
+    }
+    
     // Each product item: padding (6px top + 6px bottom = 12px) + gap (4px) + content (~24px) = ~40px per item
-    // The container has max-height: 280px from CSS
-    const containerMaxHeight = 280; // max-height from CSS
-    const itemHeight = 40; // Approximate height per item (padding 12px + gap 4px + content ~24px)
-    const reservedSpace = 0; // No reserved space needed as we use max-height
-    const availableHeight = containerMaxHeight - reservedSpace;
-    const maxVisibleItems = Math.max(1, Math.floor(availableHeight / itemHeight));
+    const itemHeight = 40; // Approximate height per item
+    // Calculate max items that fit, ensuring we use the space efficiently
+    const maxVisibleItems = Math.max(5, Math.floor(containerHeight / itemHeight));
     
     // Show as many products as can fit, or all if showAllProducts is true
     const sortedProducts = showAllProducts ? allProducts : allProducts.slice(0, maxVisibleItems);

@@ -838,7 +838,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    max-height: 280px;
+    min-height: 200px;
+    max-height: 400px;
     overflow-y: auto;
     padding-right: 4px;
 }
