@@ -786,7 +786,9 @@ async function saveAPIKey(provider) {
         values[field.name] = value;
     }
     
-    if (hasEmptyField) {
+    // Allow empty values for LLM providers (to clear existing keys)
+    const llmProviders = ['openai', 'anthropic', 'google'];
+    if (hasEmptyField && !llmProviders.includes(provider)) {
         showError('Please fill in all required fields');
         return;
     }
@@ -826,7 +828,17 @@ async function saveAPIKey(provider) {
             body: JSON.stringify(payload)
         });
         
-        if (!response.ok) throw new Error('Failed to save API key');
+        if (!response.ok) {
+            let errorMessage = 'Failed to save API key';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch (e) {
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
+        }
         
         // Reload configuration
         await loadConfiguration();

@@ -314,7 +314,6 @@ async def get_llm_config():
     Updates the LLM configuration by saving API keys and provider settings to the .env file.
     
     **Security:**
-    - Requires authentication (admin only)
     - API keys are saved to `.env` file in the backend directory
     - Environment variables are updated for the current session
     
@@ -337,18 +336,15 @@ async def get_llm_config():
     """,
     tags=["Configuration", "LLM"],
     responses={
-        200: {"description": "Configuration updated successfully"},
-        401: {"description": "Authentication required"},
-        403: {"description": "Admin access required"}
+        200: {"description": "Configuration updated successfully"}
     }
 )
 async def set_llm_config(
-    payload: LLMConfigPayload,
-    current_user: TokenData = Depends(require_auth)
+    payload: LLMConfigPayload
 ):
-    """Set LLM configuration (save to .env file). Admin only."""
+    """Set LLM configuration (save to .env file)."""
     from pathlib import Path
-    logger.info(f"Admin {current_user.username} updated LLM configuration")
+    logger.info("LLM configuration updated")
     backend_path = Path(__file__).resolve().parents[2]
     env_path = backend_path / ".env"
     
@@ -364,14 +360,14 @@ async def set_llm_config(
     
     # Update with new values
     if payload.openai_api_key is not None:
-        if payload.openai_api_key:
-            env_vars['OPENAI_API_KEY'] = payload.openai_api_key
+        if payload.openai_api_key and payload.openai_api_key.strip():
+            env_vars['OPENAI_API_KEY'] = payload.openai_api_key.strip()
         elif 'OPENAI_API_KEY' in env_vars:
             del env_vars['OPENAI_API_KEY']
     
     if payload.anthropic_api_key is not None:
-        if payload.anthropic_api_key:
-            env_vars['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+        if payload.anthropic_api_key and payload.anthropic_api_key.strip():
+            env_vars['ANTHROPIC_API_KEY'] = payload.anthropic_api_key.strip()
         elif 'ANTHROPIC_API_KEY' in env_vars:
             del env_vars['ANTHROPIC_API_KEY']
     
@@ -405,12 +401,11 @@ async def set_llm_config(
 
 @router.post("/api/config/set-key")
 async def set_api_key(
-    payload: dict,
-    current_user: TokenData = Depends(require_auth)
+    payload: dict
 ):
-    """Set a generic API key (for Google, GitHub, Trustpilot, LinkedIn, Twitter, etc.). Admin only."""
+    """Set a generic API key (for Google, GitHub, Trustpilot, LinkedIn, Twitter, etc.)."""
     from pathlib import Path
-    logger.info(f"Admin {current_user.username} updated API key for provider: {payload.get('provider')}")
+    logger.info(f"API key updated for provider: {payload.get('provider')}")
     provider = payload.get('provider')
     keys = payload.get('keys')
     key = payload.get('key')
