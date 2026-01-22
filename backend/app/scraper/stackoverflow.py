@@ -38,18 +38,27 @@ class StackOverflowScraper(BaseScraper):
             max_pages = (limit // 30) + 1
             pagesize = min(30, limit)
             
+            # Ensure query contains OVH-related terms for better relevance
+            search_query = query
+            query_lower = query.lower()
+            if 'ovh' not in query_lower and 'ovhcloud' not in query_lower:
+                # If base keywords don't include OVH, add it to ensure relevance
+                search_query = f"OVH {query}"
+            
             while len(all_posts) < limit and page <= max_pages:
+                # Use 'q' parameter to search in both title AND body for better relevance
+                # Stack Overflow API: 'q' searches in title and body, 'intitle' only searches in title
                 params = {
                     "site": "stackoverflow",
-                    "intitle": query,
-                    "sort": "creation",
+                    "q": search_query,  # Search in title AND body for better relevance
+                    "sort": "relevance",  # Sort by relevance instead of creation date
                     "order": "desc",
                     "pagesize": pagesize,
                     "page": page,
                     "filter": "withbody",
                 }
                 
-                self.logger.log("info", f"Fetching page {page}", details={'query': query})
+                self.logger.log("info", f"Fetching page {page}", details={'query': search_query})
                 
                 try:
                     response = await self._fetch_get(

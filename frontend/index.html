@@ -943,6 +943,12 @@
                         onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)';">
                         🗑️ Remove Non-OVH Posts
                     </button>
+                    <button onclick="checkProductLabels()" style="padding: 12px 24px; background: #3b82f6; border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease;" 
+                        title="Check product labels statistics and distribution"
+                        onmouseover="this.style.background='#2563eb'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.background='#3b82f6'; this.style.transform='translateY(0)';">
+                        📦 Check Product Labels
+                    </button>
                 </div>
             </div>
         </section>
@@ -1020,6 +1026,9 @@
                 <option value="Reddit">🔴 Reddit</option>
                 <option value="Google News">📰 Google News</option>
                 <option value="Trustpilot">⭐ Trustpilot</option>
+                <option value="OVH Forum">💬 OVH Forum</option>
+                <option value="Mastodon">🐘 Mastodon</option>
+                <option value="G2 Crowd">⭐ G2 Crowd</option>
             </select>
             
             <select id="languageFilter">
@@ -2334,6 +2343,59 @@
                 console.error(`Error during cleanup: ${e.message}`);
                 showToast(`Error: ${e.message}`, 'error');
                 console.error('Cleanup non-OVH posts exception:', e);
+            }
+        }
+        
+        async function checkProductLabels() {
+            try {
+                console.log('Checking product labels...');
+                showToast('Analyzing product labels...', 'info');
+                
+                const response = await fetch(`${API_BASE}/admin/product-labels-stats`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || `HTTP ${response.status}`);
+                }
+                
+                const stats = await response.json();
+                
+                // Build detailed message
+                let message = '📦 Product Labels Statistics\n\n';
+                message += `📊 Overview:\n`;
+                message += `• Total posts: ${stats.total_posts}\n`;
+                message += `• Posts with product label: ${stats.posts_with_label} (${stats.coverage_percentage}%)\n`;
+                message += `• Posts without product label: ${stats.posts_without_label} (${(100 - stats.coverage_percentage).toFixed(2)}%)\n\n`;
+                
+                if (Object.keys(stats.label_distribution).length > 0) {
+                    message += `📈 Product Distribution:\n`;
+                    const sortedLabels = Object.entries(stats.label_distribution)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 10); // Top 10
+                    
+                    for (const [label, count] of sortedLabels) {
+                        const percentage = ((count / stats.total_posts) * 100).toFixed(1);
+                        message += `• ${label}: ${count} posts (${percentage}%)\n`;
+                    }
+                    
+                    if (Object.keys(stats.label_distribution).length > 10) {
+                        message += `\n... and ${Object.keys(stats.label_distribution).length - 10} more products\n`;
+                    }
+                } else {
+                    message += `⚠️ No product labels detected in any posts.\n`;
+                }
+                
+                message += `\n💡 Tip: Posts without labels may need manual review or improved detection patterns.`;
+                
+                // Show in alert (or could be improved with a modal)
+                alert(message);
+                
+                // Also log to console for detailed analysis
+                console.log('Product Labels Stats:', stats);
+                
+            } catch (e) {
+                console.error('Error checking product labels:', e);
+                showToast(`Error: ${e.message}`, 'error');
             }
         }
         

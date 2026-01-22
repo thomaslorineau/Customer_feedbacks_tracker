@@ -202,6 +202,94 @@ async def cleanup_non_ovh_posts():
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
+@router.get('/admin/product-labels-stats')
+async def get_product_labels_stats():
+    """Get statistics about product labels in posts."""
+    """
+    Analyze all posts and return statistics about product labels:
+    - Total posts
+    - Posts with detected product labels
+    - Posts without product labels
+    - Distribution of product labels
+    """
+    import re
+    
+    try:
+        # Get all posts
+        all_posts = db.get_posts(limit=10000, offset=0)
+        
+        # Product detection patterns (aligned with frontend product-detection.js)
+        # Order matters: more specific patterns first
+        product_patterns = [
+            # Web & Hosting
+            {'key': 'domain', 'pattern': re.compile(r'\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b', re.I), 'label': 'Domain'},
+            {'key': 'wordpress', 'pattern': re.compile(r'\b(wordpress|wp\s*host|wp\s*config)\b', re.I), 'label': 'WordPress'},
+            {'key': 'email', 'pattern': re.compile(r'\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b', re.I), 'label': 'Email'},
+            {'key': 'web-hosting', 'pattern': re.compile(r'\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b', re.I), 'label': 'Hosting'},
+            
+            # Cloud & Servers
+            {'key': 'vps', 'pattern': re.compile(r'\b(vps|virtual\s*private\s*server|kimsufi)\b', re.I), 'label': 'VPS'},
+            {'key': 'dedicated', 'pattern': re.compile(r'\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b', re.I), 'label': 'Dedicated'},
+            {'key': 'public-cloud', 'pattern': re.compile(r'\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b', re.I), 'label': 'Public Cloud'},
+            {'key': 'private-cloud', 'pattern': re.compile(r'\b(private\s*cloud|vmware|vsphere)\b', re.I), 'label': 'Private Cloud'},
+            {'key': 'kubernetes', 'pattern': re.compile(r'\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b', re.I), 'label': 'Kubernetes'},
+            
+            # Storage & Backup
+            {'key': 'object-storage', 'pattern': re.compile(r'\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b', re.I), 'label': 'Storage'},
+            {'key': 'backup', 'pattern': re.compile(r'\b(backup|veeam|archive|snapshot|restore)\b', re.I), 'label': 'Backup'},
+            
+            # Network & CDN
+            {'key': 'cdn', 'pattern': re.compile(r'\b(cdn|content\s*delivery|cache)\b', re.I), 'label': 'CDN'},
+            {'key': 'load-balancer', 'pattern': re.compile(r'\b(load\s*balancer|iplb|lb|balancing)\b', re.I), 'label': 'Load Balancer'},
+            {'key': 'ddos', 'pattern': re.compile(r'\b(ddos|anti-ddos|protection|mitigation)\b', re.I), 'label': 'DDoS Protection'},
+            {'key': 'network', 'pattern': re.compile(r'\b(network|vrack|vlan|ip\s*address|subnet)\b', re.I), 'label': 'Network'},
+            
+            # Support & Billing (lower priority)
+            {'key': 'manager', 'pattern': re.compile(r'\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b', re.I), 'label': 'Manager'},
+            {'key': 'api', 'pattern': re.compile(r'\b(api|sdk|integration|rest\s*api|webhook)\b', re.I), 'label': 'API'},
+        ]
+        
+        def detect_product(content):
+            """Detect product from post content."""
+            if not content:
+                return None
+            content_lower = content.lower()
+            for product in product_patterns:
+                if product['pattern'].search(content_lower):
+                    return product['label']
+            return None
+        
+        # Analyze posts
+        total_posts = len(all_posts)
+        posts_with_label = 0
+        posts_without_label = 0
+        label_distribution = {}
+        
+        for post in all_posts:
+            content = post.get('content', '') or ''
+            detected_label = detect_product(content)
+            
+            if detected_label:
+                posts_with_label += 1
+                label_distribution[detected_label] = label_distribution.get(detected_label, 0) + 1
+            else:
+                posts_without_label += 1
+        
+        # Sort labels by count
+        sorted_labels = sorted(label_distribution.items(), key=lambda x: x[1], reverse=True)
+        
+        return {
+            'total_posts': total_posts,
+            'posts_with_label': posts_with_label,
+            'posts_without_label': posts_without_label,
+            'label_distribution': dict(sorted_labels),
+            'coverage_percentage': round((posts_with_label / total_posts * 100) if total_posts > 0 else 0, 2)
+        }
+    except Exception as e:
+        logger.error(f"Error getting product labels stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # UI VERSION ENDPOINTS
 # ============================================================================

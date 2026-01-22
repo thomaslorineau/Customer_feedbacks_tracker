@@ -56,9 +56,9 @@ def scrape_x(query: str, limit: int = 50):
             else:
                 logger.info("[X SCRAPER] Twitter API v2 returned no results, falling back to Nitter")
         else:
-            logger.debug("[X SCRAPER] No Twitter Bearer Token configured, skipping API")
+            logger.warning("[X SCRAPER] No Twitter Bearer Token configured. Configure TWITTER_BEARER_TOKEN in Settings to use Twitter API v2. Falling back to Nitter instances (may be unreliable).")
     except Exception as e:
-        logger.debug(f"[X SCRAPER] Error checking for Twitter API token: {e}")
+        logger.warning(f"[X SCRAPER] Error checking for Twitter API token: {e}")
     
     # Strategy 2: Try Nitter instances (fallback)
     results = _try_nitter_scrape(query, limit)
@@ -67,6 +67,7 @@ def scrape_x(query: str, limit: int = 50):
     
     # All methods failed - return empty list (no sample data)
     logger.warning("[X SCRAPER] All scraping methods failed, returning empty list")
+    logger.info("[X SCRAPER] To enable Twitter/X scraping, configure TWITTER_BEARER_TOKEN in Settings (Settings > API Keys > Twitter/X API)")
     return []
 
 
