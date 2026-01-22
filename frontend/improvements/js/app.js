@@ -161,13 +161,62 @@ async function loadPainPoints() {
         const data = await response.json();
         console.log('Pain points data received:', data);
         
-        if (!data.pain_points || data.pain_points.length === 0) {
+        // Filter pain points by product if filter is active
+        let filteredPainPoints = data.pain_points || [];
+        if (currentProductFilter) {
+            // Filter pain points by checking if their posts match the product
+            const dateFrom = getDateFrom(currentPeriodDays);
+            const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}&search=${encodeURIComponent(currentProductFilter)}`);
+            if (postsResponse.ok) {
+                const postsData = await postsResponse.json();
+                const productPosts = postsData.posts || [];
+                
+                // Import product detection function
+                const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+                
+                // Filter pain points based on whether their keywords match posts with the product
+                filteredPainPoints = filteredPainPoints.filter(pp => {
+                    // Get keywords for this pain point
+                    const keywords = PAIN_POINT_KEYWORDS[pp.title] || [];
+                    if (keywords.length === 0) return false;
+                    
+                    // Check if any product post matches the pain point keywords
+                    return productPosts.some(post => {
+                        const content = (post.content || '').toLowerCase();
+                        const productLabel = getProductLabel(post.id, post.content, post.language);
+                        if (productLabel !== currentProductFilter) return false;
+                        return keywords.some(keyword => content.includes(keyword.toLowerCase()));
+                    });
+                });
+                
+                // Recalculate post counts for filtered pain points
+                filteredPainPoints = filteredPainPoints.map(pp => {
+                    const keywords = PAIN_POINT_KEYWORDS[pp.title] || [];
+                    const matchingPosts = productPosts.filter(post => {
+                        const content = (post.content || '').toLowerCase();
+                        const productLabel = getProductLabel(post.id, post.content, post.language);
+                        if (productLabel !== currentProductFilter) return false;
+                        return keywords.some(keyword => content.includes(keyword.toLowerCase()));
+                    });
+                    return {
+                        ...pp,
+                        posts_count: matchingPosts.length
+                    };
+                }).filter(pp => pp.posts_count > 0);
+            }
+        }
+        
+        if (!filteredPainPoints || filteredPainPoints.length === 0) {
             const periodText = getPeriodText(currentPeriodDays);
-            painPointsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No pain points found for the selected period (${periodText}).</div>`;
+            const filterText = currentProductFilter ? ` for product "${currentProductFilter}"` : '';
+            painPointsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No pain points found${filterText} for the selected period (${periodText}).</div>`;
             return;
         }
         
-        painPointsList.innerHTML = data.pain_points.map((pp, index) => `
+        // Show only top 5, but store all filtered pain points
+        const displayPainPoints = filteredPainPoints.slice(0, 5);
+        
+        painPointsList.innerHTML = displayPainPoints.map((pp, index) => `
             <div class="pain-point-item clickable-pain-point" onclick="openPainPointDrawer('${escapeHtml(pp.title)}', ${index})" style="cursor: pointer;">
                 <div class="pain-point-icon">${pp.icon}</div>
                 <div class="pain-point-content">
@@ -178,14 +227,16 @@ async function loadPainPoints() {
             </div>
         `).join('');
         
-        // Store pain points data globally for drawer access
-        window.currentPainPoints = data.pain_points;
+        // Store filtered pain points data globally for drawer access
+        window.currentPainPoints = filteredPainPoints;
         
         // Show "View All" link if there are more pain points
         const viewAllLink = document.getElementById('viewAllPainPoints');
-        if (viewAllLink && data.total_pain_points > 5) {
+        if (viewAllLink && filteredPainPoints.length > 5) {
             viewAllLink.style.display = 'inline-block';
-            viewAllLink.textContent = `View All ${data.total_pain_points} Pain Points >`;
+            viewAllLink.textContent = `View All ${filteredPainPoints.length} Pain Points >`;
+        } else if (viewAllLink) {
+            viewAllLink.style.display = 'none';
         }
     } catch (error) {
         console.error('Error loading pain points:', error);
@@ -236,7 +287,7 @@ async function loadProductDistribution() {
             // Escape product name for onclick attribute
             const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
             return `
-                <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterDashboardByProduct('${escapedProduct}')" title="Click to filter Dashboard posts by ${escapeHtml(product.product)}">
+                <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')" title="Click to filter this page by ${escapeHtml(product.product)}">
                     <div class="product-color" style="background: ${product.color};"></div>
                     <div class="product-bar-container">
                         <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -265,7 +316,7 @@ async function loadProductDistribution() {
                         // Escape product name for onclick attribute
                         const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
                         return `
-                            <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterDashboardByProduct('${escapedProduct}')" title="Click to filter Dashboard posts by ${escapeHtml(product.product)}">
+                            <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')" title="Click to filter this page by ${escapeHtml(product.product)}">
                                 <div class="product-color" style="background: ${product.color};"></div>
                                 <div class="product-bar-container">
                                     <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -329,7 +380,12 @@ async function loadPostsForImprovement(resetOffset = false, productFilter = null
         const dateFrom = getDateFrom(currentPeriodDays);
         params.append('date_from', dateFrom);
         
-        if (search) params.append('search', search);
+        // Add product filter if active (use search parameter for product filtering)
+        if (filterProduct) {
+            params.append('search', filterProduct);
+        } else if (search) {
+            params.append('search', search);
+        }
         if (language !== 'all') params.append('language', language);
         if (source !== 'all') params.append('source', source);
         
@@ -901,14 +957,15 @@ async function filterByProduct(productName) {
     // Update visual indicator
     updateProductFilterIndicator();
     
-    // Reload posts with filter
-    await loadPostsForImprovement(true, currentProductFilter);
+    // Reload all data with filter
+    await Promise.all([
+        loadPainPoints(),
+        loadProductDistribution(),
+        loadPostsForImprovement(true, currentProductFilter)
+    ]);
     
     // Reload LLM analysis with filter
     await loadImprovementsAnalysis();
-    
-    // Reload product distribution to update active state
-    await loadProductDistribution();
 }
 
 // Filter Dashboard by product (opens Dashboard with product filter applied)
