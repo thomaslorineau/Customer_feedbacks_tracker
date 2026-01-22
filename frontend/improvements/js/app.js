@@ -83,20 +83,26 @@ async function _deprecated_loadVersion() {
 // Load improvements summary
 async function loadImprovementsSummary() {
     try {
+        const summaryEl = document.getElementById('improvementsSummary');
+        if (summaryEl) {
+            summaryEl.classList.add('loading');
+        }
+        
         const response = await fetch('/api/improvements-summary');
         if (response.ok) {
             const data = await response.json();
-            const summaryEl = document.getElementById('improvementsSummary');
             if (summaryEl && data.summary) {
                 summaryEl.textContent = data.summary;
+                summaryEl.classList.remove('loading');
             } else if (summaryEl) {
                 summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
+                summaryEl.classList.remove('loading');
             }
         } else {
             console.error('Failed to load improvements summary:', response.status, response.statusText);
-            const summaryEl = document.getElementById('improvementsSummary');
             if (summaryEl) {
                 summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
+                summaryEl.classList.remove('loading');
             }
         }
     } catch (error) {
@@ -104,6 +110,7 @@ async function loadImprovementsSummary() {
         const summaryEl = document.getElementById('improvementsSummary');
         if (summaryEl) {
             summaryEl.textContent = "💡 Improvement opportunities based on customer feedback";
+            summaryEl.classList.remove('loading');
         }
     }
 }

@@ -222,6 +222,41 @@ def init_db() -> None:
     except Exception:
         pass  # Column already exists
     
+    # Add answered status columns (migration for existing databases)
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN is_answered INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN answered_at TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN answered_by TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN answer_detection_method TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    
+    # Add index for answered status
+    try:
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_posts_is_answered 
+            ON posts(is_answered)
+        ''')
+        conn.commit()
+    except Exception:
+        pass  # Index already exists
+    
     # Add indexes for faster queries (Performance optimization)
     c.execute('''
         CREATE INDEX IF NOT EXISTS idx_posts_source 
@@ -929,24 +964,178 @@ def get_posts(limit: int = 100, offset: int = 0, language: Optional[str] = None)
     with get_db() as conn:
         c = conn.cursor()
         
+        # Check which columns exist in the database (for backward compatibility)
+        c.execute("DESCRIBE posts")
+        columns_info = c.fetchall()
+        available_columns = [col[0] for col in columns_info]
+        
+        # Base columns
+        base_columns = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language', 'relevance_score']
+        
+        # Add answered columns if they exist
+        answered_columns = []
+        if 'is_answered' in available_columns:
+            answered_columns.append('is_answered')
+        if 'answered_at' in available_columns:
+            answered_columns.append('answered_at')
+        if 'answered_by' in available_columns:
+            answered_columns.append('answered_by')
+        if 'answer_detection_method' in available_columns:
+            answered_columns.append('answer_detection_method')
+        
+        all_columns = base_columns + answered_columns
+        columns_str = ', '.join(all_columns)
+        
         # SECURITY: Always use parameterized queries
         if language and language != 'all':
             c.execute(
-                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score '
-                'FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?',
+                f'SELECT {columns_str} FROM posts WHERE language = ? ORDER BY id DESC LIMIT ? OFFSET ?',
                 (language, limit, offset)
             )
         else:
             c.execute(
-                'SELECT id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score '
-                'FROM posts ORDER BY id DESC LIMIT ? OFFSET ?',
+                f'SELECT {columns_str} FROM posts ORDER BY id DESC LIMIT ? OFFSET ?',
                 (limit, offset)
             )
         
         rows = c.fetchall()
     
-    keys = ['id', 'source', 'author', 'content', 'url', 'created_at', 'sentiment_score', 'sentiment_label', 'language', 'relevance_score']
-    return [dict(zip(keys, row)) for row in rows]
+    return [dict(zip(all_columns, row)) for row in rows]
+
+
+def update_post_answered_status(post_id: int, is_answered: bool, answered_by: Optional[str] = None, method: str = 'manual') -> bool:
+    """Met à jour le statut de réponse d'un post."""
+    conn, _ = get_db_connection()
+    try:
+        answered_at = datetime.datetime.now().isoformat() if is_answered else None
+        c = conn.cursor()
+        
+        # First verify the post exists
+        c.execute('SELECT id FROM posts WHERE id = ?', (post_id,))
+        if not c.fetchone():
+            logger.warning(f"Post {post_id} not found for answered status update")
+            return False
+        
+        # Update the post
+        c.execute('''
+            UPDATE posts 
+            SET is_answered = ?, answered_at = ?, answered_by = ?, answer_detection_method = ?
+            WHERE id = ?
+        ''', (1 if is_answered else 0, answered_at, answered_by, method, post_id))
+        conn.commit()
+        
+        # Verify the update succeeded by checking the post again
+        c.execute('SELECT is_answered FROM posts WHERE id = ?', (post_id,))
+        result = c.fetchone()
+        if result:
+            updated_value = result[0]
+            expected_value = 1 if is_answered else 0
+            success = updated_value == expected_value
+            if success:
+                logger.debug(f"Successfully updated answered status for post {post_id} to {is_answered}")
+            else:
+                logger.warning(f"Update may have failed: post {post_id} is_answered={updated_value}, expected={expected_value}")
+            return success
+        return False
+    except Exception as e:
+        logger.error(f"Error updating answered status for post {post_id}: {e}", exc_info=True)
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def detect_and_update_answered_status(post_id: Optional[int], post_data: Dict[str, Any]) -> bool:
+    """
+    Détecte automatiquement si un post a été répondu selon sa source.
+    
+    Args:
+        post_id: ID du post
+        post_data: Dict avec les métadonnées du post (comments, replies, etc.)
+    
+    Returns:
+        True si le statut a été mis à jour, False sinon
+    """
+    source = post_data.get('source', '').lower()
+    is_answered = False
+    answered_by = None
+    method = 'auto'
+    
+    if source == 'reddit':
+        num_comments = post_data.get('num_comments', 0) or post_data.get('comments', 0)
+        is_answered = num_comments > 0
+        answered_by = 'Community' if is_answered else None
+    
+    elif source == 'github' or source == 'github issues':
+        comments = post_data.get('comments', 0) or post_data.get('comments_count', 0)
+        is_answered = comments > 0
+        answered_by = 'Community' if is_answered else None
+    
+    elif source == 'trustpilot':
+        has_company_reply = post_data.get('has_company_reply', False) or post_data.get('company_replied', False)
+        is_answered = has_company_reply
+        answered_by = 'OVH' if is_answered else None
+    
+    elif source == 'stackoverflow' or source == 'stack overflow':
+        is_answered_bool = post_data.get('is_answered', False)
+        answer_count = post_data.get('answer_count', 0) or post_data.get('answers', 0)
+        is_answered = is_answered_bool or answer_count > 0
+        answered_by = 'Community' if is_answered else None
+    
+    elif source == 'x' or source == 'twitter':
+        is_answered = False  # To be improved
+    
+    elif source == 'ovh forum':
+        comments = post_data.get('comments', 0) or post_data.get('num_comments', 0) or post_data.get('replies', 0)
+        is_answered = comments > 0
+        answered_by = 'Community' if is_answered else None
+    
+    elif source == 'g2 crowd' or source == 'g2-crowd':
+        is_answered = False  # To be improved
+    
+    elif source == 'linkedin':
+        is_answered = False  # To be improved
+    
+    if is_answered and post_id:
+        return update_post_answered_status(post_id, True, answered_by, method)
+    return False
+
+
+def get_answered_stats() -> Dict[str, Any]:
+    """Obtenir les statistiques de réponses."""
+    conn, _ = get_db_connection()
+    try:
+        c = conn.cursor()
+        c.execute('''
+            SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN is_answered = 1 THEN 1 ELSE 0 END) as answered,
+                SUM(CASE WHEN is_answered = 0 OR is_answered IS NULL THEN 1 ELSE 0 END) as not_answered
+            FROM posts
+            WHERE url NOT LIKE '%/sample%' 
+            AND url NOT LIKE '%example.com%'
+        ''')
+        result = c.fetchone()
+        total = result[0] or 0
+        answered = result[1] or 0
+        not_answered = result[2] or 0
+        answered_percentage = round((answered / total * 100), 1) if total > 0 else 0.0
+        return {
+            "total": total,
+            "answered": answered,
+            "not_answered": not_answered,
+            "answered_percentage": answered_percentage
+        }
+    except Exception as e:
+        logger.error(f"Error getting answered stats: {e}")
+        return {
+            "total": 0,
+            "answered": 0,
+            "not_answered": 0,
+            "answered_percentage": 0.0
+        }
+    finally:
+        conn.close()
 
 
 def create_job_record(job_id: str) -> None:

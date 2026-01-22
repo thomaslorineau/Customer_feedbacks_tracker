@@ -257,6 +257,11 @@
                             <select class="filter-select" id="productFilter">
                                 <option value="all">All Products</option>
                             </select>
+                            <select class="filter-select" id="answeredFilter">
+                                <option value="all">All Status</option>
+                                <option value="1">Answered</option>
+                                <option value="0">Not Answered</option>
+                            </select>
                             <input type="date" id="dateFrom" class="filter-select" title="From Date" placeholder="From" style="min-width: 140px;">
                             <input type="date" id="dateTo" class="filter-select" title="To Date" placeholder="To" style="min-width: 140px;">
                             <button id="clearTimelineFilterBtn" class="filter-btn" style="background: #ef4444; color: white; margin-left: 8px;" title="Reset timeline to default (last 12 months)">Clear Filter</button>
@@ -368,6 +373,11 @@
                             <option value="all">All Languages</option>
                             <option value="fr">Français</option>
                             <option value="en">English</option>
+                        </select>
+                        <select id="postsAnsweredFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
+                            <option value="all">All Status</option>
+                            <option value="1">Answered</option>
+                            <option value="0">Not Answered</option>
                         </select>
                         <input type="date" id="postsDateFrom" onchange="updatePostsDisplay()" class="filter-select" title="From Date" placeholder="From" style="min-width: 140px;">
                         <input type="date" id="postsDateTo" onchange="updatePostsDisplay()" class="filter-select" title="To Date" placeholder="To" style="min-width: 140px;">

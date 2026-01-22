@@ -73,3 +73,29 @@ class RecommendedActionsResponse(BaseModel):
     llm_available: bool = Field(default=True, description="Whether LLM was used to generate actions")
 
 
+class WhatsHappeningRequest(BaseModel):
+    """Request model for generating What's Happening insights."""
+    posts: List[dict] = Field(..., description="List of filtered posts to analyze")
+    stats: dict = Field(default={}, description="Statistics about posts")
+    active_filters: str = Field(default="", description="Description of active filters")
+
+
+class WhatsHappeningInsight(BaseModel):
+    """Model for a single What's Happening insight."""
+    type: str = Field(..., description="Type of insight: 'top_product', 'top_issue', 'spike', 'trend'")
+    title: str = Field(..., description="Title of the insight")
+    description: str = Field(..., description="Description of the insight")
+    icon: str = Field(default="📊", description="Emoji icon for the insight")
+    metric: str = Field(default="", description="Metric or percentage if applicable")
+    count: int = Field(default=0, description="Count or number if applicable")
+
+
+class WhatsHappeningResponse(BaseModel):
+    """Response model for What's Happening insights."""
+    insights: List[WhatsHappeningInsight] = Field(..., description="List of generated insights")
+    llm_available: bool = Field(default=True, description="Whether LLM was used to generate insights")
+
+
+
+
+

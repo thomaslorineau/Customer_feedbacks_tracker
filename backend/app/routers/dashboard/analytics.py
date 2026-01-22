@@ -208,8 +208,8 @@ async def get_posts_by_source():
     tags=["Analytics", "Dashboard", "Insights"]
 )
 async def get_pain_points(
-    days: int = Query(30, description="Number of days to analyze", ge=1, le=365, example=30),
-    limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=20, example=5)
+    days: int = Query(30, description="Number of days to analyze", ge=1, le=365, examples=[30]),
+    limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=20, examples=[5])
 ):
     """Analyze recurring pain points from customer feedback over the last N days."""
     now = time.time()

@@ -9,7 +9,8 @@ import httpx
 
 from .models import (
     ImprovementIdea, ImprovementIdeasResponse, ImprovementIdeaRequest,
-    RecommendedAction, RecommendedActionsResponse, RecommendedActionRequest
+    RecommendedAction, RecommendedActionsResponse, RecommendedActionRequest,
+    WhatsHappeningInsight, WhatsHappeningResponse, WhatsHappeningRequest
 )
 from .analytics import get_pain_points
 
@@ -416,6 +417,238 @@ async def get_recommended_actions(request: RecommendedActionRequest):
         return RecommendedActionsResponse(actions=actions, llm_available=llm_available)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate recommended actions: {str(e)}")
+
+
+async def generate_whats_happening_insights_with_llm(
+    posts: List[dict],
+    stats: dict,
+    active_filters: str = ""
+) -> List[WhatsHappeningInsight]:
+    """Generate What's Happening insights using LLM API."""
+    # Prepare posts for analysis (focus on negative posts and recent ones)
+    negative_posts = [p for p in posts if p.get('sentiment_label') == 'negative']
+    recent_posts = [p for p in posts if p.get('created_at')]
+    # Sort by date, most recent first
+    recent_posts.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
+    posts_for_analysis = (negative_posts[:20] if negative_posts else recent_posts[:20])
+    
+    posts_summary = []
+    for post in posts_for_analysis:
+        posts_summary.append({
+            'content': (post.get('content', '') or '')[:400],
+            'sentiment': post.get('sentiment_label', 'neutral'),
+            'source': post.get('source', 'Unknown'),
+            'created_at': post.get('created_at', ''),
+            'language': post.get('language', 'unknown')
+        })
+    
+    total = stats.get('total', len(posts))
+    positive = stats.get('positive', 0)
+    negative = stats.get('negative', 0)
+    neutral = stats.get('neutral', 0)
+    recent_negative = stats.get('recent_negative', 0)
+    recent_total = stats.get('recent_total', 0)
+    spike_detected = stats.get('spike_detected', False)
+    
+    prompt = f"""You are an OVHcloud customer feedback analyst. Analyze the following customer feedback posts and generate key insights for the "What's Happening" section.
+
+CONTEXT:
+- Active filters: {active_filters if active_filters else "All posts (no filters)"}
+- Total posts analyzed: {total} (Positive: {positive}, Negative: {negative}, Neutral: {neutral})
+- Recent posts (last 48h): {recent_total} total, {recent_negative} negative
+- Spike detected: {spike_detected} {'⚠️ Significant increase in negative feedback!' if spike_detected else ''}
+
+POSTS TO ANALYZE:
+{json.dumps(posts_summary, indent=2, ensure_ascii=False)}
+
+Based on this analysis, generate 2-4 key insights. Focus on:
+1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be specific (e.g., "VPS", "Hosting", "Billing", "Support", "API", "Domain", etc.). If multiple products are mentioned, identify the most critical one.
+2. **Top Issue**: What is the main problem or concern mentioned across these posts? Extract the core issue, not just keywords. Be specific and actionable (e.g., "Payment processing delays", "Server downtime", "Support response time", etc.).
+3. **Spike Alert** (if spike_detected is true): Highlight the spike in negative feedback
+4. **Trend** (optional): Any notable trend or pattern you observe
+
+Format your response as a JSON array with this structure:
+[
+  {{
+    "type": "top_product",
+    "title": "Top Product Impacted: [Product Name]",
+    "description": "[Percentage]% of negative posts relate to [Product Name] issues. [Brief explanation based on actual posts]",
+    "icon": "🎁",
+    "metric": "[percentage]%",
+    "count": [number]
+  }},
+  {{
+    "type": "top_issue",
+    "title": "Top Issue: [Issue Name]",
+    "description": "[Count] posts mention issues related to [Issue]. [Brief explanation based on actual posts]",
+    "icon": "💬",
+    "metric": "",
+    "count": [number]
+  }},
+  {{
+    "type": "spike",
+    "title": "Spike in Negative Feedback",
+    "description": "[Percentage]% increase in negative feedback. [Count] negative posts in past 48h.",
+    "icon": "⚠️",
+    "metric": "+[percentage]%",
+    "count": [number]
+  }}
+]
+
+IMPORTANT:
+- Base insights on ACTUAL content from the posts, not assumptions
+- Be specific and reference actual issues/products mentioned
+- If a filter is active, acknowledge it in the insights
+- Use appropriate icons (🎁 for products, 💬 for issues, ⚠️ for alerts, 📊 for trends)
+- Ensure percentages and counts are accurate based on the data provided"""
+
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    
+    if not openai_key and not anthropic_key:
+        return generate_whats_happening_fallback(posts, stats, active_filters)
+    
+    try:
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+            # Use Anthropic
+            api_key = anthropic_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 2000,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['content'][0]['text']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        insights_data = json.loads(json_match.group())
+                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            # Use OpenAI
+            api_key = openai_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        insights_data = json.loads(json_match.group())
+                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        return generate_whats_happening_fallback(posts, stats, active_filters)
+    except Exception as e:
+        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
+        return generate_whats_happening_fallback(posts, stats, active_filters)
+    
+    return generate_whats_happening_fallback(posts, stats, active_filters)
+
+
+def generate_whats_happening_fallback(
+    posts: List[dict],
+    stats: dict,
+    active_filters: str = ""
+) -> List[WhatsHappeningInsight]:
+    """Fallback rule-based insights generator."""
+    insights = []
+    
+    negative = stats.get('negative', 0)
+    recent_negative = stats.get('recent_negative', 0)
+    spike_detected = stats.get('spike_detected', False)
+    
+    # Spike alert
+    if spike_detected and recent_negative > 0:
+        spike_percentage = stats.get('spike_percentage', 0)
+        insights.append(WhatsHappeningInsight(
+            type="spike",
+            title="Spike in Negative Feedback Detected",
+            description=f"{spike_percentage if spike_percentage > 0 else 'Significant'}% more than average. {recent_negative} negative posts in past 48h.",
+            icon="⚠️",
+            metric=f"+{spike_percentage}%" if spike_percentage > 0 else "",
+            count=recent_negative
+        ))
+    
+    # Top product (simplified fallback)
+    top_product = stats.get('top_product', 'N/A')
+    top_product_count = stats.get('top_product_count', 0)
+    if top_product != 'N/A' and top_product_count > 0:
+        top_product_percentage = stats.get('top_product_percentage', 0)
+        insights.append(WhatsHappeningInsight(
+            type="top_product",
+            title=f"Top Product Impacted: {top_product}",
+            description=f"{top_product_percentage}% of negative posts are relating to {top_product} issues.",
+            icon="🎁",
+            metric=f"{top_product_percentage}%",
+            count=top_product_count
+        ))
+    
+    # Top issue (simplified fallback)
+    top_issue = stats.get('top_issue', 'N/A')
+    top_issue_count = stats.get('top_issue_count', 0)
+    if top_issue != 'N/A' and top_issue_count > 0:
+        insights.append(WhatsHappeningInsight(
+            type="top_issue",
+            title=f'Top Issue: "{top_issue.capitalize()}"',
+            description=f"{top_issue_count} posts mention issues related to {top_issue}.",
+            icon="💬",
+            metric="",
+            count=top_issue_count
+        ))
+    
+    return insights
+
+
+@router.post("/api/whats-happening", response_model=WhatsHappeningResponse)
+async def get_whats_happening(request: WhatsHappeningRequest):
+    """Generate What's Happening insights based on filtered posts using LLM."""
+    try:
+        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic']
+        
+        insights = await generate_whats_happening_insights_with_llm(
+            request.posts,
+            request.stats,
+            request.active_filters
+        )
+        return WhatsHappeningResponse(insights=insights, llm_available=llm_available)
+    except Exception as e:
+        logger.error(f"Failed to generate What's Happening insights: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
 
 
 @router.get("/api/improvements-summary")

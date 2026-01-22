@@ -174,10 +174,10 @@ function renderSourceChart(sourceData, sentimentBySource) {
             maintainAspectRatio: false,
             layout: {
                 padding: {
-                    bottom: 45,
-                    top: 10,
-                    left: 10,
-                    right: 10
+                    bottom: 5,
+                    top: 5,
+                    left: 5,
+                    right: 5
                 }
             },
             plugins: {
@@ -186,10 +186,12 @@ function renderSourceChart(sourceData, sentimentBySource) {
                     position: 'top',
                     labels: {
                         usePointStyle: true,
-                        padding: 15,
+                        padding: 8,
                         font: {
-                            size: 12
-                        }
+                            size: 11
+                        },
+                        boxWidth: 12,
+                        boxHeight: 12
                     }
                 },
                 tooltip: {
@@ -237,18 +239,18 @@ function renderSourceChart(sourceData, sentimentBySource) {
             scales: {
                 x: {
                     stacked: true,
-                    categoryPercentage: 0.7,
-                    barPercentage: 0.85,
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.9,
                     ticks: {
                         font: {
-                            size: 12,
+                            size: 11,
                             weight: '600',
                             family: 'system-ui, -apple-system, sans-serif'
                         },
                         maxRotation: 0,
                         minRotation: 0,
                         color: 'var(--text-primary)',
-                        padding: 12,
+                        padding: 4,
                         autoSkip: false
                     },
                     grid: {
@@ -261,10 +263,10 @@ function renderSourceChart(sourceData, sentimentBySource) {
                     ticks: {
                         stepSize: 1,
                         font: {
-                            size: 11,
+                            size: 10,
                             family: 'system-ui, -apple-system, sans-serif'
                         },
-                        padding: 10,
+                        padding: 5,
                         color: 'var(--text-secondary)'
                     },
                     grid: {

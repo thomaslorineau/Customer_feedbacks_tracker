@@ -158,6 +158,11 @@ def process_and_save_items(items: List[Dict], source_name: str) -> Tuple[int, in
                 
                 if inserted:
                     added += 1
+                    # Try to detect and update answered status automatically
+                    try:
+                        db.detect_and_update_answered_status(inserted, it)
+                    except Exception as e:
+                        logger.debug(f"[{source_name}] Could not auto-detect answered status for post {inserted}: {e}")
                 else:
                     skipped_duplicates += 1
             except Exception as e:

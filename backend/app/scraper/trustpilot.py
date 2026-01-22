@@ -245,6 +245,104 @@ class TrustpilotScraper(BaseScraper):
                         
                         sentiment_score = (rating - 3) / 2  # 1-5 scale -> -1 to 1
                         
+                        # Check for company reply
+                        has_company_reply = False
+                        company_replied = False
+                        
+                        # Look for company reply indicators in the card
+                        # Trustpilot uses various selectors for company replies
+                        company_reply_elem = (
+                            card.find('div', {'data-business-reply-typography': True}) or
+                            card.find('div', class_=re.compile(r'business.*reply|company.*reply', re.I)) or
+                            card.find('section', class_=re.compile(r'business.*reply|company.*reply', re.I)) or
+                            card.find('div', {'data-review-business-reply-typography': True})
+                        )
+                        
+                        if company_reply_elem:
+                            reply_text = company_reply_elem.get_text(strip=True)
+                            # Check if reply text contains meaningful content (not just empty)
+                            if reply_text and len(reply_text) > 10:
+                                has_company_reply = True
+                                company_replied = True
+                        
+                        # Also check for "Réponse : OVHcloud" or similar patterns in card text
+                        # But be careful not to match customer mentions like "Merci pour une réponse"
+                        if not has_company_reply:
+                            card_text = card.get_text()
+                            # Look for patterns like "Réponse : OVH", "Réponse de OVH", etc.
+                            # Only match if "Réponse" is clearly a section header/title, not in customer text
+                            # Pattern: "Réponse" followed by colon and OVH, or "Réponse de OVH" as a standalone phrase
+                            # Exclude customer phrases like "pour une réponse", "d'une réponse", "merci pour la réponse", "merci à X pour une réponse"
+                            reply_match = re.search(r'(?:^|[\n:])[Rr]éponse\s*:?\s*(?:de\s+)?(?:ovh|ovhcloud)', card_text, re.I | re.MULTILINE)
+                            if reply_match:
+                                # Additional check: make sure it's not in customer context
+                                # Check the text before the match for customer phrases
+                                text_before = card_text[:reply_match.start()].lower()
+                                # Don't match if it's in phrases like "pour une réponse", "d'une réponse", "merci pour la réponse", "merci à X pour une réponse"
+                                customer_phrases = [
+                                    r'pour\s+(?:une|la)\s+réponse',
+                                    r'd[eu]\s+(?:une|la)\s+réponse',
+                                    r'merci\s+(?:à|pour).*réponse',
+                                    r'merci.*pour\s+(?:une|la)\s+réponse'
+                                ]
+                                # Check last 150 characters before match for customer context
+                                is_customer_context = any(re.search(phrase, text_before[-150:], re.I) for phrase in customer_phrases)
+                                
+                                if not is_customer_context:
+                                    has_company_reply = True
+                                    company_replied = True
+                        
+                        # ALWAYS visit the individual review page for more reliable detection
+                        # This is slower but more accurate - we do this for ALL reviews to ensure we don't miss replies
+                        if review_url and review_url != TRUSTPILOT_WEB and '/reviews/' in review_url:
+                            try:
+                                # Visit the individual review page to check for company reply
+                                await asyncio.sleep(0.5)  # Rate limiting
+                                review_response = await self._fetch_get(review_url, headers=DEFAULT_HEADERS)
+                                if review_response.status_code == 200:
+                                    review_soup = BeautifulSoup(review_response.text, 'html.parser')
+                                    page_text = review_soup.get_text()
+                                    
+                                    # Method 1: Look for reply HTML elements
+                                    reply_on_page = (
+                                        review_soup.find('div', {'data-business-reply-typography': True}) or
+                                        review_soup.find('div', {'data-review-business-reply-typography': True}) or
+                                        review_soup.find('section', class_=re.compile(r'business.*reply|company.*reply', re.I))
+                                    )
+                                    
+                                    if reply_on_page:
+                                        reply_text = reply_on_page.get_text(strip=True)
+                                        if reply_text and len(reply_text) > 10:
+                                            has_company_reply = True
+                                            company_replied = True
+                                    
+                                    # Method 2: Check for "Réponse : OVHcloud" text pattern (more robust)
+                                    if not has_company_reply:
+                                        # Look for "Réponse : OVHcloud" or "Réponse: OVHcloud" as a section header
+                                        reply_match = re.search(r'(?:^|[\n:])[Rr]éponse\s*:?\s*(?:de\s+)?(?:ovh|ovhcloud)', page_text, re.I | re.MULTILINE)
+                                        if reply_match:
+                                            # Make sure it's not in customer context
+                                            text_before = page_text[:reply_match.start()].lower()
+                                            customer_phrases = [
+                                                r'pour\s+(?:une|la)\s+réponse',
+                                                r'd[eu]\s+(?:une|la)\s+réponse',
+                                                r'merci\s+(?:à|pour).*réponse',
+                                                r'merci.*pour\s+(?:une|la)\s+réponse'
+                                            ]
+                                            is_customer_context = any(re.search(phrase, text_before[-200:], re.I) for phrase in customer_phrases)
+                                            
+                                            if not is_customer_context:
+                                                # Check if there's actual reply content after "Réponse : OVHcloud"
+                                                text_after = page_text[reply_match.end():reply_match.end()+500]
+                                                if len(text_after.strip()) > 20:  # There's content after the header
+                                                    has_company_reply = True
+                                                    company_replied = True
+                                                    self.logger.log("debug", f"Found company reply via text pattern on {review_url}")
+                            except Exception as e:
+                                # If visiting individual page fails, continue without reply detection
+                                self.logger.log("debug", f"Could not check individual review page {review_url}: {e}")
+                                pass
+                        
                         post = {
                             "source": "Trustpilot",
                             "author": author,
@@ -253,6 +351,8 @@ class TrustpilotScraper(BaseScraper):
                             "created_at": created_at,
                             "sentiment_score": sentiment_score,
                             "sentiment_label": sentiment_label,
+                            "has_company_reply": has_company_reply,
+                            "company_replied": company_replied,
                         }
                         reviews.append(post)
                         parsed_count += 1
@@ -320,6 +420,11 @@ class TrustpilotScraper(BaseScraper):
                 
                 sentiment_score = (rating - 3) / 2
                 
+                # Check for company reply in API response
+                company_reply = review.get("companyReply")
+                has_company_reply = bool(company_reply and company_reply.get("text"))
+                company_replied = has_company_reply
+                
                 post = {
                     "source": "Trustpilot",
                     "author": review.get("consumer", {}).get("displayName", "Anonymous"),
@@ -328,6 +433,8 @@ class TrustpilotScraper(BaseScraper):
                     "created_at": review.get("createdAt", datetime.now().isoformat()),
                     "sentiment_score": sentiment_score,
                     "sentiment_label": sentiment_label,
+                    "has_company_reply": has_company_reply,
+                    "company_replied": company_replied,
                 }
                 reviews.append(post)
             except Exception as e:

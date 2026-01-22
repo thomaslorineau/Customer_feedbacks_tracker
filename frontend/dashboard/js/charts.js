@@ -7,6 +7,7 @@ let currentTimelineData = null; // Store current timeline data for onClick handl
 let isSelecting = false;
 let selectionStart = null;
 let selectionEnd = null;
+let isDragging = false; // Track if user is dragging to select date range
 
 export function initCharts(state) {
     state.subscribe((updatedState) => {
@@ -40,6 +41,11 @@ export function updateTimelineChart(state) {
             timelineChart.destroy();
             timelineChart = null;
         }
+        // Also check if Chart.js has registered a chart on this canvas
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) {
+            existingChart.destroy();
+        }
         return;
     }
     
@@ -72,6 +78,15 @@ export function updateTimelineChart(state) {
     if (timelineChart) {
         timelineChart.destroy();
         timelineChart = null;
+        // Reset dragging state when chart is destroyed
+        isDragging = false;
+        isSelecting = false;
+    }
+    
+    // Also check if Chart.js has registered a chart on this canvas and destroy it
+    const existingChart = Chart.getChart(canvas);
+    if (existingChart) {
+        existingChart.destroy();
     }
     
     // Store timeline data for onClick handler
@@ -81,8 +96,14 @@ export function updateTimelineChart(state) {
         posts: posts
     };
     
-    // Wait a bit to ensure canvas is ready
+    // Wait a bit to ensure canvas is ready and previous chart is fully destroyed
     setTimeout(() => {
+        // Double-check that canvas is not in use
+        const stillExistingChart = Chart.getChart(canvas);
+        if (stillExistingChart) {
+            stillExistingChart.destroy();
+        }
+        
         // Ensure canvas has proper dimensions
         const container = canvas.parentElement;
         if (container) {
@@ -349,7 +370,6 @@ export function updateTimelineChart(state) {
 }
 
 function setupTimelineSelection(canvas, chart) {
-    let isDragging = false;
     let startX = null;
     let startIndex = null;
     let selectionRect = null;

@@ -22,7 +22,7 @@ class Config(BaseSettings):
     """Application configuration with secure API key management using Pydantic Settings."""
     
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(Path(__file__).parent.parent / ".env"),  # backend/.env
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"

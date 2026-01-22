@@ -18,29 +18,25 @@ class ScrapeResult(BaseModel):
     """Response model for scraping operations."""
     posts: List[dict] = Field(
         default=[], 
-        description="List of scraped posts with metadata (source, author, content, url, sentiment, etc.)",
-        example=[]
+        description="List of scraped posts with metadata (source, author, content, url, sentiment, etc.)"
     )
     total: int = Field(
         default=0, 
         description="Total number of posts scraped from the source",
-        example=25,
         ge=0
     )
     added: int = Field(
         default=0, 
         description="Number of new posts successfully added to database (duplicates are excluded)",
-        example=20,
         ge=0
     )
     errors: List[str] = Field(
         default=[], 
-        description="List of error messages encountered during scraping or processing",
-        example=[]
+        description="List of error messages encountered during scraping or processing"
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "posts": [],
                 "total": 25,
@@ -55,12 +51,11 @@ class KeywordsPayload(BaseModel):
     keywords: List[str] = Field(
         default_factory=list, 
         description="List of keywords to scrape. If empty, base keywords from settings will be used automatically. Maximum 50 keywords allowed.",
-        example=["OVH", "OVHCloud", "OVH VPS"],
         max_items=50
     )
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "keywords": ["OVH", "OVHCloud", "OVH hosting"]
             }
@@ -122,8 +117,8 @@ class KeywordsPayload(BaseModel):
 )
 async def scrape_x_endpoint(
     request: Request, 
-    query: str = Query("OVH", description="Search query for X/Twitter. Use 'OVH' to trigger base keywords mode.", example="OVH VPS"),
-    limit: int = Query(100, description="Maximum number of posts to scrape", ge=1, le=200, example=100)
+    query: str = Query("OVH", description="Search query for X/Twitter. Use 'OVH' to trigger base keywords mode.", examples=["OVH VPS"]),
+    limit: int = Query(100, description="Maximum number of posts to scrape", ge=1, le=200, examples=[100])
 ):
     """
     Scrape X/Twitter posts about OVH.
@@ -183,8 +178,8 @@ async def scrape_x_endpoint(
     tags=["Scraping"]
 )
 async def scrape_stackoverflow_endpoint(
-    query: str = Query("OVH", description="Search query. Will be combined with base keywords.", example="OVH domain"),
-    limit: int = Query(50, description="Maximum number of questions to scrape", ge=1, le=100, example=50)
+    query: str = Query("OVH", description="Search query. Will be combined with base keywords.", examples=["OVH domain"]),
+    limit: int = Query(50, description="Maximum number of questions to scrape", ge=1, le=100, examples=[50])
 ):
     """Scrape Stack Overflow questions about OVH."""
     source_name = "Stack Overflow"
@@ -233,8 +228,8 @@ async def scrape_stackoverflow_endpoint(
 )
 async def scrape_github_endpoint(
     request: Request, 
-    query: str = Query("OVH", description="Search query for GitHub issues", example="OVH API"),
-    limit: int = Query(50, description="Maximum number of issues to scrape", ge=1, le=100, example=50)
+    query: str = Query("OVH", description="Search query for GitHub issues", examples=["OVH API"]),
+    limit: int = Query(50, description="Maximum number of issues to scrape", ge=1, le=100, examples=[50])
 ):
     """Scrape GitHub issues mentioning OVH."""
     source_name = "GitHub"
@@ -278,8 +273,8 @@ async def scrape_github_endpoint(
 )
 async def scrape_reddit_endpoint(
     request: Request, 
-    query: str = Query("OVH", description="Search query for Reddit", example="OVH hosting"),
-    limit: int = Query(50, description="Maximum number of posts to scrape", ge=1, le=100, example=50)
+    query: str = Query("OVH", description="Search query for Reddit", examples=["OVH hosting"]),
+    limit: int = Query(50, description="Maximum number of posts to scrape", ge=1, le=100, examples=[50])
 ):
     """Scrape Reddit posts and discussions about OVH using RSS feeds."""
     source_name = "Reddit"
@@ -486,8 +481,8 @@ async def scrape_news_endpoint(request: Request, query: str = "OVH", limit: int 
 )
 async def scrape_trustpilot_endpoint(
     request: Request, 
-    query: str = Query("OVH domain", description="Search query for Trustpilot reviews", example="OVH domain"),
-    limit: int = Query(200, description="Maximum number of reviews to scrape", ge=1, le=1000, example=200)
+    query: str = Query("OVH domain", description="Search query for Trustpilot reviews", examples=["OVH domain"]),
+    limit: int = Query(200, description="Maximum number of reviews to scrape", ge=1, le=1000, examples=[200])
 ):
     """Scrape Trustpilot customer reviews about OVH."""
     source_name = "Trustpilot"

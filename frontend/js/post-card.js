@@ -94,6 +94,11 @@ function renderPostCard(post, options = {}) {
                         🌐 ${escapeHtml(post.language.toUpperCase())}
                     </span>
                     ` : ''}
+                    ${post.is_answered === 1 || post.is_answered === true ? `
+                    <span class="answered-badge answered-yes" title="Post répondu${post.answered_by ? ' par ' + escapeHtml(post.answered_by) : ''}${post.answered_at ? ' le ' + escapeHtml(post.answered_at) : ''}">
+                        ✓ Answered
+                    </span>
+                    ` : ''}
                     <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
 
 Calculé à partir de :
@@ -107,6 +112,22 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     </span>
                 </div>
                 <div class="post-actions">
+                    ${(() => {
+                        const isAnswered = post.is_answered === 1 || post.is_answered === true;
+                        // Toggle: if answered, clicking will set to false (not answered), and vice versa
+                        const toggleValue = !isAnswered;
+                        return isAnswered ? `
+                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, false)" class="post-action-btn btn-not-answered" title="Marquer comme non répondu">
+                        <span class="btn-icon">✗</span>
+                        <span class="btn-text">Not Answered</span>
+                    </button>
+                    ` : `
+                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, true)" class="post-action-btn btn-answered" title="Marquer comme répondu">
+                        <span class="btn-icon">✓</span>
+                        <span class="btn-text">Answered</span>
+                    </button>
+                    `;
+                    })()}
                     <button onclick="${options.onPreviewClickName || 'openPostPreview'}(${post.id})" class="post-action-btn btn-preview">
                         <span class="btn-icon">👁️</span>
                         <span class="btn-text">Preview</span>
@@ -124,4 +145,7 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
         </div>
     `;
 }
+
+// Make renderPostCard globally available
+window.renderPostCard = renderPostCard;
 

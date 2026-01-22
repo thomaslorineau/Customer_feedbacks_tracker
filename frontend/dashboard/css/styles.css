@@ -663,15 +663,16 @@ body {
     max-height: 320px;
     height: 320px;
     position: relative;
-    margin-top: 8px;
+    margin-top: 4px;
     overflow: visible;
     display: flex;
     flex-direction: column;
-    padding-bottom: 45px;
+    padding: 4px;
+    padding-bottom: 8px;
 }
 
 .chart-container-source canvas {
-    max-height: calc(100% - 45px);
+    max-height: 100%;
     width: 100% !important;
     height: auto !important;
     flex: 1;

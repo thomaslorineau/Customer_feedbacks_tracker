@@ -1,9 +1,7 @@
-"""Posts endpoints for retrieving and filtering posts."""
-import datetime
-import time
-import logging
+"""Posts endpoints for dashboard."""
+from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
-from fastapi import APIRouter
+import logging
 
 from ... import db
 
@@ -12,144 +10,158 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/posts")
-async def get_posts(limit: int = 20, offset: int = 0, language: str = None):
-    """Get posts from database, excluding sample data."""
-    posts = db.get_posts(limit=limit, offset=offset, language=language)
-    filtered = []
-    for post in posts:
-        url = post.get('url', '')
-        is_sample = (
-            '/sample' in url or
-            'example.com' in url or
-            '/status/174' in url or
-            url == 'https://trustpilot.com/sample'
-        )
-        if not is_sample:
-            try:
-                created_at = post.get('created_at', '')
-                if created_at:
-                    dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                    post['created_at_timestamp'] = dt.timestamp()
-                else:
-                    post['created_at_timestamp'] = 0
-            except:
-                post['created_at_timestamp'] = 0
-            
-            post['views'] = post.get('views', 0)
-            post['comments'] = post.get('comments', 0)
-            post['reactions'] = post.get('reactions', 0)
-            
-            filtered.append(post)
-    return filtered
-
-
-@router.get("/api/posts-for-improvement")
-async def get_posts_for_improvement(
-    limit: int = 20,
-    offset: int = 0,
-    search: Optional[str] = None,
-    language: Optional[str] = None,
-    source: Optional[str] = None,
-    sort_by: str = "opportunity_score"
+@router.get("/posts", tags=["Dashboard", "Posts"])
+async def get_posts(
+    limit: int = Query(100, description="Maximum number of posts to return", ge=1, le=10000, examples=[100]),
+    offset: int = Query(0, description="Offset for pagination", ge=0, examples=[0]),
+    language: Optional[str] = Query(None, description="Filter by language (optional)", examples=["en", "fr"])
 ):
-    """Get posts ranked by priority score for improvement review."""
-    all_posts = db.get_posts(limit=10000, offset=0)
+    """
+    Get posts from the database with pagination support.
     
-    for post in all_posts:
-        try:
+    Returns a list of posts ordered by ID (most recent first).
+    Supports filtering by language and pagination via limit/offset.
+    """
+    try:
+        posts = db.get_posts(limit=limit, offset=offset, language=language)
+        return posts
+    except Exception as e:
+        logger.error(f"Error fetching posts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch posts: {str(e)}")
+
+
+@router.post("/posts/{post_id}/mark-answered", tags=["Dashboard", "Posts"])
+async def mark_post_answered(post_id: int, answered: bool = True):
+    """Marquer manuellement un post comme répondu ou non répondu."""
+    success = db.update_post_answered_status(post_id, answered, method='manual')
+    if not success:
+        raise HTTPException(status_code=404, detail="Post not found or update failed")
+    return {"success": True, "post_id": post_id, "answered": answered}
+
+
+@router.get("/posts/stats/answered", tags=["Dashboard", "Posts"])
+async def get_answered_stats():
+    """Obtenir les statistiques de réponses."""
+    stats = db.get_answered_stats()
+    return stats
+
+
+@router.get("/api/posts-for-improvement", tags=["Dashboard", "Posts"])
+async def get_posts_for_improvement(
+    limit: int = Query(20, description="Maximum number of posts to return", ge=1, le=1000),
+    offset: int = Query(0, description="Offset for pagination", ge=0),
+    sort_by: str = Query("opportunity_score", description="Sort field", examples=["opportunity_score", "created_at", "relevance_score"]),
+    search: Optional[str] = Query(None, description="Search term"),
+    language: Optional[str] = Query(None, description="Filter by language"),
+    source: Optional[str] = Query(None, description="Filter by source")
+):
+    """
+    Get posts for improvement review with opportunity scoring.
+    
+    Returns posts sorted by opportunity score (or other field) with filters.
+    Opportunity score is calculated based on sentiment, relevance, and recency.
+    """
+    try:
+        # Get all posts (we'll filter and sort in Python for now)
+        all_posts = db.get_posts(limit=10000, offset=0)
+        
+        # Filter posts
+        filtered_posts = []
+        for post in all_posts:
+            # Skip sample posts
+            url = post.get('url', '')
+            if '/sample' in url or 'example.com' in url:
+                continue
+            
+            # Apply filters
+            if search:
+                search_lower = search.lower()
+                content = (post.get('content', '') or '').lower()
+                if search_lower not in content:
+                    continue
+            
+            if language and language != 'all':
+                post_lang = (post.get('language', '') or '').lower()
+                if post_lang != language.lower():
+                    continue
+            
+            if source and source != 'all':
+                post_source = (post.get('source', '') or '').lower()
+                # Normalize source names
+                if post_source == 'github issues' or post_source == 'github discussions':
+                    post_source = 'github'
+                if post_source != source.lower():
+                    continue
+            
+            filtered_posts.append(post)
+        
+        # Calculate opportunity score for each post
+        import time
+        now = time.time()
+        
+        for post in filtered_posts:
+            # Base score from relevance
+            relevance_score = post.get('relevance_score', 0) or 0
+            
+            # Sentiment multiplier (negative posts get higher score)
+            sentiment_multiplier = 1.0
+            if post.get('sentiment_label') == 'negative':
+                sentiment_multiplier = 2.0
+            elif post.get('sentiment_label') == 'neutral':
+                sentiment_multiplier = 0.5
+            
+            # Recency multiplier (recent posts get higher score)
             created_at = post.get('created_at', '')
+            recency_multiplier = 1.0
             if created_at:
-                dt = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
-                post['created_at_timestamp'] = dt.timestamp()
-            else:
-                post['created_at_timestamp'] = 0
-        except:
-            post['created_at_timestamp'] = 0
-        post['views'] = post.get('views', 0)
-        post['comments'] = post.get('comments', 0)
-        post['reactions'] = post.get('reactions', 0)
-    
-    filtered = all_posts
-    
-    if search:
-        search_lower = search.lower()
-        filtered = [p for p in filtered if search_lower in (p.get('content', '') or '').lower()]
-    
-    if language and language != 'all':
-        filtered = [p for p in filtered if p.get('language') == language]
-    
-    if source and source != 'all':
-        filtered = [p for p in filtered if 
-                   (p.get('source') == source) or 
-                   (source == 'GitHub' and (p.get('source') == 'GitHub Issues' or p.get('source') == 'GitHub Discussions'))]
-    
-    now = time.time()
-    posts_with_scores = []
-    
-    pain_point_keywords = []
-    pain_point_patterns = {
-        'Refund Delays': ['refund', 'rembours', 'remboursement', 'pending refund', 'delayed refund'],
-        'Billing Clarity': ['billing', 'invoice', 'facture', 'charge', 'confusing', 'unclear'],
-        'HTTPS/SSL Renewal': ['ssl', 'https', 'certificate', 'renewal', 'expired', 'certificat'],
-        'Support Response Time': ['support', 'response', 'slow', 'unresponsive', 'waiting', 'ticket'],
-        'VPS Backups': ['backup', 'vps backup', 'backup error', 'backup fail', 'sauvegarde'],
-        'Domain Issues': ['domain', 'dns', 'nameserver', 'domaine', 'expired domain'],
-        'Email Problems': ['email', 'mail', 'mx record', 'smtp', 'imap', 'exchange']
-    }
-    for pattern in pain_point_patterns.values():
-        pain_point_keywords.extend([k.lower() for k in pattern])
-    
-    for post in filtered:
-        content_lower = (post.get('content', '') or '').lower()
+                try:
+                    from datetime import datetime
+                    post_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    post_timestamp = post_date.timestamp()
+                    days_old = (now - post_timestamp) / (24 * 3600)
+                    if days_old < 7:
+                        recency_multiplier = 1.5
+                    elif days_old < 30:
+                        recency_multiplier = 1.2
+                    elif days_old > 90:
+                        recency_multiplier = 0.8
+                except:
+                    pass
+            
+            # Engagement score
+            views = post.get('views', 0) or 0
+            comments = post.get('comments', 0) or post.get('num_comments', 0) or 0
+            reactions = post.get('reactions', 0) or 0
+            engagement = views + (comments * 2) + (reactions * 1.5)
+            engagement_multiplier = min(1.0 + (engagement / 1000), 2.0)
+            
+            # Calculate opportunity score (0-100)
+            opportunity_score = min(
+                (relevance_score * sentiment_multiplier * recency_multiplier * engagement_multiplier),
+                100
+            )
+            
+            post['opportunity_score'] = round(opportunity_score, 1)
         
-        sentiment_value = 0.0
-        if post.get('sentiment_label') == 'negative':
-            sentiment_value = 1.0
-        elif post.get('sentiment_label') == 'neutral':
-            sentiment_value = 0.5
-        else:
-            sentiment_value = 0.2
+        # Sort posts
+        reverse_order = True  # Higher scores first
+        if sort_by == 'opportunity_score':
+            filtered_posts.sort(key=lambda p: p.get('opportunity_score', 0), reverse=reverse_order)
+        elif sort_by == 'created_at':
+            filtered_posts.sort(key=lambda p: p.get('created_at', ''), reverse=reverse_order)
+        elif sort_by == 'relevance_score':
+            filtered_posts.sort(key=lambda p: p.get('relevance_score', 0), reverse=reverse_order)
         
-        keyword_matches = sum(1 for keyword in pain_point_keywords if keyword in content_lower)
-        keyword_relevance = min(1.0, 0.1 + (keyword_matches * 0.3))
+        # Apply pagination
+        total = len(filtered_posts)
+        paginated_posts = filtered_posts[offset:offset + limit]
         
-        post_time = post.get('created_at_timestamp', 0) or 0
-        days_ago = (now - post_time) / (24 * 3600)
-        if days_ago <= 7:
-            recency_value = 1.0
-        elif days_ago <= 30:
-            recency_value = 0.7
-        elif days_ago <= 90:
-            recency_value = 0.4
-        else:
-            recency_value = 0.1
-        
-        priority_score = sentiment_value * keyword_relevance * recency_value
-        priority_score_scaled = int(priority_score * 100)
-        
-        posts_with_scores.append({
-            **post,
-            'opportunity_score': priority_score_scaled,
-            'priority_score': priority_score_scaled
-        })
-    
-    if sort_by == 'opportunity_score':
-        posts_with_scores.sort(key=lambda x: x.get('opportunity_score', 0), reverse=True)
-    elif sort_by == 'recent':
-        posts_with_scores.sort(key=lambda x: x.get('created_at_timestamp', 0) or 0, reverse=True)
-    elif sort_by == 'engagement':
-        posts_with_scores.sort(key=lambda x: 
-            (x.get('views', 0) or 0) + (x.get('comments', 0) or 0) + (x.get('reactions', 0) or 0), 
-            reverse=True)
-    
-    paginated = posts_with_scores[offset:offset + limit]
-    
-    return {
-        'posts': paginated,
-        'total': len(posts_with_scores),
-        'offset': offset,
-        'limit': limit
-    }
-
-
+        return {
+            "posts": paginated_posts,
+            "total": total,
+            "limit": limit,
+            "offset": offset
+        }
+    except Exception as e:
+        logger.error(f"Error fetching posts for improvement: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch posts: {str(e)}")

@@ -344,9 +344,19 @@ async def set_llm_config(
 ):
     """Set LLM configuration (save to .env file)."""
     from pathlib import Path
+    import os
+    
     logger.info("LLM configuration updated")
+    
+    # Get backend directory (where .env should be)
+    # __file__ is backend/app/routers/config.py
+    # parents[0] = backend/app/routers
+    # parents[1] = backend/app
+    # parents[2] = backend
     backend_path = Path(__file__).resolve().parents[2]
     env_path = backend_path / ".env"
+    
+    logger.info(f"Saving LLM config to: {env_path}")
     
     # Read existing .env if it exists
     env_vars = {}
@@ -362,22 +372,41 @@ async def set_llm_config(
     if payload.openai_api_key is not None:
         if payload.openai_api_key and payload.openai_api_key.strip():
             env_vars['OPENAI_API_KEY'] = payload.openai_api_key.strip()
+            logger.info("OpenAI API key updated")
         elif 'OPENAI_API_KEY' in env_vars:
             del env_vars['OPENAI_API_KEY']
+            logger.info("OpenAI API key removed")
     
     if payload.anthropic_api_key is not None:
         if payload.anthropic_api_key and payload.anthropic_api_key.strip():
             env_vars['ANTHROPIC_API_KEY'] = payload.anthropic_api_key.strip()
+            logger.info("Anthropic API key updated")
         elif 'ANTHROPIC_API_KEY' in env_vars:
             del env_vars['ANTHROPIC_API_KEY']
+            logger.info("Anthropic API key removed")
     
     if payload.llm_provider:
         env_vars['LLM_PROVIDER'] = payload.llm_provider
+        logger.info(f"LLM provider set to: {payload.llm_provider}")
     
-    # Write back to .env
-    with open(env_path, "w", encoding="utf-8") as f:
-        for key, value in env_vars.items():
-            f.write(f"{key}={value}\n")
+    # Ensure backend directory exists
+    backend_path.mkdir(parents=True, exist_ok=True)
+    
+    # Write back to .env (create if doesn't exist)
+    try:
+        with open(env_path, "w", encoding="utf-8") as f:
+            # Write header comment
+            f.write("# LLM Configuration\n")
+            f.write("# This file is auto-generated. Do not edit manually.\n\n")
+            
+            # Write all environment variables
+            for key, value in sorted(env_vars.items()):
+                f.write(f"{key}={value}\n")
+        
+        logger.info(f"✅ LLM configuration saved to {env_path}")
+    except Exception as e:
+        logger.error(f"❌ Failed to save LLM config to {env_path}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
     
     # Update environment variables for current session
     if payload.openai_api_key:
@@ -386,6 +415,20 @@ async def set_llm_config(
         os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
     if payload.llm_provider:
         os.environ['LLM_PROVIDER'] = payload.llm_provider
+    
+    # Also update the config singleton if it exists
+    # Note: This updates the current session, but a restart is needed for full persistence
+    try:
+        from ..config import config
+        if payload.openai_api_key is not None:
+            config.openai_api_key = payload.openai_api_key if payload.openai_api_key else None
+        if payload.anthropic_api_key is not None:
+            config.anthropic_api_key = payload.anthropic_api_key if payload.anthropic_api_key else None
+        if payload.llm_provider:
+            config.llm_provider = payload.llm_provider
+        logger.info("Config singleton updated for current session")
+    except Exception as e:
+        logger.warning(f"Could not update config singleton: {e}")
     
     return LLMConfigResponse(
         provider=env_vars.get('LLM_PROVIDER', 'openai'),

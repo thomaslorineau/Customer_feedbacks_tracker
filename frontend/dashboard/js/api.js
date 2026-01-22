@@ -170,6 +170,32 @@ export class API {
         return response.json();
     }
     
+    async getWhatsHappeningInsights(posts, stats, activeFilters) {
+        // Prepare posts data for LLM analysis
+        const postsForAnalysis = posts.slice(0, 30).map(p => ({
+            content: (p.content || '').substring(0, 400),
+            sentiment: p.sentiment_label,
+            source: p.source,
+            created_at: p.created_at,
+            language: p.language,
+            product: p.product || null
+        }));
+        
+        const response = await fetch(`${this.baseURL}/api/whats-happening`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                posts: postsForAnalysis,
+                stats: stats,
+                active_filters: activeFilters
+            })
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to get What's Happening insights: ${response.statusText}`);
+        }
+        return response.json();
+    }
+    
     async startScrapingJob(keywords, limit = 50, concurrency = 2, delay = 0.5) {
         const response = await fetch(`${this.baseURL}/scrape/keywords?limit=${limit}&concurrency=${concurrency}&delay=${delay}`, {
             method: 'POST',

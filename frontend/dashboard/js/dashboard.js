@@ -11,8 +11,11 @@ let state = null;
 export function initDashboard(appState) {
     state = appState;
     
-    // Initialize default date range (last 12 months) if no dates are set
-    initializeDefaultDateRange();
+    // Initialize default date range based on actual posts dates if no dates are set
+    // Wait a bit to ensure posts are loaded first
+    setTimeout(() => {
+        initializeDefaultDateRange();
+    }, 200);
     
     // Initialize event listeners
     setupEventListeners();
@@ -37,43 +40,66 @@ function initializeDefaultDateRange() {
         return;
     }
     
-    // Only set default if no dates are already set
-    const hasDateFrom = state.filters?.dateFrom && state.filters.dateFrom !== '';
-    const hasDateTo = state.filters?.dateTo && state.filters.dateTo !== '';
+    // Check both state filters and HTML inputs
+    const hasDateFromState = state.filters?.dateFrom && state.filters.dateFrom !== '';
+    const hasDateToState = state.filters?.dateTo && state.filters.dateTo !== '';
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    const hasDateFromInput = dateFromInput && dateFromInput.value !== '';
+    const hasDateToInput = dateToInput && dateToInput.value !== '';
     
-    if (!hasDateFrom && !hasDateTo) {
-        // Set default: last 12 months
-        const now = new Date();
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(now.getMonth() - 12);
+    console.log('initializeDefaultDateRange: Checking dates', {
+        hasDateFromState,
+        hasDateToState,
+        hasDateFromInput,
+        hasDateToInput,
+        stateDateFrom: state.filters?.dateFrom,
+        stateDateTo: state.filters?.dateTo,
+        inputDateFrom: dateFromInput?.value,
+        inputDateTo: dateToInput?.value
+    });
+    
+    // If dates are set in inputs but not in state, sync them
+    // But if they filter all posts, clear them
+    if (hasDateFromInput || hasDateToInput) {
+        const inputDateFrom = dateFromInput?.value || '';
+        const inputDateTo = dateToInput?.value || '';
         
-        const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-        const dateToStr = now.toISOString().split('T')[0];
+        // Temporarily apply these dates to check if they filter all posts
+        const originalDateFrom = state.filters.dateFrom;
+        const originalDateTo = state.filters.dateTo;
+        state.filters.dateFrom = inputDateFrom;
+        state.filters.dateTo = inputDateTo;
+        state.applyFilters();
         
-        console.log('initializeDefaultDateRange: Setting default date range', {
-            dateFrom: dateFromStr,
-            dateTo: dateToStr,
-            postsCount: state.posts?.length || 0
-        });
-        
-        // Update date filters
-        const dateFromInput = document.getElementById('dateFrom');
-        const dateToInput = document.getElementById('dateTo');
-        const globalDateFrom = document.getElementById('globalDateFrom');
-        const globalDateTo = document.getElementById('globalDateTo');
-        
-        if (dateFromInput) dateFromInput.value = dateFromStr;
-        if (dateToInput) dateToInput.value = dateToStr;
-        if (globalDateFrom) globalDateFrom.value = dateFromStr;
-        if (globalDateTo) globalDateTo.value = dateToStr;
-        
-        // Update state (this will trigger filtering)
-        state.setFilter('dateFrom', dateFromStr);
-        state.setFilter('dateTo', dateToStr);
-        
-        console.log('Default date range initialized: last 12 months. Filtered posts:', state.filteredPosts?.length || 0);
+        if (state.filteredPosts.length === 0 && state.posts.length > 0) {
+            console.warn('initializeDefaultDateRange: Dates in inputs filter all posts, clearing them');
+            // Clear both inputs and state
+            if (dateFromInput) dateFromInput.value = '';
+            if (dateToInput) dateToInput.value = '';
+            const globalDateFrom = document.getElementById('globalDateFrom');
+            const globalDateTo = document.getElementById('globalDateTo');
+            if (globalDateFrom) globalDateFrom.value = '';
+            if (globalDateTo) globalDateTo.value = '';
+            state.filters.dateFrom = '';
+            state.filters.dateTo = '';
+            state.applyFilters();
+        } else {
+            // Dates are valid, sync state with inputs
+            state.setFilter('dateFrom', inputDateFrom);
+            state.setFilter('dateTo', inputDateTo);
+        }
+    } else if (!hasDateFromState && !hasDateToState) {
+        // No dates set anywhere - ensure filters are applied
+        console.log('initializeDefaultDateRange: No date filters set - showing all posts');
+        state.applyFilters();
+        console.log('Filtered posts (no date filter):', state.filteredPosts?.length || 0);
     } else {
-        console.log('initializeDefaultDateRange: Dates already set, skipping default initialization');
+        // Dates are in state but not in inputs - sync inputs
+        if (hasDateFromState && dateFromInput) dateFromInput.value = state.filters.dateFrom;
+        if (hasDateToState && dateToInput) dateToInput.value = state.filters.dateTo;
+        state.applyFilters();
+        console.log('initializeDefaultDateRange: Dates from state applied. Filtered posts:', state.filteredPosts?.length || 0);
     }
 }
 
@@ -133,6 +159,47 @@ function setupEventListeners() {
             state.setFilter('product', e.target.value);
             updateResetFiltersButtonVisibility();
             updateDashboard();
+        });
+    }
+    
+    const answeredFilter = document.getElementById('answeredFilter');
+    if (answeredFilter) {
+        answeredFilter.addEventListener('change', (e) => {
+            const value = e.target.value;
+            state.setFilter('answered', value);
+            // Sync with All Posts section filter
+            const postsAnsweredFilterEl = document.getElementById('postsAnsweredFilter');
+            if (postsAnsweredFilterEl && postsAnsweredFilterEl.value !== value) {
+                postsAnsweredFilterEl.value = value;
+            }
+            updateResetFiltersButtonVisibility();
+            updateDashboard();
+            // Update All Posts display if it exists
+            if (document.getElementById('postsGallery')) {
+                postsCurrentOffset = 0; // Reset pagination
+                updatePostsDisplay();
+            }
+        });
+    }
+    
+    // Posts section answered filter
+    const postsAnsweredFilter = document.getElementById('postsAnsweredFilter');
+    if (postsAnsweredFilter) {
+        postsAnsweredFilter.addEventListener('change', (e) => {
+            const value = e.target.value;
+            state.setFilter('answered', value);
+            // Sync with timeline filter
+            const answeredFilterEl = document.getElementById('answeredFilter');
+            if (answeredFilterEl && answeredFilterEl.value !== value) {
+                answeredFilterEl.value = value;
+            }
+            updateResetFiltersButtonVisibility();
+            updateDashboard();
+            // Update All Posts display
+            if (document.getElementById('postsGallery')) {
+                postsCurrentOffset = 0; // Reset pagination
+                updatePostsDisplay();
+            }
         });
     }
     
@@ -617,10 +684,14 @@ function updateProductDistribution() {
     
     console.log('updateProductDistribution: Processing posts', { totalPosts: posts.length });
     
+    // List of language codes to exclude from product distribution
+    const languageCodes = ['FR', 'EN', 'ES', 'DE', 'IT', 'PT', 'NL', 'PL', 'RU', 'ZH', 'JA', 'KO', 'AR', 'HI', 'TR', 'SV', 'DA', 'FI', 'NO', 'CS', 'HU', 'RO', 'BG', 'HR', 'SK', 'SL', 'ET', 'LV', 'LT', 'MT', 'EL', 'UK', 'BE', 'GA', 'CY', 'LU', 'UNKNOWN'];
+    
     posts.forEach(post => {
         // Get product label (simplified - you may need to import getProductLabel from v1)
         const productLabel = getProductLabelSimple(post);
-        if (productLabel) {
+        // Only count if it's a real product, not a language code
+        if (productLabel && !languageCodes.includes(productLabel.toUpperCase())) {
             productCounts[productLabel] = (productCounts[productLabel] || 0) + 1;
         }
     });
@@ -1015,10 +1086,12 @@ function clearTimelineFilter() {
     const sentimentFilter = document.getElementById('sentimentFilter');
     const languageFilter = document.getElementById('languageFilter');
     const productFilter = document.getElementById('productFilter');
+    const answeredFilter = document.getElementById('answeredFilter');
     
     if (sentimentFilter) sentimentFilter.value = 'all';
     if (languageFilter) languageFilter.value = 'all';
     if (productFilter) productFilter.value = 'all';
+    if (answeredFilter) answeredFilter.value = 'all';
     
     // Update state
     state.setFilter('dateFrom', dateFromStr);
@@ -1026,6 +1099,7 @@ function clearTimelineFilter() {
     state.setFilter('sentiment', 'all');
     state.setFilter('language', 'all');
     state.setFilter('product', 'all');
+    state.setFilter('answered', 'all');
     
     // Update indicator
     updateDefaultDateRangeIndicator();
@@ -1077,6 +1151,7 @@ function resetFilters() {
     state.setFilter('source', '');
     state.setFilter('dateFrom', ''); // Clear dates
     state.setFilter('dateTo', ''); // Clear dates
+    state.setFilter('answered', 'all');
     
     // Reset UI elements
     const globalSearch = document.getElementById('globalSearch');
@@ -1090,6 +1165,9 @@ function resetFilters() {
     
     const productFilter = document.getElementById('productFilter');
     if (productFilter) productFilter.value = 'all';
+    
+    const answeredFilter = document.getElementById('answeredFilter');
+    if (answeredFilter) answeredFilter.value = 'all';
     
     // Reset global date slicer to empty
     const globalDateFrom = document.getElementById('globalDateFrom');
@@ -2184,6 +2262,78 @@ function updatePositiveSatisfactionKPI() {
     }
 }
 
+// Mark post as answered/not answered
+async function markPostAnswered(postId, answered) {
+    try {
+        const response = await fetch(`/posts/${postId}/mark-answered?answered=${answered}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+            throw new Error(`Failed to mark post: ${errorData.detail || response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`✅ Post ${postId} successfully marked as ${answered ? 'answered' : 'not answered'} in database`);
+        
+        // Reload ALL posts from server to ensure complete sync with database
+        try {
+            console.log('🔄 Reloading all posts from server to sync with database...');
+            const postsResponse = await fetch(`/posts?limit=10000`);
+            if (postsResponse.ok) {
+                const updatedPosts = await postsResponse.json();
+                console.log(`✅ Reloaded ${updatedPosts.length} posts from server`);
+                
+                if (state) {
+                    // Filter valid posts (exclude samples and relevance_score = 0)
+                    const validPosts = filterValidPosts(updatedPosts);
+                    
+                    // Completely replace state.posts with fresh data from server
+                    state.setPosts(validPosts);
+                    console.log(`✅ State updated with ${validPosts.length} valid posts`);
+                    console.log(`📊 Posts answered in fresh data: ${validPosts.filter(p => p.is_answered === 1 || p.is_answered === true).length}`);
+                }
+            } else {
+                throw new Error(`Failed to reload posts: ${postsResponse.status} ${postsResponse.statusText}`);
+            }
+        } catch (reloadError) {
+            console.error('❌ Could not reload posts from server:', reloadError);
+            // Fallback: update local state only (but this is not ideal)
+            if (state && state.posts) {
+                const post = state.posts.find(p => p.id === postId);
+                if (post) {
+                    post.is_answered = answered ? 1 : 0;
+                    post.answered_at = answered ? new Date().toISOString() : null;
+                    post.answered_by = answered ? 'Manual' : null;
+                    post.answer_detection_method = 'manual';
+                    state.applyFilters();
+                    state.notifyListeners();
+                    console.warn('⚠️ Using local state update (not synced with database)');
+                }
+            }
+        }
+        
+        // Refresh the dashboard and posts display
+        updateDashboard();
+        if (document.getElementById('postsGallery')) {
+            updatePostsDisplay();
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('❌ Error marking post as answered:', error);
+        alert(`Erreur lors du marquage du post: ${error.message}`);
+        throw error;
+    }
+}
+
+// Make markPostAnswered globally available
+window.markPostAnswered = markPostAnswered;
+
 // Generate PowerPoint Report
 /**
  * Capture a Chart.js canvas as base64 image
@@ -2410,6 +2560,7 @@ function updatePostsDisplay() {
     const sentimentFilter = document.getElementById('postsSentimentFilter')?.value || 'all';
     const sourceFilter = document.getElementById('postsSourceFilter')?.value || 'all';
     const languageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
+    const answeredFilter = document.getElementById('postsAnsweredFilter')?.value || 'all';
     const dateFrom = document.getElementById('postsDateFrom')?.value || '';
     const dateTo = document.getElementById('postsDateTo')?.value || '';
     
@@ -2442,6 +2593,14 @@ function updatePostsDisplay() {
             }
         }
         
+        // Sync answered filter
+        if (state.filters.answered !== undefined) {
+            const postsAnsweredFilterEl = document.getElementById('postsAnsweredFilter');
+            if (postsAnsweredFilterEl && postsAnsweredFilterEl.value !== state.filters.answered) {
+                postsAnsweredFilterEl.value = state.filters.answered;
+            }
+        }
+        
         // Sync date filters
         if (state.filters.dateFrom) {
             const postsDateFromEl = document.getElementById('postsDateFrom');
@@ -2462,10 +2621,44 @@ function updatePostsDisplay() {
     const finalSentimentFilter = document.getElementById('postsSentimentFilter')?.value || 'all';
     const finalSourceFilter = document.getElementById('postsSourceFilter')?.value || 'all';
     const finalLanguageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
+    const finalAnsweredFilter = document.getElementById('postsAnsweredFilter')?.value || 'all';
     const finalDateFrom = document.getElementById('postsDateFrom')?.value || '';
     const finalDateTo = document.getElementById('postsDateTo')?.value || '';
+    
+    // Update state with answered filter if it changed
+    if (state && state.filters) {
+        if (state.filters.answered !== finalAnsweredFilter) {
+            state.setFilter('answered', finalAnsweredFilter);
+        }
+        // Also update other filters to ensure state is in sync
+        if (state.filters.sentiment !== finalSentimentFilter) {
+            state.setFilter('sentiment', finalSentimentFilter);
+        }
+        // Only set source filter if it's not empty and not 'all'
+        const normalizedSourceFilter = finalSourceFilter === 'all' ? '' : finalSourceFilter;
+        if (state.filters.source !== normalizedSourceFilter) {
+            state.setFilter('source', normalizedSourceFilter);
+        }
+        
+        // Check if source filter is filtering all posts - if so, clear it
+        if (state.filters.source && state.filters.source !== '' && state.filteredPosts.length === 0 && state.posts.length > 0) {
+            console.warn('Source filter is filtering all posts, clearing it. Source was:', state.filters.source);
+            state.setFilter('source', '');
+            const postsSourceFilterEl = document.getElementById('postsSourceFilter');
+            if (postsSourceFilterEl) postsSourceFilterEl.value = 'all';
+        }
+        if (state.filters.language !== finalLanguageFilter) {
+            state.setFilter('language', finalLanguageFilter);
+        }
+        if (state.filters.dateFrom !== finalDateFrom) {
+            state.setFilter('dateFrom', finalDateFrom);
+        }
+        if (state.filters.dateTo !== finalDateTo) {
+            state.setFilter('dateTo', finalDateTo);
+        }
+    }
 
-    // Filter posts
+    // Filter posts manually (don't rely on filteredPosts as it might not include all filters)
     let filtered = state.posts.filter(post => {
         // Filter out sample data
         const isSample = post.url && (
@@ -2496,6 +2689,19 @@ function updatePostsDisplay() {
         const filterLanguage = (finalLanguageFilter || '').toLowerCase();
         const matchesLanguage = !finalLanguageFilter || finalLanguageFilter === 'all' || postLanguage === filterLanguage;
         
+        // Answered filter
+        const isAnswered = post.is_answered === 1 || post.is_answered === true || post.is_answered === '1';
+        let matchesAnswered = true;
+        if (finalAnsweredFilter && finalAnsweredFilter !== 'all') {
+            if (finalAnsweredFilter === '1') {
+                // Filter for answered posts only
+                matchesAnswered = isAnswered;
+            } else if (finalAnsweredFilter === '0') {
+                // Filter for not answered posts only
+                matchesAnswered = !isAnswered;
+            }
+        }
+        
         // Date range filter
         let matchesDate = true;
         if (finalDateFrom || finalDateTo) {
@@ -2504,7 +2710,7 @@ function updatePostsDisplay() {
             if (finalDateTo && postDate > finalDateTo) matchesDate = false;
         }
 
-        return matchesSource && matchesSentiment && matchesLanguage && matchesDate;
+        return matchesSource && matchesSentiment && matchesLanguage && matchesAnswered && matchesDate;
     });
 
     // Filter out posts with relevance_score = 0 BEFORE pagination
@@ -2619,6 +2825,7 @@ function clearPostsFilters() {
     document.getElementById('postsSentimentFilter').value = 'all';
     document.getElementById('postsSourceFilter').value = 'all';
     document.getElementById('postsLanguageFilter').value = 'all';
+    document.getElementById('postsAnsweredFilter').value = 'all';
     document.getElementById('postsDateFrom').value = '';
     document.getElementById('postsDateTo').value = '';
     // Clear global state filters

@@ -12,7 +12,8 @@ export class State {
             language: 'all',
             product: 'all',
             dateFrom: '',
-            dateTo: ''
+            dateTo: '',
+            answered: 'all'
         };
     }
     
@@ -38,6 +39,16 @@ export class State {
     applyFilters() {
         console.log('Applying filters:', this.filters);
         console.log('Total posts before filtering:', this.posts.length);
+        let filteredCount = 0;
+        let excludedBySample = 0;
+        let excludedBySearch = 0;
+        let excludedBySentiment = 0;
+        let excludedBySource = 0;
+        let excludedByLanguage = 0;
+        let excludedByProduct = 0;
+        let excludedByDate = 0;
+        let excludedByAnswered = 0;
+        
         this.filteredPosts = this.posts.filter(post => {
             // Filter out sample posts
             const url = post.url || '';
@@ -57,16 +68,21 @@ export class State {
                     post.author?.toLowerCase().includes(searchLower) ||
                     post.url?.toLowerCase().includes(searchLower) ||
                     post.source?.toLowerCase().includes(searchLower);
-                if (!matchesSearch) return false;
+                if (!matchesSearch) {
+                    excludedBySearch++;
+                    return false;
+                }
             }
             
             // Sentiment filter
             if (this.filters.sentiment && this.filters.sentiment !== 'all' && post.sentiment_label !== this.filters.sentiment) {
+                excludedBySentiment++;
                 return false;
             }
             
             // Source filter (normalize GitHub and Mastodon sources)
-            if (this.filters.source) {
+            // Only filter if source is set and not empty
+            if (this.filters.source && this.filters.source !== '' && this.filters.source !== 'all') {
                 let normalizedSource = post.source;
                 if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
                     normalizedSource = 'GitHub';
@@ -74,6 +90,7 @@ export class State {
                     normalizedSource = 'Mastodon';
                 }
                 if (normalizedSource !== this.filters.source && post.source !== this.filters.source) {
+                    excludedBySource++;
                     return false;
                 }
             }
@@ -83,6 +100,7 @@ export class State {
                 const postLanguage = (post.language || '').toLowerCase();
                 const filterLanguage = (this.filters.language || '').toLowerCase();
                 if (postLanguage !== filterLanguage) {
+                    excludedByLanguage++;
                     return false;
                 }
             }
@@ -123,19 +141,64 @@ export class State {
                 const postDateStr = new Date(post.created_at).toISOString().split('T')[0];
                 const filterDateFromStr = this.filters.dateFrom;
                 // Compare date strings (YYYY-MM-DD format)
-                if (postDateStr < filterDateFromStr) return false;
+                if (postDateStr < filterDateFromStr) {
+                    excludedByDate++;
+                    return false;
+                }
             }
             
             if (this.filters.dateTo) {
                 const postDateStr = new Date(post.created_at).toISOString().split('T')[0];
                 const filterDateToStr = this.filters.dateTo;
                 // Compare date strings (YYYY-MM-DD format)
-                if (postDateStr > filterDateToStr) return false;
+                if (postDateStr > filterDateToStr) {
+                    excludedByDate++;
+                    return false;
+                }
             }
             
+            // Answered filter
+            if (this.filters.answered && this.filters.answered !== 'all') {
+                const isAnswered = post.is_answered === 1 || post.is_answered === true;
+                if (this.filters.answered === '1' && !isAnswered) {
+                    excludedByAnswered++;
+                    return false;
+                }
+                if (this.filters.answered === '0' && isAnswered) {
+                    excludedByAnswered++;
+                    return false;
+                }
+            }
+            
+            filteredCount++;
             return true;
         });
         console.log('Filtered posts count:', this.filteredPosts.length);
+        console.log('Filter breakdown:', {
+            total: this.posts.length,
+            filtered: filteredCount,
+            excludedBySample,
+            excludedBySearch,
+            excludedBySentiment,
+            excludedBySource,
+            excludedByLanguage,
+            excludedByProduct,
+            excludedByDate,
+            excludedByAnswered,
+            currentSourceFilter: this.filters.source
+        });
+        
+        // Auto-clear source filter if it filters all posts (but avoid infinite loop)
+        if (this.filteredPosts.length === 0 && this.posts.length > 0 && this.filters.source && this.filters.source !== '' && this.filters.source !== 'all' && excludedBySource === this.posts.length) {
+            console.warn('Source filter filtered all posts, auto-clearing. Source was:', this.filters.source);
+            this.filters.source = '';
+            // Re-apply filters without source filter (but only once to avoid infinite loop)
+            if (!this._clearingSourceFilter) {
+                this._clearingSourceFilter = true;
+                this.applyFilters();
+                this._clearingSourceFilter = false;
+            }
+        }
     }
     
     subscribe(listener) {

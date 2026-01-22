@@ -220,12 +220,16 @@ class App {
             console.log('App: Loading posts from API...');
             console.log('App: API Base URL:', this.api.baseURL);
             
-            const url = `${this.api.baseURL}/posts?limit=1000&offset=0`;
+            const url = `${this.api.baseURL}/posts?limit=10000&offset=0`;  // Increased limit to get all posts
             console.log('App: Full URL:', url);
             
-            const posts = await this.api.getPosts(1000, 0);
+            const posts = await this.api.getPosts(10000, 0);  // Get all posts to ensure complete sync
             console.log('App: Posts loaded:', posts?.length || 0, 'posts');
             console.log('App: Posts type:', Array.isArray(posts) ? 'Array' : typeof posts);
+            
+            // Log answered posts count for debugging
+            const answeredCount = posts?.filter(p => p.is_answered === 1 || p.is_answered === true).length || 0;
+            console.log(`App: Posts answered in database: ${answeredCount}`);
             
             if (posts && posts.length > 0) {
                 console.log('App: First post sample:', posts[0]);

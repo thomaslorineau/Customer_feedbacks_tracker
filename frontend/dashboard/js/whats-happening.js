@@ -1,6 +1,6 @@
 // What's Happening analysis module
 import { getProductLabel } from './product-detection.js';
-import { API } from './api.js';
+// API will be imported dynamically when needed to avoid cache issues
 import { updateDashboard } from './dashboard.js';
 
 // Store state reference for click handlers
@@ -9,7 +9,7 @@ let currentState = null;
 // Track if click handler has been attached to avoid duplicates
 let statsCardsClickHandlerAttached = false;
 
-export function updateWhatsHappening(state) {
+export async function updateWhatsHappening(state) {
     // Store state reference for click handlers
     currentState = state;
     
@@ -57,36 +57,137 @@ export function updateWhatsHappening(state) {
     const spikeDetected = avgNegativePer48h > 0 && recentNegative > avgNegativePer48h * 2.3; // 230% increase
     const spikePercentage = avgNegativePer48h > 0 ? Math.round(((recentNegative - avgNegativePer48h) / avgNegativePer48h) * 100) : 0;
     
-    // Top product impacted
-    const productCounts = {};
-    posts.filter(p => p.sentiment_label === 'negative').forEach(post => {
-        const product = getProductLabel(post.id, post.content, post.language);
-        if (product) {
-            productCounts[product] = (productCounts[product] || 0) + 1;
-        }
-    });
-    const topProduct = Object.entries(productCounts)
-        .sort((a, b) => b[1] - a[1])[0];
-    const topProductPercentage = negative > 0 && topProduct 
-        ? Math.round((topProduct[1] / negative) * 100) 
-        : 0;
+    // Prepare stats for LLM analysis
+    const statsForLLM = {
+        total,
+        positive,
+        negative,
+        neutral,
+        recent_negative: recentNegative,
+        recent_total: recentPosts.length,
+        spike_detected: spikeDetected,
+        spike_percentage: spikePercentage
+    };
     
-    // Top issue (most common word in negative posts)
-    const negativePosts = posts.filter(p => p.sentiment_label === 'negative');
-    const wordCounts = {};
-    negativePosts.forEach(post => {
-        const words = (post.content || '').toLowerCase()
-            .replace(/[^\w\s]/g, ' ')
-            .split(/\s+/)
-            .filter(w => w.length > 4);
-        words.forEach(word => {
-            if (!['ovh', 'ovhcloud', 'customer', 'service', 'support', 'issue', 'problem'].includes(word)) {
-                wordCounts[word] = (wordCounts[word] || 0) + 1;
+    // Get active filters description
+    const activeFilters = getActiveFilters(state);
+    const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
+    
+    // Call LLM API to generate insights
+    let insights = [];
+    let llmAvailable = false;
+    try {
+        // Try to use API class, but fallback to direct fetch if not available
+        let apiInstance = null;
+        try {
+            const apiModule = await import(`./api.js?t=${Date.now()}`);
+            const API = apiModule.API;
+            apiInstance = new API();
+            
+            if (typeof apiInstance.getWhatsHappeningInsights === 'function') {
+                const response = await apiInstance.getWhatsHappeningInsights(posts, statsForLLM, activeFiltersDescription);
+                insights = response.insights || [];
+                llmAvailable = response.llm_available !== false;
+                console.log('LLM insights generated via API class:', insights);
+            } else {
+                throw new Error('Method not available in API class');
+            }
+        } catch (apiError) {
+            // Fallback to direct fetch
+            console.warn('API class not available, using direct fetch:', apiError);
+            const baseURL = window.location.origin;
+            const postsForAnalysis = posts.slice(0, 30).map(p => ({
+                content: (p.content || '').substring(0, 400),
+                sentiment: p.sentiment_label,
+                source: p.source,
+                created_at: p.created_at,
+                language: p.language,
+                product: p.product || null
+            }));
+            
+            const response = await fetch(`${baseURL}/api/whats-happening`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    posts: postsForAnalysis,
+                    stats: statsForLLM,
+                    active_filters: activeFiltersDescription
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to get What's Happening insights: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            insights = data.insights || [];
+            llmAvailable = data.llm_available !== false;
+            console.log('LLM insights generated via direct fetch:', insights);
+        }
+    } catch (error) {
+        console.warn('Failed to get LLM insights, using fallback:', error);
+        // Fallback to hardcoded logic if LLM fails
+        const productCounts = {};
+        posts.filter(p => p.sentiment_label === 'negative').forEach(post => {
+            const product = getProductLabel(post.id, post.content, post.language);
+            if (product) {
+                productCounts[product] = (productCounts[product] || 0) + 1;
             }
         });
-    });
-    const topIssue = Object.entries(wordCounts)
-        .sort((a, b) => b[1] - a[1])[0];
+        const topProduct = Object.entries(productCounts)
+            .sort((a, b) => b[1] - a[1])[0];
+        const topProductPercentage = negative > 0 && topProduct 
+            ? Math.round((topProduct[1] / negative) * 100) 
+            : 0;
+        
+        const negativePosts = posts.filter(p => p.sentiment_label === 'negative');
+        const wordCounts = {};
+        negativePosts.forEach(post => {
+            const words = (post.content || '').toLowerCase()
+                .replace(/[^\w\s]/g, ' ')
+                .split(/\s+/)
+                .filter(w => w.length > 4);
+            words.forEach(word => {
+                if (!['ovh', 'ovhcloud', 'customer', 'service', 'support', 'issue', 'problem'].includes(word)) {
+                    wordCounts[word] = (wordCounts[word] || 0) + 1;
+                }
+            });
+        });
+        const topIssue = Object.entries(wordCounts)
+            .sort((a, b) => b[1] - a[1])[0];
+        
+        // Convert to insights format for consistency
+        if (spikeDetected) {
+            insights.push({
+                type: 'spike',
+                title: 'Spike in Negative Feedback Detected',
+                description: `${spikePercentage > 0 ? `+${spikePercentage}%` : 'Significant'} more than average. ${recentNegative} negative posts in past 48h.`,
+                icon: '⚠️',
+                metric: spikePercentage > 0 ? `+${spikePercentage}%` : '',
+                count: recentNegative
+            });
+        }
+        if (topProduct) {
+            insights.push({
+                type: 'top_product',
+                title: `Top Product Impacted: ${topProduct[0]}`,
+                description: `${topProductPercentage}% of negative posts are relating to ${topProduct[0]} issues.`,
+                icon: '🎁',
+                metric: `${topProductPercentage}%`,
+                count: topProduct[1]
+            });
+        }
+        if (topIssue) {
+            insights.push({
+                type: 'top_issue',
+                title: `Top Issue: "${topIssue[0].charAt(0).toUpperCase() + topIssue[0].slice(1)}"`,
+                description: `${topIssue[1]} posts mention issues related to ${topIssue[0]} requests.`,
+                icon: '💬',
+                metric: '',
+                count: topIssue[1]
+            });
+        }
+    }
     
     // Update stats cards with click handlers
     const statsCards = document.getElementById('statsCards');
@@ -96,27 +197,106 @@ export function updateWhatsHappening(state) {
         return;
     }
     
+    // Calculate answered stats from filtered posts (for display in filtered context)
+    const answered = posts.filter(p => p.is_answered === 1 || p.is_answered === true).length;
+    const notAnswered = posts.filter(p => !p.is_answered || p.is_answered === 0 || p.is_answered === false).length;
+    const totalForAnswered = posts.length;
+    const answeredPercentage = totalForAnswered > 0 ? ((answered / totalForAnswered) * 100).toFixed(0) : '0';
+    
+    // Calculate satisfaction (same logic as updatePositiveSatisfactionKPI)
+    const satisfactionPositive = posts.filter(p => p.sentiment_label === 'positive').length;
+    const satisfactionPercentage = total > 0 ? Math.round((satisfactionPositive / total) * 100) : 0;
+    
+    // Fetch global answered stats from API (for accurate global statistics)
+    let globalAnsweredStats = null;
+    try {
+        const response = await fetch('/posts/stats/answered');
+        if (response.ok) {
+            globalAnsweredStats = await response.json();
+            console.log('Global answered stats from API:', globalAnsweredStats);
+        } else {
+            console.warn('Failed to fetch global answered stats:', response.status, response.statusText);
+        }
+    } catch (e) {
+        console.error('Could not fetch global answered stats from API:', e);
+    }
+    
+    // Calculate percentages for sentiment cards
+    const positivePercentage = total > 0 ? Math.round((positive / total) * 100) : 0;
+    const negativePercentage = total > 0 ? Math.round((negative / total) * 100) : 0;
+    const neutralPercentage = total > 0 ? Math.round((neutral / total) * 100) : 0;
+    const recentPercentage = total > 0 ? Math.round((recentPosts.length / total) * 100) : 0;
+    
     // Create stats cards with clickable-stat-card class (except Total Posts)
     const htmlContent = `
         <div class="stat-card" data-filter-type="all" title="Total posts">
-            <div class="stat-card-value">${total}</div>
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">📊</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700;">${total}</div>
             <div class="stat-card-label">Total Posts</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center; flex-wrap: wrap;">
+                <span style="color: #10b981; font-weight: 600;">😊 ${positive}</span>
+                <span style="color: #ef4444; font-weight: 600;">😞 ${negative}</span>
+                <span style="color: #6b7280; font-weight: 600;">😐 ${neutral}</span>
+            </div>
         </div>
         <div class="stat-card positive clickable-stat-card" data-filter-type="sentiment" data-filter-value="positive" title="Click to filter by positive sentiment">
-            <div class="stat-card-value">${positive}</div>
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">😊</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: #10b981;">${positivePercentage}%</div>
             <div class="stat-card-label">Positive</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: #10b981; font-weight: 600;">😊 ${positive}</span>
+                <span style="color: var(--text-muted); font-weight: 600;">/ ${total}</span>
+            </div>
         </div>
         <div class="stat-card negative clickable-stat-card" data-filter-type="sentiment" data-filter-value="negative" title="Click to filter by negative sentiment">
-            <div class="stat-card-value">${negative}</div>
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">😞</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: #ef4444;">${negativePercentage}%</div>
             <div class="stat-card-label">Negative</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: #ef4444; font-weight: 600;">😞 ${negative}</span>
+                <span style="color: var(--text-muted); font-weight: 600;">/ ${total}</span>
+            </div>
         </div>
         <div class="stat-card neutral clickable-stat-card" data-filter-type="sentiment" data-filter-value="neutral" title="Click to filter by neutral sentiment">
-            <div class="stat-card-value">${neutral}</div>
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">😐</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: #6b7280;">${neutralPercentage}%</div>
             <div class="stat-card-label">Neutral</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: #6b7280; font-weight: 600;">😐 ${neutral}</span>
+                <span style="color: var(--text-muted); font-weight: 600;">/ ${total}</span>
+            </div>
         </div>
         <div class="stat-card clickable-stat-card" data-filter-type="recent" title="Click to filter posts from last 48 hours">
-            <div class="stat-card-value">${recentPosts.length}</div>
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">⏰</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: var(--accent-primary);">${recentPercentage}%</div>
             <div class="stat-card-label">Recent (48h)</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: var(--accent-primary); font-weight: 600;">⏰ ${recentPosts.length}</span>
+                <span style="color: var(--text-muted); font-weight: 600;">/ ${total}</span>
+            </div>
+        </div>
+        <div class="stat-card answered-stats-card clickable-stat-card" data-filter-type="answered" data-filter-value="1" title="Click to filter by answered posts${globalAnsweredStats ? ` (Global: ${globalAnsweredStats.answered_percentage}%)` : ''}">
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">💬</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: var(--accent-primary);">${globalAnsweredStats ? globalAnsweredStats.answered_percentage : answeredPercentage}%</div>
+            <div class="stat-card-label">Answered</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: #10b981; font-weight: 600;">✓ ${globalAnsweredStats ? globalAnsweredStats.answered : answered}</span>
+                <span style="color: #ef4444; font-weight: 600;">✗ ${globalAnsweredStats ? globalAnsweredStats.not_answered : notAnswered}</span>
+            </div>
+            ${globalAnsweredStats && totalForAnswered < globalAnsweredStats.total ? `
+            <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px; text-align: center;">
+                (${totalForAnswered} filtered / ${globalAnsweredStats.total} total)
+            </div>
+            ` : ''}
+        </div>
+        <div class="stat-card positive clickable-stat-card" data-filter-type="sentiment" data-filter-value="positive" title="Click to filter by positive sentiment (satisfaction)">
+            <div class="stat-card-icon" style="font-size: 1.5em; margin-bottom: 4px;">😊</div>
+            <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: #10b981;">${satisfactionPercentage}%</div>
+            <div class="stat-card-label">Satisfaction</div>
+            <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
+                <span style="color: #10b981; font-weight: 600;">😊 ${satisfactionPositive}</span>
+                <span style="color: #ef4444; font-weight: 600;">😞 ${negative}</span>
+            </div>
         </div>
     `;
     
@@ -190,44 +370,37 @@ export function updateWhatsHappening(state) {
     });
     
     
-    // Update content
+    // Update What's Happening content with LLM insights
     const content = document.getElementById('whatsHappeningContent');
+    if (!content) return;
+    
     let contentHTML = '';
     
-    if (spikeDetected && recentNegative > 0) {
-        contentHTML += `
-            <div class="alert-box">
-                <div class="alert-box-icon">⚡</div>
-                <div class="alert-box-content">
-                    <h3>Spike in Negative Feedback Detected</h3>
-                    <p>${spikePercentage > 0 ? `+${spikePercentage}%` : 'Significant'} more than average. ${recentNegative} negative posts in past 48h.</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    if (topProduct) {
-        contentHTML += `
-            <div class="insight-box">
-                <div class="insight-box-icon">🎁</div>
-                <div class="insight-box-content">
-                    <h4>Top Product Impacted: ${topProduct[0]}</h4>
-                    <p>${topProductPercentage}% of negative posts are relating to ${topProduct[0]} issues.</p>
-                </div>
-            </div>
-        `;
-    }
-    
-    if (topIssue) {
-        contentHTML += `
-            <div class="insight-box">
-                <div class="insight-box-icon">💬</div>
-                <div class="insight-box-content">
-                    <h4>Top Issue: "${topIssue[0].charAt(0).toUpperCase() + topIssue[0].slice(1)}"</h4>
-                    <p>${topIssue[1]} posts mention issues related to ${topIssue[0]} requests.</p>
-                </div>
-            </div>
-        `;
+    // Render insights from LLM (or fallback)
+    if (insights && insights.length > 0) {
+        insights.forEach(insight => {
+            if (insight.type === 'spike') {
+                contentHTML += `
+                    <div class="alert-box">
+                        <div class="alert-box-icon">${insight.icon || '⚠️'}</div>
+                        <div class="alert-box-content">
+                            <h3>${insight.title}</h3>
+                            <p>${insight.description}</p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                contentHTML += `
+                    <div class="insight-box">
+                        <div class="insight-box-icon">${insight.icon || '📊'}</div>
+                        <div class="insight-box-content">
+                            <h4>${insight.title}</h4>
+                            <p>${insight.description}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        });
     }
     
     if (!contentHTML) {
@@ -236,10 +409,25 @@ export function updateWhatsHappening(state) {
     
     content.innerHTML = contentHTML;
     
-    // Get active filters for context
-    const activeFilters = getActiveFilters(state);
+    // Update Recommended Actions with full context (using stats from LLM analysis)
+    // Note: activeFilters was already declared earlier in the function
+    const statsForActions = {
+        ...statsForLLM,
+        top_product: insights.find(i => i.type === 'top_product')?.title?.replace('Top Product Impacted: ', '') || 'N/A',
+        top_product_count: insights.find(i => i.type === 'top_product')?.count || 0,
+        top_product_percentage: parseInt(insights.find(i => i.type === 'top_product')?.metric?.replace('%', '') || '0'),
+        top_issue: insights.find(i => i.type === 'top_issue')?.title?.replace('Top Issue: ', '').replace(/"/g, '') || 'N/A',
+        top_issue_count: insights.find(i => i.type === 'top_issue')?.count || 0,
+        active_filters: activeFilters.description,
+        filtered_context: activeFilters.description !== 'All posts (no filters)',
+        search_term: state.filters?.search || ''
+    };
+    // Extract top product and top issue from insights for Recommended Actions
+    const topProductInsight = insights.find(i => i.type === 'top_product');
+    const topIssueInsight = insights.find(i => i.type === 'top_issue');
+    const topProduct = topProductInsight ? [topProductInsight.title.replace('Top Product Impacted: ', ''), topProductInsight.count] : null;
+    const topIssue = topIssueInsight ? [topIssueInsight.title.replace('Top Issue: ', '').replace(/"/g, ''), topIssueInsight.count] : null;
     
-    // Update Recommended Actions with full context
     updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters);
 }
 
@@ -273,6 +461,19 @@ function handleStatsCardClick(e) {
         // Sync UI element
         const sentimentFilter = document.getElementById('sentimentFilter');
         if (sentimentFilter) sentimentFilter.value = newSentiment;
+        
+        // Update dashboard and open drawer
+        updateDashboard();
+        openFilteredPostsDrawer(state);
+    } else if (filterType === 'answered') {
+        // Filter by answered status
+        const currentAnswered = state.filters?.answered || 'all';
+        const newAnswered = currentAnswered === filterValue ? 'all' : filterValue;
+        state.setFilter('answered', newAnswered);
+        
+        // Sync UI element
+        const answeredFilter = document.getElementById('answeredFilter');
+        if (answeredFilter) answeredFilter.value = newAnswered;
         
         // Update dashboard and open drawer
         updateDashboard();
@@ -560,6 +761,8 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
         };
         
         // Call LLM API with full context
+        // Import API dynamically to ensure it's loaded
+        const { API } = await import('./api.js');
         const api = new API();
         const response = await api.getRecommendedActions(posts, recentPosts, stats, 5);
         const actions = response.actions || [];
