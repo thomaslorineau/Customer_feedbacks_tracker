@@ -53,7 +53,8 @@ async def get_posts_for_improvement(
     sort_by: str = Query("opportunity_score", description="Sort field", examples=["opportunity_score", "created_at", "relevance_score"]),
     search: Optional[str] = Query(None, description="Search term"),
     language: Optional[str] = Query(None, description="Filter by language"),
-    source: Optional[str] = Query(None, description="Filter by source")
+    source: Optional[str] = Query(None, description="Filter by source"),
+    date_from: Optional[str] = Query(None, description="Filter posts from this date (YYYY-MM-DD)")
 ):
     """
     Get posts for improvement review with opportunity scoring.
@@ -72,6 +73,19 @@ async def get_posts_for_improvement(
             url = post.get('url', '')
             if '/sample' in url or 'example.com' in url:
                 continue
+            
+            # Apply date filter
+            if date_from:
+                created_at = post.get('created_at', '')
+                if created_at:
+                    try:
+                        from datetime import datetime
+                        post_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        cutoff_date = datetime.fromisoformat(date_from)
+                        if post_date.replace(tzinfo=None) < cutoff_date:
+                            continue
+                    except (ValueError, AttributeError):
+                        continue
             
             # Apply filters
             if search:

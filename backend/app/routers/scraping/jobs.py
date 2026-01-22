@@ -306,6 +306,10 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
         
         async def process_with_semaphore(task):
             async with semaphore:
+                nonlocal started_count
+                started_count += 1
+                logger.debug(f"Job {job_id[:8]}: Starting task {started_count}/{total_tasks}")
+                
                 if job.get('cancelled'):
                     return None
                 try:
@@ -335,19 +339,33 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
         wrapped_tasks = [asyncio.create_task(process_with_semaphore(task)) for task in tasks]
         
         completed_count = 0
+        started_count = 0  # Track how many tasks have started
         
         async def progress_heartbeat():
-            nonlocal completed_count
+            nonlocal completed_count, started_count
+            # Estimate progress: assume tasks take time, so show partial progress based on started tasks
             while job.get('status') == 'running' and completed_count < total_tasks:
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(2.0)  # Update every 2 seconds
                 if job.get('cancelled'):
                     break
-                if completed_count > 0:
-                    job['progress']['completed'] = completed_count
-                    try:
-                        db.update_job_progress(job_id, total_tasks, completed_count)
-                    except Exception:
-                        pass
+                
+                # Update progress: show at least some progress even if tasks are still running
+                # Use a combination of completed and estimated progress
+                estimated_progress = completed_count
+                if started_count > completed_count:
+                    # Estimate: if tasks are running, assume they're 50% done
+                    estimated_progress = completed_count + int((started_count - completed_count) * 0.5)
+                
+                # Always update progress, even if it's 0 (to show the job is alive)
+                job['progress']['completed'] = min(estimated_progress, total_tasks)
+                try:
+                    db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
+                except Exception:
+                    pass
+                
+                # Log progress every 10% or every 10 tasks
+                if completed_count > 0 and completed_count % max(1, total_tasks // 10) == 0:
+                    logger.info(f"Job {job_id[:8]}: {completed_count}/{total_tasks} tasks completed ({completed_count*100//total_tasks}%)")
         
         heartbeat_task = asyncio.create_task(progress_heartbeat())
         
@@ -362,11 +380,18 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
                     result = await completed_task
                     
                     completed_count += 1
-                    job['progress']['completed'] = completed_count
+                    # Update progress immediately when a task completes
+                    estimated_progress = completed_count
+                    if started_count > completed_count:
+                        estimated_progress = completed_count + int((started_count - completed_count) * 0.5)
+                    
+                    job['progress']['completed'] = min(estimated_progress, total_tasks)
                     try:
-                        db.update_job_progress(job_id, total_tasks, completed_count)
+                        db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
                     except Exception:
                         pass
+                    
+                    logger.debug(f"Job {job_id[:8]}: Task completed ({completed_count}/{total_tasks})")
                     
                     if isinstance(result, Exception):
                         error_msg = str(result)
@@ -399,9 +424,14 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
                     logger.error(f"Error processing completed task for job {job_id}: {error_msg}", exc_info=True)
                     
                     completed_count += 1
-                    job['progress']['completed'] = completed_count
+                    # Update progress even on error
+                    estimated_progress = completed_count
+                    if started_count > completed_count:
+                        estimated_progress = completed_count + int((started_count - completed_count) * 0.5)
+                    
+                    job['progress']['completed'] = min(estimated_progress, total_tasks)
                     try:
-                        db.update_job_progress(job_id, total_tasks, completed_count)
+                        db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
                     except Exception:
                         pass
         

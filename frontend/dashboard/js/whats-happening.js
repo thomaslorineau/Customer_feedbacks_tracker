@@ -138,38 +138,40 @@ export async function updateWhatsHappening(state) {
             console.log('LLM insights generated via direct fetch:', insights);
         }
     } catch (error) {
-        console.warn('Failed to get LLM insights, using fallback:', error);
-        // Fallback to hardcoded logic if LLM fails
-        const productCounts = {};
-        posts.filter(p => p.sentiment_label === 'negative').forEach(post => {
-            const product = getProductLabel(post.id, post.content, post.language);
-            if (product) {
-                productCounts[product] = (productCounts[product] || 0) + 1;
-            }
-        });
-        const topProduct = Object.entries(productCounts)
-            .sort((a, b) => b[1] - a[1])[0];
-        const topProductPercentage = negative > 0 && topProduct 
-            ? Math.round((topProduct[1] / negative) * 100) 
-            : 0;
-        
-        const negativePosts = posts.filter(p => p.sentiment_label === 'negative');
-        const wordCounts = {};
-        negativePosts.forEach(post => {
-            const words = (post.content || '').toLowerCase()
-                .replace(/[^\w\s]/g, ' ')
-                .split(/\s+/)
-                .filter(w => w.length > 4);
-            words.forEach(word => {
-                if (!['ovh', 'ovhcloud', 'customer', 'service', 'support', 'issue', 'problem'].includes(word)) {
-                    wordCounts[word] = (wordCounts[word] || 0) + 1;
-                }
-            });
-        });
-        const topIssue = Object.entries(wordCounts)
-            .sort((a, b) => b[1] - a[1])[0];
-        
-        // Convert to insights format for consistency
+        console.warn('Failed to get LLM insights:', error);
+        // Show refresh button on error
+        const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
+        if (refreshBtn) {
+            refreshBtn.style.display = 'flex';
+        }
+        // Show error message with retry option instead of fallback
+        const content = document.getElementById('whatsHappeningContent');
+        if (content) {
+            content.innerHTML = `
+                <div style="text-align: center; padding: 30px; color: var(--text-primary);">
+                    <div style="font-size: 3em; margin-bottom: 16px;">⚠️</div>
+                    <h3 style="margin: 0 0 12px 0; color: var(--text-primary);">AI Analysis Unavailable</h3>
+                    <p style="margin: 0 0 20px 0; color: var(--text-secondary); line-height: 1.6;">
+                        Unable to generate AI insights. This could be due to:<br>
+                        • Missing or invalid LLM API keys in Settings<br>
+                        • Network connectivity issues<br>
+                        • LLM service temporarily unavailable
+                    </p>
+                    <button onclick="refreshWhatsHappening()" class="btn-refresh-analysis" style="margin: 0 auto;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <polyline points="1 20 1 14 7 14"/>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                        </svg>
+                        Retry Analysis
+                    </button>
+                    <p style="margin-top: 16px; font-size: 0.9em; color: var(--text-muted);">
+                        <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Configure API keys</a> to enable AI-powered insights
+                    </p>
+                </div>
+            `;
+        }
+        // Still show spike detection if available (basic detection)
         if (spikeDetected) {
             insights.push({
                 type: 'spike',
@@ -180,31 +182,18 @@ export async function updateWhatsHappening(state) {
                 count: recentNegative
             });
         }
-        if (topProduct) {
-            insights.push({
-                type: 'top_product',
-                title: `Top Product Impacted: ${topProduct[0]}`,
-                description: `${topProductPercentage}% of negative posts are relating to ${topProduct[0]} issues.`,
-                icon: '🎁',
-                metric: `${topProductPercentage}%`,
-                count: topProduct[1]
-            });
-        }
-        if (topIssue) {
-            insights.push({
-                type: 'top_issue',
-                title: `Top Issue: "${topIssue[0].charAt(0).toUpperCase() + topIssue[0].slice(1)}"`,
-                description: `${topIssue[1]} posts mention issues related to ${topIssue[0]} requests.`,
-                icon: '💬',
-                metric: '',
-                count: topIssue[1]
-            });
-        }
     } finally {
         // Always hide overlay, even if there was an error
         clearTimeout(overlayTimeout);
         if (overlay) {
             overlay.style.display = 'none';
+        }
+        // Show refresh button if there was an error or LLM is not available
+        const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
+        if (refreshBtn && (!llmAvailable || insights.length === 0)) {
+            refreshBtn.style.display = 'flex';
+        } else if (refreshBtn && llmAvailable && insights.length > 0) {
+            refreshBtn.style.display = 'none';
         }
     }
     
@@ -395,26 +384,36 @@ export async function updateWhatsHappening(state) {
     
     let contentHTML = '';
     
+    // Store insights globally for drawer access
+    window.currentInsights = insights;
+    
     // Render insights from LLM (or fallback)
     if (insights && insights.length > 0) {
-        insights.forEach(insight => {
+        insights.forEach((insight, index) => {
+            const insightId = `insight-${index}`;
+            const clickableClass = insight.count > 0 ? 'clickable-insight' : '';
+            const cursorStyle = insight.count > 0 ? 'cursor: pointer;' : '';
+            const onClickHandler = insight.count > 0 ? `onclick="openInsightDrawerByIndex(${index})"` : '';
+            
             if (insight.type === 'spike') {
                 contentHTML += `
-                    <div class="alert-box">
+                    <div class="alert-box ${clickableClass}" id="${insightId}" data-insight-index="${index}" data-insight-type="${insight.type}" style="${cursorStyle}" ${onClickHandler}>
                         <div class="alert-box-icon">${insight.icon || '⚠️'}</div>
                         <div class="alert-box-content">
                             <h3>${insight.title}</h3>
                             <p>${insight.description}</p>
+                            ${insight.count > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: rgba(255, 255, 255, 0.9); font-weight: 600;">Click to view ${insight.count} related posts →</p>` : ''}
                         </div>
                     </div>
                 `;
             } else {
                 contentHTML += `
-                    <div class="insight-box">
+                    <div class="insight-box ${clickableClass}" id="${insightId}" data-insight-index="${index}" data-insight-type="${insight.type}" style="${cursorStyle}" ${onClickHandler}>
                         <div class="insight-box-icon">${insight.icon || '📊'}</div>
                         <div class="insight-box-content">
                             <h4>${insight.title}</h4>
                             <p>${insight.description}</p>
+                            ${insight.count > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: var(--accent-primary); font-weight: 600;">Click to view ${insight.count} related posts →</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -452,6 +451,34 @@ export async function updateWhatsHappening(state) {
         console.error('Error in updateRecommendedActions:', error);
     });
 }
+
+// Refresh What's Happening analysis
+window.refreshWhatsHappening = async function() {
+    const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refreshing...';
+    }
+    
+    try {
+        // Re-import and call updateWhatsHappening
+        if (currentState) {
+            await updateWhatsHappening(currentState);
+        } else {
+            // Try to get state from dashboard
+            if (window.state) {
+                await updateWhatsHappening(window.state);
+            }
+        }
+    } catch (error) {
+        console.error('Error refreshing What\'s Happening:', error);
+    } finally {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh Analysis';
+        }
+    }
+};
 
 // Separate function for the click handler
 function handleStatsCardClick(e) {
@@ -713,6 +740,192 @@ function escapeHtml(text) {
 
 // Make closeFilteredPostsDrawer available globally
 window.closeFilteredPostsDrawer = closeFilteredPostsDrawer;
+
+// Open drawer for insight posts by index
+window.openInsightDrawerByIndex = function(index) {
+    if (!window.currentInsights || !window.currentInsights[index]) {
+        console.error('Insight not found at index:', index);
+        return;
+    }
+    
+    const insight = window.currentInsights[index];
+    openInsightDrawer(insight.type, insight);
+};
+
+// Open drawer for insight posts
+function openInsightDrawer(insightType, insight) {
+    if (!currentState) {
+        console.error('No state available for insight drawer');
+        return;
+    }
+    
+    const posts = currentState.filteredPosts || [];
+    let filteredPosts = [];
+    let title = '';
+    let description = '';
+    
+    // Filter posts based on insight type
+    if (insightType === 'spike') {
+        // Show negative posts from last 48 hours
+        const now = new Date();
+        const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+        filteredPosts = posts.filter(p => {
+            const postDate = new Date(p.created_at);
+            return postDate >= last48h && p.sentiment_label === 'negative';
+        });
+        title = 'Spike in Negative Feedback';
+        description = `${insight.description || 'Recent spike in negative feedback detected'}`;
+    } else if (insightType === 'top_product') {
+        // Extract product name from title
+        const productName = insight.title.replace('Top Product Impacted: ', '').trim();
+        filteredPosts = posts.filter(p => {
+            if (p.sentiment_label !== 'negative') return false;
+            const content = (p.content || '').toLowerCase();
+            const productLower = productName.toLowerCase();
+            // Check if product is mentioned in content
+            return content.includes(productLower);
+        });
+        title = `Posts about ${productName}`;
+        description = `${insight.description || `Posts mentioning ${productName}`}`;
+    } else if (insightType === 'top_issue') {
+        // Extract issue keyword from title
+        const issueText = insight.title.replace('Top Issue: ', '').replace(/"/g, '').trim();
+        const issueKeyword = issueText.toLowerCase();
+        filteredPosts = posts.filter(p => {
+            if (p.sentiment_label !== 'negative') return false;
+            const content = (p.content || '').toLowerCase();
+            // Check if issue keyword is mentioned in content
+            return content.includes(issueKeyword);
+        });
+        title = `Posts about "${issueText}"`;
+        description = `${insight.description || `Posts mentioning ${issueText}`}`;
+    }
+    
+    // Sort by date (most recent first)
+    filteredPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // Open drawer with filtered posts
+    openInsightPostsDrawer(filteredPosts, title, description, insight);
+};
+
+// Open drawer for insight posts
+function openInsightPostsDrawer(posts, title, description, insight) {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (!drawer) {
+        console.error('Drawer not found');
+        return;
+    }
+    
+    const drawerContent = document.getElementById('filteredPostsDrawerContent');
+    if (!drawerContent) {
+        console.error('Drawer content not found');
+        return;
+    }
+    
+    // Calculate scrollbar width before hiding it
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    document.body.classList.add('drawer-open');
+    drawer.classList.add('open');
+    
+    // Helper functions
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function truncateText(text, maxLength) {
+        if (!text) return 'No content';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+    
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+    
+    function getSourceIcon(source) {
+        const icons = {
+            'X/Twitter': '🐦',
+            'Twitter': '🐦',
+            'Reddit': '🔴',
+            'Trustpilot': '⭐',
+            'OVH Forum': '💬',
+            'News': '📰',
+            'GitHub': '🐙',
+            'LinkedIn': '💼'
+        };
+        return icons[source] || '📝';
+    }
+    
+    // Build HTML
+    let html = `
+        <div class="drawer-header">
+            <h3>${escapeHtml(title)}</h3>
+            <button class="drawer-close" onclick="closeFilteredPostsDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div class="drawer-info">
+            <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(description)}</p>
+            <div class="drawer-stats">
+                <span class="drawer-stat-value">${posts.length}</span>
+                <span class="drawer-stat-label">posts</span>
+            </div>
+        </div>
+        <div class="drawer-posts">
+    `;
+    
+    if (posts.length === 0) {
+        html += `
+            <div class="drawer-empty">
+                <p>No posts found matching this insight.</p>
+            </div>
+        `;
+    } else {
+        posts.forEach(post => {
+            const sourceIcon = getSourceIcon(post.source);
+            const timeAgo = getTimeAgo(post.created_at);
+            const sentiment = post.sentiment_label || 'neutral';
+            const category = getProductLabel(post.id, post.content, post.language) || 'General';
+            
+            html += `
+                <div class="drawer-post-item">
+                    <div class="drawer-post-header">
+                        <div class="drawer-post-source">
+                            <span class="drawer-source-icon">${sourceIcon}</span>
+                            <span class="drawer-source-name">${escapeHtml(post.source || 'Unknown')}</span>
+                            ${category && category !== 'General' ? `<span class="drawer-post-category" style="margin-left: 8px; padding: 3px 8px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.75em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : ''}
+                            <span class="drawer-post-time">${timeAgo}</span>
+                        </div>
+                        <span class="drawer-sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+                    </div>
+                    <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
+                    <div class="drawer-post-meta">
+                        ${category && category !== 'General' ? `<span class="drawer-post-category" style="padding: 4px 10px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.8em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : '<span class="drawer-post-category" style="padding: 4px 10px; background: var(--bg-secondary, #f3f4f6); border-radius: 6px; color: var(--text-secondary, #6b7280); font-size: 0.8em;">General</span>'}
+                        ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link">View post →</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    html += `
+        </div>
+    `;
+    
+    drawerContent.innerHTML = html;
+}
 
 function getActiveFilters(state) {
     const filters = {

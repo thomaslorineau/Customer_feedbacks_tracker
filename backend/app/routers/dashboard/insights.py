@@ -615,7 +615,7 @@ POSTS TO ANALYZE:
 {json.dumps(posts_summary, indent=2, ensure_ascii=False)}
 
 Based on this analysis, generate 2-4 key insights. Focus on:
-1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be specific (e.g., "VPS", "Hosting", "Billing", "Support", "API", "Domain", etc.). If multiple products are mentioned, identify the most critical one.
+1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be specific (e.g., "VPS", "Hosting", "Public Cloud", "API", "Domain", "DNS", etc.). If multiple products are mentioned, identify the most critical one.
 2. **Top Issue**: What is the main problem or concern mentioned across these posts? Extract the core issue, not just keywords. Be specific and actionable (e.g., "Payment processing delays", "Server downtime", "Support response time", etc.).
 3. **Spike Alert** (if spike_detected is true): Highlight the spike in negative feedback
 4. **Trend** (optional): Any notable trend or pattern you observe
@@ -912,26 +912,65 @@ async def get_pain_points_endpoint(
 
 
 @router.get("/api/product-opportunities", response_model=ProductDistributionResponse, tags=["Dashboard", "Insights"])
-async def get_product_opportunities():
+async def get_product_opportunities(
+    date_from: Optional[str] = Query(None, description="Filter posts from this date (YYYY-MM-DD)")
+):
     """Get product distribution with opportunity scores based on negative feedback."""
     try:
         # Get all posts from database (using a high limit to get all posts)
         posts = db.get_posts(limit=10000, offset=0)
         
-        # Product keywords to detect
+        # Filter by date if provided
+        if date_from:
+            from datetime import datetime
+            try:
+                # Parse date_from (YYYY-MM-DD format)
+                cutoff_date = datetime.strptime(date_from, '%Y-%m-%d')
+                filtered_posts = []
+                for post in posts:
+                    created_at = post.get('created_at', '')
+                    if created_at:
+                        try:
+                            # Parse post date (handle various formats)
+                            post_date_str = created_at.replace('Z', '+00:00')
+                            try:
+                                post_date = datetime.fromisoformat(post_date_str)
+                            except ValueError:
+                                # Try parsing without timezone
+                                post_date = datetime.fromisoformat(created_at.split('T')[0])
+                            
+                            # Compare dates (remove timezone for comparison)
+                            post_date_naive = post_date.replace(tzinfo=None) if post_date.tzinfo else post_date
+                            if post_date_naive.date() >= cutoff_date.date():
+                                filtered_posts.append(post)
+                        except (ValueError, AttributeError) as e:
+                            logger.debug(f"Error parsing post date {created_at}: {e}")
+                            continue
+                posts = filtered_posts
+            except ValueError as e:
+                logger.warning(f"Invalid date_from format: {date_from}, error: {e}")
+                pass  # Invalid date format, use all posts
+        
+        # Product keywords to detect - based on OVHcloud.com products
         product_keywords = {
-            'VPS': ['vps', 'virtual private server'],
-            'Hosting': ['hosting', 'web hosting', 'shared hosting'],
-            'Domain': ['domain', 'domaine', 'dns'],
-            'Email': ['email', 'mail', 'smtp', 'imap'],
-            'Storage': ['storage', 'object storage', 'backup', 's3'],
-            'CDN': ['cdn', 'content delivery'],
-            'Public Cloud': ['public cloud', 'publiccloud'],
-            'Private Cloud': ['private cloud', 'privatecloud'],
-            'Dedicated Server': ['dedicated', 'dedicated server', 'serveur dédié'],
-            'Billing': ['billing', 'invoice', 'facture', 'payment', 'paiement'],
-            'Support': ['support', 'ticket', 'help', 'assistance'],
-            'API': ['api', 'rest api', 'graphql']
+            'VPS': ['vps', 'virtual private server', 'ovh vps', 'vps cloud', 'cloud vps'],
+            'Hosting': ['hosting', 'web hosting', 'shared hosting', 'ovh hosting', 'web hosting plan'],
+            'Domain': ['domain', 'domaine', 'domain name', 'domain registration', 'domain renewal', 'domain transfer', 'domain expiration', 'registrar', 'bureau d\'enregistrement', 'whois', 'domain management', '.ovh', '.com', '.net', '.org', '.fr', '.eu'],
+            'DNS': ['dns', 'dns zone', 'dns anycast', 'dnssec', 'dns record', 'dns configuration', 'nameserver', 'ns record', 'a record', 'mx record', 'cname record', 'txt record', 'dns management', 'dns hosting'],
+            'Email': ['email', 'mail', 'smtp', 'imap', 'pop3', 'email hosting', 'exchange', 'email account'],
+            'Storage': ['storage', 'object storage', 'backup', 's3', 'cloud storage', 'object storage s3', 'high performance storage'],
+            'CDN': ['cdn', 'content delivery', 'content delivery network', 'ovh cdn'],
+            'Public Cloud': ['public cloud', 'publiccloud', 'ovh public cloud', 'public cloud instance', 'horizon', 'openstack'],
+            'Private Cloud': ['private cloud', 'privatecloud', 'ovh private cloud', 'vmware', 'vsphere', 'hosted private cloud'],
+            'Dedicated Server': ['dedicated', 'dedicated server', 'serveur dédié', 'bare metal', 'ovh dedicated', 'server', 'serveur'],
+            'API': ['api', 'rest api', 'graphql', 'ovh api', 'api ovh', 'ovhcloud api'],
+            'Load Balancer': ['load balancer', 'loadbalancer', 'lb', 'ip load balancing'],
+            'Failover IP': ['failover ip', 'failover', 'ip failover', 'additional ip'],
+            'SSL Certificate': ['ssl', 'ssl certificate', 'certificate', 'tls', 'https certificate'],
+            'Managed Kubernetes': ['kubernetes', 'k8s', 'managed kubernetes', 'ovh kubernetes'],
+            'Managed Databases': ['database', 'mysql', 'postgresql', 'mongodb', 'redis', 'managed database', 'ovh database'],
+            'Network': ['network', 'vrack', 'vrack', 'private network', 'vlan'],
+            'IP': ['ip address', 'ipv4', 'ipv6', 'ip block', 'ip range']
         }
         
         # Count posts by product
@@ -941,8 +980,11 @@ async def get_product_opportunities():
             is_negative = post.get('sentiment_label') == 'negative'
             
             # Detect products mentioned in post
+            # A post can match multiple products, so we count it for all matching products
+            matched_products = []
             for product_name, keywords in product_keywords.items():
                 if any(keyword in content for keyword in keywords):
+                    matched_products.append(product_name)
                     if product_name not in product_stats:
                         product_stats[product_name] = {
                             'total': 0,

@@ -1681,6 +1681,25 @@ body {
     line-height: 1.4;
 }
 
+/* Clickable insights */
+.clickable-insight {
+    transition: all 0.2s ease;
+}
+
+.clickable-insight:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.alert-box.clickable-insight:hover {
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.insight-box.clickable-insight:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 4px 12px rgba(0, 153, 255, 0.2);
+}
+
 /* Recommended Actions */
 .recommended-actions {
     margin-top: 24px;
@@ -2428,5 +2447,48 @@ body:not(.drawer-open) {
 
 body.dark-mode .llm-analysis-overlay {
     background: rgba(0, 0, 0, 0.85);
+}
+
+/* Refresh Analysis Button */
+.btn-refresh-analysis {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
+}
+
+.btn-refresh-analysis:hover {
+    background: var(--accent-secondary);
+    box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.btn-refresh-analysis:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
+}
+
+.btn-refresh-analysis:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-refresh-analysis svg {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 

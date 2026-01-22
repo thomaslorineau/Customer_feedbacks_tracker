@@ -3,6 +3,26 @@
 // Store current product filter
 let currentProductFilter = null;
 
+// Store current period filter (in days)
+let currentPeriodDays = 30; // Default to 30 days
+
+// Helper function to get period text
+function getPeriodText(days) {
+    if (days === 30) return 'Last 30 days';
+    if (days === 60) return 'Last 60 days';
+    if (days === 90) return 'Last 90 days';
+    if (days === 180) return 'Last 6 months';
+    if (days === 365) return 'Last year';
+    return `Last ${days} days`;
+}
+
+// Helper function to get date_from parameter for API calls
+function getDateFrom(days) {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString().split('T')[0];
+}
+
 // Initialize theme
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -128,7 +148,7 @@ async function loadPainPoints() {
     
     try {
         console.log('Loading pain points...');
-        const response = await fetch('/api/pain-points?days=30&limit=5');
+        const response = await fetch(`/api/pain-points?days=${currentPeriodDays}&limit=5`);
         console.log('Pain points response status:', response.status, response.statusText);
         
         if (!response.ok) {
@@ -142,7 +162,8 @@ async function loadPainPoints() {
         console.log('Pain points data received:', data);
         
         if (!data.pain_points || data.pain_points.length === 0) {
-            painPointsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No pain points found in the last 30 days.</div>';
+            const periodText = getPeriodText(currentPeriodDays);
+            painPointsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">No pain points found for the selected period (${periodText}).</div>`;
             return;
         }
         
@@ -182,7 +203,9 @@ async function loadProductDistribution() {
     
     try {
         console.log('Loading product distribution...');
-        const response = await fetch('/api/product-opportunities');
+        // Add date filter to product opportunities
+        const dateFrom = getDateFrom(currentPeriodDays);
+        const response = await fetch(`/api/product-opportunities?date_from=${dateFrom}`);
         console.log('Product distribution response status:', response.status, response.statusText);
         
         if (!response.ok) {
@@ -298,6 +321,10 @@ async function loadPostsForImprovement(resetOffset = false, productFilter = null
             offset: currentOffset.toString(),
             sort_by: sortBy
         });
+        
+        // Add date filter
+        const dateFrom = getDateFrom(currentPeriodDays);
+        params.append('date_from', dateFrom);
         
         if (search) params.append('search', search);
         if (language !== 'all') params.append('language', language);
@@ -497,8 +524,32 @@ function createImprovementTicket(postId) {
     // This could open a modal or redirect to a ticket creation page
 }
 
+// Reload all data when period filter changes
+async function reloadAllData() {
+    try {
+        await Promise.all([
+            loadPainPoints(),
+            loadProductDistribution(),
+            loadPostsForImprovement(true)
+        ]);
+        await loadImprovementsAnalysis();
+    } catch (error) {
+        console.error('Error reloading data:', error);
+    }
+}
+
 // Setup event listeners
 function setupEventListeners() {
+    // Period filter change handler
+    const periodFilter = document.getElementById('improvementsPeriod');
+    if (periodFilter) {
+        periodFilter.addEventListener('change', async (e) => {
+            currentPeriodDays = parseInt(e.target.value, 10);
+            console.log('Period filter changed to:', currentPeriodDays, 'days');
+            await reloadAllData();
+        });
+    }
+    
     // Search input
     const searchInput = document.getElementById('improvementsSearch');
     if (searchInput) {
@@ -577,9 +628,10 @@ async function loadImprovementsAnalysis() {
     }, 30000);
     
     try {
-        // Get pain points and products data
-        const painPointsResponse = await fetch('/api/pain-points?days=30&limit=10');
-        const productsResponse = await fetch('/api/product-opportunities');
+        // Get pain points and products data with current period filter
+        const painPointsResponse = await fetch(`/api/pain-points?days=${currentPeriodDays}&limit=10`);
+        const dateFrom = getDateFrom(currentPeriodDays);
+        const productsResponse = await fetch(`/api/product-opportunities?date_from=${dateFrom}`);
         
         if (!painPointsResponse.ok || !productsResponse.ok) {
             throw new Error('Failed to load data for analysis');
@@ -605,8 +657,11 @@ async function loadImprovementsAnalysis() {
         }
         
         // Get total posts count (filtered if product filter is active)
-        const postsParams = currentProductFilter ? `?search=${encodeURIComponent(currentProductFilter)}` : '';
-        const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000${currentProductFilter ? `&search=${encodeURIComponent(currentProductFilter)}` : ''}`);
+        const postsParams = new URLSearchParams({ limit: '1000', date_from: dateFrom });
+        if (currentProductFilter) {
+            postsParams.append('search', currentProductFilter);
+        }
+        const postsResponse = await fetch(`/api/posts-for-improvement?${postsParams.toString()}`);
         let postsData = { total: 0, posts: [] };
         if (postsResponse.ok) {
             postsData = await postsResponse.json();
@@ -676,7 +731,17 @@ async function loadImprovementsAnalysis() {
     } catch (error) {
         console.error('Error loading improvements analysis:', error);
         if (insightsContainer) {
-            insightsContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444;">Error loading analysis: ${error.message}</div>`;
+            insightsContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444;">
+                <p>Error loading analysis: ${escapeHtml(error.message)}</p>
+                <button onclick="refreshImprovementsAnalysis()" style="margin-top: 10px; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer;">
+                    🔄 Retry Analysis
+                </button>
+            </div>`;
+        }
+        // Show refresh button on error
+        const refreshBtn = document.getElementById('refreshImprovementsAnalysisBtn');
+        if (refreshBtn) {
+            refreshBtn.style.display = 'flex';
         }
         // Still show the section even if there's an error
         if (analysisSection) {
@@ -690,6 +755,26 @@ async function loadImprovementsAnalysis() {
         }
     }
 }
+
+// Refresh Improvements Analysis
+window.refreshImprovementsAnalysis = async function() {
+    const refreshBtn = document.getElementById('refreshImprovementsAnalysisBtn');
+    if (refreshBtn) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refreshing...';
+    }
+    
+    try {
+        await loadImprovementsAnalysis();
+    } catch (error) {
+        console.error('Error refreshing improvements analysis:', error);
+    } finally {
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh Analysis';
+        }
+    }
+};
 
 // Helper function to escape HTML
 function escapeHtml(text) {
@@ -716,7 +801,7 @@ function openPostPreviewModal(postId) {
     }
     
     // Format date
-    const postDate = new Date(post.created_at).toLocaleString('fr-FR', {
+    const postDate = new Date(post.created_at).toLocaleString('en-US', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -740,21 +825,21 @@ function openPostPreviewModal(postId) {
                 </span>
             </div>
             <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
-                <strong>Auteur:</strong> ${escapeHtml(post.author || 'Unknown')}
+                <strong>Author:</strong> ${escapeHtml(post.author || 'Unknown')}
             </div>
             <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
                 <strong>Date:</strong> ${postDate}
             </div>
             ${post.language && post.language !== 'unknown' ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
-                <strong>Langue:</strong> ${escapeHtml(post.language.toUpperCase())}
+                <strong>Language:</strong> ${escapeHtml(post.language.toUpperCase())}
             </div>` : ''}
             <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
-                <strong>Score d'opportunité:</strong> ${post.opportunity_score || 0}
+                <strong>Opportunity Score:</strong> ${post.opportunity_score || 0}
             </div>
         </div>
         
         <div style="padding: 20px; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(0, 153, 255, 0.2);">
-            <h3 style="color: var(--accent-primary); margin-top: 0; margin-bottom: 15px; font-size: 1.2em;">Contenu:</h3>
+            <h3 style="color: var(--accent-primary); margin-top: 0; margin-bottom: 15px; font-size: 1.2em;">Content:</h3>
             <div style="color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; max-height: none; overflow-y: visible; padding: 15px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
                 ${escapeHtml(post.content || 'No content available')}
             </div>

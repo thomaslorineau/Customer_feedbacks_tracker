@@ -25,10 +25,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Simple connection pool for DuckDB
-_connection_pool: List[duckdb.DuckDBPyConnection] = []
-_pool_lock = Lock()
-_MAX_POOL_SIZE = 5
+# Single shared connection for DuckDB (DuckDB doesn't support multiple concurrent connections well)
+_shared_connection: Optional[Any] = None
+_connection_lock = Lock()
 
 
 def get_db_connection() -> Tuple[Any, bool]:
@@ -37,67 +36,82 @@ def get_db_connection() -> Tuple[Any, bool]:
     Returns: (connection, is_duckdb) where is_duckdb is always True
     
     Note: For better resource management, prefer using get_db() context manager.
+    DuckDB doesn't support multiple concurrent connections well, so we use a single shared connection.
     """
     if not DUCKDB_AVAILABLE:
         raise RuntimeError("DuckDB is not available. Please install it: pip install duckdb")
     
-    try:
-        # Try to get connection from pool
-        with _pool_lock:
-            if _connection_pool:
-                conn = _connection_pool.pop()
-                # Verify connection is still valid
+    global _shared_connection
+    
+    with _connection_lock:
+        try:
+            # Check if shared connection exists and is valid
+            if _shared_connection is not None:
                 try:
-                    conn.execute("SELECT 1")
-                    return conn, True
+                    _shared_connection.execute("SELECT 1")
+                    return _shared_connection, True
                 except Exception:
-                    # Connection is invalid, create new one
-                    pass
-        
-        # Create new connection
-        conn = duckdb.connect(str(DB_FILE))
-        return conn, True
-    except Exception as e:
-        error_str = str(e)
-        # Check if it's a serialization/corruption error
-        if "Serialization" in error_str or "corrupt" in error_str.lower() or "Failed to deserialize" in error_str:
-            logger.warning(f"DuckDB corruption detected: {e}")
-            logger.info("Attempting automatic database repair...")
-            try:
-                # Try to repair the database
-                _repair_database()
-                # Retry connection after repair
-                conn = duckdb.connect(str(DB_FILE))
-                logger.info("Database repaired successfully, connection restored")
-                return conn, True
-            except Exception as repair_error:
-                logger.error(f"Database repair failed: {repair_error}")
-                raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE} and repair failed: {repair_error}")
-        else:
-            logger.error(f"DuckDB connection failed: {e}")
-            raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE}: {e}")
+                    # Connection is invalid, close it and create new one
+                    try:
+                        _shared_connection.close()
+                    except Exception:
+                        pass
+                    _shared_connection = None
+            
+            # Create new connection
+            _shared_connection = duckdb.connect(str(DB_FILE))
+            return _shared_connection, True
+        except Exception as e:
+            error_str = str(e)
+            # Check if it's a file lock error
+            if "Cannot open file" in error_str or "used by another process" in error_str.lower():
+                logger.error(f"DuckDB file is locked: {e}")
+                logger.info("Waiting a moment and retrying...")
+                import time
+                # Close existing connection if any
+                if _shared_connection is not None:
+                    try:
+                        _shared_connection.close()
+                    except Exception:
+                        pass
+                    _shared_connection = None
+                # Try multiple times with increasing delays
+                for attempt in range(3):
+                    wait_time = 0.2 * (attempt + 1)  # 0.2s, 0.4s, 0.6s
+                    time.sleep(wait_time)
+                    try:
+                        _shared_connection = duckdb.connect(str(DB_FILE))
+                        logger.info(f"Successfully connected after {attempt + 1} retry(ies)")
+                        return _shared_connection, True
+                    except Exception as retry_error:
+                        if attempt == 2:  # Last attempt
+                            logger.error(f"All retry attempts failed: {retry_error}")
+                            raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE} after 3 attempts: {retry_error}")
+                        logger.warning(f"Retry {attempt + 1} failed, waiting {wait_time}s...")
+            # Check if it's a serialization/corruption error
+            elif "Serialization" in error_str or "corrupt" in error_str.lower() or "Failed to deserialize" in error_str:
+                logger.warning(f"DuckDB corruption detected: {e}")
+                logger.info("Attempting automatic database repair...")
+                try:
+                    # Try to repair the database
+                    _repair_database()
+                    # Retry connection after repair
+                    _shared_connection = duckdb.connect(str(DB_FILE))
+                    logger.info("Database repaired successfully, connection restored")
+                    return _shared_connection, True
+                except Exception as repair_error:
+                    logger.error(f"Database repair failed: {repair_error}")
+                    raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE} and repair failed: {repair_error}")
+            else:
+                logger.error(f"DuckDB connection failed: {e}")
+                raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE}: {e}")
 
 
 def _return_connection_to_pool(conn: Any) -> None:
-    """Return a connection to the pool if there's space."""
-    with _pool_lock:
-        if len(_connection_pool) < _MAX_POOL_SIZE:
-            try:
-                # Verify connection is still valid
-                conn.execute("SELECT 1")
-                _connection_pool.append(conn)
-            except Exception:
-                # Connection is invalid, close it
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-        else:
-            # Pool is full, close the connection
-            try:
-                conn.close()
-            except Exception:
-                pass
+    """No-op for shared connection - connection stays open."""
+    # With shared connection, we don't close it after each use
+    # It will be reused for the next operation
+    pass
 
 
 @contextmanager

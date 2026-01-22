@@ -6,7 +6,6 @@ console.log('API_BASE_URL:', API_BASE_URL);
 
 // State
 let configData = null;
-let revealedKeys = new Set();
 
 // Load and display version
 let versionData = null;
@@ -454,7 +453,6 @@ function renderScrapersAPIKeys() {
 // Attach event listeners to provider buttons
 function attachButtonListeners(providerId) {
     const editBtn = document.getElementById(`edit-btn-${providerId}`);
-    const revealBtn = document.getElementById(`reveal-btn-${providerId}`);
     
     if (editBtn) {
         editBtn.addEventListener('click', (e) => {
@@ -465,19 +463,6 @@ function attachButtonListeners(providerId) {
                 window.enableEditMode(providerId);
             } else {
                 console.error('enableEditMode function not available');
-            }
-        });
-    }
-    
-    if (revealBtn) {
-        revealBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Reveal button clicked for:', providerId);
-            if (window.toggleRevealKey) {
-                window.toggleRevealKey(providerId);
-            } else {
-                console.error('toggleRevealKey function not available');
             }
         });
     }
@@ -511,9 +496,9 @@ function renderProviderCard(provider) {
             
             ${isConfigured ? `
                 <div class="api-key-value">
-                    <div class="key-display ${revealedKeys.has(provider.id) ? '' : 'hidden'}" 
+                    <div class="key-display" 
                          id="key-${provider.id}">
-                        ${revealedKeys.has(provider.id) ? '••••••••' : maskedKey}
+                        ${maskedKey}
                     </div>
                     <div class="key-actions">
                         <button class="btn-icon" 
@@ -527,17 +512,6 @@ function renderProviderCard(provider) {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                             </svg>
                             Edit
-                        </button>
-                        <button class="btn-icon" 
-                                id="reveal-btn-${provider.id}"
-                                type="button"
-                                data-provider="${provider.id}"
-                                data-action="reveal">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                            ${revealedKeys.has(provider.id) ? 'Hide' : 'Reveal'}
                         </button>
                     </div>
                 </div>
@@ -644,149 +618,6 @@ function renderRateLimiting() {
     `;
 }
 
-// Toggle Reveal Key
-async function toggleRevealKey(provider) {
-    console.log('toggleRevealKey called for provider:', provider);
-    const keyDisplay = document.getElementById(`key-${provider}`);
-    const revealBtn = document.getElementById(`reveal-btn-${provider}`);
-    
-    if (!keyDisplay || !revealBtn) {
-        console.error('Elements not found:', { keyDisplay, revealBtn, provider });
-        return;
-    }
-    
-    if (revealedKeys.has(provider)) {
-        // Hide the key
-        revealedKeys.delete(provider);
-        keyDisplay.textContent = configData.api_keys[provider].masked;
-        keyDisplay.classList.add('hidden');
-        revealBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-            </svg>
-            Reveal
-        `;
-    } else {
-        // Reveal the key
-        revealBtn.innerHTML = '<span class="loading-spinner"></span> Loading...';
-        revealBtn.disabled = true;
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}`, {
-                method: 'POST'
-            });
-            
-            if (!response.ok) throw new Error('Failed to reveal key');
-            
-            const data = await response.json();
-            revealedKeys.add(provider);
-            keyDisplay.textContent = data.key;
-            keyDisplay.classList.remove('hidden');
-            revealBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-                Hide
-            `;
-            
-            // Auto-hide after 30 seconds for security
-            setTimeout(() => {
-                if (revealedKeys.has(provider)) {
-                    toggleRevealKey(provider);
-                }
-            }, 30000);
-            
-        } catch (error) {
-            console.error('Error revealing key:', error);
-            showError('Failed to reveal API key');
-            revealBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                    <circle cx="12" cy="12" r="3"/>
-                </svg>
-                Reveal
-            `;
-        } finally {
-            revealBtn.disabled = false;
-        }
-    }
-}
-
-// Copy Key to Clipboard
-async function copyKey(provider) {
-    const copyBtn = document.getElementById(`copy-btn-${provider}`);
-    const keyDisplay = document.getElementById(`key-${provider}`);
-    
-    let keyToCopy = keyDisplay.textContent;
-    
-    // If key is not revealed, reveal it first
-    if (!revealedKeys.has(provider)) {
-        copyBtn.innerHTML = '<span class="loading-spinner"></span>';
-        copyBtn.disabled = true;
-        
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}`, {
-                method: 'POST'
-            });
-            
-            if (!response.ok) throw new Error('Failed to get key');
-            
-            const data = await response.json();
-            keyToCopy = data.key;
-        } catch (error) {
-            console.error('Error getting key:', error);
-            showError('Failed to copy API key');
-            copyBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-                Copy
-            `;
-            copyBtn.disabled = false;
-            return;
-        }
-    }
-    
-    // Copy to clipboard
-    try {
-        await navigator.clipboard.writeText(keyToCopy);
-        
-        // Show success feedback
-        const feedback = document.getElementById('copyFeedback');
-        feedback.querySelector('span').textContent = `${provider.toUpperCase()} API key copied to clipboard!`;
-        feedback.classList.add('show');
-        
-        // Update button to show success
-        copyBtn.classList.add('success');
-        copyBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            Copied!
-        `;
-        
-        setTimeout(() => {
-            feedback.classList.remove('show');
-            copyBtn.classList.remove('success');
-            copyBtn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                </svg>
-                Copy
-            `;
-        }, 3000);
-        
-    } catch (error) {
-        console.error('Error copying to clipboard:', error);
-        showError('Failed to copy to clipboard');
-    } finally {
-        copyBtn.disabled = false;
-    }
-}
 
 // Enable Edit Mode
 async function enableEditMode(provider) {
@@ -840,22 +671,9 @@ async function enableEditMode(provider) {
         return;
     }
     
-    // Get current key value
+    // Don't reveal the key for security - leave input empty
+    // User must enter the full key when editing
     let currentKey = '';
-    const llmProvidersList = ['openai', 'anthropic', 'mistral'];
-    if (llmProvidersList.includes(provider)) {
-        try {
-            const response = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}`, {
-                method: 'POST'
-            });
-            if (response.ok) {
-                const data = await response.json();
-                currentKey = data.key || '';
-            }
-        } catch (error) {
-            console.error('Error revealing key for edit:', error);
-        }
-    }
     
     // Replace the configured view with edit form
     const apiKeyValue = card.querySelector('.api-key-value');
@@ -935,14 +753,10 @@ function exitEditMode(provider) {
 // Make functions globally available
 window.enableEditMode = enableEditMode;
 window.exitEditMode = exitEditMode;
-window.toggleRevealKey = toggleRevealKey;
-window.copyKey = copyKey;
 
 // Debug: Verify functions are available
 console.log('Settings functions exported:', {
-    enableEditMode: typeof window.enableEditMode,
-    toggleRevealKey: typeof window.toggleRevealKey,
-    copyKey: typeof window.copyKey
+    enableEditMode: typeof window.enableEditMode
 });
 
 // Toggle Input Visibility
