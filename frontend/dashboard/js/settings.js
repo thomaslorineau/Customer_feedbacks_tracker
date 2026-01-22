@@ -287,11 +287,11 @@ function renderLLM() {
             docsUrl: 'https://console.anthropic.com/'
         },
         { 
-            id: 'google', 
-            name: 'Google AI', 
-            icon: '🔍',
-            description: 'Gemini models for multimodal AI capabilities',
-            docsUrl: 'https://makersuite.google.com/app/apikey'
+            id: 'mistral', 
+            name: 'Mistral AI', 
+            icon: '🌊',
+            description: 'Mistral models for advanced AI capabilities',
+            docsUrl: 'https://console.mistral.ai/api-keys/'
         }
     ];
     
@@ -359,6 +359,11 @@ function renderLLM() {
             </div>
         </div>
     `;
+    
+    // Attach event listeners to buttons after rendering
+    llmProviders.forEach(provider => {
+        attachButtonListeners(provider.id);
+    });
 }
 
 // Render Scrapers API Keys Section
@@ -439,6 +444,43 @@ function renderScrapersAPIKeys() {
             </div>
         </div>
     `;
+    
+    // Attach event listeners to buttons after rendering
+    scraperProviders.forEach(provider => {
+        attachButtonListeners(provider.id);
+    });
+}
+
+// Attach event listeners to provider buttons
+function attachButtonListeners(providerId) {
+    const editBtn = document.getElementById(`edit-btn-${providerId}`);
+    const revealBtn = document.getElementById(`reveal-btn-${providerId}`);
+    
+    if (editBtn) {
+        editBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Edit button clicked for:', providerId);
+            if (window.enableEditMode) {
+                window.enableEditMode(providerId);
+            } else {
+                console.error('enableEditMode function not available');
+            }
+        });
+    }
+    
+    if (revealBtn) {
+        revealBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Reveal button clicked for:', providerId);
+            if (window.toggleRevealKey) {
+                window.toggleRevealKey(providerId);
+            } else {
+                console.error('toggleRevealKey function not available');
+            }
+        });
+    }
 }
 
 function renderProviderCard(provider) {
@@ -475,22 +517,27 @@ function renderProviderCard(provider) {
                     </div>
                     <div class="key-actions">
                         <button class="btn-icon" 
-                                onclick="toggleRevealKey('${provider.id}')"
-                                id="reveal-btn-${provider.id}">
+                                id="edit-btn-${provider.id}"
+                                title="Edit API key"
+                                type="button"
+                                data-provider="${provider.id}"
+                                data-action="edit">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Edit
+                        </button>
+                        <button class="btn-icon" 
+                                id="reveal-btn-${provider.id}"
+                                type="button"
+                                data-provider="${provider.id}"
+                                data-action="reveal">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                             </svg>
                             ${revealedKeys.has(provider.id) ? 'Hide' : 'Reveal'}
-                        </button>
-                        <button class="btn-icon secondary" 
-                                onclick="copyKey('${provider.id}')"
-                                id="copy-btn-${provider.id}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                            </svg>
-                            Copy
                         </button>
                     </div>
                 </div>
@@ -599,8 +646,14 @@ function renderRateLimiting() {
 
 // Toggle Reveal Key
 async function toggleRevealKey(provider) {
+    console.log('toggleRevealKey called for provider:', provider);
     const keyDisplay = document.getElementById(`key-${provider}`);
     const revealBtn = document.getElementById(`reveal-btn-${provider}`);
+    
+    if (!keyDisplay || !revealBtn) {
+        console.error('Elements not found:', { keyDisplay, revealBtn, provider });
+        return;
+    }
     
     if (revealedKeys.has(provider)) {
         // Hide the key
@@ -735,6 +788,163 @@ async function copyKey(provider) {
     }
 }
 
+// Enable Edit Mode
+async function enableEditMode(provider) {
+    console.log('enableEditMode called for provider:', provider);
+    const card = document.querySelector(`[data-provider="${provider}"]`);
+    if (!card) {
+        console.error(`Card not found for provider: ${provider}`);
+        return;
+    }
+    
+    const keyData = configData.api_keys[provider];
+    if (!keyData || !keyData.configured) {
+        console.warn(`Provider ${provider} is not configured, cannot edit`);
+        return;
+    }
+    
+    // Get provider info
+    const llmProviders = [
+        { id: 'openai', name: 'OpenAI', icon: '🤖', docsUrl: 'https://platform.openai.com/api-keys' },
+        { id: 'anthropic', name: 'Anthropic', icon: '🧠', docsUrl: 'https://console.anthropic.com/' },
+        { id: 'mistral', name: 'Mistral AI', icon: '🌊', docsUrl: 'https://console.mistral.ai/api-keys/' }
+    ];
+    
+    const scraperProviders = [
+        { id: 'github', name: 'GitHub', icon: '🐙', docsUrl: 'https://github.com/settings/tokens' },
+        { id: 'trustpilot', name: 'Trustpilot', icon: '⭐', docsUrl: 'https://developers.trustpilot.com/' },
+        { id: 'linkedin', name: 'LinkedIn', icon: '💼', docsUrl: 'https://www.linkedin.com/developers/apps' },
+        { id: 'twitter', name: 'Twitter/X API', icon: '🐦', docsUrl: 'https://developer.twitter.com/en/portal/dashboard' }
+    ];
+    
+    const providerInfo = [...llmProviders, ...scraperProviders].find(p => p.id === provider);
+    if (!providerInfo) {
+        console.error(`Provider info not found for: ${provider}`);
+        return;
+    }
+    
+    // Determine field name
+    const fieldMap = {
+        'openai': 'OPENAI_API_KEY',
+        'anthropic': 'ANTHROPIC_API_KEY',
+        'mistral': 'MISTRAL_API_KEY',
+        'github': 'GITHUB_TOKEN',
+        'trustpilot': 'TRUSTPILOT_API_KEY',
+        'linkedin': 'LINKEDIN_CLIENT_ID',
+        'twitter': 'TWITTER_BEARER_TOKEN'
+    };
+    
+    const fieldName = fieldMap[provider];
+    if (!fieldName) {
+        console.error(`Field name not found for provider: ${provider}`);
+        return;
+    }
+    
+    // Get current key value
+    let currentKey = '';
+    const llmProvidersList = ['openai', 'anthropic', 'mistral'];
+    if (llmProvidersList.includes(provider)) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                currentKey = data.key || '';
+            }
+        } catch (error) {
+            console.error('Error revealing key for edit:', error);
+        }
+    }
+    
+    // Replace the configured view with edit form
+    const apiKeyValue = card.querySelector('.api-key-value');
+    const apiKeyInfo = card.querySelector('.api-key-info');
+    
+    if (apiKeyValue && apiKeyInfo) {
+        const editFormHtml = `
+            <div class="api-key-form-container">
+                <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider}');">
+                    <div class="form-group">
+                        <label for="key-input-${provider}">API Key</label>
+                        <div class="input-with-button">
+                            <input 
+                                type="password" 
+                                id="key-input-${provider}"
+                                class="api-key-input"
+                                placeholder="Enter your ${providerInfo.name} API key"
+                                value="${currentKey}"
+                                autocomplete="off"
+                            />
+                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-save-key" id="save-btn-${provider}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Save API Key
+                        </button>
+                        <button type="button" class="btn-get-key" onclick="exitEditMode('${provider}')" style="background: var(--text-secondary);">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/>
+                                <line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+        
+        apiKeyValue.outerHTML = editFormHtml;
+        
+        // Focus on input after a short delay
+        setTimeout(() => {
+            const input = document.getElementById(`key-input-${provider}`);
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }, 100);
+    }
+}
+
+// Exit Edit Mode
+function exitEditMode(provider) {
+    // Reload configuration to restore the original view
+    loadConfiguration().then(() => {
+        // Re-render the specific provider card
+        const llmProviders = ['openai', 'anthropic', 'mistral'];
+        if (llmProviders.includes(provider)) {
+            renderLLM();
+        } else {
+            renderScrapersAPIKeys();
+        }
+    });
+}
+
+// Make functions globally available
+window.enableEditMode = enableEditMode;
+window.exitEditMode = exitEditMode;
+window.toggleRevealKey = toggleRevealKey;
+window.copyKey = copyKey;
+
+// Debug: Verify functions are available
+console.log('Settings functions exported:', {
+    enableEditMode: typeof window.enableEditMode,
+    toggleRevealKey: typeof window.toggleRevealKey,
+    copyKey: typeof window.copyKey
+});
+
 // Toggle Input Visibility
 function toggleInputVisibility(inputId) {
     const input = document.getElementById(inputId);
@@ -753,7 +963,7 @@ async function saveAPIKey(provider) {
     const providers = [
         { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
         { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
-        { id: 'google', fields: [{ name: 'GOOGLE_API_KEY' }] },
+        { id: 'mistral', fields: [{ name: 'MISTRAL_API_KEY' }] },
         { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
         { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
         { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
@@ -787,7 +997,7 @@ async function saveAPIKey(provider) {
     }
     
     // Allow empty values for LLM providers (to clear existing keys)
-    const llmProviders = ['openai', 'anthropic', 'google'];
+    const llmProviders = ['openai', 'anthropic', 'mistral'];
     if (hasEmptyField && !llmProviders.includes(provider)) {
         showError('Please fill in all required fields');
         return;
@@ -804,6 +1014,8 @@ async function saveAPIKey(provider) {
             payload = { openai_api_key: values.OPENAI_API_KEY };
         } else if (provider === 'anthropic') {
             payload = { anthropic_api_key: values.ANTHROPIC_API_KEY };
+        } else if (provider === 'mistral') {
+            payload = { mistral_api_key: values.MISTRAL_API_KEY };
         } else {
             // For other providers, use a generic endpoint
             // Send all fields as a single request
@@ -821,7 +1033,7 @@ async function saveAPIKey(provider) {
             return;
         }
         
-        // For OpenAI and Anthropic, use existing endpoint
+        // For OpenAI, Anthropic, and Mistral, use existing endpoint
         const response = await fetch(`${API_BASE_URL}/api/llm-config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -847,7 +1059,7 @@ async function saveAPIKey(provider) {
         // Update badges and re-render sections
         if (configData && configData.api_keys) {
             // Check if it's an LLM provider
-            const llmProviders = ['openai', 'anthropic', 'google'];
+            const llmProviders = ['openai', 'anthropic', 'mistral'];
             if (llmProviders.includes(provider)) {
                 renderLLM();
             } else {

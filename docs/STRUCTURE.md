@@ -250,7 +250,8 @@ ovh-complaints-tracker/
 ## 📝 Notes
 
 - **Base de données** : DuckDB (`data.duckdb`) - migration complète depuis SQLite (janvier 2026)
-- **Notifications email** : Système complet avec triggers configurables et templates HTML ⭐ NOUVEAU
+- **Notifications email** : Système complet avec triggers configurables et templates HTML
+- **Page Improvements** : Filtrage par produit interactif, modale de prévisualisation des posts, opportunity scores (0-100), détection automatique des pain points
 - **Backups** : Les 5 derniers backups sont conservés dans `backend/backups/`
 - **Fichiers de log** : `backend.log` et logs dans `backend/logs/`
 - **Configuration** : Fichiers `.env` dans `backend/` (non commités, voir `.gitignore`)

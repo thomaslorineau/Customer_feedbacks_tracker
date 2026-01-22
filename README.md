@@ -153,11 +153,15 @@ ovh-complaints-tracker/
 - ✅ **Base Keywords System** : Keywords de base configurables (brands, products, problems, leadership) combinés avec keywords utilisateur
 - ✅ **Relevance Scoring** : Score de pertinence automatique (0-100%) pour filtrer les posts non pertinents (< 30% filtrés)
 - ✅ **Analyse de sentiment** : Classification automatique (positif/négatif/neutre) avec VADER
-- ✅ **Priority Scoring** : Algorithme multiplicatif `sentiment * keyword_relevance * recency` pour prioriser les posts
+- ✅ **Opportunity Score** : Score additif sur 0-100 combinant pertinence (0-30), sentiment (0-40), récence (0-20) et engagement (0-10) pour prioriser les posts
 - ✅ **Dashboard interactif** : Graphiques, filtres, timeline, section "All Posts" avec filtres complets
 - ✅ **Posts Statistics** : Métriques de satisfaction avec échelle dynamique (Excellent/Good/Fair/Poor)
 - ✅ **Critical Posts Drawer** : Accès rapide aux posts négatifs avec filtres personnalisables
-- ✅ **Product Analysis** : Analyse LLM des produits avec identification des pain points
+- ✅ **Product Analysis** : Analyse LLM des produits avec identification des pain points et filtrage interactif
+- ✅ **Filtrage par produit** : Clic sur un produit dans "Distribution by Product" pour filtrer l'analyse LLM et les posts
+- ✅ **Modale de prévisualisation** : Affichage complet du contenu des posts avec lien vers la source originale
+- ✅ **Opportunity Score amélioré** : Score sur 0-100 combinant pertinence, sentiment, récence et engagement
+- ✅ **Pain Points** : Détection automatique des problèmes récurrents basée sur l'analyse de mots-clés
 - ✅ **Logs persistants** : Suivi détaillé des opérations de scraping
 - ✅ **Détection de pays** : Identification du pays depuis le contenu
 - ✅ **Actions recommandées** : Suggestions basées sur l'IA (OpenAI/Anthropic)

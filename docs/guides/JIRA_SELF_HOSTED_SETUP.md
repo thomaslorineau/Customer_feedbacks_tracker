@@ -144,3 +144,7 @@ Si vous rencontrez des problèmes :
 3. Vérifier les permissions du compte
 4. Contacter l'administrateur Jira si nécessaire
 
+
+
+
+

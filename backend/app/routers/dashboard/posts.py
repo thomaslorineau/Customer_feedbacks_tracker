@@ -100,19 +100,26 @@ async def get_posts_for_improvement(
         now = time.time()
         
         for post in filtered_posts:
-            # Base score from relevance
+            # Base score from relevance (scale 0-30)
+            # relevance_score is typically 0.3-1.0, so we scale it to 0-30 points
             relevance_score = post.get('relevance_score', 0) or 0
+            base_score = min(relevance_score * 30, 30)
             
-            # Sentiment multiplier (negative posts get higher score)
-            sentiment_multiplier = 1.0
-            if post.get('sentiment_label') == 'negative':
-                sentiment_multiplier = 2.0
-            elif post.get('sentiment_label') == 'neutral':
-                sentiment_multiplier = 0.5
+            # Sentiment score (additive, 0-40 points)
+            # Negative posts are most important for improvements
+            sentiment_score = 0
+            sentiment_label = post.get('sentiment_label', 'neutral')
+            if sentiment_label == 'negative':
+                sentiment_score = 40  # High priority for negative feedback
+            elif sentiment_label == 'neutral':
+                sentiment_score = 15  # Medium priority
+            else:  # positive
+                sentiment_score = 5   # Low priority
             
-            # Recency multiplier (recent posts get higher score)
+            # Recency score (additive, 0-20 points)
+            # Recent posts are more actionable
+            recency_score = 0
             created_at = post.get('created_at', '')
-            recency_multiplier = 1.0
             if created_at:
                 try:
                     from datetime import datetime
@@ -120,24 +127,29 @@ async def get_posts_for_improvement(
                     post_timestamp = post_date.timestamp()
                     days_old = (now - post_timestamp) / (24 * 3600)
                     if days_old < 7:
-                        recency_multiplier = 1.5
+                        recency_score = 20  # Very recent
                     elif days_old < 30:
-                        recency_multiplier = 1.2
-                    elif days_old > 90:
-                        recency_multiplier = 0.8
+                        recency_score = 15  # Recent
+                    elif days_old < 90:
+                        recency_score = 10  # Moderately old
+                    else:
+                        recency_score = 5   # Old
                 except:
-                    pass
+                    recency_score = 10  # Default if date parsing fails
             
-            # Engagement score
+            # Engagement score (additive, 0-10 points)
+            # Posts with high engagement indicate broader impact
             views = post.get('views', 0) or 0
             comments = post.get('comments', 0) or post.get('num_comments', 0) or 0
             reactions = post.get('reactions', 0) or 0
-            engagement = views + (comments * 2) + (reactions * 1.5)
-            engagement_multiplier = min(1.0 + (engagement / 1000), 2.0)
+            engagement = views + (comments * 3) + (reactions * 2)
+            # Scale: 0 engagement = 0 points, 1000+ engagement = 10 points
+            engagement_score = min(engagement / 100, 10)
             
             # Calculate opportunity score (0-100)
+            # Formula: base (0-30) + sentiment (0-40) + recency (0-20) + engagement (0-10)
             opportunity_score = min(
-                (relevance_score * sentiment_multiplier * recency_multiplier * engagement_multiplier),
+                base_score + sentiment_score + recency_score + engagement_score,
                 100
             )
             

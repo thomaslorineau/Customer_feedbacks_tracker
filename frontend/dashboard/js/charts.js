@@ -21,9 +21,27 @@ export function updateTimelineChart(state) {
     
     const posts = state.filteredPosts || [];
     
+    // Note: state.filteredPosts should already be filtered by date range
+    // But we ensure the timeline only shows posts within the date range filter
+    // This ensures alignment between timeline and date range filter
+    let filteredPosts = posts;
+    if (state.filters?.dateFrom || state.filters?.dateTo) {
+        filteredPosts = posts.filter(post => {
+            const postDate = new Date(post.created_at).toISOString().split('T')[0];
+            
+            if (state.filters.dateFrom && postDate < state.filters.dateFrom) {
+                return false;
+            }
+            if (state.filters.dateTo && postDate > state.filters.dateTo) {
+                return false;
+            }
+            return true;
+        });
+    }
+    
     // Group posts by date
     const grouped = {};
-    posts.forEach(post => {
+    filteredPosts.forEach(post => {
         const date = new Date(post.created_at);
         const key = date.toISOString().split('T')[0];
         if (!grouped[key]) {
@@ -89,11 +107,11 @@ export function updateTimelineChart(state) {
         existingChart.destroy();
     }
     
-    // Store timeline data for onClick handler
+    // Store timeline data for onClick handler (use filtered posts to match date range)
     currentTimelineData = {
         sortedKeys: sortedKeys,
         grouped: grouped,
-        posts: posts
+        posts: filteredPosts // Use filtered posts to ensure alignment with date range
     };
     
     // Wait a bit to ensure canvas is ready and previous chart is fully destroyed

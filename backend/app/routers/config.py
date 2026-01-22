@@ -1,7 +1,7 @@
 """
 Configuration routes for API keys, LLM settings, and keywords.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List
 import logging
@@ -168,9 +168,18 @@ async def get_app_version():
 )
 async def get_config():
     """Get full configuration including API keys status, rate limiting, and environment."""
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Reload .env to get latest values
+    backend_path = Path(__file__).resolve().parents[2]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    google_key = os.getenv('GOOGLE_API_KEY')
+    mistral_key = os.getenv('MISTRAL_API_KEY')
     github_token = os.getenv('GITHUB_TOKEN')
     trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
     linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
@@ -205,10 +214,10 @@ async def get_config():
                 "masked": mask_key(anthropic_key),
                 "length": len(anthropic_key) if anthropic_key else 0
             },
-            "google": {
-                "configured": bool(google_key),
-                "masked": mask_key(google_key),
-                "length": len(google_key) if google_key else 0
+            "mistral": {
+                "configured": bool(mistral_key),
+                "masked": mask_key(mistral_key),
+                "length": len(mistral_key) if mistral_key else 0
             },
             "github": {
                 "configured": bool(github_token),
@@ -242,7 +251,8 @@ class LLMConfigPayload(BaseModel):
     """Request model for LLM configuration."""
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
-    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic)$", description="LLM provider")
+    mistral_api_key: Optional[str] = Field(None, description="Mistral API key")
+    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic|mistral)$", description="LLM provider")
 
 
 class KeywordsPayload(BaseModel):
@@ -290,19 +300,29 @@ class BaseKeywordsPayload(BaseModel):
 )
 async def get_llm_config():
     """Get current LLM configuration status (without exposing keys)."""
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Reload .env to get latest values
+    backend_path = Path(__file__).resolve().parents[2]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    mistral_key = os.getenv('MISTRAL_API_KEY')
     provider = os.getenv('LLM_PROVIDER', 'openai').lower()
     
     return LLMConfigResponse(
         provider=provider,
-        api_key_set=bool(openai_key or anthropic_key),
-        available=bool(openai_key or anthropic_key),
+        api_key_set=bool(openai_key or anthropic_key or mistral_key),
+        available=bool(openai_key or anthropic_key or mistral_key),
         # Legacy fields for backward compatibility
         openai_api_key_set=bool(openai_key),
         anthropic_api_key_set=bool(anthropic_key),
         llm_provider=provider,
-        status="configured" if (openai_key or anthropic_key) else "not_configured"
+        status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
     )
 
 
@@ -385,6 +405,14 @@ async def set_llm_config(
             del env_vars['ANTHROPIC_API_KEY']
             logger.info("Anthropic API key removed")
     
+    if payload.mistral_api_key is not None:
+        if payload.mistral_api_key and payload.mistral_api_key.strip():
+            env_vars['MISTRAL_API_KEY'] = payload.mistral_api_key.strip()
+            logger.info("Mistral API key updated")
+        elif 'MISTRAL_API_KEY' in env_vars:
+            del env_vars['MISTRAL_API_KEY']
+            logger.info("Mistral API key removed")
+    
     if payload.llm_provider:
         env_vars['LLM_PROVIDER'] = payload.llm_provider
         logger.info(f"LLM provider set to: {payload.llm_provider}")
@@ -409,10 +437,21 @@ async def set_llm_config(
         raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
     
     # Update environment variables for current session
-    if payload.openai_api_key:
-        os.environ['OPENAI_API_KEY'] = payload.openai_api_key
-    if payload.anthropic_api_key:
-        os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+    if payload.openai_api_key is not None:
+        if payload.openai_api_key:
+            os.environ['OPENAI_API_KEY'] = payload.openai_api_key
+        elif 'OPENAI_API_KEY' in os.environ:
+            del os.environ['OPENAI_API_KEY']
+    if payload.anthropic_api_key is not None:
+        if payload.anthropic_api_key:
+            os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+        elif 'ANTHROPIC_API_KEY' in os.environ:
+            del os.environ['ANTHROPIC_API_KEY']
+    if payload.mistral_api_key is not None:
+        if payload.mistral_api_key:
+            os.environ['MISTRAL_API_KEY'] = payload.mistral_api_key
+        elif 'MISTRAL_API_KEY' in os.environ:
+            del os.environ['MISTRAL_API_KEY']
     if payload.llm_provider:
         os.environ['LLM_PROVIDER'] = payload.llm_provider
     
@@ -424,6 +463,8 @@ async def set_llm_config(
             config.openai_api_key = payload.openai_api_key if payload.openai_api_key else None
         if payload.anthropic_api_key is not None:
             config.anthropic_api_key = payload.anthropic_api_key if payload.anthropic_api_key else None
+        if payload.mistral_api_key is not None:
+            config.mistral_api_key = payload.mistral_api_key if payload.mistral_api_key else None
         if payload.llm_provider:
             config.llm_provider = payload.llm_provider
         logger.info("Config singleton updated for current session")
@@ -432,13 +473,13 @@ async def set_llm_config(
     
     return LLMConfigResponse(
         provider=env_vars.get('LLM_PROVIDER', 'openai'),
-        api_key_set=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY')),
-        available=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY')),
+        api_key_set=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')),
+        available=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')),
         # Legacy fields
         openai_api_key_set=bool(env_vars.get('OPENAI_API_KEY')),
         anthropic_api_key_set=bool(env_vars.get('ANTHROPIC_API_KEY')),
         llm_provider=env_vars.get('LLM_PROVIDER', 'openai'),
-        status="configured"
+        status="configured" if (env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')) else "not_configured"
     )
 
 
@@ -658,4 +699,57 @@ async def update_base_keywords(payload: BaseKeywordsPayload):
     except Exception as e:
         logger.error(f"Error updating base keywords: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update base keywords: {str(e)}")
+
+
+@router.post(
+    "/api/config/reveal-key",
+    summary="Reveal API Key",
+    description="""
+    Returns the full (unmasked) API key for a given provider.
+    This endpoint is used when editing API keys to show the current value.
+    
+    **Security:**
+    - Requires authentication
+    - Only returns the key if it exists
+    
+    **Query Parameters:**
+    - `provider`: Provider name (openai, anthropic, mistral, github, trustpilot, linkedin, twitter)
+    """,
+    tags=["Configuration"]
+)
+async def reveal_key(provider: str = Query(..., description="Provider name (openai, anthropic, mistral, github, trustpilot, linkedin, twitter)")):
+    """Reveal API key for editing purposes."""
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Reload .env to get latest values
+    backend_path = Path(__file__).resolve().parents[2]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
+    # Map provider names to environment variable names
+    provider_map = {
+        'openai': 'OPENAI_API_KEY',
+        'anthropic': 'ANTHROPIC_API_KEY',
+        'mistral': 'MISTRAL_API_KEY',
+        'github': 'GITHUB_TOKEN',
+        'trustpilot': 'TRUSTPILOT_API_KEY',
+        'linkedin': 'LINKEDIN_CLIENT_ID',  # Note: LinkedIn has both client_id and client_secret
+        'twitter': 'TWITTER_BEARER_TOKEN'
+    }
+    
+    if not provider or provider not in provider_map:
+        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}. Valid providers: {', '.join(provider_map.keys())}")
+    
+    env_var_name = provider_map[provider]
+    key_value = os.getenv(env_var_name)
+    
+    if not key_value:
+        raise HTTPException(status_code=404, detail=f"API key not found for provider: {provider}")
+    
+    return {
+        "provider": provider,
+        "key": key_value
+    }
 

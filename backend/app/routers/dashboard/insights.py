@@ -3,16 +3,21 @@ import os
 import json
 import re
 import logging
-from typing import List
+import asyncio
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 import httpx
 
 from .models import (
     ImprovementIdea, ImprovementIdeasResponse, ImprovementIdeaRequest,
     RecommendedAction, RecommendedActionsResponse, RecommendedActionRequest,
-    WhatsHappeningInsight, WhatsHappeningResponse, WhatsHappeningRequest
+    WhatsHappeningInsight, WhatsHappeningResponse, WhatsHappeningRequest,
+    PainPointsResponse, ProductDistributionResponse, ProductOpportunity,
+    ImprovementInsight, ImprovementsAnalysisRequest, ImprovementsAnalysisResponse
 )
 from .analytics import get_pain_points
+from ... import db
+from fastapi import Query
 
 logger = logging.getLogger(__name__)
 
@@ -21,18 +26,40 @@ router = APIRouter()
 
 async def generate_ideas_with_llm(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
     """Generate improvement ideas using LLM API."""
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Reload .env to get latest values
+    backend_path = Path(__file__).resolve().parents[3]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
+    # Filter posts to prioritize negative/neutral for improvement ideas
+    relevant_posts = [p for p in posts if p.get('sentiment_label') in ['negative', 'neutral']]
+    if not relevant_posts:
+        logger.info("No negative or neutral posts found, using all posts for ideas.")
+        relevant_posts = posts
+    
+    if not relevant_posts:
+        raise HTTPException(status_code=400, detail="No relevant posts found for analysis.")
+    
+    posts_for_llm = relevant_posts[:20]  # Limit to 20 posts for LLM analysis
+    
     posts_summary = []
-    for post in posts[:20]:
+    for post in posts_for_llm:
         posts_summary.append({
             'content': post.get('content', '')[:500],
             'sentiment': post.get('sentiment_label', 'neutral'),
             'source': post.get('source', 'Unknown')
         })
     
-    prompt = f"""Analyze the following customer feedback posts about OVH products and generate {max_ideas} concrete product improvement ideas.
+    prompt = f"""Analyze the following {len(posts_for_llm)} customer feedback posts about OVH products and generate {max_ideas} concrete product improvement ideas.
 
 Posts to analyze:
 {json.dumps(posts_summary, indent=2, ensure_ascii=False)}
+
+IMPORTANT: Even with few posts, generate meaningful ideas. If you have at least 2-3 posts, you can identify patterns. Do not return an empty array.
 
 For each idea, provide:
 1. A clear, concise title (max 60 characters)
@@ -54,48 +81,20 @@ Focus on actionable improvements that address real customer pain points. Be spec
 
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    mistral_key = os.getenv('MISTRAL_API_KEY')
     llm_provider = os.getenv('LLM_PROVIDER', '').lower()
     
-    # Determine which provider to use
-    # Priority: LLM_PROVIDER env var > available API keys
-    if not openai_key and not anthropic_key:
-        return generate_ideas_fallback(posts, max_ideas)
+    logger.info(f"generate_ideas_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
     
-    try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
-            # Use Anthropic
-            api_key = anthropic_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.anthropic.com/v1/messages',
-                        headers={
-                            'x-api-key': api_key,
-                            'anthropic-version': '2023-06-01',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                            'max_tokens': 2000,
-                            'messages': [
-                                {'role': 'user', 'content': prompt}
-                            ]
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['content'][0]['text']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        ideas_data = json.loads(json_match.group())
-                        return [ImprovementIdea(**idea) for idea in ideas_data]
-        
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
-            # Use OpenAI
-            api_key = openai_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
+    if not openai_key and not anthropic_key and not mistral_key:
+        raise HTTPException(status_code=400, detail="No LLM API key configured. Please configure at least one API key in Settings.")
+    
+    # Helper function to call a single LLM
+    async def call_llm(provider: str, api_key: str, prompt: str) -> Optional[str]:
+        """Call a single LLM and return the response content."""
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                if provider == 'openai':
                     response = await client.post(
                         'https://api.openai.com/v1/chat/completions',
                         headers={
@@ -114,24 +113,177 @@ Focus on actionable improvements that address real customer pain points. Be spec
                     )
                     response.raise_for_status()
                     result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
+                    return result['choices'][0]['message']['content']
+                
+                elif provider == 'anthropic':
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 2000,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['content'][0]['text']
+                
+                elif provider == 'mistral':
+                    response = await client.post(
+                        'https://api.mistral.ai/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+        except Exception as e:
+            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+            return None
+        return None
+    
+    # If all 3 LLMs are configured, call them in parallel and summarize with OpenAI
+    if openai_key and anthropic_key and mistral_key:
+        logger.info("All 3 LLMs configured, calling in parallel and summarizing with OpenAI")
+        try:
+            # Call all 3 in parallel
+            results = await asyncio.gather(
+                call_llm('openai', openai_key, prompt),
+                call_llm('anthropic', anthropic_key, prompt),
+                call_llm('mistral', mistral_key, prompt),
+                return_exceptions=True
+            )
+            
+            openai_result, anthropic_result, mistral_result = results
+            
+            # Collect valid results
+            valid_results = []
+            if openai_result and not isinstance(openai_result, Exception):
+                valid_results.append(('OpenAI', openai_result))
+            if anthropic_result and not isinstance(anthropic_result, Exception):
+                valid_results.append(('Anthropic', anthropic_result))
+            if mistral_result and not isinstance(mistral_result, Exception):
+                valid_results.append(('Mistral', mistral_result))
+            
+            if not valid_results:
+                raise HTTPException(status_code=500, detail="All LLM calls failed. Please check your API keys.")
+            
+            # Use OpenAI to summarize the combined results
+            summary_prompt = f"""You are analyzing product improvement ideas from multiple AI models. Below are the ideas generated by {len(valid_results)} different AI models:
+
+{chr(10).join([f'{name} ideas:{chr(10)}{result}' for name, result in valid_results])}
+
+Your task is to synthesize these ideas into a single, comprehensive list of {max_ideas} best improvement ideas. 
+
+Rules:
+- Combine similar ideas from different models
+- Prioritize ideas that appear in multiple models
+- Keep the best ideas based on clarity, actionability, and impact
+- Ensure each idea has a clear title, description, priority, and related_posts_count
+- Do not return an empty array
+
+Format your response as a JSON array with this structure:
+[
+  {{
+    "title": "Idea title",
+    "description": "Detailed description...",
+    "priority": "high|medium|low",
+    "related_posts_count": 3
+  }}
+]"""
+            
+            summary_content = await call_llm('openai', openai_key, summary_prompt)
+            if summary_content:
+                json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    logger.info(f"Generated {len(ideas_data)} ideas from summarized LLM results")
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        except Exception as e:
+            logger.error(f"Error in parallel LLM call or summarization: {type(e).__name__}: {e}", exc_info=True)
+            # Fall through to single LLM logic
+    
+    # Single LLM logic (if not all 3 are configured, or if parallel call failed)
+    try:
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key and not mistral_key):
+            # Use Anthropic
+            if anthropic_key:
+                content = await call_llm('anthropic', anthropic_key, prompt)
+                if content:
                     json_match = re.search(r'\[.*\]', content, re.DOTALL)
                     if json_match:
                         ideas_data = json.loads(json_match.group())
                         return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+            # Use Mistral
+            if mistral_key:
+                content = await call_llm('mistral', mistral_key, prompt)
+                if content:
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        ideas_data = json.loads(json_match.group())
+                        return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            # Use OpenAI
+            if openai_key:
+                content = await call_llm('openai', openai_key, prompt)
+                if content:
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        ideas_data = json.loads(json_match.group())
+                        return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        # If provider is set but no matching key, try any available key
+        if openai_key:
+            content = await call_llm('openai', openai_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        if anthropic_key:
+            content = await call_llm('anthropic', anthropic_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        if mistral_key:
+            content = await call_llm('mistral', mistral_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
     
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 401:
-            logger.warning(f"LLM API authentication failed (401): Invalid or expired API key. Using fallback.")
-        else:
-            logger.warning(f"LLM API error ({e.response.status_code}): {e}. Using fallback.")
-        return generate_ideas_fallback(posts, max_ideas)
     except Exception as e:
-        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
-        return generate_ideas_fallback(posts, max_ideas)
+        logger.error(f"LLM API error: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
     
-    return generate_ideas_fallback(posts, max_ideas)
+    raise HTTPException(status_code=500, detail="Failed to generate ideas: No LLM response received.")
 
 
 def generate_ideas_fallback(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
@@ -744,6 +896,359 @@ Generate a sentence in English that summarizes the top improvement ideas in a cl
     except Exception as e:
         logger.error(f"Error generating improvements summary: {e}", exc_info=True)
         return {"summary": "Analyzing improvement opportunities..."}
+
+
+@router.get("/api/pain-points", response_model=PainPointsResponse, tags=["Dashboard", "Insights"])
+async def get_pain_points_endpoint(
+    days: int = Query(30, description="Number of days to look back", ge=1, le=365),
+    limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=50)
+):
+    """Get recurring pain points from posts in the last N days."""
+    try:
+        return await get_pain_points(days=days, limit=limit)
+    except Exception as e:
+        logger.error(f"Error getting pain points: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get pain points: {str(e)}")
+
+
+@router.get("/api/product-opportunities", response_model=ProductDistributionResponse, tags=["Dashboard", "Insights"])
+async def get_product_opportunities():
+    """Get product distribution with opportunity scores based on negative feedback."""
+    try:
+        # Get all posts from database (using a high limit to get all posts)
+        posts = db.get_posts(limit=10000, offset=0)
+        
+        # Product keywords to detect
+        product_keywords = {
+            'VPS': ['vps', 'virtual private server'],
+            'Hosting': ['hosting', 'web hosting', 'shared hosting'],
+            'Domain': ['domain', 'domaine', 'dns'],
+            'Email': ['email', 'mail', 'smtp', 'imap'],
+            'Storage': ['storage', 'object storage', 'backup', 's3'],
+            'CDN': ['cdn', 'content delivery'],
+            'Public Cloud': ['public cloud', 'publiccloud'],
+            'Private Cloud': ['private cloud', 'privatecloud'],
+            'Dedicated Server': ['dedicated', 'dedicated server', 'serveur dédié'],
+            'Billing': ['billing', 'invoice', 'facture', 'payment', 'paiement'],
+            'Support': ['support', 'ticket', 'help', 'assistance'],
+            'API': ['api', 'rest api', 'graphql']
+        }
+        
+        # Count posts by product
+        product_stats = {}
+        for post in posts:
+            content = (post.get('content', '') or '').lower()
+            is_negative = post.get('sentiment_label') == 'negative'
+            
+            # Detect products mentioned in post
+            for product_name, keywords in product_keywords.items():
+                if any(keyword in content for keyword in keywords):
+                    if product_name not in product_stats:
+                        product_stats[product_name] = {
+                            'total': 0,
+                            'negative': 0
+                        }
+                    product_stats[product_name]['total'] += 1
+                    if is_negative:
+                        product_stats[product_name]['negative'] += 1
+        
+        # Calculate opportunity scores and create ProductOpportunity objects
+        products = []
+        colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7']
+        
+        for idx, (product_name, stats) in enumerate(sorted(product_stats.items(), key=lambda x: x[1]['negative'], reverse=True)):
+            total = stats['total']
+            negative = stats['negative']
+            
+            # Calculate opportunity score (0-100)
+            # Higher score = more negative posts relative to total + volume factor
+            # Formula: (negative_ratio * 60) + (volume_factor * 40)
+            # This balances both the percentage of negative feedback and the absolute volume
+            if total > 0:
+                negative_ratio = negative / total
+                # Volume factor: more posts = higher score, capped at 40 points
+                # Scale: 1 post = 4 points, 10 posts = 20 points, 50+ posts = 40 points
+                volume_factor = min(negative / 50.0, 1.0) * 40
+                # Ratio factor: percentage of negative posts, capped at 60 points
+                ratio_factor = negative_ratio * 60
+                opportunity_score = int(min(ratio_factor + volume_factor, 100))
+            else:
+                opportunity_score = 0
+            
+            color = colors[idx % len(colors)]
+            
+            products.append(ProductOpportunity(
+                product=product_name,
+                opportunity_score=opportunity_score,
+                negative_posts=negative,
+                total_posts=total,
+                color=color
+            ))
+        
+        # Sort by opportunity score (descending)
+        products.sort(key=lambda x: x.opportunity_score, reverse=True)
+        
+        return ProductDistributionResponse(products=products)
+    except Exception as e:
+        logger.error(f"Error getting product opportunities: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get product opportunities: {str(e)}")
+
+
+async def generate_improvements_analysis_with_llm(
+    pain_points: List[dict],
+    products: List[dict],
+    total_posts: int
+) -> ImprovementsAnalysisResponse:
+    """Generate improvements analysis with insights and ROI using LLM."""
+    from pathlib import Path
+    from dotenv import load_dotenv
+    
+    # Reload .env to get latest values
+    backend_path = Path(__file__).resolve().parents[3]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
+    # Prepare data for LLM
+    pain_points_text = "\n".join([
+        f"- {pp.get('title', 'N/A')}: {pp.get('description', '')} ({pp.get('posts_count', 0)} posts)"
+        for pp in pain_points[:10]
+    ]) if pain_points else "No pain points identified."
+    
+    products_text = "\n".join([
+        f"- {p.get('product', 'N/A')}: {p.get('opportunity_score', 0)}/100 score, {p.get('negative_posts', 0)} negative posts out of {p.get('total_posts', 0)} total"
+        for p in products[:10]
+    ]) if products else "No product data available."
+    
+    prompt = f"""You are an OVHcloud product improvement analyst. Analyze the following improvement opportunities and generate key insights with ROI estimates.
+
+CONTEXT:
+- Total posts analyzed: {total_posts}
+- Pain points identified: {len(pain_points)}
+- Products with opportunities: {len(products)}
+
+PAIN POINTS:
+{pain_points_text}
+
+PRODUCT OPPORTUNITIES:
+{products_text}
+
+Based on this analysis, generate:
+1. **Key Findings** (3-5 bullet points): What are the main patterns and issues that emerge?
+2. **ROI & Customer Impact**: Estimate the potential ROI and customer impact of addressing these improvements
+3. **Priority Insights**: Which improvements would have the highest impact?
+
+Format your response as JSON with this structure:
+{{
+  "key_findings": [
+    "Finding 1: [specific insight]",
+    "Finding 2: [specific insight]",
+    "Finding 3: [specific insight]"
+  ],
+  "roi_summary": "[2-3 sentences about ROI and customer impact. Be specific about potential benefits: customer satisfaction improvement, retention, revenue impact, etc.]",
+  "insights": [
+    {{
+      "type": "key_finding",
+      "title": "Key Finding Title",
+      "description": "Detailed description of the finding",
+      "icon": "💡",
+      "metric": "",
+      "roi_impact": "Potential impact: [specific estimate]"
+    }},
+    {{
+      "type": "roi",
+      "title": "ROI & Customer Impact",
+      "description": "[Specific ROI estimate and customer impact]",
+      "icon": "💰",
+      "metric": "",
+      "roi_impact": "[ROI estimate]"
+    }},
+    {{
+      "type": "priority",
+      "title": "Priority Focus Area",
+      "description": "[Which improvements to prioritize and why]",
+      "icon": "🎯",
+      "metric": "",
+      "roi_impact": ""
+    }}
+  ]
+}}
+
+Be specific and actionable. Reference actual products and pain points from the data provided."""
+
+    openai_key = os.getenv('OPENAI_API_KEY')
+    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    mistral_key = os.getenv('MISTRAL_API_KEY')
+    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    
+    if not openai_key and not anthropic_key and not mistral_key:
+        return generate_improvements_analysis_fallback(pain_points, products, total_posts)
+    
+    # Helper function to call LLM
+    async def call_llm(provider: str, api_key: str, prompt: str) -> Optional[str]:
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                if provider == 'openai':
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud product improvement analyst. Generate specific, actionable insights with ROI estimates.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+                
+                elif provider == 'anthropic':
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 2000,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['content'][0]['text']
+                
+                elif provider == 'mistral':
+                    response = await client.post(
+                        'https://api.mistral.ai/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud product improvement analyst. Generate specific, actionable insights with ROI estimates.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+        except Exception as e:
+            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+            return None
+        return None
+    
+    try:
+        # Try to use configured provider or any available
+        content = None
+        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+            content = await call_llm('anthropic', anthropic_key, prompt)
+        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+            content = await call_llm('mistral', mistral_key, prompt)
+        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+            content = await call_llm('openai', openai_key, prompt)
+        else:
+            # Try any available
+            if openai_key:
+                content = await call_llm('openai', openai_key, prompt)
+            elif anthropic_key:
+                content = await call_llm('anthropic', anthropic_key, prompt)
+            elif mistral_key:
+                content = await call_llm('mistral', mistral_key, prompt)
+        
+        if content:
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                insights = [ImprovementInsight(**insight) for insight in data.get('insights', [])]
+                return ImprovementsAnalysisResponse(
+                    insights=insights,
+                    roi_summary=data.get('roi_summary', ''),
+                    key_findings=data.get('key_findings', []),
+                    llm_available=True
+                )
+    except Exception as e:
+        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
+    
+    return generate_improvements_analysis_fallback(pain_points, products, total_posts)
+
+
+def generate_improvements_analysis_fallback(
+    pain_points: List[dict],
+    products: List[dict],
+    total_posts: int
+) -> ImprovementsAnalysisResponse:
+    """Fallback analysis when LLM is not available."""
+    insights = []
+    key_findings = []
+    
+    if pain_points:
+        top_pain_point = max(pain_points, key=lambda x: x.get('posts_count', 0))
+        insights.append(ImprovementInsight(
+            type='key_finding',
+            title=f"Top Pain Point: {top_pain_point.get('title', 'N/A')}",
+            description=f"{top_pain_point.get('description', '')} ({top_pain_point.get('posts_count', 0)} posts)",
+            icon='💡',
+            metric=f"{top_pain_point.get('posts_count', 0)} posts",
+            roi_impact="Addressing this could improve customer satisfaction"
+        ))
+        key_findings.append(f"Top pain point: {top_pain_point.get('title', 'N/A')} with {top_pain_point.get('posts_count', 0)} mentions")
+    
+    if products:
+        top_product = max(products, key=lambda x: x.get('opportunity_score', 0))
+        insights.append(ImprovementInsight(
+            type='priority',
+            title=f"Priority Product: {top_product.get('product', 'N/A')}",
+            description=f"Highest opportunity score ({top_product.get('opportunity_score', 0)}/100) with {top_product.get('negative_posts', 0)} negative posts",
+            icon='🎯',
+            metric=f"{top_product.get('opportunity_score', 0)}/100",
+            roi_impact="Focus improvements here for maximum impact"
+        ))
+        key_findings.append(f"Priority product: {top_product.get('product', 'N/A')} needs attention")
+    
+    roi_summary = f"Based on {total_posts} posts analyzed, addressing the top {len(pain_points)} pain points could significantly improve customer satisfaction and retention."
+    
+    return ImprovementsAnalysisResponse(
+        insights=insights,
+        roi_summary=roi_summary,
+        key_findings=key_findings,
+        llm_available=False
+    )
+
+
+@router.post("/api/improvements-analysis", response_model=ImprovementsAnalysisResponse, tags=["Dashboard", "Insights"])
+async def get_improvements_analysis(request: ImprovementsAnalysisRequest):
+    """Generate comprehensive improvements analysis with insights and ROI using LLM."""
+    try:
+        # Convert Pydantic models to dicts for LLM function
+        pain_points_dicts = [pp.dict() if hasattr(pp, 'dict') else pp for pp in request.pain_points]
+        products_dicts = [p.dict() if hasattr(p, 'dict') else p for p in request.products]
+        
+        return await generate_improvements_analysis_with_llm(
+            pain_points_dicts,
+            products_dicts,
+            request.total_posts
+        )
+    except Exception as e:
+        logger.error(f"Error generating improvements analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate improvements analysis: {str(e)}")
 
 
 

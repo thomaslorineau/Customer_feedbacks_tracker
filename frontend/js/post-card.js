@@ -77,7 +77,14 @@ function renderPostCard(post, options = {}) {
                                 title="Add product label">+ Label</button>
                     `}
                 </div>
-                <span class="post-date">${formatDate(post.created_at)}</span>
+                <div class="post-header-right">
+                    <span class="post-date">${formatDate(post.created_at)}</span>
+                    ${post.language && post.language !== 'unknown' ? `
+                    <span class="language-badge-header" title="Language: ${escapeHtml(post.language.toUpperCase())}">
+                        🌐 ${escapeHtml(post.language.toUpperCase())}
+                    </span>
+                    ` : ''}
+                </div>
             </div>
             <div class="post-body">
                 <div class="post-author">${escapeHtml(post.author || 'Unknown')}</div>
@@ -87,18 +94,22 @@ function renderPostCard(post, options = {}) {
                 <div class="post-meta-badges">
                     <span class="sentiment ${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
                         ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
-                        ${(post.sentiment_label || 'neutral').toUpperCase()} ${(post.sentiment_score || 0).toFixed(2)}
+                        ${(post.sentiment_label || 'neutral').charAt(0).toUpperCase() + (post.sentiment_label || 'neutral').slice(1)} ${(post.sentiment_score || 0).toFixed(2)}
                     </span>
-                    ${post.language && post.language !== 'unknown' ? `
-                    <span class="language-badge" style="padding: 4px 10px; border-radius: 6px; font-size: 0.8em; font-weight: 600; background: rgba(139, 92, 246, 0.15); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3);" title="Language: ${escapeHtml(post.language.toUpperCase())}">
-                        🌐 ${escapeHtml(post.language.toUpperCase())}
-                    </span>
-                    ` : ''}
-                    ${post.is_answered === 1 || post.is_answered === true ? `
-                    <span class="answered-badge answered-yes" title="Post répondu${post.answered_by ? ' par ' + escapeHtml(post.answered_by) : ''}${post.answered_at ? ' le ' + escapeHtml(post.answered_at) : ''}">
-                        ✓ Answered
-                    </span>
-                    ` : ''}
+                    ${(() => {
+                        const isAnswered = post.is_answered === 1 || post.is_answered === true;
+                        return isAnswered ? `
+                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, false)" class="post-action-btn btn-answered" title="Post répondu${post.answered_by ? ' par ' + escapeHtml(post.answered_by) : ''}${post.answered_at ? ' le ' + escapeHtml(post.answered_at) : ''} - Cliquer pour marquer comme non répondu">
+                        <span class="btn-icon">✓</span>
+                        <span class="btn-text">Answered</span>
+                    </button>
+                    ` : `
+                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, true)" class="post-action-btn btn-answered" style="opacity: 0.6;" title="Marquer comme répondu">
+                        <span class="btn-icon">✓</span>
+                        <span class="btn-text">Answered</span>
+                    </button>
+                    `;
+                    })()}
                     <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
 
 Calculé à partir de :
@@ -112,22 +123,6 @@ Les posts avec un score < 30% sont automatiquement filtrés.">
                     </span>
                 </div>
                 <div class="post-actions">
-                    ${(() => {
-                        const isAnswered = post.is_answered === 1 || post.is_answered === true;
-                        // Toggle: if answered, clicking will set to false (not answered), and vice versa
-                        const toggleValue = !isAnswered;
-                        return isAnswered ? `
-                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, false)" class="post-action-btn btn-not-answered" title="Marquer comme non répondu">
-                        <span class="btn-icon">✗</span>
-                        <span class="btn-text">Not Answered</span>
-                    </button>
-                    ` : `
-                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, true)" class="post-action-btn btn-answered" title="Marquer comme répondu">
-                        <span class="btn-icon">✓</span>
-                        <span class="btn-text">Answered</span>
-                    </button>
-                    `;
-                    })()}
                     <button onclick="${options.onPreviewClickName || 'openPostPreview'}(${post.id})" class="post-action-btn btn-preview">
                         <span class="btn-icon">👁️</span>
                         <span class="btn-text">Preview</span>

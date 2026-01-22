@@ -1,18 +1,9 @@
-"""Dashboard router module."""
+"""Dashboard routers."""
 from fastapi import APIRouter
-from .analytics import router as analytics_router
-from .insights import router as insights_router
-from .posts import router as posts_router
+from . import insights, posts
 
-# Combine all routers
 router = APIRouter()
-router.include_router(analytics_router)
-router.include_router(insights_router)
-router.include_router(posts_router)
 
-__all__ = ['router']
-
-
-
-
-
+# Include sub-routers (no prefix, routes already have their paths defined)
+router.include_router(insights.router, tags=["Dashboard", "Insights"])
+router.include_router(posts.router, tags=["Dashboard", "Posts"])

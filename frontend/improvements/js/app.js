@@ -1,5 +1,8 @@
 // Improvements Opportunities App
 
+// Store current product filter
+let currentProductFilter = null;
+
 // Initialize theme
 function initializeTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -117,23 +120,26 @@ async function loadImprovementsSummary() {
 
 // Load pain points
 async function loadPainPoints() {
+    const painPointsList = document.getElementById('painPointsList');
+    if (!painPointsList) {
+        console.error('painPointsList element not found in DOM');
+        return;
+    }
+    
     try {
         console.log('Loading pain points...');
         const response = await fetch('/api/pain-points?days=30&limit=5');
-        console.log('Pain points response status:', response.status);
+        console.log('Pain points response status:', response.status, response.statusText);
+        
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Pain points error response:', errorText);
+            painPointsList.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">Error loading pain points: HTTP ${response.status}<br><small>${errorText}</small></div>`;
             throw new Error(`Failed to load pain points: ${response.status} ${errorText}`);
         }
-        const data = await response.json();
-        console.log('Pain points data:', data);
         
-        const painPointsList = document.getElementById('painPointsList');
-        if (!painPointsList) {
-            console.error('painPointsList element not found');
-            return;
-        }
+        const data = await response.json();
+        console.log('Pain points data received:', data);
         
         if (!data.pain_points || data.pain_points.length === 0) {
             painPointsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No pain points found in the last 30 days.</div>';
@@ -204,7 +210,7 @@ async function loadProductDistribution() {
             // Escape product name for onclick attribute
             const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
             return `
-                <div class="product-item" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="openProductAnalysis('${escapedProduct}')">
+                <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')">
                     <div class="product-color" style="background: ${product.color};"></div>
                     <div class="product-bar-container">
                         <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -233,7 +239,7 @@ async function loadProductDistribution() {
                         // Escape product name for onclick attribute
                         const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
                         return `
-                            <div class="product-item" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="openProductAnalysis('${escapedProduct}')">
+                            <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')">
                                 <div class="product-color" style="background: ${product.color};"></div>
                                 <div class="product-bar-container">
                                     <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -256,6 +262,9 @@ async function loadProductDistribution() {
                 }
             };
         }
+        
+        // Update filter indicator after loading
+        updateProductFilterIndicator();
     } catch (error) {
         console.error('Error loading product distribution:', error);
         productDistribution.innerHTML = `<div style="text-align: center; padding: 40px; color: #ef4444;">
@@ -270,10 +279,13 @@ async function loadProductDistribution() {
 let currentOffset = 0;
 const postsPerPage = 20;
 
-async function loadPostsForImprovement(resetOffset = false) {
+async function loadPostsForImprovement(resetOffset = false, productFilter = null) {
     if (resetOffset) {
         currentOffset = 0;
     }
+    
+    // Use current filter if not specified
+    const filterProduct = productFilter !== null ? productFilter : currentProductFilter;
     
     try {
         const search = document.getElementById('improvementsSearch')?.value || '';
@@ -304,11 +316,30 @@ async function loadPostsForImprovement(resetOffset = false) {
         const data = await response.json();
         console.log('Posts data received:', data);
         
+        // Cache posts for preview modal
+        if (resetOffset) {
+            allPostsCache = data.posts;
+        } else {
+            allPostsCache = [...allPostsCache, ...data.posts];
+        }
+        
+        // Filter posts by product if filter is active
+        let filteredPosts = data.posts;
+        if (filterProduct) {
+            // Import product detection function
+            const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+            filteredPosts = data.posts.filter(post => {
+                const productLabel = getProductLabel(post.id, post.content, post.language);
+                return productLabel === filterProduct;
+            });
+            console.log(`Filtered ${filteredPosts.length} posts for product: ${filterProduct}`);
+        }
+        
         const postsList = document.getElementById('postsToReviewList');
         const resultsCount = document.getElementById('resultsCount');
         
         if (resultsCount) {
-            resultsCount.textContent = data.total;
+            resultsCount.textContent = filterProduct ? filteredPosts.length : data.total;
         }
         
         if (!postsList) return;
@@ -317,12 +348,15 @@ async function loadPostsForImprovement(resetOffset = false) {
             postsList.innerHTML = '';
         }
         
-        if (data.posts.length === 0 && currentOffset === 0) {
-            postsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">No posts found matching the filters.</div>';
+        if (filteredPosts.length === 0 && currentOffset === 0) {
+            const noPostsMsg = filterProduct 
+                ? `No posts found for product: ${filterProduct}`
+                : 'No posts found matching the filters.';
+            postsList.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">${noPostsMsg}</div>`;
             return;
         }
         
-        const postsHtml = data.posts.map(post => {
+        const postsHtml = filteredPosts.map(post => {
             const sourceIcon = getSourceIcon(post.source);
             const timeAgo = getTimeAgo(post.created_at);
             const views = post.views || 0;
@@ -332,7 +366,7 @@ async function loadPostsForImprovement(resetOffset = false) {
             const isNegative = post.sentiment_label === 'negative';
             
             return `
-                <div class="post-review-item">
+                <div class="post-review-item" onclick="openPostPreviewModal(${post.id})" style="cursor: pointer;">
                     <div class="post-source-logo" style="background: ${getSourceColor(post.source)};">
                         ${sourceIcon}
                     </div>
@@ -350,7 +384,7 @@ async function loadPostsForImprovement(resetOffset = false) {
                         </div>
                     </div>
                     <div class="post-score">${post.opportunity_score || 0}</div>
-                    <button class="post-action-btn" onclick="createImprovementTicket(${post.id})">
+                    <button class="post-action-btn" onclick="event.stopPropagation(); createImprovementTicket(${post.id})">
                         + Create Improvement Ticket
                     </button>
                 </div>
@@ -363,8 +397,9 @@ async function loadPostsForImprovement(resetOffset = false) {
             postsList.innerHTML += postsHtml;
         }
         
-        // Add load more button if there are more posts
-        if (currentOffset + postsPerPage < data.total) {
+        // Add load more button if there are more posts (only if not filtering by product)
+        const totalToShow = filterProduct ? filteredPosts.length : data.total;
+        if (!filterProduct && currentOffset + postsPerPage < data.total) {
             const loadMoreBtn = document.createElement('button');
             loadMoreBtn.className = 'post-action-btn';
             loadMoreBtn.style.margin = '20px auto';
@@ -504,19 +539,254 @@ async function init() {
     try {
         console.log('Loading data...');
         await Promise.all([
-            loadImprovementsSummary(),
             loadPainPoints(),
             loadProductDistribution(),
             loadPostsForImprovement(true)
         ]);
         console.log('All data loaded successfully');
+        
+        // Load LLM analysis after data is loaded
+        await loadImprovementsAnalysis();
     } catch (error) {
         console.error('Error during initialization:', error);
     }
 }
 
+// Load improvements analysis with LLM
+async function loadImprovementsAnalysis() {
+    const analysisSection = document.getElementById('improvementsAnalysis');
+    const insightsContainer = document.getElementById('improvementsInsights');
+    const roiContainer = document.getElementById('improvementsROI');
+    const overlay = document.getElementById('improvementsOverlay');
+    
+    if (!analysisSection || !insightsContainer || !roiContainer) {
+        console.warn('Improvements analysis containers not found');
+        return;
+    }
+    
+    // Show overlay during LLM analysis
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+    
+    // Set a timeout to hide overlay after max 30 seconds (safety measure)
+    const overlayTimeout = setTimeout(() => {
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }, 30000);
+    
+    try {
+        // Get pain points and products data
+        const painPointsResponse = await fetch('/api/pain-points?days=30&limit=10');
+        const productsResponse = await fetch('/api/product-opportunities');
+        
+        if (!painPointsResponse.ok || !productsResponse.ok) {
+            throw new Error('Failed to load data for analysis');
+        }
+        
+        const painPointsData = await painPointsResponse.json();
+        const productsData = await productsResponse.json();
+        
+        // Filter pain points and products by current product filter if active
+        let filteredPainPoints = painPointsData.pain_points || [];
+        let filteredProducts = productsData.products || [];
+        
+        if (currentProductFilter) {
+            // Filter products to only show the selected one
+            filteredProducts = productsData.products.filter(p => p.product === currentProductFilter);
+            // Filter pain points that mention the product (simplified - could be improved)
+            filteredPainPoints = painPointsData.pain_points.filter(pp => {
+                const titleLower = (pp.title || '').toLowerCase();
+                const descLower = (pp.description || '').toLowerCase();
+                const productLower = currentProductFilter.toLowerCase();
+                return titleLower.includes(productLower) || descLower.includes(productLower);
+            });
+        }
+        
+        // Get total posts count (filtered if product filter is active)
+        const postsParams = currentProductFilter ? `?search=${encodeURIComponent(currentProductFilter)}` : '';
+        const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000${currentProductFilter ? `&search=${encodeURIComponent(currentProductFilter)}` : ''}`);
+        let postsData = { total: 0, posts: [] };
+        if (postsResponse.ok) {
+            postsData = await postsResponse.json();
+            // If filtering by product, count only posts matching that product
+            if (currentProductFilter && postsData.posts) {
+                const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+                const matchingPosts = postsData.posts.filter(post => {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    return productLabel === currentProductFilter;
+                });
+                postsData.total = matchingPosts.length;
+            }
+        }
+        
+        // Call LLM analysis endpoint
+        const analysisResponse = await fetch('/api/improvements-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                pain_points: filteredPainPoints,
+                products: filteredProducts,
+                total_posts: postsData.total || 0
+            })
+        });
+        
+        if (!analysisResponse.ok) {
+            throw new Error('Failed to generate analysis');
+        }
+        
+        const analysis = await analysisResponse.json();
+        
+        // Display insights
+        if (analysis.insights && analysis.insights.length > 0) {
+            insightsContainer.innerHTML = analysis.insights.map(insight => `
+                <div class="insight-card" style="margin-bottom: 16px; padding: 16px; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+                    <div style="display: flex; align-items: start; gap: 12px;">
+                        <span style="font-size: 1.5em;">${insight.icon || '💡'}</span>
+                        <div style="flex: 1;">
+                            <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: var(--text-primary);">${escapeHtml(insight.title)}</h3>
+                            <p style="margin: 0 0 8px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(insight.description)}</p>
+                            ${insight.metric ? `<div style="font-weight: 600; color: var(--accent-primary);">${escapeHtml(insight.metric)}</div>` : ''}
+                            ${insight.roi_impact ? `<div style="margin-top: 8px; padding: 8px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: #059669; font-size: 0.9em;"><strong>Impact:</strong> ${escapeHtml(insight.roi_impact)}</div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            insightsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No insights available at this time.</div>';
+        }
+        
+        // Display ROI summary
+        if (analysis.roi_summary) {
+            roiContainer.innerHTML = `
+                <h3 style="margin: 0 0 12px 0; color: #059669; display: flex; align-items: center; gap: 8px;">
+                    <span>💰</span>
+                    <span>ROI & Customer Impact</span>
+                </h3>
+                <p style="margin: 0; color: var(--text-secondary); line-height: 1.7; font-size: 1.05em;">${escapeHtml(analysis.roi_summary)}</p>
+            `;
+        } else {
+            roiContainer.innerHTML = '';
+        }
+        
+        // Show the analysis section
+        analysisSection.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error loading improvements analysis:', error);
+        if (insightsContainer) {
+            insightsContainer.innerHTML = `<div style="text-align: center; padding: 20px; color: #ef4444;">Error loading analysis: ${error.message}</div>`;
+        }
+        // Still show the section even if there's an error
+        if (analysisSection) {
+            analysisSection.style.display = 'block';
+        }
+    } finally {
+        // Always hide overlay, even if there was an error
+        clearTimeout(overlayTimeout);
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Open post preview modal
+function openPostPreviewModal(postId) {
+    const post = allPostsCache.find(p => p.id === postId);
+    if (!post) {
+        console.error('Post not found:', postId);
+        return;
+    }
+    
+    const modal = document.getElementById('postPreviewModal');
+    const contentDiv = document.getElementById('postPreviewContent');
+    const linkDiv = document.getElementById('postPreviewLink');
+    
+    if (!modal || !contentDiv || !linkDiv) {
+        console.error('Preview modal elements not found');
+        return;
+    }
+    
+    // Format date
+    const postDate = new Date(post.created_at).toLocaleString('fr-FR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    // Get sentiment class
+    const sentimentClass = post.sentiment_label === 'negative' ? 'sentiment-negative' : 
+                          post.sentiment_label === 'positive' ? 'sentiment-positive' : 'sentiment-neutral';
+    
+    // Build content HTML
+    contentDiv.innerHTML = `
+        <div style="margin-bottom: 20px; padding: 15px; background: rgba(0, 153, 255, 0.1); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="color: var(--accent-primary); font-size: 1.1em;">${escapeHtml(post.source || 'Unknown Source')}</strong>
+                </div>
+                <span class="${sentimentClass}" style="font-size: 0.95em; padding: 4px 12px; border-radius: 6px;">
+                    ${(post.sentiment_label || 'neutral').toUpperCase()} ${post.sentiment_score ? `(${(post.sentiment_score).toFixed(2)})` : ''}
+                </span>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Auteur:</strong> ${escapeHtml(post.author || 'Unknown')}
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Date:</strong> ${postDate}
+            </div>
+            ${post.language && post.language !== 'unknown' ? `<div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Langue:</strong> ${escapeHtml(post.language.toUpperCase())}
+            </div>` : ''}
+            <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
+                <strong>Score d'opportunité:</strong> ${post.opportunity_score || 0}
+            </div>
+        </div>
+        
+        <div style="padding: 20px; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(0, 153, 255, 0.2);">
+            <h3 style="color: var(--accent-primary); margin-top: 0; margin-bottom: 15px; font-size: 1.2em;">Contenu:</h3>
+            <div style="color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; line-height: 1.6; max-height: none; overflow-y: visible; padding: 15px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+                ${escapeHtml(post.content || 'No content available')}
+            </div>
+        </div>
+    `;
+    
+    // Set link
+    if (post.url && post.url !== '#') {
+        linkDiv.href = post.url;
+        linkDiv.target = '_blank';
+        linkDiv.style.display = 'inline-block';
+    } else {
+        linkDiv.style.display = 'none';
+    }
+    
+    // Show modal
+    modal.style.display = 'block';
+}
+
+function closePostPreviewModal() {
+    const modal = document.getElementById('postPreviewModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
 // Make functions available globally
 window.createImprovementTicket = createImprovementTicket;
+window.filterByProduct = filterByProduct;
+window.openProductAnalysis = openProductAnalysis; // Keep for backward compatibility
+window.openPostPreviewModal = openPostPreviewModal;
+window.closePostPreviewModal = closePostPreviewModal;
 
 function toggleHelpMenu() {
     const menu = document.getElementById('helpMenu');
@@ -528,88 +798,80 @@ function toggleHelpMenu() {
 window.toggleHelpMenu = toggleHelpMenu;
 
 // Initialize when DOM is ready
-// Product Analysis Drawer
-async function openProductAnalysis(productName) {
-    const drawer = document.getElementById('productAnalysisDrawer');
-    const drawerContent = document.getElementById('productAnalysisDrawerContent');
-    
-    if (!drawer || !drawerContent) {
-        console.error('Product analysis drawer not found');
-        return;
+// Filter by product (replaces openProductAnalysis - no drawer)
+async function filterByProduct(productName) {
+    // Toggle filter: if same product clicked, clear filter
+    if (currentProductFilter === productName) {
+        currentProductFilter = null;
+    } else {
+        currentProductFilter = productName;
     }
     
-    // Show loading state
-    drawerContent.innerHTML = `
-        <div class="drawer-header">
-            <h3>Analyzing ${escapeHtml(productName)}...</h3>
-            <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
-        </div>
-        <div style="padding: 24px; text-align: center;">
-            <div class="spinner" style="margin: 0 auto;"></div>
-            <p style="margin-top: 16px; color: var(--text-secondary);">Analyzing posts with LLM...</p>
-        </div>
-    `;
+    console.log('Filtering by product:', currentProductFilter || 'none');
     
-    drawer.classList.add('open');
+    // Update visual indicator
+    updateProductFilterIndicator();
     
-    try {
-        // Fetch product analysis from backend
-        const response = await fetch(`/api/product-analysis/${encodeURIComponent(productName)}`);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    // Reload posts with filter
+    await loadPostsForImprovement(true, currentProductFilter);
+    
+    // Reload LLM analysis with filter
+    await loadImprovementsAnalysis();
+    
+    // Reload product distribution to update active state
+    await loadProductDistribution();
+}
+
+// Update product filter indicator
+function updateProductFilterIndicator() {
+    const productDistribution = document.getElementById('productDistribution');
+    if (!productDistribution) return;
+    
+    // Update all product items styling
+    productDistribution.querySelectorAll('.product-item').forEach(item => {
+        const product = item.getAttribute('data-product');
+        if (currentProductFilter === product) {
+            item.classList.add('active-filter');
+            item.style.border = '2px solid var(--accent-primary)';
+            item.style.boxShadow = '0 0 0 3px rgba(0, 153, 255, 0.2)';
+            item.style.borderRadius = '8px';
+        } else {
+            item.classList.remove('active-filter');
+            item.style.border = '';
+            item.style.boxShadow = '';
         }
-        
-        const data = await response.json();
-        
-        // Display analysis
-        drawerContent.innerHTML = `
-            <div class="drawer-header">
-                <h3>📊 ${escapeHtml(productName)} Analysis</h3>
-                <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
-            </div>
-            <div class="drawer-info" style="padding: 20px 24px; border-bottom: 1px solid var(--border-color);">
-                <div class="drawer-stats" style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <div>
-                        <span class="drawer-stat-value">${data.posts_count || 0}</span>
-                        <span class="drawer-stat-label">Total Posts</span>
-                    </div>
-                    <div>
-                        <span class="drawer-stat-value" style="color: #ef4444;">${data.negative_posts_count || 0}</span>
-                        <span class="drawer-stat-label">Negative Posts</span>
-                    </div>
-                    ${data.llm_available ? `
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="color: #10b981; font-size: 1.2em;">✓</span>
-                            <span class="drawer-stat-label">LLM Analysis</span>
-                        </div>
-                    ` : `
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <span style="color: #f59e0b; font-size: 1.2em;">⚠</span>
-                            <span class="drawer-stat-label">Fallback Analysis</span>
-                        </div>
-                    `}
-                </div>
-            </div>
-            <div style="padding: 24px;">
-                <h4 style="margin-bottom: 16px; color: var(--text-primary); font-size: 1.1em; font-weight: 600;">Summary of Issues (English)</h4>
-                <div style="background: var(--bg-secondary); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); line-height: 1.8; color: var(--text-primary); white-space: pre-wrap;">
-                    ${escapeHtml(data.summary || 'No analysis available.')}
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        console.error('Error loading product analysis:', error);
-        drawerContent.innerHTML = `
-            <div class="drawer-header">
-                <h3>Error</h3>
-                <button class="drawer-close" onclick="closeProductAnalysisDrawer()" aria-label="Close drawer">×</button>
-            </div>
-            <div style="padding: 24px; text-align: center; color: #ef4444;">
-                <p><strong>Failed to load analysis</strong></p>
-                <p style="margin-top: 8px; font-size: 0.9em; color: var(--text-secondary);">${escapeHtml(error.message)}</p>
-            </div>
-        `;
+    });
+    
+    // Show/hide clear filter button
+    let clearFilterBtn = document.getElementById('clearProductFilterBtn');
+    if (currentProductFilter) {
+        if (!clearFilterBtn) {
+            clearFilterBtn = document.createElement('button');
+            clearFilterBtn.id = 'clearProductFilterBtn';
+            clearFilterBtn.className = 'filter-clear-btn';
+            clearFilterBtn.innerHTML = `Clear filter: ${escapeHtml(currentProductFilter)} ×`;
+            clearFilterBtn.onclick = () => filterByProduct(currentProductFilter); // Toggle to clear
+            clearFilterBtn.style.cssText = 'margin: 16px 0; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;';
+            
+            const productDistributionSection = document.querySelector('.product-distribution-section');
+            if (productDistributionSection) {
+                productDistributionSection.insertBefore(clearFilterBtn, productDistributionSection.firstChild);
+            }
+        } else {
+            clearFilterBtn.innerHTML = `Clear filter: ${escapeHtml(currentProductFilter)} ×`;
+            clearFilterBtn.style.display = 'block';
+        }
+    } else {
+        if (clearFilterBtn) {
+            clearFilterBtn.style.display = 'none';
+        }
     }
+}
+
+// Product Analysis Drawer (kept for backward compatibility but not used)
+async function openProductAnalysis(productName) {
+    // Redirect to filter function instead
+    await filterByProduct(productName);
 }
 
 function closeProductAnalysisDrawer() {

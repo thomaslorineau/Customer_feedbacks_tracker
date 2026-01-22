@@ -161,3 +161,7 @@ Le refactoring a **considérablement amélioré** la qualité du code :
 **Date:** 20 Janvier 2026
 
 
+
+
+
+

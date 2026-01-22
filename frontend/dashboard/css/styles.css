@@ -2394,3 +2394,39 @@ body:not(.drawer-open) {
     }
 }
 
+/* LLM Analysis Overlay */
+.llm-analysis-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    border-radius: 16px;
+}
+
+.llm-analysis-overlay .overlay-content {
+    background: var(--bg-card);
+    padding: 32px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+}
+
+.llm-analysis-overlay .overlay-content p {
+    margin-top: 16px;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1.1em;
+}
+
+body.dark-mode .llm-analysis-overlay {
+    background: rgba(0, 0, 0, 0.85);
+}
+

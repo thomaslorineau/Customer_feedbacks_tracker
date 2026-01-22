@@ -77,14 +77,24 @@ Chaque post scrapé reçoit un score de pertinence (0-100%) basé sur :
 - **Méthode** : Analyse du contenu et des métadonnées
 - **Affichage** : Carte interactive sur le dashboard
 
-#### 2.4 Priority Scoring
-Algorithme multiplicatif pour prioriser les posts :
+#### 2.4 Opportunity Score (0-100)
+Score additif pour prioriser les posts nécessitant une attention :
 ```
-priority_score = sentiment_value × keyword_relevance × recency_value
+opportunity_score = relevance_score + sentiment_score + recency_score + engagement_score
 ```
-- **sentiment_value** : 1.0 (négatif), 0.5 (neutre), 0.2 (positif)
-- **keyword_relevance** : Basé sur correspondance avec pain points
-- **recency_value** : Décroissance exponentielle selon l'âge du post
+- **relevance_score (0-30 points)** : Score de pertinence du post (relevance_score × 30)
+- **sentiment_score (0-40 points)** : 
+  - Négatif = 40 points
+  - Neutre = 15 points
+  - Positif = 5 points
+- **recency_score (0-20 points)** :
+  - < 7 jours = 20 points
+  - < 30 jours = 15 points
+  - < 90 jours = 10 points
+  - Sinon = 5 points
+- **engagement_score (0-10 points)** : Basé sur vues (0.01 par vue), commentaires (3 par commentaire), réactions (2 par réaction), plafonné à 10 points
+
+**Note** : L'ancien Priority Score multiplicatif (`sentiment × keyword_relevance × recency`) a été remplacé par ce système additif plus représentatif sur une échelle 0-100.
 
 ---
 
@@ -136,10 +146,18 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 - **Actions** : Ajouter au backlog directement depuis le drawer
 
 #### 3.3 Page "Improvements Opportunities" (`/improvements`)
-- **Pain Points** : Top 5 problèmes récurrents (30 derniers jours)
-- **Distribution par produit** : Graphique avec scores d'opportunité
-- **Analyse produit** : Clic sur un produit → Analyse LLM des problèmes
-- **Posts à revoir** : Liste triée par priority score
+- **Pain Points** : Top 5 problèmes récurrents (30 derniers jours) détectés automatiquement via analyse de mots-clés
+- **Distribution par produit** : Graphique avec scores d'opportunité (0-100) classés par ordre décroissant
+- **Filtrage par produit** : Clic sur un produit dans la distribution → Filtre automatique de l'analyse LLM et des posts à revoir
+- **Bouton "Clear Filter"** : Réinitialise le filtre produit pour afficher toutes les données
+- **Analyse LLM** : Analyse contextuelle des problèmes avec overlay de chargement limité à la section d'analyse
+- **Posts à revoir** : Liste triée par opportunity score avec filtres (recherche, langue, source, date)
+- **Modale de prévisualisation** : Clic sur un post → Affichage complet du contenu, métadonnées (auteur, date, sentiment, score) et lien vers le post original
+- **Opportunity Score** : Score sur 0-100 calculé à partir de :
+  - Pertinence (0-30 points) : Score de pertinence du post
+  - Sentiment (0-40 points) : Négatif = 40, Neutre = 15, Positif = 5
+  - Récence (0-20 points) : < 7 jours = 20, < 30 jours = 15, < 90 jours = 10, sinon = 5
+  - Engagement (0-10 points) : Basé sur vues, commentaires et réactions
 
 #### 3.4 Page "Settings" (`/settings`)
 - **Configuration API Keys** : OpenAI, Anthropic, Google, GitHub, Trustpilot
@@ -246,7 +264,7 @@ priority_score = sentiment_value × keyword_relevance × recency_value
 - `GET /api/stats` : Statistiques globales
 - `GET /api/pain-points` : Points de douleur récurrents
 - `GET /api/product-opportunities` : Opportunités par produit
-- `GET /api/posts-for-improvement` : Posts triés par priority score
+- `GET /api/posts-for-improvement` : Posts triés par opportunity score (0-100)
 - `GET /api/product-analysis/{product_name}` : Analyse LLM d'un produit ⭐ **NOUVEAU**
 
 #### 5.4 Endpoints de configuration

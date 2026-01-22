@@ -212,7 +212,13 @@
         </section>
 
         <!-- What's Happening Section -->
-        <section class="panel-whats-happening" style="grid-column: 1 / 3;">
+        <section class="panel-whats-happening" style="grid-column: 1 / 3; position: relative;">
+            <div class="llm-analysis-overlay" id="whatsHappeningOverlay" style="display: none;">
+                <div class="overlay-content">
+                    <div class="spinner"></div>
+                    <p>Analyzing with AI...</p>
+                </div>
+            </div>
             <div class="whats-happening-header">
                 <h2>⚠️ What's Happening</h2>
             </div>

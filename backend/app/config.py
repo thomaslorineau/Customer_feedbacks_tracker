@@ -41,7 +41,7 @@ class Config(BaseSettings):
     # API Keys (private - never log these!)
     openai_api_key: Optional[str] = Field(default=None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(default=None, description="Anthropic API key")
-    google_api_key: Optional[str] = Field(default=None, description="Google API key")
+    mistral_api_key: Optional[str] = Field(default=None, description="Mistral API key")
     trustpilot_api_key: Optional[str] = Field(default=None, description="Trustpilot API key")
     github_token: Optional[str] = Field(default=None, description="GitHub token")
     
@@ -128,8 +128,8 @@ class Config(BaseSettings):
         return self.anthropic_api_key
     
     @property
-    def _GOOGLE_API_KEY(self) -> Optional[str]:
-        return self.google_api_key
+    def _MISTRAL_API_KEY(self) -> Optional[str]:
+        return self.mistral_api_key
     
     @property
     def _TRUSTPILOT_API_KEY(self) -> Optional[str]:
@@ -176,7 +176,7 @@ class Config(BaseSettings):
         key_map = {
             "openai": self._OPENAI_API_KEY,
             "anthropic": self._ANTHROPIC_API_KEY,
-            "google": self._GOOGLE_API_KEY,
+            "mistral": self._MISTRAL_API_KEY,
             "trustpilot": self._TRUSTPILOT_API_KEY,
             "github": self._GITHUB_TOKEN,
             # Third-party APIs (optional)
@@ -266,9 +266,9 @@ class Config(BaseSettings):
         format_rules = {
             "openai": lambda k: k.startswith("sk-") and len(k) > 20,
             "anthropic": lambda k: k.startswith("sk-ant-") and len(k) > 20,
+            "mistral": lambda k: len(k) > 10,
             "github": lambda k: (k.startswith("ghp_") or k.startswith("github_pat_")) and len(k) > 20,
             "trustpilot": lambda k: len(k) > 10,
-            "google": lambda k: len(k) > 10,
             "linkedin_client_id": lambda k: len(k) > 10,
             "linkedin_client_secret": lambda k: len(k) > 10,
             "twitter_bearer": lambda k: len(k) > 20,
@@ -321,7 +321,7 @@ class Config(BaseSettings):
         summary.append("")
         summary.append("🔑 API Keys Status:")
         
-        providers = ["openai", "anthropic", "google", "github", "trustpilot"]
+        providers = ["openai", "anthropic", "mistral", "github", "trustpilot"]
         for provider in providers:
             key = self.get_api_key(provider)
             if key:

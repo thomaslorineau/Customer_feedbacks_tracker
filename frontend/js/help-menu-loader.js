@@ -17,7 +17,7 @@ const HELP_MENU_CONTENT = `
 <!-- Project Overview -->
 <h3>📊 Project Overview</h3>
 <ul>
-    <li><strong>Version:</strong> 1.0.1 (Beta)</li>
+    <li><strong>Version:</strong> 1.0.8 (Beta)</li>
     <li><strong>Status:</strong> Fully Functional ✅</li>
     <li><strong>Database:</strong> DuckDB</li>
     <li><strong>Backend:</strong> FastAPI (Python 3.11+)</li>
@@ -32,7 +32,9 @@ const HELP_MENU_CONTENT = `
     <li><strong>📊 Interactive Dashboard:</strong> Visual analytics with charts, filters, and real-time insights</li>
     <li><strong>🤖 AI-Powered Insights:</strong> Get recommended actions and product analysis using LLM</li>
     <li><strong>📧 Email Notifications:</strong> Automatic alerts for problematic posts with configurable triggers</li>
-    <li><strong>💡 Improvement Opportunities:</strong> Identify pain points and prioritize actions</li>
+    <li><strong>💡 Improvement Opportunities:</strong> Identify pain points, filter by product, and prioritize actions with opportunity scores (0-100)</li>
+    <li><strong>🔍 Product Filtering:</strong> Click on a product to filter LLM analysis and posts automatically</li>
+    <li><strong>👁️ Post Preview:</strong> View full post content in a modal with link to original source</li>
 </ul>
 
 <!-- How Scraping Works -->
@@ -98,7 +100,15 @@ const HELP_MENU_CONTENT = `
         Posts with score &lt; 30% are automatically filtered.
     </li>
     <li><strong>Sentiment Analysis:</strong> VADER-based classification (Positive/Negative/Neutral)</li>
-    <li><strong>Priority Score:</strong> <code>sentiment × relevance × recency</code> - used to prioritize posts requiring attention</li>
+    <li><strong>Opportunity Score (0-100):</strong> Additive score combining:
+        <ul>
+            <li>Relevance (0-30 points): Based on post relevance score</li>
+            <li>Sentiment (0-40 points): Negative = 40, Neutral = 15, Positive = 5</li>
+            <li>Recency (0-20 points): Recent posts score higher</li>
+            <li>Engagement (0-10 points): Based on views, comments, reactions</li>
+        </ul>
+        Used to prioritize posts requiring attention.
+    </li>
 </ul>
 
 <!-- Settings Configuration -->
@@ -152,7 +162,7 @@ const HELP_MENU_CONTENT = `
 <h3>📄 Pages Overview</h3>
 <ul>
     <li><strong>📊 Dashboard Analytics:</strong> Visual insights, charts, timeline, and post management with advanced filtering</li>
-    <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis, product distribution, and prioritized posts to review</li>
+    <li><strong>💡 Improvements Opportunities:</strong> Pain points analysis (auto-detected), product distribution with opportunity scores, interactive product filtering, LLM analysis, and prioritized posts to review with preview modal</li>
     <li><strong>📥 Feedbacks Collection:</strong> Configure keywords, launch scrapers, view progress, and export data</li>
     <li><strong>📋 Scraping Logs:</strong> Real-time monitoring of scraping operations, errors, and success rates</li>
     <li><strong>⚙️ Settings:</strong> Configure API keys, email notifications, base keywords, and application settings</li>
@@ -166,7 +176,9 @@ const HELP_MENU_CONTENT = `
     <li><strong>Launch Scraping:</strong> Click "Scrape New Data" to collect feedback from all sources</li>
     <li><strong>Monitor Progress:</strong> Watch real-time progress in Feedbacks Collection or check Scraping Logs</li>
     <li><strong>Analyze Results:</strong> View collected feedback in Dashboard Analytics with interactive charts and filters</li>
-    <li><strong>Get Insights:</strong> Check Improvements Opportunities for pain points and recommended actions</li>
+    <li><strong>Get Insights:</strong> Check Improvements Opportunities for auto-detected pain points, product distribution, and recommended actions</li>
+    <li><strong>Filter by Product:</strong> Click on a product in the distribution chart to filter LLM analysis and posts automatically</li>
+    <li><strong>Preview Posts:</strong> Click on any post in Improvements Opportunities to see full content in a preview modal</li>
     <li><strong>Set Up Alerts:</strong> Configure email notification triggers in Settings to get notified of problematic posts</li>
 </ol>
 
@@ -179,7 +191,10 @@ const HELP_MENU_CONTENT = `
     <li>Configure email triggers to stay informed about critical feedback without checking manually</li>
     <li>Use the Dashboard timeline to identify trends and spikes in feedback</li>
     <li>Export filtered posts to CSV for external analysis or reporting</li>
-    <li>Check Improvements Opportunities regularly to identify recurring issues</li>
+    <li>Check Improvements Opportunities regularly to identify recurring issues (auto-detected pain points)</li>
+    <li>Click on products in the distribution chart to focus analysis on specific products</li>
+    <li>Use the post preview modal to quickly review full content without leaving the page</li>
+    <li>Opportunity scores (0-100) help prioritize which posts need immediate attention</li>
 </ul>
 
 <!-- Security -->

@@ -90,10 +90,28 @@ function initializeDefaultDateRange() {
             state.setFilter('dateTo', inputDateTo);
         }
     } else if (!hasDateFromState && !hasDateToState) {
-        // No dates set anywhere - ensure filters are applied
-        console.log('initializeDefaultDateRange: No date filters set - showing all posts');
-        state.applyFilters();
-        console.log('Filtered posts (no date filter):', state.filteredPosts?.length || 0);
+        // No dates set anywhere - set default date range to last 12 months to align with timeline
+        console.log('initializeDefaultDateRange: No date filters set - setting default to last 12 months');
+        const now = new Date();
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(now.getMonth() - 12);
+        
+        const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
+        const dateToStr = now.toISOString().split('T')[0];
+        
+        // Set in inputs
+        if (dateFromInput) dateFromInput.value = dateFromStr;
+        if (dateToInput) dateToInput.value = dateToStr;
+        const globalDateFrom = document.getElementById('globalDateFrom');
+        const globalDateTo = document.getElementById('globalDateTo');
+        if (globalDateFrom) globalDateFrom.value = dateFromStr;
+        if (globalDateTo) globalDateTo.value = dateToStr;
+        
+        // Set in state
+        state.setFilter('dateFrom', dateFromStr);
+        state.setFilter('dateTo', dateToStr);
+        updateDefaultDateRangeIndicator();
+        console.log('initializeDefaultDateRange: Default date range set (last 12 months). Filtered posts:', state.filteredPosts?.length || 0);
     } else {
         // Dates are in state but not in inputs - sync inputs
         if (hasDateFromState && dateFromInput) dateFromInput.value = state.filters.dateFrom;

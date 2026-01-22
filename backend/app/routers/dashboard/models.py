@@ -1,6 +1,6 @@
 """Pydantic models for dashboard endpoints."""
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 
 
 class PainPoint(BaseModel):
@@ -93,6 +93,31 @@ class WhatsHappeningInsight(BaseModel):
 class WhatsHappeningResponse(BaseModel):
     """Response model for What's Happening insights."""
     insights: List[WhatsHappeningInsight] = Field(..., description="List of generated insights")
+    llm_available: bool = Field(default=True, description="Whether LLM was used to generate insights")
+
+
+class ImprovementInsight(BaseModel):
+    """Model for a single improvement insight."""
+    type: str = Field(..., description="Type of insight: 'key_finding', 'roi', 'trend', 'priority'")
+    title: str = Field(..., description="Title of the insight")
+    description: str = Field(..., description="Description of the insight")
+    icon: str = Field(default="💡", description="Emoji icon for the insight")
+    metric: str = Field(default="", description="Metric or value if applicable")
+    roi_impact: Optional[str] = Field(None, description="ROI or customer impact estimate")
+
+
+class ImprovementsAnalysisRequest(BaseModel):
+    """Request model for improvements analysis."""
+    pain_points: List[PainPoint] = Field(default=[], description="List of pain points to analyze")
+    products: List[ProductOpportunity] = Field(default=[], description="List of products with opportunity scores")
+    total_posts: int = Field(default=0, description="Total number of posts analyzed")
+
+
+class ImprovementsAnalysisResponse(BaseModel):
+    """Response model for improvements analysis."""
+    insights: List[ImprovementInsight] = Field(..., description="List of generated insights")
+    roi_summary: str = Field(default="", description="Summary of ROI and customer impact")
+    key_findings: List[str] = Field(default=[], description="Key findings from the analysis")
     llm_available: bool = Field(default=True, description="Whether LLM was used to generate insights")
 
 

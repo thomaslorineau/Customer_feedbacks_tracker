@@ -222,7 +222,7 @@
         }
 
         .btn-icon {
-            background: var(--accent-color);
+            background: var(--accent-primary, #0099ff);
             color: white;
             border: none;
             border-radius: 6px;
@@ -232,13 +232,15 @@
             align-items: center;
             gap: 0.5rem;
             font-size: 0.875rem;
-            font-weight: 500;
+            font-weight: 600;
             transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
         }
 
         .btn-icon:hover {
-            background: var(--accent-hover);
+            background: var(--accent-hover, #0088ee);
             transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3);
         }
 
         .btn-icon:active {
@@ -1570,7 +1572,7 @@
     </div>
 
     <script src="/js/help-menu-loader.js"></script>
-    <script src="/dashboard/js/settings.js"></script>
+    <script src="/dashboard/js/settings.js?v=5.0"></script>
     <script>
         // Define toggleHelpMenu function immediately (before DOMContentLoaded)
         // This ensures it's available when the navigation link is clicked
@@ -1825,7 +1827,6 @@
         // ============================================================================
         // Email Notifications Management
         // ============================================================================
-        const API_BASE = window.location.origin;
 
         async function loadEmailNotifications() {
             try {

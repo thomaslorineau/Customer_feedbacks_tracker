@@ -2078,27 +2078,55 @@
         
         function loadProductLabels() {
             const saved = localStorage.getItem('ovh_product_labels');
-            return saved ? JSON.parse(saved) : {};
+            const labels = saved ? JSON.parse(saved) : {};
+            
+            // Clean up any language codes that were mistakenly saved as product labels
+            const languageCodes = ['FR', 'EN', 'ES', 'DE', 'IT', 'PT', 'NL', 'PL', 'RU', 'ZH', 'JA', 'KO', 'AR', 'HI', 'TR', 'SV', 'DA', 'FI', 'NO', 'CS', 'HU', 'RO', 'BG', 'HR', 'SK', 'SL', 'ET', 'LV', 'LT', 'MT', 'EL', 'UK', 'BE', 'GA', 'CY', 'LU', 'UNKNOWN', 'fr', 'en', 'es', 'de', 'it', 'pt', 'nl', 'pl', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'tr', 'sv', 'da', 'fi', 'no', 'cs', 'hu', 'ro', 'bg', 'hr', 'sk', 'sl', 'et', 'lv', 'lt', 'mt', 'el', 'uk', 'be', 'ga', 'cy', 'lu', 'unknown'];
+            let cleaned = false;
+            
+            for (const postId in labels) {
+                const label = labels[postId];
+                if (languageCodes.includes(label.toUpperCase()) || languageCodes.includes(label.toLowerCase())) {
+                    delete labels[postId];
+                    cleaned = true;
+                }
+            }
+            
+            // Save cleaned labels if any were removed
+            if (cleaned) {
+                localStorage.setItem('ovh_product_labels', JSON.stringify(labels));
+            }
+            
+            return labels;
         }
         
         function getProductLabel(postId, postContent, postLanguage) {
+            // List of language codes to exclude (they are NOT products)
+            const languageCodes = ['FR', 'EN', 'ES', 'DE', 'IT', 'PT', 'NL', 'PL', 'RU', 'ZH', 'JA', 'KO', 'AR', 'HI', 'TR', 'SV', 'DA', 'FI', 'NO', 'CS', 'HU', 'RO', 'BG', 'HR', 'SK', 'SL', 'ET', 'LV', 'LT', 'MT', 'EL', 'UK', 'BE', 'GA', 'CY', 'LU', 'UNKNOWN', 'fr', 'en', 'es', 'de', 'it', 'pt', 'nl', 'pl', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'tr', 'sv', 'da', 'fi', 'no', 'cs', 'hu', 'ro', 'bg', 'hr', 'sk', 'sl', 'et', 'lv', 'lt', 'mt', 'el', 'uk', 'be', 'ga', 'cy', 'lu', 'unknown'];
+            
             // First check if there's a manually edited label
             const editedLabels = loadProductLabels();
             if (editedLabels[postId]) {
-                return editedLabels[postId];
+                const label = editedLabels[postId];
+                // Filter out language codes even if manually set
+                if (languageCodes.includes(label.toUpperCase()) || languageCodes.includes(label.toLowerCase())) {
+                    return null;
+                }
+                return label;
             }
             
             // Otherwise detect automatically
             const detectedProduct = detectOVHProduct(postContent);
             if (detectedProduct) {
+                // Double-check that detected product is not a language code
+                if (languageCodes.includes(detectedProduct.toUpperCase()) || languageCodes.includes(detectedProduct.toLowerCase())) {
+                    return null;
+                }
                 return detectedProduct;
             }
             
-            // Fallback to language if not unknown
-            if (postLanguage && postLanguage !== 'unknown') {
-                return postLanguage.toUpperCase();
-            }
-            
+            // No fallback - return null if no product detected
+            // (Language should not be used as product label per user request)
             return null;
         }
         

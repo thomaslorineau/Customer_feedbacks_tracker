@@ -32,9 +32,12 @@
 │  │                                                                      │   │
 │  │  ┌────────────────────────────────────────────────────────────────┐ │   │
 │  │  │  /improvements (Improvements Opportunities)                    │ │   │
-│  │  │  ├─ Recurring Pain Points (top 5, last 30 days)               │ │   │
-│  │  │  ├─ Product Distribution (opportunity scores)                 │ │   │
-│  │  │  └─ Posts to Review (ranked by priority score)                 │ │   │
+│  │  │  ├─ Recurring Pain Points (top 5, last 30 days, auto-detected) │ │   │
+│  │  │  ├─ Product Distribution (opportunity scores 0-100)             │ │   │
+│  │  │  ├─ Product Filtering (click product → filter LLM & posts)    │ │   │
+│  │  │  ├─ LLM Analysis (with overlay limited to analysis section)    │ │   │
+│  │  │  ├─ Posts to Review (ranked by opportunity score 0-100)       │ │   │
+│  │  │  └─ Post Preview Modal (full content + original link)          │ │   │
 │  │  └────────────────────────────────────────────────────────────────┘ │   │
 │  │                                                                      │   │
 │  │  Navigation: Menu with theme toggle, consistent across all pages    │   │
@@ -386,8 +389,11 @@ ovh-complaints-tracker/
 12. **Fallback Strategies**: Scrapers use multiple strategies (Primary → Google Search → RSS Detector → empty list) for maximum resilience.
 13. **Base Keywords System**: Configurable base keywords (brands, products, problems, leadership) combined with user-defined keywords.
 14. **Relevance Scoring**: Automatic relevance scoring (0-100%) filters out non-relevant posts (< 30% threshold).
-15. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters. Product analysis with AI-powered summaries.
-16. **Priority Scoring**: Multiplicative algorithm: `sentiment * keyword_relevance * recency` (0-100 scale) for accurate prioritization.
+15. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters. Product analysis with AI-powered summaries and product-specific filtering.
+16. **Opportunity Score**: Additive algorithm (0-100): `relevance_score + sentiment_score + recency_score + engagement_score` for accurate prioritization. Replaces the old multiplicative priority score.
+17. **Product Filtering**: Interactive filtering on Improvements page - clicking a product filters LLM analysis and posts automatically.
+18. **Post Preview Modal**: Full-content preview modal with metadata and link to original post source.
+19. **Pain Points Detection**: Automatic detection of recurring issues based on keyword analysis in recent negative/neutral posts.
 17. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
 18. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
 19. **Dashboard Enhancements**: Posts Statistics with dynamic satisfaction metrics, Critical Posts drawer, All Posts section with comprehensive filters.

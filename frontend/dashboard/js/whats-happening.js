@@ -73,6 +73,19 @@ export async function updateWhatsHappening(state) {
     const activeFilters = getActiveFilters(state);
     const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
     
+    // Show overlay during LLM analysis
+    const overlay = document.getElementById('whatsHappeningOverlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+    }
+    
+    // Set a timeout to hide overlay after max 30 seconds (safety measure)
+    const overlayTimeout = setTimeout(() => {
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }, 30000);
+    
     // Call LLM API to generate insights
     let insights = [];
     let llmAvailable = false;
@@ -186,6 +199,12 @@ export async function updateWhatsHappening(state) {
                 metric: '',
                 count: topIssue[1]
             });
+        }
+    } finally {
+        // Always hide overlay, even if there was an error
+        clearTimeout(overlayTimeout);
+        if (overlay) {
+            overlay.style.display = 'none';
         }
     }
     
@@ -428,7 +447,10 @@ export async function updateWhatsHappening(state) {
     const topProduct = topProductInsight ? [topProductInsight.title.replace('Top Product Impacted: ', ''), topProductInsight.count] : null;
     const topIssue = topIssueInsight ? [topIssueInsight.title.replace('Top Issue: ', '').replace(/"/g, ''), topIssueInsight.count] : null;
     
-    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters);
+    // Update recommended actions (this is async but we don't wait for it)
+    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters).catch(error => {
+        console.error('Error in updateRecommendedActions:', error);
+    });
 }
 
 // Separate function for the click handler
