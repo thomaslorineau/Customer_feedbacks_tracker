@@ -105,30 +105,30 @@ export class State {
                 }
             }
             
-            // Product filter - use getProductLabel
+            // Product filter - use keyword matching based on official OVH products
             if (this.filters.product && this.filters.product !== 'all') {
-                // Import getProductLabel dynamically
-                import('./product-detection.js').then(module => {
-                    const productLabel = module.getProductLabel(post.id, post.content, post.language);
-                    if (productLabel !== this.filters.product) {
-                        return false;
-                    }
-                });
-                // Synchronous check for now
                 const content = (post.content || '').toLowerCase();
                 const productLower = this.filters.product.toLowerCase();
-                // Simple keyword matching as fallback
+                // Extended keyword matching based on official OVH products (aligned with insights.py)
                 const productKeywords = {
-                    'Billing': ['billing', 'invoice', 'payment', 'charge', 'refund'],
-                    'VPS': ['vps', 'virtual private server'],
-                    'Hosting': ['hosting', 'web hosting', 'shared hosting'],
-                    'Manager': ['manager', 'control panel', 'dashboard'],
-                    'API': ['api', 'rest api', 'api key'],
-                    'Domain': ['domain', 'dns', 'domain name'],
-                    'Support': ['support', 'ticket', 'help', 'assistance'],
-                    'Network': ['network', 'bandwidth', 'traffic', 'ddos'],
-                    'Storage': ['storage', 'backup', 'snapshot'],
-                    'Database': ['database', 'mysql', 'postgresql']
+                    'VPS': ['vps', 'virtual private server', 'ovh vps', 'vps cloud', 'cloud vps'],
+                    'Hosting': ['hosting', 'web hosting', 'shared hosting', 'ovh hosting', 'web hosting plan'],
+                    'Domain': ['domain', 'domaine', 'domain name', 'domain registration', 'domain renewal', 'domain transfer', 'domain expiration', 'registrar', 'bureau d\'enregistrement', 'whois', 'domain management', '.ovh', '.com', '.net', '.org', '.fr', '.eu'],
+                    'DNS': ['dns', 'dns zone', 'dns anycast', 'dnssec', 'dns record', 'dns configuration', 'nameserver', 'ns record', 'a record', 'mx record', 'cname record', 'txt record', 'dns management', 'dns hosting'],
+                    'Email': ['email', 'mail', 'smtp', 'imap', 'pop3', 'email hosting', 'exchange', 'email account'],
+                    'Storage': ['storage', 'object storage', 's3', 'cloud storage', 'object storage s3', 'high performance storage'],
+                    'CDN': ['cdn', 'content delivery', 'content delivery network', 'ovh cdn'],
+                    'Public Cloud': ['public cloud', 'publiccloud', 'ovh public cloud', 'public cloud instance', 'horizon', 'openstack'],
+                    'Private Cloud': ['private cloud', 'privatecloud', 'ovh private cloud', 'vmware', 'vsphere', 'hosted private cloud'],
+                    'Dedicated Server': ['dedicated', 'dedicated server', 'serveur dédié', 'bare metal', 'ovh dedicated', 'server', 'serveur'],
+                    'API': ['api', 'rest api', 'graphql', 'ovh api', 'api ovh', 'ovhcloud api'],
+                    'Load Balancer': ['load balancer', 'loadbalancer', 'lb', 'ip load balancing'],
+                    'Failover IP': ['failover ip', 'failover', 'ip failover', 'additional ip'],
+                    'SSL Certificate': ['ssl', 'ssl certificate', 'certificate', 'tls', 'https certificate'],
+                    'Managed Kubernetes': ['kubernetes', 'k8s', 'managed kubernetes', 'ovh kubernetes'],
+                    'Managed Databases': ['database', 'mysql', 'postgresql', 'mongodb', 'redis', 'managed database', 'ovh database'],
+                    'Network': ['network', 'vrack', 'private network', 'vlan'],
+                    'IP': ['ip address', 'ipv4', 'ipv6', 'ip block', 'ip range']
                 };
                 const keywords = productKeywords[this.filters.product] || [productLower];
                 if (!keywords.some(kw => content.includes(kw))) {

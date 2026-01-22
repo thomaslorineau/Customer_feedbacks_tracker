@@ -204,49 +204,59 @@ async def cleanup_non_ovh_posts():
 
 @router.get('/admin/product-labels-stats')
 async def get_product_labels_stats():
-    """Get statistics about product labels in posts."""
+    """Get statistics about product labels in posts, validating against official OVH products."""
     """
     Analyze all posts and return statistics about product labels:
     - Total posts
     - Posts with detected product labels
     - Posts without product labels
     - Distribution of product labels
+    - Validation: labels matching official OVH products vs invalid labels
+    - Posts with incorrect or non-OVH product labels
     """
     import re
     
     try:
-        # Get all posts
-        all_posts = db.get_posts(limit=10000, offset=0)
+        # Official OVH products list (based on OVHcloud.com)
+        # This is the authoritative list of valid OVH products
+        OFFICIAL_OVH_PRODUCTS = {
+            'VPS', 'Hosting', 'Domain', 'DNS', 'Email', 'Storage', 'CDN', 
+            'Public Cloud', 'Private Cloud', 'Dedicated Server', 'API',
+            'Load Balancer', 'Failover IP', 'SSL Certificate', 
+            'Managed Kubernetes', 'Managed Databases', 'Network', 'IP'
+        }
         
-        # Product detection patterns (aligned with frontend product-detection.js)
+        # Product detection patterns (aligned with official OVH products from insights.py)
+        # Based on OVHcloud.com official products list
         # Order matters: more specific patterns first
         product_patterns = [
             # Web & Hosting
-            {'key': 'domain', 'pattern': re.compile(r'\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b', re.I), 'label': 'Domain'},
-            {'key': 'wordpress', 'pattern': re.compile(r'\b(wordpress|wp\s*host|wp\s*config)\b', re.I), 'label': 'WordPress'},
-            {'key': 'email', 'pattern': re.compile(r'\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b', re.I), 'label': 'Email'},
-            {'key': 'web-hosting', 'pattern': re.compile(r'\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b', re.I), 'label': 'Hosting'},
+            {'key': 'domain', 'pattern': re.compile(r'\b(domain|domaine|domain\s*name|domain\s*registration|domain\s*renewal|domain\s*transfer|domain\s*expiration|registrar|bureau\s*d\'enregistrement|whois|domain\s*management|\.ovh|\.com|\.net|\.org|\.fr|\.eu)\b', re.I), 'label': 'Domain'},
+            {'key': 'dns', 'pattern': re.compile(r'\b(dns|dns\s*zone|dns\s*anycast|dnssec|dns\s*record|dns\s*configuration|nameserver|ns\s*record|a\s*record|mx\s*record|cname\s*record|txt\s*record|dns\s*management|dns\s*hosting)\b', re.I), 'label': 'DNS'},
+            {'key': 'email', 'pattern': re.compile(r'\b(email|mail|smtp|imap|pop3|email\s*hosting|exchange|email\s*account)\b', re.I), 'label': 'Email'},
+            {'key': 'web-hosting', 'pattern': re.compile(r'\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*hosting\s*plan|ovh\s*hosting)\b', re.I), 'label': 'Hosting'},
             
             # Cloud & Servers
-            {'key': 'vps', 'pattern': re.compile(r'\b(vps|virtual\s*private\s*server|kimsufi)\b', re.I), 'label': 'VPS'},
-            {'key': 'dedicated', 'pattern': re.compile(r'\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b', re.I), 'label': 'Dedicated'},
-            {'key': 'public-cloud', 'pattern': re.compile(r'\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b', re.I), 'label': 'Public Cloud'},
-            {'key': 'private-cloud', 'pattern': re.compile(r'\b(private\s*cloud|vmware|vsphere)\b', re.I), 'label': 'Private Cloud'},
-            {'key': 'kubernetes', 'pattern': re.compile(r'\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b', re.I), 'label': 'Kubernetes'},
+            {'key': 'vps', 'pattern': re.compile(r'\b(vps|virtual\s*private\s*server|ovh\s*vps|vps\s*cloud|cloud\s*vps)\b', re.I), 'label': 'VPS'},
+            {'key': 'dedicated', 'pattern': re.compile(r'\b(dedicated|dedicated\s*server|serveur\s*dédié|bare\s*metal|ovh\s*dedicated|server|serveur)\b', re.I), 'label': 'Dedicated Server'},
+            {'key': 'public-cloud', 'pattern': re.compile(r'\b(public\s*cloud|publiccloud|ovh\s*public\s*cloud|public\s*cloud\s*instance|horizon|openstack)\b', re.I), 'label': 'Public Cloud'},
+            {'key': 'private-cloud', 'pattern': re.compile(r'\b(private\s*cloud|privatecloud|ovh\s*private\s*cloud|vmware|vsphere|hosted\s*private\s*cloud)\b', re.I), 'label': 'Private Cloud'},
+            {'key': 'kubernetes', 'pattern': re.compile(r'\b(kubernetes|k8s|managed\s*kubernetes|ovh\s*kubernetes)\b', re.I), 'label': 'Managed Kubernetes'},
+            {'key': 'managed-databases', 'pattern': re.compile(r'\b(database|mysql|postgresql|mongodb|redis|managed\s*database|ovh\s*database)\b', re.I), 'label': 'Managed Databases'},
             
             # Storage & Backup
-            {'key': 'object-storage', 'pattern': re.compile(r'\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b', re.I), 'label': 'Storage'},
-            {'key': 'backup', 'pattern': re.compile(r'\b(backup|veeam|archive|snapshot|restore)\b', re.I), 'label': 'Backup'},
+            {'key': 'object-storage', 'pattern': re.compile(r'\b(storage|object\s*storage|s3|cloud\s*storage|object\s*storage\s*s3|high\s*performance\s*storage)\b', re.I), 'label': 'Storage'},
             
             # Network & CDN
-            {'key': 'cdn', 'pattern': re.compile(r'\b(cdn|content\s*delivery|cache)\b', re.I), 'label': 'CDN'},
-            {'key': 'load-balancer', 'pattern': re.compile(r'\b(load\s*balancer|iplb|lb|balancing)\b', re.I), 'label': 'Load Balancer'},
-            {'key': 'ddos', 'pattern': re.compile(r'\b(ddos|anti-ddos|protection|mitigation)\b', re.I), 'label': 'DDoS Protection'},
-            {'key': 'network', 'pattern': re.compile(r'\b(network|vrack|vlan|ip\s*address|subnet)\b', re.I), 'label': 'Network'},
+            {'key': 'cdn', 'pattern': re.compile(r'\b(cdn|content\s*delivery|content\s*delivery\s*network|ovh\s*cdn)\b', re.I), 'label': 'CDN'},
+            {'key': 'load-balancer', 'pattern': re.compile(r'\b(load\s*balancer|loadbalancer|lb|ip\s*load\s*balancing)\b', re.I), 'label': 'Load Balancer'},
+            {'key': 'failover-ip', 'pattern': re.compile(r'\b(failover\s*ip|failover|ip\s*failover|additional\s*ip)\b', re.I), 'label': 'Failover IP'},
+            {'key': 'ssl-certificate', 'pattern': re.compile(r'\b(ssl|ssl\s*certificate|certificate|tls|https\s*certificate)\b', re.I), 'label': 'SSL Certificate'},
+            {'key': 'network', 'pattern': re.compile(r'\b(network|vrack|private\s*network|vlan)\b', re.I), 'label': 'Network'},
+            {'key': 'ip', 'pattern': re.compile(r'\b(ip\s*address|ipv4|ipv6|ip\s*block|ip\s*range)\b', re.I), 'label': 'IP'},
             
-            # Support & Billing (lower priority)
-            {'key': 'manager', 'pattern': re.compile(r'\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b', re.I), 'label': 'Manager'},
-            {'key': 'api', 'pattern': re.compile(r'\b(api|sdk|integration|rest\s*api|webhook)\b', re.I), 'label': 'API'},
+            # API
+            {'key': 'api', 'pattern': re.compile(r'\b(api|rest\s*api|graphql|ovh\s*api|api\s*ovh|ovhcloud\s*api)\b', re.I), 'label': 'API'},
         ]
         
         def detect_product(content):
@@ -259,11 +269,16 @@ async def get_product_labels_stats():
                     return product['label']
             return None
         
+        # Get all posts from database
+        all_posts = db.get_posts(limit=10000, offset=0)
+        
         # Analyze posts
         total_posts = len(all_posts)
         posts_with_label = 0
         posts_without_label = 0
         label_distribution = {}
+        invalid_labels = {}  # Labels that don't match official OVH products
+        posts_with_invalid_labels = []  # Posts with invalid labels
         
         for post in all_posts:
             content = post.get('content', '') or ''
@@ -272,18 +287,38 @@ async def get_product_labels_stats():
             if detected_label:
                 posts_with_label += 1
                 label_distribution[detected_label] = label_distribution.get(detected_label, 0) + 1
+                
+                # Validate against official OVH products
+                if detected_label not in OFFICIAL_OVH_PRODUCTS:
+                    invalid_labels[detected_label] = invalid_labels.get(detected_label, 0) + 1
+                    posts_with_invalid_labels.append({
+                        'id': post.get('id'),
+                        'detected_label': detected_label,
+                        'content_preview': content[:150] if content else 'No content'
+                    })
             else:
                 posts_without_label += 1
         
         # Sort labels by count
         sorted_labels = sorted(label_distribution.items(), key=lambda x: x[1], reverse=True)
         
+        # Calculate validation stats
+        valid_labels_count = sum(count for label, count in label_distribution.items() if label in OFFICIAL_OVH_PRODUCTS)
+        invalid_labels_count = sum(count for label, count in label_distribution.items() if label not in OFFICIAL_OVH_PRODUCTS)
+        
         return {
             'total_posts': total_posts,
             'posts_with_label': posts_with_label,
             'posts_without_label': posts_without_label,
             'label_distribution': dict(sorted_labels),
-            'coverage_percentage': round((posts_with_label / total_posts * 100) if total_posts > 0 else 0, 2)
+            'coverage_percentage': round((posts_with_label / total_posts * 100) if total_posts > 0 else 0, 2),
+            'validation': {
+                'valid_labels_count': valid_labels_count,
+                'invalid_labels_count': invalid_labels_count,
+                'invalid_labels': dict(sorted(invalid_labels.items(), key=lambda x: x[1], reverse=True)),
+                'posts_with_invalid_labels': posts_with_invalid_labels[:10],  # Limit to first 10 for display
+                'official_products': sorted(list(OFFICIAL_OVH_PRODUCTS))
+            }
         }
     except Exception as e:
         logger.error(f"Error getting product labels stats: {e}")

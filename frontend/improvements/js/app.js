@@ -167,8 +167,8 @@ async function loadPainPoints() {
             return;
         }
         
-        painPointsList.innerHTML = data.pain_points.map(pp => `
-            <div class="pain-point-item">
+        painPointsList.innerHTML = data.pain_points.map((pp, index) => `
+            <div class="pain-point-item clickable-pain-point" onclick="openPainPointDrawer('${escapeHtml(pp.title)}', ${index})" style="cursor: pointer;">
                 <div class="pain-point-icon">${pp.icon}</div>
                 <div class="pain-point-content">
                     <div class="pain-point-title">${escapeHtml(pp.title)}</div>
@@ -177,6 +177,9 @@ async function loadPainPoints() {
                 </div>
             </div>
         `).join('');
+        
+        // Store pain points data globally for drawer access
+        window.currentPainPoints = data.pain_points;
         
         // Show "View All" link if there are more pain points
         const viewAllLink = document.getElementById('viewAllPainPoints');
@@ -233,7 +236,7 @@ async function loadProductDistribution() {
             // Escape product name for onclick attribute
             const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
             return `
-                <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')">
+                <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterDashboardByProduct('${escapedProduct}')" title="Click to filter Dashboard posts by ${escapeHtml(product.product)}">
                     <div class="product-color" style="background: ${product.color};"></div>
                     <div class="product-bar-container">
                         <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -262,7 +265,7 @@ async function loadProductDistribution() {
                         // Escape product name for onclick attribute
                         const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
                         return `
-                            <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')">
+                            <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterDashboardByProduct('${escapedProduct}')" title="Click to filter Dashboard posts by ${escapeHtml(product.product)}">
                                 <div class="product-color" style="background: ${product.color};"></div>
                                 <div class="product-bar-container">
                                     <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
@@ -869,6 +872,7 @@ function closePostPreviewModal() {
 // Make functions available globally
 window.createImprovementTicket = createImprovementTicket;
 window.filterByProduct = filterByProduct;
+window.filterDashboardByProduct = filterDashboardByProduct;
 window.openProductAnalysis = openProductAnalysis; // Keep for backward compatibility
 window.openPostPreviewModal = openPostPreviewModal;
 window.closePostPreviewModal = closePostPreviewModal;
@@ -905,6 +909,17 @@ async function filterByProduct(productName) {
     
     // Reload product distribution to update active state
     await loadProductDistribution();
+}
+
+// Filter Dashboard by product (opens Dashboard with product filter applied)
+function filterDashboardByProduct(productName) {
+    console.log('Filtering Dashboard by product:', productName);
+    
+    // Store product filter in localStorage for Dashboard to read
+    localStorage.setItem('dashboardProductFilter', productName);
+    
+    // Navigate to Dashboard
+    window.location.href = '/dashboard/';
 }
 
 // Update product filter indicator
@@ -965,6 +980,194 @@ function closeProductAnalysisDrawer() {
         drawer.classList.remove('open');
     }
 }
+
+// Pain point keywords mapping (same as backend)
+const PAIN_POINT_KEYWORDS = {
+    'Performance Issues': ['slow', 'lent', 'performance', 'lag', 'timeout', 'time out', 'slowly', 'slowness', 'slow response', 'slow loading', 'slowly loading'],
+    'Downtime & Outages': ['down', 'outage', 'offline', 'unavailable', 'unreachable', 'not working', 'doesn\'t work', 'not accessible', 'service unavailable', 'error 503', 'error 502', 'error 500'],
+    'Billing Problems': ['billing', 'invoice', 'payment', 'charge', 'charged', 'refund', 'cost', 'price', 'expensive', 'overcharge', 'facture', 'paiement', 'facturation'],
+    'Support Issues': ['support', 'ticket', 'help', 'assistance', 'response time', 'no response', 'no reply', 'customer service', 'service client'],
+    'Configuration Problems': ['config', 'configuration', 'setup', 'install', 'installation', 'configure', 'setting', 'settings', 'cannot configure', 'can\'t configure'],
+    'API & Integration Issues': ['api', 'integration', 'endpoint', 'connection', 'connect', 'authentication', 'auth', 'token', 'credential'],
+    'Data Loss & Backup': ['lost', 'delete', 'deleted', 'backup', 'restore', 'recovery', 'data loss', 'lost data', 'missing data'],
+    'Security Concerns': ['security', 'hack', 'breach', 'vulnerability', 'exploit', 'unauthorized', 'access', 'secure', 'protection'],
+    'Migration Problems': ['migration', 'migrate', 'transfer', 'move', 'upgrade', 'update', 'migration failed', 'cannot migrate'],
+    'Network Issues': ['network', 'connection', 'latency', 'bandwidth', 'ddos', 'attack', 'traffic', 'routing', 'dns']
+};
+
+// Open drawer for pain point posts
+window.openPainPointDrawer = function(painPointTitle, painPointIndex) {
+    const painPoint = window.currentPainPoints && window.currentPainPoints[painPointIndex];
+    if (!painPoint) {
+        console.error('Pain point not found:', painPointTitle);
+        return;
+    }
+    
+    // Get keywords for this pain point
+    const keywords = PAIN_POINT_KEYWORDS[painPointTitle] || [];
+    if (keywords.length === 0) {
+        console.warn('No keywords found for pain point:', painPointTitle);
+        return;
+    }
+    
+    // Load all posts and filter by keywords
+    loadPainPointPosts(painPointTitle, keywords, painPoint);
+};
+
+async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
+    try {
+        // Get date filter
+        const dateFrom = getDateFrom(currentPeriodDays);
+        
+        // Fetch posts with date filter
+        const response = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load posts: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const allPosts = data.posts || [];
+        
+        // Filter posts by keywords (case-insensitive)
+        const filteredPosts = allPosts.filter(post => {
+            const content = (post.content || '').toLowerCase();
+            return keywords.some(keyword => content.includes(keyword.toLowerCase()));
+        });
+        
+        // Sort by opportunity score (descending)
+        filteredPosts.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
+        
+        // Open drawer with filtered posts
+        openPainPointDrawerContent(painPointTitle, painPoint.description, filteredPosts, painPoint);
+        
+    } catch (error) {
+        console.error('Error loading pain point posts:', error);
+        alert(`Error loading posts for ${painPointTitle}: ${error.message}`);
+    }
+}
+
+function openPainPointDrawerContent(title, description, posts, painPoint) {
+    const drawer = document.getElementById('painPointsDrawer');
+    if (!drawer) {
+        console.error('Pain points drawer not found');
+        return;
+    }
+    
+    const drawerContent = document.getElementById('painPointsDrawerContent');
+    if (!drawerContent) {
+        console.error('Pain points drawer content not found');
+        return;
+    }
+    
+    // Show drawer
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    document.body.classList.add('drawer-open');
+    drawer.style.display = 'block';
+    drawer.classList.add('open');
+    
+    // Helper functions
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+    
+    function getSourceIcon(source) {
+        const icons = {
+            'X/Twitter': '🐦',
+            'Twitter': '🐦',
+            'Reddit': '🔴',
+            'Trustpilot': '⭐',
+            'OVH Forum': '💬',
+            'Stack Overflow': '📚',
+            'GitHub': '💻',
+            'Google News': '📰',
+            'Mastodon': '🐘',
+            'G2 Crowd': '⭐'
+        };
+        return icons[source] || '📝';
+    }
+    
+    // Build HTML
+    let html = `
+        <div class="drawer-header">
+            <div>
+                <h3>${painPoint.icon || '📊'} ${escapeHtml(title)}</h3>
+                <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 0.9em;">${escapeHtml(description)}</p>
+            </div>
+            <button class="drawer-close" onclick="closePainPointDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div class="drawer-info">
+            <div class="drawer-stats">
+                <span class="drawer-stat-value">${posts.length}</span>
+                <span class="drawer-stat-label">posts</span>
+            </div>
+        </div>
+        <div class="drawer-posts">
+    `;
+    
+    if (posts.length === 0) {
+        html += `
+            <div class="drawer-empty">
+                <p>No posts found matching this pain point.</p>
+            </div>
+        `;
+    } else {
+        posts.forEach(post => {
+            const sourceIcon = getSourceIcon(post.source);
+            const timeAgo = getTimeAgo(post.created_at);
+            const sentiment = post.sentiment_label || 'neutral';
+            const sentimentClass = sentiment === 'negative' ? 'sentiment-negative' : 
+                                 sentiment === 'positive' ? 'sentiment-positive' : 'sentiment-neutral';
+            
+            html += `
+                <div class="drawer-post-item" onclick="openPostPreviewModal(${post.id})" style="cursor: pointer;">
+                    <div class="drawer-post-header">
+                        <div class="drawer-post-source">
+                            <span class="drawer-source-icon">${sourceIcon}</span>
+                            <span class="drawer-source-name">${escapeHtml(post.source || 'Unknown')}</span>
+                            <span class="drawer-post-time">${timeAgo}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="drawer-sentiment-badge ${sentimentClass}">${sentiment}</span>
+                            ${post.opportunity_score ? `<span style="padding: 4px 8px; background: rgba(0, 153, 255, 0.1); border-radius: 4px; color: var(--accent-primary); font-size: 0.8em; font-weight: 600;">Score: ${post.opportunity_score}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
+                    <div class="drawer-post-meta">
+                        ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link" onclick="event.stopPropagation();">View post →</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    html += `
+        </div>
+    `;
+    
+    drawerContent.innerHTML = html;
+}
+
+window.closePainPointDrawer = function() {
+    const drawer = document.getElementById('painPointsDrawer');
+    if (drawer) {
+        drawer.classList.remove('open');
+        drawer.style.display = 'none';
+        document.body.classList.remove('drawer-open');
+        document.body.style.paddingRight = '';
+    }
+};
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);

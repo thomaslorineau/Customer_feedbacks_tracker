@@ -11,6 +11,40 @@ let state = null;
 export function initDashboard(appState) {
     state = appState;
     
+    // Check for product filter from Improvements page
+    const dashboardProductFilter = localStorage.getItem('dashboardProductFilter');
+    if (dashboardProductFilter) {
+        console.log('Dashboard: Applying product filter from Improvements page:', dashboardProductFilter);
+        // Clear the localStorage flag so it doesn't persist
+        localStorage.removeItem('dashboardProductFilter');
+        
+        // Apply the filter after a short delay to ensure DOM is ready and posts are loaded
+        setTimeout(() => {
+            // Set filter directly in state (it will use getProductLabel for matching)
+            state.setFilter('product', dashboardProductFilter);
+            
+            // Also update the select if it exists
+            const productFilter = document.getElementById('productFilter');
+            if (productFilter) {
+                // Check if the product exists in the select options
+                const optionExists = Array.from(productFilter.options).some(opt => opt.value === dashboardProductFilter || opt.textContent === dashboardProductFilter);
+                if (optionExists) {
+                    // Find the matching option
+                    const matchingOption = Array.from(productFilter.options).find(opt => opt.value === dashboardProductFilter || opt.textContent === dashboardProductFilter);
+                    if (matchingOption) {
+                        productFilter.value = matchingOption.value;
+                    }
+                } else {
+                    console.log('Dashboard: Product filter not in select options, using direct state filter:', dashboardProductFilter);
+                    // The state filter will handle it via keyword matching
+                }
+            }
+            
+            // Update dashboard to apply the filter
+            updateDashboard();
+        }, 300);
+    }
+    
     // Initialize default date range based on actual posts dates if no dates are set
     // Wait a bit to ensure posts are loaded first
     setTimeout(() => {

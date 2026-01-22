@@ -2360,12 +2360,37 @@
                 
                 const stats = await response.json();
                 
-                // Build detailed message
+                // Build detailed message with validation
                 let message = '📦 Product Labels Statistics\n\n';
                 message += `📊 Overview:\n`;
                 message += `• Total posts: ${stats.total_posts}\n`;
                 message += `• Posts with product label: ${stats.posts_with_label} (${stats.coverage_percentage}%)\n`;
                 message += `• Posts without product label: ${stats.posts_without_label} (${(100 - stats.coverage_percentage).toFixed(2)}%)\n\n`;
+                
+                // Validation section
+                if (stats.validation) {
+                    const validation = stats.validation;
+                    message += `✅ Validation (vs Official OVH Products):\n`;
+                    message += `• Valid labels: ${validation.valid_labels_count} posts\n`;
+                    message += `• Invalid labels: ${validation.invalid_labels_count} posts\n\n`;
+                    
+                    if (validation.invalid_labels_count > 0) {
+                        message += `⚠️ Invalid Labels Detected:\n`;
+                        for (const [label, count] of Object.entries(validation.invalid_labels)) {
+                            message += `  - "${label}": ${count} posts (not an official OVH product)\n`;
+                        }
+                        message += `\n`;
+                    }
+                    
+                    message += `📋 Official OVH Products (${validation.official_products.length}):\n`;
+                    validation.official_products.slice(0, 10).forEach(product => {
+                        message += `  • ${product}\n`;
+                    });
+                    if (validation.official_products.length > 10) {
+                        message += `  ... and ${validation.official_products.length - 10} more\n`;
+                    }
+                    message += `\n`;
+                }
                 
                 if (Object.keys(stats.label_distribution).length > 0) {
                     message += `📈 Product Distribution:\n`;
@@ -2375,7 +2400,9 @@
                     
                     for (const [label, count] of sortedLabels) {
                         const percentage = ((count / stats.total_posts) * 100).toFixed(1);
-                        message += `• ${label}: ${count} posts (${percentage}%)\n`;
+                        const isValid = stats.validation && stats.validation.official_products.includes(label);
+                        const statusIcon = isValid ? '✅' : '❌';
+                        message += `${statusIcon} ${label}: ${count} posts (${percentage}%)\n`;
                     }
                     
                     if (Object.keys(stats.label_distribution).length > 10) {
@@ -2385,7 +2412,17 @@
                     message += `⚠️ No product labels detected in any posts.\n`;
                 }
                 
-                message += `\n💡 Tip: Posts without labels may need manual review or improved detection patterns.`;
+                if (stats.validation && stats.validation.posts_with_invalid_labels.length > 0) {
+                    message += `\n⚠️ Sample Posts with Invalid Labels:\n`;
+                    stats.validation.posts_with_invalid_labels.slice(0, 3).forEach(post => {
+                        message += `  • Post #${post.id}: "${post.detected_label}" - ${post.content_preview}...\n`;
+                    });
+                    if (stats.validation.posts_with_invalid_labels.length > 3) {
+                        message += `  ... and ${stats.validation.posts_with_invalid_labels.length - 3} more\n`;
+                    }
+                }
+                
+                message += `\n💡 Tip: Invalid labels should be reviewed and corrected to match official OVH products.`;
                 
                 // Show in alert (or could be improved with a modal)
                 alert(message);

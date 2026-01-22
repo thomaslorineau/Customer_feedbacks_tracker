@@ -148,6 +148,16 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px var(--shadow);
         }
+        
+        .clickable-pain-point {
+            cursor: pointer;
+        }
+        
+        .clickable-pain-point:hover {
+            background: rgba(0, 153, 255, 0.1) !important;
+            transform: translateY(-3px) scale(1.01);
+            box-shadow: 0 6px 16px rgba(0, 153, 255, 0.2);
+        }
 
         .pain-point-icon {
             font-size: 2em;
@@ -802,6 +812,16 @@
         <div class="drawer-backdrop" onclick="closeProductAnalysisDrawer()"></div>
         <div class="drawer-panel">
             <div id="productAnalysisDrawerContent" class="drawer-content">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Pain Points Drawer -->
+    <div id="painPointsDrawer" class="filtered-posts-drawer" style="display: none;">
+        <div class="drawer-backdrop" onclick="closePainPointDrawer()"></div>
+        <div class="drawer-panel">
+            <div id="painPointsDrawerContent" class="drawer-content">
                 <!-- Content will be populated by JavaScript -->
             </div>
         </div>
