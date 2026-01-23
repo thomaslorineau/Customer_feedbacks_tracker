@@ -355,8 +355,7 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 1.75, // Approximate ratio based on container (561/320 ≈ 1.75)
+            maintainAspectRatio: false, // Let container control height
             layout: {
                 padding: {
                     bottom: 5,
@@ -532,8 +531,19 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
                     display: finalStyle.display,
                     visibility: finalStyle.visibility,
                     opacity: finalStyle.opacity,
-                    chartVisible: sourceChart && !sourceChart.destroyed
+                    chartVisible: sourceChart && !sourceChart.destroyed,
+                    chartData: sourceChart?.data ? {
+                        labels: sourceChart.data.labels?.length || 0,
+                        datasets: sourceChart.data.datasets?.length || 0,
+                        firstDatasetData: sourceChart.data.datasets?.[0]?.data || []
+                    } : null
                 });
+                
+                // Force one more update with animation to ensure rendering
+                if (sourceChart && !sourceChart.destroyed) {
+                    sourceChart.update('active');
+                    console.log('[source-chart-v2.js] Final update() called with active mode');
+                }
             }
         }, 200);
     }
