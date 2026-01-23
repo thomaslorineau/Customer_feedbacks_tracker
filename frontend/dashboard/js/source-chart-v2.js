@@ -23,41 +23,77 @@ export function initSourceChart(state) {
     
     // Ensure we never make API calls - only use state data
     if (!state) {
+        console.warn('[source-chart-v2.js] No state provided to initSourceChart');
         return;
     }
     
     currentState = state;
+    console.log('[source-chart-v2.js] State received:', {
+        hasPosts: !!state.posts,
+        postsCount: state.posts?.length || 0,
+        hasFilteredPosts: !!state.filteredPosts,
+        filteredPostsCount: state.filteredPosts?.length || 0
+    });
     
     // Subscribe to state changes to update chart with filtered data
     state.subscribe((updatedState) => {
+        console.log('[source-chart-v2.js] State updated via subscription:', {
+            postsCount: updatedState.posts?.length || 0,
+            filteredPostsCount: updatedState.filteredPosts?.length || 0
+        });
         currentState = updatedState;
         try {
             updateSourceChartFromState(updatedState);
         } catch (e) {
-            // Silently ignore errors - chart will update when ready
+            console.error('[source-chart-v2.js] Error updating chart from subscription:', e);
         }
     });
     
     // Initial load from state (if posts are already loaded)
     // NEVER make API calls - only use state data
-    if (state.posts && state.posts.length > 0) {
+    const posts = state.filteredPosts || state.posts || [];
+    if (posts.length > 0) {
+        console.log(`[source-chart-v2.js] Posts already available (${posts.length}), updating chart immediately`);
         try {
-            updateSourceChartFromState(state);
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    setTimeout(() => updateSourceChartFromState(state), 100);
+                });
+            } else {
+                setTimeout(() => updateSourceChartFromState(state), 100);
+            }
         } catch (e) {
-            // Silently ignore errors - chart will update when ready
+            console.error('[source-chart-v2.js] Error updating chart on init:', e);
         }
     } else {
+        console.log('[source-chart-v2.js] No posts yet, waiting for state update...');
         // Wait a bit for posts to load, then update from state
         // NO API CALLS - only wait for state to be populated
-        setTimeout(() => {
-            if (currentState && currentState.posts && currentState.posts.length > 0) {
-                try {
-                    updateSourceChartFromState(currentState);
-                } catch (e) {
-                    // Silently ignore errors - chart will update when ready
+        // Try multiple times with increasing delays
+        const tryUpdate = (attempt = 1) => {
+            const maxAttempts = 10;
+            const delay = attempt * 200; // 200ms, 400ms, 600ms, etc.
+            
+            setTimeout(() => {
+                const currentPosts = currentState?.filteredPosts || currentState?.posts || [];
+                if (currentPosts.length > 0) {
+                    console.log(`[source-chart-v2.js] Posts loaded after ${delay}ms (${currentPosts.length} posts), updating chart`);
+                    try {
+                        updateSourceChartFromState(currentState);
+                    } catch (e) {
+                        console.error('[source-chart-v2.js] Error updating chart after wait:', e);
+                    }
+                } else if (attempt < maxAttempts) {
+                    console.log(`[source-chart-v2.js] Attempt ${attempt}/${maxAttempts}: Still no posts, retrying...`);
+                    tryUpdate(attempt + 1);
+                } else {
+                    console.warn('[source-chart-v2.js] Max attempts reached, no posts found');
                 }
-            }
-        }, 500);
+            }, delay);
+        };
+        
+        tryUpdate();
     }
 }
 
@@ -71,10 +107,17 @@ function updateSourceChartFromState(state) {
     }
     
     const posts = state.filteredPosts || state.posts || [];
-    console.log(`[source-chart-v2.js] Updating chart with ${posts.length} posts`);
+    console.log(`[source-chart-v2.js] Updating chart with ${posts.length} posts (filtered: ${state.filteredPosts?.length || 0}, total: ${state.posts?.length || 0})`);
     
     if (posts.length === 0) {
-        console.warn('[source-chart-v2.js] No posts available to render chart');
+        console.warn('[source-chart-v2.js] No posts available to render chart. State:', {
+            hasPosts: !!state.posts,
+            postsCount: state.posts?.length || 0,
+            hasFilteredPosts: !!state.filteredPosts,
+            filteredPostsCount: state.filteredPosts?.length || 0
+        });
+        // Don't return - try to render empty chart or wait
+        // Maybe data is still loading, so we'll retry via subscription
         return;
     }
     
