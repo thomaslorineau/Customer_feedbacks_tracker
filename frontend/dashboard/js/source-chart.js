@@ -4,8 +4,6 @@
  * with click-to-filter functionality
  */
 
-import { API } from './api.js';
-
 let sourceChart = null;
 let currentState = null;
 
@@ -76,20 +74,32 @@ function updateSourceChartFromState(state) {
  * Kept for backward compatibility but should use updateSourceChartFromState instead
  */
 async function loadAndRenderSourceChart() {
-    // Use state data directly instead of API call
-    if (currentState && currentState.posts && currentState.posts.length > 0) {
-        updateSourceChartFromState(currentState);
-    } else {
-        // If no state available, show empty state
-        const canvas = document.getElementById('sourceChart');
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = 'var(--text-muted)';
-            ctx.font = '14px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+    try {
+        // Use state data directly instead of API call
+        if (currentState && currentState.posts && currentState.posts.length > 0) {
+            updateSourceChartFromState(currentState);
+        } else {
+            // If no state available, wait a bit and try again (state might be loading)
+            setTimeout(() => {
+                if (currentState && currentState.posts && currentState.posts.length > 0) {
+                    updateSourceChartFromState(currentState);
+                } else {
+                    // Show empty state
+                    const canvas = document.getElementById('sourceChart');
+                    if (canvas) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'var(--text-muted)';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+                    }
+                }
+            }, 500);
         }
+    } catch (error) {
+        // Silently handle errors - chart will update when state is available
+        console.debug('Source chart: Waiting for state data', error);
     }
 }
 

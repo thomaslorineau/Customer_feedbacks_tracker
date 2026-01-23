@@ -646,6 +646,27 @@ async function init() {
     initializeTheme();
     setupThemeToggle();
     setupEventListeners();
+    
+    // Show LLM analysis overlay IMMEDIATELY on page load
+    const showImprovementsOverlay = () => {
+        const analysisSection = document.getElementById('improvementsAnalysis');
+        const overlay = document.getElementById('improvementsOverlay');
+        if (analysisSection && overlay) {
+            // Show section first so overlay can be visible
+            analysisSection.style.setProperty('display', 'block', 'important');
+            analysisSection.style.setProperty('position', 'relative', 'important');
+            // Show overlay
+            overlay.style.setProperty('display', 'flex', 'important');
+            overlay.style.setProperty('z-index', '1000', 'important');
+            overlay.style.setProperty('visibility', 'visible', 'important');
+            overlay.style.setProperty('opacity', '1', 'important');
+            overlay.removeAttribute('hidden');
+        }
+    };
+    showImprovementsOverlay();
+    requestAnimationFrame(() => showImprovementsOverlay());
+    setTimeout(() => showImprovementsOverlay(), 100);
+    
     // Load version using the shared loader if available, otherwise use local function
     // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
     if (window.loadVersion) {

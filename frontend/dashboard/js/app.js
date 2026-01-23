@@ -107,6 +107,21 @@ class App {
         
         // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
         
+        // Show LLM analysis overlay IMMEDIATELY on page load
+        const showWhatsHappeningOverlay = () => {
+            const overlay = document.getElementById('whatsHappeningOverlay');
+            if (overlay) {
+                overlay.style.setProperty('display', 'flex', 'important');
+                overlay.style.setProperty('z-index', '1000', 'important');
+                overlay.style.setProperty('visibility', 'visible', 'important');
+                overlay.style.setProperty('opacity', '1', 'important');
+                overlay.removeAttribute('hidden');
+            }
+        };
+        showWhatsHappeningOverlay();
+        requestAnimationFrame(() => showWhatsHappeningOverlay());
+        setTimeout(() => showWhatsHappeningOverlay(), 100);
+        
         // Load initial data FIRST, before initializing dashboard (which sets default date filters)
         // Add timeout to ensure loading indicator is hidden even if API hangs
         const loadingTimeout = setTimeout(() => {
