@@ -1,4 +1,6 @@
 // Application state management
+import { getProductLabel } from './product-detection.js';
+
 export class State {
     constructor() {
         this.posts = [];
@@ -61,11 +63,14 @@ export class State {
             // Search filter
             if (this.filters.search) {
                 const searchLower = this.filters.search.toLowerCase();
+                // Get detected product label for this post
+                const productLabel = getProductLabel(post.id, post.content, post.language);
                 const matchesSearch = 
                     post.content?.toLowerCase().includes(searchLower) ||
                     post.author?.toLowerCase().includes(searchLower) ||
                     post.url?.toLowerCase().includes(searchLower) ||
-                    post.source?.toLowerCase().includes(searchLower);
+                    post.source?.toLowerCase().includes(searchLower) ||
+                    (productLabel && productLabel.toLowerCase().includes(searchLower));
                 if (!matchesSearch) {
                     excludedBySearch++;
                     return false;

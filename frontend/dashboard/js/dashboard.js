@@ -1783,11 +1783,13 @@ function updateCriticalPostsButton() {
         // Apply global search filter if present
         if (globalSearch && globalSearch.trim() !== '') {
             const searchLower = globalSearch.toLowerCase();
+            const productLabel = getProductLabel(p.id, p.content, p.language);
             const matchesSearch = 
                 p.content?.toLowerCase().includes(searchLower) ||
                 p.author?.toLowerCase().includes(searchLower) ||
                 p.url?.toLowerCase().includes(searchLower) ||
-                p.source?.toLowerCase().includes(searchLower);
+                p.source?.toLowerCase().includes(searchLower) ||
+                (productLabel && productLabel.toLowerCase().includes(searchLower));
             if (!matchesSearch) {
                 return false;
             }
@@ -1847,11 +1849,13 @@ function getFilteredCriticalPosts(sentiment, periodDays, sortBy = 'score') {
         // Apply global search filter if present
         if (globalSearch && globalSearch.trim() !== '') {
             const searchLower = globalSearch.toLowerCase();
+            const productLabel = getProductLabel(p.id, p.content, p.language);
             const matchesSearch = 
                 p.content?.toLowerCase().includes(searchLower) ||
                 p.author?.toLowerCase().includes(searchLower) ||
                 p.url?.toLowerCase().includes(searchLower) ||
-                p.source?.toLowerCase().includes(searchLower);
+                p.source?.toLowerCase().includes(searchLower) ||
+                (productLabel && productLabel.toLowerCase().includes(searchLower));
             if (!matchesSearch) {
                 return false;
             }
@@ -2717,11 +2721,13 @@ function updatePostsDisplay() {
         // Apply global search filter (from main search bar)
         if (globalSearch) {
             const searchLower = globalSearch.toLowerCase();
+            const productLabel = getProductLabel(post.id, post.content, post.language);
             const matchesSearch = 
                 post.content?.toLowerCase().includes(searchLower) ||
                 post.author?.toLowerCase().includes(searchLower) ||
                 post.url?.toLowerCase().includes(searchLower) ||
-                post.source?.toLowerCase().includes(searchLower);
+                post.source?.toLowerCase().includes(searchLower) ||
+                (productLabel && productLabel.toLowerCase().includes(searchLower));
             if (!matchesSearch) return false;
         }
 
