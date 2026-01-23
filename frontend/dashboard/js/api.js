@@ -8,7 +8,6 @@ export class API {
         // Detect API base URL from current location
         const hostname = window.location.hostname;
         const port = window.location.port;
-        const fullUrl = window.location.href;
         
         // Default to current hostname and port
         let baseURL = `${window.location.protocol}//${hostname}`;
@@ -27,25 +26,14 @@ export class API {
             }
         }
         
-        console.log('API Base URL Detection:', {
-            hostname,
-            port,
-            fullUrl,
-            detectedBaseURL: baseURL
-        });
         return baseURL;
     }
     
     async getPosts(limit = 100, offset = 0) {
         const url = `${this.baseURL}/posts?limit=${limit}&offset=${offset}`;
-        console.log('API: Fetching posts from:', url);
-        console.log('API: baseURL:', this.baseURL);
-        console.log('API: window.location:', window.location.href);
         
         try {
             const response = await fetch(url);
-            console.log('API: Response status:', response.status, response.statusText);
-            console.log('API: Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (!response.ok) {
                 const errorText = await response.text();
@@ -54,7 +42,6 @@ export class API {
             }
             
             const contentType = response.headers.get('content-type');
-            console.log('API: Content-Type:', contentType);
             
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
@@ -63,8 +50,6 @@ export class API {
             }
             
             const data = await response.json();
-            console.log('API: Received', data?.length || 0, 'posts');
-            console.log('API: Data type:', Array.isArray(data) ? 'Array' : typeof data);
             
             if (!Array.isArray(data)) {
                 console.error('API: Expected array but got:', typeof data, data);
@@ -73,12 +58,7 @@ export class API {
             
             return data;
         } catch (error) {
-            console.error('API: Fetch error:', error);
-            console.error('API: Error name:', error.name);
-            console.error('API: Error message:', error.message);
-            if (error.cause) {
-                console.error('API: Error cause:', error.cause);
-            }
+            console.error('API: Fetch error:', error.message);
             throw error;
         }
     }

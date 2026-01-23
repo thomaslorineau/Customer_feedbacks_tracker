@@ -80,12 +80,9 @@ window.toggleTheme = toggleTheme;
 
 class App {
     constructor() {
-        console.log('App: Constructor called');
         try {
             this.api = new API();
-            console.log('App: API initialized, baseURL:', this.api.baseURL);
             this.state = new State();
-            console.log('App: State initialized');
             this.init();
         } catch (error) {
             console.error('App: Error in constructor:', error);
@@ -102,8 +99,6 @@ class App {
     }
     
     async init() {
-        console.log('App: Initializing...');
-        
         // Initialize theme
         initializeTheme();
         
@@ -115,7 +110,6 @@ class App {
         // Load initial data FIRST, before initializing dashboard (which sets default date filters)
         // Add timeout to ensure loading indicator is hidden even if API hangs
         const loadingTimeout = setTimeout(() => {
-            console.warn('App: Loading timeout - hiding loading indicator');
             const loadingIndicator = document.getElementById('loadingIndicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
@@ -123,10 +117,8 @@ class App {
         }, 10000); // 10 second timeout
         
         try {
-            console.log('App: Loading posts before initializing dashboard...');
             await this.loadPosts();
             clearTimeout(loadingTimeout);
-            console.log('App: Posts loaded, now initializing dashboard...');
         } catch (error) {
             clearTimeout(loadingTimeout);
             console.error('App: Failed to load posts:', error);
@@ -165,15 +157,8 @@ class App {
             console.error('App: Error initializing sentiment chart:', error);
         }
         
-        // Manually trigger dashboard update after everything is initialized
+        // Ensure loading indicator is hidden after initialization
         setTimeout(() => {
-            if (typeof updateDashboard === 'function') {
-                console.log('App: Triggering final dashboard update...');
-                updateDashboard();
-            } else {
-                console.error('App: updateDashboard function not found');
-            }
-            // Ensure loading indicator is hidden
             const loadingIndicator = document.getElementById('loadingIndicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
@@ -217,26 +202,9 @@ class App {
 
     async loadPosts() {
         try {
-            console.log('App: Loading posts from API...');
-            console.log('App: API Base URL:', this.api.baseURL);
-            
-            const url = `${this.api.baseURL}/posts?limit=10000&offset=0`;  // Increased limit to get all posts
-            console.log('App: Full URL:', url);
-            
             const posts = await this.api.getPosts(10000, 0);  // Get all posts to ensure complete sync
-            console.log('App: Posts loaded:', posts?.length || 0, 'posts');
-            console.log('App: Posts type:', Array.isArray(posts) ? 'Array' : typeof posts);
-            
-            // Log answered posts count for debugging
-            const answeredCount = posts?.filter(p => p.is_answered === 1 || p.is_answered === true).length || 0;
-            console.log(`App: Posts answered in database: ${answeredCount}`);
-            
-            if (posts && posts.length > 0) {
-                console.log('App: First post sample:', posts[0]);
-            }
             
             if (!posts || posts.length === 0) {
-                console.warn('App: No posts found in database');
                 this.showError('No posts found in database. Go to Feedbacks Collection to scrape some data.');
                 // Show empty state message
                 const postsList = document.getElementById('postsList');
@@ -248,30 +216,15 @@ class App {
             
             // Filter valid posts (exclude samples and relevance_score = 0) to match data collection page
             const validPosts = this.filterValidPosts(posts);
-            console.log('App: Valid posts (after filtering samples and relevance_score=0):', validPosts?.length || 0, 'posts');
             
-            console.log('App: Setting posts in state...');
+            // Set posts in state (will trigger dashboard update via subscription)
             this.state.setPosts(validPosts);
-            console.log('App: Posts set in state. Total posts:', this.state.posts?.length || 0);
-            console.log('App: Filtered posts:', this.state.filteredPosts?.length || 0);
             
             // Hide loading indicator
             const loadingIndicator = document.getElementById('loadingIndicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
             }
-            
-            // Dashboard will update automatically via state subscription in initDashboard
-            // Also manually trigger dashboard update to ensure everything is displayed
-            setTimeout(() => {
-                if (typeof updateDashboard === 'function') {
-                    console.log('App: Calling updateDashboard() with', this.state.filteredPosts?.length || 0, 'filtered posts');
-                    updateDashboard();
-                } else {
-                    console.error('App: updateDashboard function not found');
-                    this.showError('updateDashboard function not found. Check console for details.');
-                }
-            }, 100);
         } catch (error) {
             console.error('App: Failed to load posts:', error);
             console.error('App: Error details:', error.message);

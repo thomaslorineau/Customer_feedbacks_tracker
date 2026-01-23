@@ -37,8 +37,6 @@ export class State {
     }
     
     applyFilters() {
-        console.log('Applying filters:', this.filters);
-        console.log('Total posts before filtering:', this.posts.length);
         let filteredCount = 0;
         let excludedBySample = 0;
         let excludedBySearch = 0;
@@ -173,24 +171,9 @@ export class State {
             filteredCount++;
             return true;
         });
-        console.log('Filtered posts count:', this.filteredPosts.length);
-        console.log('Filter breakdown:', {
-            total: this.posts.length,
-            filtered: filteredCount,
-            excludedBySample,
-            excludedBySearch,
-            excludedBySentiment,
-            excludedBySource,
-            excludedByLanguage,
-            excludedByProduct,
-            excludedByDate,
-            excludedByAnswered,
-            currentSourceFilter: this.filters.source
-        });
         
         // Auto-clear source filter if it filters all posts (but avoid infinite loop)
         if (this.filteredPosts.length === 0 && this.posts.length > 0 && this.filters.source && this.filters.source !== '' && this.filters.source !== 'all' && excludedBySource === this.posts.length) {
-            console.warn('Source filter filtered all posts, auto-clearing. Source was:', this.filters.source);
             this.filters.source = '';
             // Re-apply filters without source filter (but only once to avoid infinite loop)
             if (!this._clearingSourceFilter) {

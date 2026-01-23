@@ -7,6 +7,22 @@ import { updateTimelineChart } from './charts.js';
 
 const api = new API();
 let state = null;
+let updateDashboardTimeout = null;
+let isUpdatingDashboard = false;
+
+// Debounced updateDashboard to avoid multiple rapid updates
+function debouncedUpdateDashboard() {
+    if (updateDashboardTimeout) {
+        clearTimeout(updateDashboardTimeout);
+    }
+    updateDashboardTimeout = setTimeout(() => {
+        if (!isUpdatingDashboard) {
+            isUpdatingDashboard = true;
+            updateDashboard();
+            isUpdatingDashboard = false;
+        }
+    }, 50); // 50ms debounce
+}
 
 export function initDashboard(appState) {
     state = appState;
@@ -14,7 +30,6 @@ export function initDashboard(appState) {
     // Check for product filter from Improvements page
     const dashboardProductFilter = localStorage.getItem('dashboardProductFilter');
     if (dashboardProductFilter) {
-        console.log('Dashboard: Applying product filter from Improvements page:', dashboardProductFilter);
         // Clear the localStorage flag so it doesn't persist
         localStorage.removeItem('dashboardProductFilter');
         
@@ -34,14 +49,8 @@ export function initDashboard(appState) {
                     if (matchingOption) {
                         productFilter.value = matchingOption.value;
                     }
-                } else {
-                    console.log('Dashboard: Product filter not in select options, using direct state filter:', dashboardProductFilter);
-                    // The state filter will handle it via keyword matching
                 }
             }
-            
-            // Update dashboard to apply the filter
-            updateDashboard();
         }, 300);
     }
     
@@ -57,10 +66,9 @@ export function initDashboard(appState) {
     // Setup modal close handlers
     setupModalHandlers();
     
-    // Subscribe to state changes to update dashboard automatically
+    // Subscribe to state changes to update dashboard automatically (debounced)
     state.subscribe((updatedState) => {
-        console.log('Dashboard: State changed, updating dashboard...');
-        updateDashboard();
+        debouncedUpdateDashboard();
     });
     
     // Posts are loaded by app.js, so we just update the dashboard
@@ -70,9 +78,15 @@ export function initDashboard(appState) {
 
 function initializeDefaultDateRange() {
     if (!state) {
-        console.warn('initializeDefaultDateRange: state not initialized yet');
         return;
     }
+    
+    // Temporarily disable notifications to avoid multiple updates
+    const originalNotify = state.notifyListeners;
+    let shouldNotify = false;
+    state.notifyListeners = () => {
+        shouldNotify = true;
+    };
     
     // Check both state filters and HTML inputs
     const hasDateFromState = state.filters?.dateFrom && state.filters.dateFrom !== '';
@@ -81,17 +95,6 @@ function initializeDefaultDateRange() {
     const dateToInput = document.getElementById('dateTo');
     const hasDateFromInput = dateFromInput && dateFromInput.value !== '';
     const hasDateToInput = dateToInput && dateToInput.value !== '';
-    
-    console.log('initializeDefaultDateRange: Checking dates', {
-        hasDateFromState,
-        hasDateToState,
-        hasDateFromInput,
-        hasDateToInput,
-        stateDateFrom: state.filters?.dateFrom,
-        stateDateTo: state.filters?.dateTo,
-        inputDateFrom: dateFromInput?.value,
-        inputDateTo: dateToInput?.value
-    });
     
     // If dates are set in inputs but not in state, sync them
     // But if they filter all posts, clear them
@@ -107,7 +110,6 @@ function initializeDefaultDateRange() {
         state.applyFilters();
         
         if (state.filteredPosts.length === 0 && state.posts.length > 0) {
-            console.warn('initializeDefaultDateRange: Dates in inputs filter all posts, clearing them');
             // Clear both inputs and state
             if (dateFromInput) dateFromInput.value = '';
             if (dateToInput) dateToInput.value = '';
@@ -119,13 +121,13 @@ function initializeDefaultDateRange() {
             state.filters.dateTo = '';
             state.applyFilters();
         } else {
-            // Dates are valid, sync state with inputs
-            state.setFilter('dateFrom', inputDateFrom);
-            state.setFilter('dateTo', inputDateTo);
+            // Dates are valid, sync state with inputs (without triggering notifications)
+            state.filters.dateFrom = inputDateFrom;
+            state.filters.dateTo = inputDateTo;
+            state.applyFilters();
         }
     } else if (!hasDateFromState && !hasDateToState) {
         // No dates set anywhere - set default date range to last 12 months to align with timeline
-        console.log('initializeDefaultDateRange: No date filters set - setting default to last 12 months');
         const now = new Date();
         const twelveMonthsAgo = new Date();
         twelveMonthsAgo.setMonth(now.getMonth() - 12);
@@ -141,17 +143,22 @@ function initializeDefaultDateRange() {
         if (globalDateFrom) globalDateFrom.value = dateFromStr;
         if (globalDateTo) globalDateTo.value = dateToStr;
         
-        // Set in state
-        state.setFilter('dateFrom', dateFromStr);
-        state.setFilter('dateTo', dateToStr);
+        // Set in state (without triggering notifications)
+        state.filters.dateFrom = dateFromStr;
+        state.filters.dateTo = dateToStr;
+        state.applyFilters();
         updateDefaultDateRangeIndicator();
-        console.log('initializeDefaultDateRange: Default date range set (last 12 months). Filtered posts:', state.filteredPosts?.length || 0);
     } else {
         // Dates are in state but not in inputs - sync inputs
         if (hasDateFromState && dateFromInput) dateFromInput.value = state.filters.dateFrom;
         if (hasDateToState && dateToInput) dateToInput.value = state.filters.dateTo;
         state.applyFilters();
-        console.log('initializeDefaultDateRange: Dates from state applied. Filtered posts:', state.filteredPosts?.length || 0);
+    }
+    
+    // Restore notifications and trigger a single update if needed
+    state.notifyListeners = originalNotify;
+    if (shouldNotify) {
+        debouncedUpdateDashboard();
     }
 }
 
@@ -600,12 +607,9 @@ function filterValidPosts(posts) {
 
 async function loadDashboardData() {
     try {
-        console.log('Loading dashboard data...');
         const posts = await api.getPosts(1000, 0);
-        console.log('Posts loaded:', posts?.length || 0, 'posts');
         
         if (!posts || posts.length === 0) {
-            console.warn('No posts found in database');
             // Show empty state message
             const postsList = document.getElementById('postsList');
             if (postsList) {
@@ -616,13 +620,10 @@ async function loadDashboardData() {
         
         // Filter valid posts (exclude samples and relevance_score = 0) to match data collection page
         const validPosts = filterValidPosts(posts);
-        console.log('Valid posts (after filtering samples and relevance_score=0):', validPosts?.length || 0, 'posts');
         
         // Load posts first - don't apply date filter on initial load
         // The default 12 months filter will only be applied when clicking "Clear Filter"
         state.setPosts(validPosts);
-        console.log('Posts set in state. Filtered posts:', state.filteredPosts?.length || 0);
-        updateDashboard();
     } catch (error) {
         console.error('Failed to load dashboard data:', error);
         // Show error message
@@ -634,16 +635,10 @@ async function loadDashboardData() {
 }
 
 export function updateDashboard() {
-    console.log('Updating dashboard...');
-    console.log('State:', state ? 'initialized' : 'NOT initialized');
-    console.log('Total posts:', state?.posts?.length || 0);
-    console.log('State filtered posts:', state?.filteredPosts?.length || 0);
     if (!state) {
-        console.error('State is not initialized');
         return;
     }
     if (!state.posts || state.posts.length === 0) {
-        console.warn('No posts in state, trying to load...');
         // Try to load posts if state is empty
         loadDashboardData().then(() => {
             // After loading, update again
@@ -734,7 +729,6 @@ function updateProductDistribution() {
     const posts = state.filteredPosts || [];
     const productCounts = {};
     
-    console.log('updateProductDistribution: Processing posts', { totalPosts: posts.length });
     
     // List of language codes to exclude from product distribution
     const languageCodes = ['FR', 'EN', 'ES', 'DE', 'IT', 'PT', 'NL', 'PL', 'RU', 'ZH', 'JA', 'KO', 'AR', 'HI', 'TR', 'SV', 'DA', 'FI', 'NO', 'CS', 'HU', 'RO', 'BG', 'HR', 'SK', 'SL', 'ET', 'LV', 'LT', 'MT', 'EL', 'UK', 'BE', 'GA', 'CY', 'LU', 'UNKNOWN'];
@@ -748,7 +742,6 @@ function updateProductDistribution() {
         }
     });
     
-    console.log('updateProductDistribution: Products detected', { productCounts, totalProducts: Object.keys(productCounts).length });
     
     // Sort by count
     const allProducts = Object.entries(productCounts)
