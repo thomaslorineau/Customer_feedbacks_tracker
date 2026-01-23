@@ -198,10 +198,13 @@ async function loadPainPoints() {
                     // Only include pain points that have matching posts
                     if (matchingPosts.length === 0) return null;
                     
+                    // Sort by opportunity score (descending) for better ordering
+                    matchingPosts.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
+                    
                     return {
                         ...pp,
                         posts_count: matchingPosts.length,
-                        posts: matchingPosts.slice(0, 3) // Store sample posts for drawer
+                        posts: matchingPosts // Store ALL matching posts for drawer (not just 3)
                     };
                 }).filter(pp => pp !== null && pp.posts_count > 0);
                 
@@ -719,7 +722,7 @@ async function loadImprovementsAnalysis() {
             });
         }
         
-        // Get total posts count (filtered if product filter is active)
+        // Get posts for analysis (filtered if product filter is active)
         const postsParams = new URLSearchParams({ limit: '1000', date_from: dateFrom });
         if (currentProductFilter) {
             postsParams.append('search', currentProductFilter);
@@ -728,25 +731,37 @@ async function loadImprovementsAnalysis() {
         let postsData = { total: 0, posts: [] };
         if (postsResponse.ok) {
             postsData = await postsResponse.json();
-            // If filtering by product, count only posts matching that product
+            // If filtering by product, filter posts to only those matching the product
             if (currentProductFilter && postsData.posts) {
                 const { getProductLabel } = await import('/dashboard/js/product-detection.js');
                 const matchingPosts = postsData.posts.filter(post => {
                     const productLabel = getProductLabel(post.id, post.content, post.language);
                     return productLabel === currentProductFilter;
                 });
+                postsData.posts = matchingPosts;
                 postsData.total = matchingPosts.length;
             }
         }
         
-        // Call LLM analysis endpoint
+        // Get analysis focus from localStorage
+        const analysisFocus = localStorage.getItem('analysisFocus') || '';
+        
+        // Get date_to (today)
+        const dateTo = new Date().toISOString().split('T')[0];
+        
+        // Call LLM analysis endpoint with posts and filters
         const analysisResponse = await fetch('/api/improvements-analysis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 pain_points: filteredPainPoints,
                 products: filteredProducts,
-                total_posts: postsData.total || 0
+                total_posts: postsData.total || 0,
+                posts: (postsData.posts || []).slice(0, 100), // Send up to 100 posts for analysis
+                analysis_focus: analysisFocus,
+                date_from: dateFrom,
+                date_to: dateTo,
+                product_filter: currentProductFilter || null
             })
         });
         
@@ -1064,7 +1079,23 @@ window.openPainPointDrawer = function(painPointTitle, painPointIndex) {
         return;
     }
     
-    // Get keywords for this pain point
+    // If pain point already has filtered posts (from product filter), use them directly
+    // This ensures we show exactly the posts that match the product filter
+    if (painPoint.posts && painPoint.posts.length > 0 && currentProductFilter) {
+        // Use the already filtered posts from the pain point
+        // These posts are already filtered by product AND keywords
+        openPainPointDrawerContent(painPointTitle, painPoint.description, painPoint.posts, painPoint);
+        return;
+    }
+    
+    // Also check if we have posts_count but no posts array - in this case we need to reload
+    // This handles the case where pain points were loaded without product filter initially
+    if (painPoint.posts_count > 0 && (!painPoint.posts || painPoint.posts.length === 0) && currentProductFilter) {
+        // We need to reload with product filter
+        // Fall through to loadPainPointPosts
+    }
+    
+    // Otherwise, load posts from API and filter
     const keywords = PAIN_POINT_KEYWORDS[painPointTitle] || [];
     if (keywords.length === 0) {
         console.warn('No keywords found for pain point:', painPointTitle);
@@ -1080,6 +1111,9 @@ async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
         // Get date filter
         const dateFrom = getDateFrom(currentPeriodDays);
         
+        // Import product detection function early
+        const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+        
         // Build API URL with filters
         const params = new URLSearchParams({
             limit: '1000',
@@ -1087,12 +1121,7 @@ async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
             date_from: dateFrom
         });
         
-        // Add product filter if active
-        if (currentProductFilter) {
-            params.append('search', currentProductFilter);
-        }
-        
-        // Fetch posts with date and product filters
+        // Fetch posts with date filter (don't use search filter, we'll filter by product label instead for accuracy)
         const response = await fetch(`/api/posts-for-improvement?${params.toString()}`);
         if (!response.ok) {
             throw new Error(`Failed to load posts: ${response.status}`);
@@ -1101,17 +1130,15 @@ async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
         const data = await response.json();
         let allPosts = data.posts || [];
         
-        // If product filter is active, also filter by product label to ensure accuracy
+        // If product filter is active, filter by product label FIRST (before keyword filtering)
         if (currentProductFilter) {
-            // Import product detection function
-            const { getProductLabel } = await import('/dashboard/js/product-detection.js');
             allPosts = allPosts.filter(post => {
                 const productLabel = getProductLabel(post.id, post.content, post.language);
                 return productLabel === currentProductFilter;
             });
         }
         
-        // Filter posts by keywords (case-insensitive)
+        // Then filter posts by keywords (case-insensitive)
         const filteredPosts = allPosts.filter(post => {
             const content = (post.content || '').toLowerCase();
             return keywords.some(keyword => content.includes(keyword.toLowerCase()));

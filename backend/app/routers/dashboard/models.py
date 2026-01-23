@@ -112,6 +112,11 @@ class ImprovementsAnalysisRequest(BaseModel):
     pain_points: List[PainPoint] = Field(default=[], description="List of pain points to analyze")
     products: List[ProductOpportunity] = Field(default=[], description="List of products with opportunity scores")
     total_posts: int = Field(default=0, description="Total number of posts analyzed")
+    posts: List[dict] = Field(default=[], description="Sample posts to analyze for concrete insights")
+    analysis_focus: Optional[str] = Field(None, description="Focus area for analysis")
+    date_from: Optional[str] = Field(None, description="Start date filter")
+    date_to: Optional[str] = Field(None, description="End date filter")
+    product_filter: Optional[str] = Field(None, description="Active product filter")
 
 
 class ImprovementsAnalysisResponse(BaseModel):
