@@ -186,6 +186,8 @@ export async function updateWhatsHappening(state) {
         }
     } catch (error) {
         console.warn('Failed to get LLM insights:', error);
+        // Mark analysis as completed even on error so overlay hides
+        analysisCompleted = true;
         // Refresh button is always visible - no need to show/hide it
         // Show error message with retry option instead of fallback
         const content = document.getElementById('whatsHappeningContent');
@@ -226,22 +228,19 @@ export async function updateWhatsHappening(state) {
             });
         }
     } finally {
-        // Always hide overlay when analysis is complete
+        // Always hide overlay when analysis is complete (or failed)
         clearTimeout(overlayTimeout);
-        if (overlay && analysisCompleted) {
-            // Small delay to ensure smooth transition
+        console.log('[whats-happening.js] Hiding overlay, analysisCompleted:', analysisCompleted);
+        if (overlay) {
+            // Always hide overlay, regardless of completion status
             setTimeout(() => {
                 if (overlay) {
-                    overlay.style.display = 'none';
+                    overlay.style.setProperty('display', 'none', 'important');
+                    overlay.style.setProperty('visibility', 'hidden', 'important');
+                    overlay.style.setProperty('opacity', '0', 'important');
+                    console.log('[whats-happening.js] Overlay hidden');
                 }
-            }, 300);
-        } else if (overlay && !analysisCompleted) {
-            // If analysis didn't complete, keep overlay visible for a bit longer
-            setTimeout(() => {
-                if (overlay) {
-                    overlay.style.display = 'none';
-                }
-            }, 1000);
+            }, analysisCompleted ? 300 : 500);
         }
         // Refresh button is always visible - no need to show/hide it
     }
