@@ -465,6 +465,18 @@ function renderScrapersAPIKeys() {
             fields: [
                 { name: 'TWITTER_BEARER_TOKEN', label: 'Bearer Token' }
             ]
+        },
+        { 
+            id: 'discord', 
+            name: 'Discord', 
+            icon: '💬',
+            description: 'Scrape Discord messages from OVH server (requires bot token and guild ID)',
+            docsUrl: 'https://discord.com/developers/docs/getting-started',
+            requiresAuth: true,
+            fields: [
+                { name: 'DISCORD_BOT_TOKEN', label: 'Bot Token' },
+                { name: 'DISCORD_GUILD_ID', label: 'Guild (Server) ID' }
+            ]
         }
     ];
     

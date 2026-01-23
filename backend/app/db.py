@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Single shared connection for DuckDB (DuckDB doesn't support multiple concurrent connections well)
 _shared_connection: Optional[Any] = None
 _connection_lock = Lock()
+_connection_refcount = 0  # Track how many operations are using the connection
 
 
 def get_db_connection() -> Tuple[Any, bool]:
@@ -43,12 +44,14 @@ def get_db_connection() -> Tuple[Any, bool]:
     
     global _shared_connection
     
+    global _connection_refcount
     with _connection_lock:
         try:
             # Check if shared connection exists and is valid
             if _shared_connection is not None:
                 try:
                     _shared_connection.execute("SELECT 1")
+                    _connection_refcount += 1
                     return _shared_connection, True
                 except Exception:
                     # Connection is invalid, close it and create new one
@@ -57,9 +60,11 @@ def get_db_connection() -> Tuple[Any, bool]:
                     except Exception:
                         pass
                     _shared_connection = None
+                    _connection_refcount = 0
             
             # Create new connection
             _shared_connection = duckdb.connect(str(DB_FILE))
+            _connection_refcount = 1
             return _shared_connection, True
         except Exception as e:
             error_str = str(e)
@@ -75,18 +80,20 @@ def get_db_connection() -> Tuple[Any, bool]:
                     except Exception:
                         pass
                     _shared_connection = None
-                # Try multiple times with increasing delays
-                for attempt in range(3):
-                    wait_time = 0.2 * (attempt + 1)  # 0.2s, 0.4s, 0.6s
+                    _connection_refcount = 0
+                # Try multiple times with increasing delays (longer waits for file locks)
+                for attempt in range(5):
+                    wait_time = 0.5 * (attempt + 1)  # 0.5s, 1.0s, 1.5s, 2.0s, 2.5s
                     time.sleep(wait_time)
                     try:
                         _shared_connection = duckdb.connect(str(DB_FILE))
+                        _connection_refcount = 1
                         logger.info(f"Successfully connected after {attempt + 1} retry(ies)")
                         return _shared_connection, True
                     except Exception as retry_error:
-                        if attempt == 2:  # Last attempt
+                        if attempt == 4:  # Last attempt
                             logger.error(f"All retry attempts failed: {retry_error}")
-                            raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE} after 3 attempts: {retry_error}")
+                            raise RuntimeError(f"Failed to connect to DuckDB database at {DB_FILE} after 5 attempts: {retry_error}")
                         logger.warning(f"Retry {attempt + 1} failed, waiting {wait_time}s...")
             # Check if it's a serialization/corruption error
             elif "Serialization" in error_str or "corrupt" in error_str.lower() or "Failed to deserialize" in error_str:
@@ -108,16 +115,33 @@ def get_db_connection() -> Tuple[Any, bool]:
 
 
 def _return_connection_to_pool(conn: Any) -> None:
-    """No-op for shared connection - connection stays open."""
+    """Return connection to pool. For shared connection, we don't close it."""
+    global _connection_refcount
+    # Decrement refcount (lock already held by caller)
+    _connection_refcount = max(0, _connection_refcount - 1)
     # With shared connection, we don't close it after each use
     # It will be reused for the next operation
     pass
+
+
+def close_shared_connection() -> None:
+    """Explicitly close the shared connection. Use with caution."""
+    global _shared_connection, _connection_refcount
+    with _connection_lock:
+        if _shared_connection is not None:
+            try:
+                _shared_connection.close()
+            except Exception:
+                pass
+            _shared_connection = None
+            _connection_refcount = 0
 
 
 @contextmanager
 def get_db() -> Generator[Any, None, None]:
     """
     Context manager for database connections with automatic commit/rollback.
+    The lock is already handled inside get_db_connection().
     
     Usage:
         with get_db() as conn:

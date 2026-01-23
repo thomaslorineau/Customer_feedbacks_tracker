@@ -51,6 +51,8 @@ class Config(BaseSettings):
     twitter_bearer_token: Optional[str] = Field(default=None, description="Twitter bearer token")
     twitter_api_key: Optional[str] = Field(default=None, description="Twitter API key")
     twitter_api_secret: Optional[str] = Field(default=None, description="Twitter API secret")
+    discord_bot_token: Optional[str] = Field(default=None, description="Discord bot token")
+    discord_guild_id: Optional[str] = Field(default=None, description="Discord guild (server) ID")
     
     # Rate limiting
     rate_limit_requests: int = Field(default=100, description="Rate limit requests per window")
@@ -159,6 +161,10 @@ class Config(BaseSettings):
     def _TWITTER_API_SECRET(self) -> Optional[str]:
         return self.twitter_api_secret
     
+    @property
+    def _DISCORD_BOT_TOKEN(self) -> Optional[str]:
+        return self.discord_bot_token
+    
     def get_api_key(self, provider: str) -> Optional[str]:
         """
         Get API key for a specific provider.
@@ -167,7 +173,7 @@ class Config(BaseSettings):
         Never log or expose the returned value.
         
         Args:
-            provider: Provider name (openai, anthropic, google, trustpilot, github, linkedin_client_id, linkedin_client_secret, twitter_bearer, twitter_api_key, twitter_api_secret)
+            provider: Provider name (openai, anthropic, google, trustpilot, github, linkedin_client_id, linkedin_client_secret, twitter_bearer, twitter_api_key, twitter_api_secret, discord)
             
         Returns:
             API key if configured, None otherwise
@@ -186,6 +192,8 @@ class Config(BaseSettings):
             "twitter_bearer_token": self._TWITTER_BEARER_TOKEN,
             "twitter_api_key": self._TWITTER_API_KEY,
             "twitter_api_secret": self._TWITTER_API_SECRET,
+            "discord": self._DISCORD_BOT_TOKEN,
+            "discord_bot_token": self._DISCORD_BOT_TOKEN,
         }
         
         key = key_map.get(provider)
@@ -275,6 +283,8 @@ class Config(BaseSettings):
             "twitter_bearer_token": lambda k: len(k) > 20,
             "twitter_api_key": lambda k: len(k) > 10,
             "twitter_api_secret": lambda k: len(k) > 10,
+            "discord": lambda k: len(k) > 50,  # Discord bot tokens are typically long
+            "discord_bot_token": lambda k: len(k) > 50,
         }
         
         validator = format_rules.get(provider.lower())
@@ -338,6 +348,7 @@ class Config(BaseSettings):
             ("linkedin_client_id", "LinkedIn Client ID"),
             ("linkedin_client_secret", "LinkedIn Client Secret"),
             ("twitter_bearer", "Twitter Bearer Token"),
+            ("discord", "Discord Bot Token"),
         ]
         for provider_key, provider_name in third_party_providers:
             key = self.get_api_key(provider_key)

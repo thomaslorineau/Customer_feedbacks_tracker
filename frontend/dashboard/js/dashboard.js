@@ -1710,22 +1710,44 @@ async function pollJobStatus(jobId) {
     const progressText = document.getElementById('scrapingProgressText');
     const progressContainer = document.getElementById('scrapingProgressContainer');
     
+    // Verify elements exist
+    if (!progressBar) console.error('[Progress] progressBar element not found!');
+    if (!progressText) console.error('[Progress] progressText element not found!');
+    if (!progressContainer) console.error('[Progress] progressContainer element not found!');
+    
+    // Track last progress to detect stuck jobs
+    let lastProgress = { completed: 0, total: 0, timestamp: Date.now() };
+    const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+    
     jobStatusInterval = setInterval(async () => {
         try {
             let job;
             try {
                 job = await api.getJobStatus(jobId);
             } catch (error) {
-                // If job doesn't exist (404), stop polling
-                if (error.status === 404 || (error.message && error.message.includes('404'))) {
-                    console.warn(`Job ${jobId.substring(0, 8)}... not found (404), stopping polling`);
+                // If job doesn't exist (404) or is gone (410), stop polling
+                if (error.status === 404 || error.status === 410 || 
+                    (error.message && (error.message.includes('404') || error.message.includes('410')))) {
+                    const statusCode = error.status || (error.message.includes('410') ? 410 : 404);
+                    console.warn(`Job ${jobId.substring(0, 8)}... not found (${statusCode}), stopping polling`);
                     clearInterval(jobStatusInterval);
                     jobStatusInterval = null;
                     currentJobId = null;
                     persistLastJob(null); // Clear persisted job
                     const progressContainer = document.getElementById('scrapingProgressContainer');
                     if (progressContainer) {
-                        progressContainer.style.display = 'none';
+                        if (statusCode === 410) {
+                            if (progressText) {
+                                progressText.textContent = '⚠️ Job was permanently removed. Please refresh the page.';
+                            }
+                            setTimeout(() => {
+                                if (progressContainer) {
+                                    progressContainer.style.display = 'none';
+                                }
+                            }, 5000);
+                        } else {
+                            progressContainer.style.display = 'none';
+                        }
                     }
                     showCancelButton(false);
                     return;
@@ -1737,47 +1759,129 @@ async function pollJobStatus(jobId) {
             
             // If job is undefined (error was caught), skip processing
             if (!job) {
+                console.warn('[Progress] Job data is undefined');
                 return;
+            }
+            
+            // Log raw job data for debugging (only first time or when status changes)
+            if (!window._lastJobStatus || window._lastJobStatus !== job.status) {
+                console.log('[Progress] Raw job data received:', JSON.stringify(job, null, 2));
+                window._lastJobStatus = job.status;
             }
             
             const status = job.status || 'unknown';
             const progress = job.progress || { total: 0, completed: 0 };
-            const completed = progress.completed || 0;
-            const total = progress.total || 0;
+            const completed = Number(progress.completed) || 0;
+            const total = Number(progress.total) || 0;
             
-            // Debug logs
-            console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total}`);
+            // Log parsed values every time to track changes
+            console.log(`[Progress] Parsed: status=${status}, completed=${completed}, total=${total}, progress object:`, progress);
+            
+            // Detect stuck jobs: if status is running but progress hasn't changed in 5 minutes
+            if (status === 'running' && total > 0) {
+                const currentProgress = { completed, total, timestamp: Date.now() };
+                const progressChanged = currentProgress.completed !== lastProgress.completed || 
+                                      currentProgress.total !== lastProgress.total;
+                
+                if (!progressChanged) {
+                    const timeSinceLastProgress = Date.now() - lastProgress.timestamp;
+                    if (timeSinceLastProgress > STUCK_THRESHOLD_MS) {
+                        console.warn(`Job ${jobId.substring(0, 8)} appears stuck: no progress for ${Math.round(timeSinceLastProgress / 1000 / 60)} minutes`);
+                        if (progressText) {
+                            progressText.textContent = `⚠️ Job appears stuck (no progress for ${Math.round(timeSinceLastProgress / 1000 / 60)} min). Click Cancel to stop.`;
+                        }
+                        // Show cancel button if hidden
+                        showCancelButton(true);
+                    }
+                } else {
+                    // Progress changed, reset tracking
+                    lastProgress = currentProgress;
+                }
+            } else if (status === 'running') {
+                // Reset tracking when status changes
+                lastProgress = { completed, total, timestamp: Date.now() };
+            }
+            
+            // Debug logs - always log to help diagnose issues
+            console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${total > 0 ? Math.round((completed/total)*100) : 0}%)`);
+            
+            // Force update if we have valid progress data
+            if (status === 'running' && total > 0 && completed >= 0) {
+                console.log(`[Progress] Updating UI: ${completed}/${total} = ${Math.round((completed/total)*100)}%`);
+            }
             
             // Always update progress bar if we have progress data (even if total is 0 initially)
-            if (progressBar) {
-                if (total > 0) {
-                    const percentage = Math.round((completed / total) * 100);
-                    progressBar.style.width = `${percentage}%`;
+            if (progressBar && progressContainer) {
+                // Ensure container is visible
+                if (progressContainer.style.display === 'none') {
+                    progressContainer.style.display = 'block';
+                    console.log('[Progress] Made progress container visible');
+                }
+                
+                if (total > 0 && completed >= 0) {
+                    const percentage = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+                    console.log(`[Progress] ✅ Updating progress bar: ${completed}/${total} = ${percentage}%`);
+                    
+                    // Update progress bar width - use !important to override any CSS
+                    progressBar.style.setProperty('width', `${percentage}%`, 'important');
                     progressBar.setAttribute('aria-valuenow', percentage);
                     
-                    // Update container attributes
-                    if (progressContainer) {
-                        progressContainer.setAttribute('data-percentage', `${percentage}%`);
-                        progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
+                    // Ensure the bar is visible
+                    progressBar.style.setProperty('display', 'block', 'important');
+                    progressBar.style.setProperty('visibility', 'visible', 'important');
+                    progressBar.style.setProperty('opacity', '1', 'important');
+                    progressBar.style.setProperty('height', '100%', 'important');
+                    
+                    // Force a repaint by reading the style
+                    void progressBar.offsetWidth;
+                    
+                    // Verify the update worked
+                    const actualWidth = progressBar.style.width;
+                    const computedWidth = window.getComputedStyle(progressBar).width;
+                    const computedDisplay = window.getComputedStyle(progressBar).display;
+                    console.log(`[Progress] Progress bar - style: ${actualWidth}, computed: ${computedWidth}, display: ${computedDisplay}`);
+                    
+                    // Also check parent container
+                    const parent = progressBar.parentElement;
+                    if (parent) {
+                        const parentWidth = window.getComputedStyle(parent).width;
+                        const parentDisplay = window.getComputedStyle(parent).display;
+                        console.log(`[Progress] Parent container - width: ${parentWidth}, display: ${parentDisplay}`);
                     }
+                    
+                    // Update container attributes
+                    progressContainer.setAttribute('data-percentage', `${percentage}%`);
+                    progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
                 } else if (status === 'running' || status === 'pending') {
                     // Show indeterminate progress when job is running but total not yet calculated
-                    progressBar.style.width = '10%';
+                    console.log(`[Progress] ⏳ Showing indeterminate progress (total=${total}, status=${status})`);
+                    progressBar.style.setProperty('width', '10%', 'important');
                     progressBar.setAttribute('aria-valuenow', 0);
-                    if (progressContainer) {
-                        progressContainer.setAttribute('data-percentage', '...');
-                        progressContainer.setAttribute('data-status', 'running');
-                    }
+                    progressBar.style.setProperty('display', 'block', 'important');
+                    progressContainer.setAttribute('data-percentage', '...');
+                    progressContainer.setAttribute('data-status', 'running');
+                } else {
+                    console.log(`[Progress] ⚠️ No progress update: total=${total}, completed=${completed}, status=${status}`);
                 }
+            } else {
+                if (!progressBar) console.error('[Progress] ❌ progressBar element not found!');
+                if (!progressContainer) console.error('[Progress] ❌ progressContainer element not found!');
             }
             
             // Update progress text
             if (progressText) {
-                if (total > 0) {
+                if (status === 'pending') {
+                    // Job is pending - show that it's starting
+                    if (total > 0) {
+                        progressText.textContent = `Starting scraping job... ${total} tasks queued`;
+                    } else {
+                        progressText.textContent = 'Initializing scraping job...';
+                    }
+                } else if (total > 0) {
                     const percentage = Math.round((completed / total) * 100);
                     progressText.textContent = `Scraping in progress: ${completed}/${total} tasks completed (${percentage}%)`;
-                } else if (status === 'running' || status === 'pending') {
-                    progressText.textContent = 'Scraping job initialized... Calculating tasks...';
+                } else if (status === 'running') {
+                    progressText.textContent = 'Scraping job running... Calculating tasks...';
                 } else {
                     progressText.textContent = 'Scraping job initialized...';
                 }

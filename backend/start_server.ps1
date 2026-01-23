@@ -8,6 +8,10 @@ Write-Host ""
 Get-Process python* -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 
+# Changer vers le répertoire backend
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $scriptPath
+
 # Démarrer le serveur
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 

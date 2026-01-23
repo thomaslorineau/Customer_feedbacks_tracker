@@ -68,6 +68,7 @@ const HELP_MENU_CONTENT = `
     <li><strong>Mastodon:</strong> Posts via Mastodon API</li>
     <li><strong>G2 Crowd:</strong> Software reviews via HTML scraping</li>
     <li><strong>LinkedIn:</strong> Public posts via API (requires API key)</li>
+    <li><strong>Discord:</strong> Messages from Discord servers via Discord API (requires bot token)</li>
 </ul>
 
 <!-- Keywords System -->
@@ -122,6 +123,7 @@ const HELP_MENU_CONTENT = `
     <li><strong>GitHub API Key:</strong> Required for GitHub issues and discussions</li>
     <li><strong>Trustpilot API Key:</strong> Required for Trustpilot reviews</li>
     <li><strong>Twitter Bearer Token:</strong> Optional, for Twitter API v2 (otherwise uses Nitter)</li>
+    <li><strong>Discord Bot Token:</strong> Required for Discord scraping (requires bot token and guild ID)</li>
 </ul>
 
 <h4>📧 Email Notifications</h4>

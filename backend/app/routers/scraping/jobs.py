@@ -9,7 +9,7 @@ import logging
 import os
 
 from ... import db
-from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin
+from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin, discord
 from ...scraper import keyword_expander
 from ...analysis import sentiment, country_detection, relevance_scorer
 from ...config import keywords_base
@@ -41,6 +41,7 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
             'news': lambda q, l: news.scrape_google_news_async(q, limit=l),
             'mastodon': lambda q, l: mastodon.scrape_mastodon_async(q, limit=l),
             'linkedin': lambda q, l: linkedin.scrape_linkedin_async(q, limit=l),
+            'discord': lambda q, l: discord.scrape_discord_async(q, limit=l),
         }
         sync_mapper = {
             'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
@@ -277,11 +278,21 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
     job = JOBS.get(job_id)
     if job is None:
         return
+    
+    # Update status to running immediately
     job['status'] = 'running'
     try:
         db.create_job_record(job_id)
-    except Exception:
-        pass
+        # Update status in DB immediately - use finalize_job but without error
+        import datetime
+        with db.get_db() as conn:
+            c = conn.cursor()
+            now = datetime.datetime.utcnow().isoformat()
+            c.execute('UPDATE jobs SET status = ?, updated_at = ? WHERE job_id = ?', ('running', now, job_id))
+            # commit is automatic with context manager
+    except Exception as e:
+        logger.warning(f"Failed to update job status to running: {e}")
+    
     sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
     total_tasks = len(keywords) * len(sources)
     job['progress'] = {'total': total_tasks, 'completed': 0}
@@ -358,10 +369,14 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
                 
                 # Always update progress, even if it's 0 (to show the job is alive)
                 job['progress']['completed'] = min(estimated_progress, total_tasks)
+                job['progress']['total'] = total_tasks  # Ensure total is always set
                 try:
                     db.update_job_progress(job_id, total_tasks, job['progress']['completed'])
-                except Exception:
-                    pass
+                    # Log progress updates periodically for debugging
+                    if completed_count % max(1, total_tasks // 20) == 0 or completed_count == 1:
+                        logger.info(f"Job {job_id[:8]}: Progress updated to {job['progress']['completed']}/{total_tasks} (DB synced)")
+                except Exception as e:
+                    logger.warning(f"Failed to update job progress in DB: {e}")
                 
                 # Log progress every 10% or every 10 tasks
                 if completed_count > 0 and completed_count % max(1, total_tasks // 10) == 0:
@@ -459,22 +474,39 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
 
 def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurrency: int, delay: float):
     """Synchronous wrapper that runs async job processing."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            def run_async():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    new_loop.run_until_complete(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
-                finally:
-                    new_loop.close()
-            thread = threading.Thread(target=run_async, daemon=True)
-            thread.start()
-        else:
-            loop.run_until_complete(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
-    except RuntimeError:
-        asyncio.run(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
+    def run_async():
+        """Run async job in a completely isolated event loop."""
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        try:
+            new_loop.run_until_complete(_process_keyword_job_async(job_id, keywords, limit, concurrency, delay))
+        except Exception as e:
+            logger.error(f"Error in keyword job thread {job_id[:8]}: {e}", exc_info=True)
+            # Update job status to failed
+            try:
+                job = JOBS.get(job_id)
+                if job:
+                    job['status'] = 'failed'
+                    job['error'] = str(e)
+                    db.append_job_error(job_id, str(e))
+                    db.finalize_job(job_id, 'failed', str(e))
+            except Exception:
+                pass
+        finally:
+            try:
+                # Cancel all pending tasks
+                pending = asyncio.all_tasks(new_loop)
+                for task in pending:
+                    task.cancel()
+                # Wait for cancellation
+                if pending:
+                    new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            new_loop.close()
+    
+    thread = threading.Thread(target=run_async, daemon=True)
+    thread.start()
 
 
 async def _process_single_source_job_async(job_id: str, source: str, query: str, limit: int):
@@ -683,22 +715,39 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
 
 def _process_single_source_job(job_id: str, source: str, query: str, limit: int):
     """Wrapper to run async job processing in a thread."""
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            def run_in_new_loop():
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                try:
-                    new_loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
-                finally:
-                    new_loop.close()
-            t = threading.Thread(target=run_in_new_loop, daemon=True)
-            t.start()
-        else:
-            loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
-    except RuntimeError:
-        asyncio.run(_process_single_source_job_async(job_id, source, query, limit))
+    def run_in_new_loop():
+        """Run async job in a completely isolated event loop."""
+        new_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(new_loop)
+        try:
+            new_loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
+        except Exception as e:
+            logger.error(f"Error in single source job thread {job_id[:8]}: {e}", exc_info=True)
+            # Update job status to failed
+            try:
+                job = JOBS.get(job_id)
+                if job:
+                    job['status'] = 'failed'
+                    job['error'] = str(e)
+                    db.append_job_error(job_id, str(e))
+                    db.finalize_job(job_id, 'failed', str(e))
+            except Exception:
+                pass
+        finally:
+            try:
+                # Cancel all pending tasks
+                pending = asyncio.all_tasks(new_loop)
+                for task in pending:
+                    task.cancel()
+                # Wait for cancellation
+                if pending:
+                    new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            except Exception:
+                pass
+            new_loop.close()
+    
+    t = threading.Thread(target=run_in_new_loop, daemon=True)
+    t.start()
 
 
 @router.post('/scrape/{source}/job')
@@ -816,16 +865,28 @@ async def get_job_status(job_id: str):
         try:
             db_job = db.get_job_record(job_id)
             if db_job:
+                # Always sync progress from DB for running jobs (DB is source of truth for progress)
+                if db_job.get('progress'):
+                    job['progress'] = db_job['progress']
+                    logger.debug(f"Synced progress from DB for job {job_id[:8]}: {db_job['progress']}")
+                
+                # Sync status for final states
                 if db_job.get('status') in ('completed', 'failed', 'cancelled'):
                     if db_job['status'] != job.get('status'):
                         job['status'] = db_job['status']
-                    if db_job.get('progress'):
-                        job['progress'] = db_job['progress']
         except Exception as e:
             logger.debug(f"Could not sync job {job_id} with DB: {e}")
         
         if 'progress' not in job:
             job['progress'] = {'total': 0, 'completed': 0}
+        
+        # Ensure progress values are integers (not None)
+        if job.get('progress'):
+            job['progress']['total'] = int(job['progress'].get('total', 0) or 0)
+            job['progress']['completed'] = int(job['progress'].get('completed', 0) or 0)
+        
+        # Log current state for debugging
+        logger.info(f"Returning job {job_id[:8]}: status={job.get('status')}, progress={job.get('progress')}")
         
         return job
     
@@ -833,9 +894,42 @@ async def get_job_status(job_id: str):
     try:
         rec = db.get_job_record(job_id)
         if rec:
-            # Ensure progress exists
+            # If job is in DB with status "running" but not in memory, it's likely stuck (server restarted)
+            # Mark it as failed after checking if it's been running for too long
+            if rec.get('status') == 'running':
+                import time
+                from datetime import datetime
+                # Check if job has been running for more than 30 minutes (likely stuck)
+                updated_at = rec.get('updated_at')
+                if updated_at:
+                    try:
+                        # Parse timestamp (format: ISO string or timestamp)
+                        if isinstance(updated_at, str):
+                            updated_dt = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                        else:
+                            updated_dt = datetime.fromtimestamp(updated_at)
+                        
+                        time_diff = (datetime.now(updated_dt.tzinfo) - updated_dt).total_seconds()
+                        # If job hasn't been updated in 30 minutes, mark as failed
+                        if time_diff > 30 * 60:  # 30 minutes
+                            logger.warning(f"Job {job_id[:8]} appears stuck (no update for {int(time_diff/60)} min), marking as failed")
+                            try:
+                                db.finalize_job(job_id, 'failed', 'Job appears stuck - no progress update for over 30 minutes')
+                                rec['status'] = 'failed'
+                                rec['error'] = 'Job appears stuck - no progress update for over 30 minutes'
+                            except Exception as e:
+                                logger.error(f"Failed to mark stuck job as failed: {e}")
+                    except Exception as e:
+                        logger.debug(f"Could not check job age: {e}")
+            
+            # Ensure progress exists and values are integers
             if 'progress' not in rec:
                 rec['progress'] = {'total': 0, 'completed': 0}
+            else:
+                rec['progress']['total'] = int(rec['progress'].get('total', 0) or 0)
+                rec['progress']['completed'] = int(rec['progress'].get('completed', 0) or 0)
+            
+            logger.info(f"Returning job {job_id[:8]} from DB: status={rec.get('status')}, progress={rec.get('progress')}")
             return rec
     except Exception as e:
         logger.debug(f"Error retrieving job {job_id} from DB: {e}")
