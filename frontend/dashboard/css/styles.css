@@ -1513,7 +1513,7 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 16px;
     /* Prevent layout shift when drawer opens */
     position: relative;
@@ -1521,6 +1521,7 @@ body {
     /* Ensure header doesn't move when drawer opens */
     width: 100%;
     box-sizing: border-box;
+    min-height: 40px; /* Fixed height to prevent movement */
 }
 
 .whats-happening-header h2 {
@@ -2451,7 +2452,7 @@ body.dark-mode .llm-analysis-overlay {
 
 /* Refresh Analysis Button */
 .btn-refresh-analysis {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
@@ -2462,29 +2463,31 @@ body.dark-mode .llm-analysis-overlay {
     cursor: pointer;
     font-size: 0.9rem;
     font-weight: 600;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
     box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 160px;
+    justify-content: center;
 }
 
 .btn-refresh-analysis:hover {
     background: var(--accent-secondary);
     box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3);
-    transform: translateY(-1px);
 }
 
 .btn-refresh-analysis:active {
-    transform: translateY(0);
     box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
 }
 
 .btn-refresh-analysis:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    transform: none;
 }
 
 .btn-refresh-analysis svg {
     animation: spin 1s linear infinite;
+    flex-shrink: 0;
 }
 
 @keyframes spin {

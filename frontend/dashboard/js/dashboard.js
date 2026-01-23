@@ -25,7 +25,15 @@ function debouncedUpdateDashboard() {
 }
 
 export function initDashboard(appState) {
+    console.log('[dashboard.js] initDashboard() called');
     state = appState;
+    
+    console.log('[dashboard.js] State:', {
+        hasPosts: !!state.posts,
+        postsCount: state.posts?.length || 0,
+        hasFilteredPosts: !!state.filteredPosts,
+        filteredPostsCount: state.filteredPosts?.length || 0
+    });
     
     // Check for product filter from Improvements page
     const dashboardProductFilter = localStorage.getItem('dashboardProductFilter');
@@ -68,8 +76,26 @@ export function initDashboard(appState) {
     
     // Subscribe to state changes to update dashboard automatically (debounced)
     state.subscribe((updatedState) => {
+        console.log('[dashboard.js] State changed, calling debouncedUpdateDashboard()');
         debouncedUpdateDashboard();
     });
+    
+    // IMPORTANT: Call updateDashboard immediately if posts are already loaded
+    // The subscription will handle future updates, but we need an initial render
+    // Add a delay on first load to ensure backend has loaded API keys from .env
+    if (state.posts && state.posts.length > 0) {
+        console.log('[dashboard.js] Posts already loaded, calling updateDashboard() after delay');
+        // Delay longer on first page load to ensure backend has loaded API keys
+        const isFirstLoad = !sessionStorage.getItem('dashboardInitialized');
+        const delay = isFirstLoad ? 1000 : 100; // 1 second on first load, 100ms otherwise
+        sessionStorage.setItem('dashboardInitialized', 'true');
+        
+        setTimeout(() => {
+            updateDashboard();
+        }, delay);
+    } else {
+        console.log('[dashboard.js] No posts yet, will update when state changes');
+    }
     
     // Posts are loaded by app.js, so we just update the dashboard
     // when state changes (via subscription)
@@ -635,10 +661,22 @@ async function loadDashboardData() {
 }
 
 export function updateDashboard() {
+    console.log('[dashboard.js] updateDashboard() called');
+    
     if (!state) {
+        console.warn('[dashboard.js] No state in updateDashboard()');
         return;
     }
+    
+    console.log('[dashboard.js] State in updateDashboard():', {
+        hasPosts: !!state.posts,
+        postsCount: state.posts?.length || 0,
+        hasFilteredPosts: !!state.filteredPosts,
+        filteredPostsCount: state.filteredPosts?.length || 0
+    });
+    
     if (!state.posts || state.posts.length === 0) {
+        console.log('[dashboard.js] No posts in state, trying to load...');
         // Try to load posts if state is empty
         loadDashboardData().then(() => {
             // After loading, update again
@@ -648,8 +686,13 @@ export function updateDashboard() {
         });
         return;
     }
+    
+    console.log('[dashboard.js] Calling update functions...');
     updateStatsBanner();
-    updateWhatsHappening(state);
+    // updateWhatsHappening is async, but we don't wait for it to avoid blocking
+    updateWhatsHappening(state).catch(error => {
+        console.error('[dashboard.js] Error in updateWhatsHappening:', error);
+    });
     updateProductDistribution();
     updatePostsList(); // This function checks if postsList exists, so it's safe
     updateCriticalPostsButton();
@@ -658,12 +701,17 @@ export function updateDashboard() {
     updatePostsSourceFilter(); // Initialize source filter options
     
     // Initialize posts display in the "All Posts" section at the bottom
-    if (document.getElementById('postsGallery')) {
+    const postsGallery = document.getElementById('postsGallery');
+    if (postsGallery) {
+        console.log('[dashboard.js] postsGallery found, calling updatePostsDisplay()');
         // Reset offset when dashboard updates to show first page
         postsCurrentOffset = 0;
         updatePostsDisplay();
+    } else {
+        console.warn('[dashboard.js] postsGallery not found');
     }
     
+    console.log('[dashboard.js] updateDashboard() completed');
     // Charts will be updated by charts.js
 }
 

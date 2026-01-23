@@ -578,6 +578,14 @@ async def generate_whats_happening_insights_with_llm(
     analysis_focus: str = ""
 ) -> List[WhatsHappeningInsight]:
     """Generate What's Happening insights using LLM API."""
+    # Reload .env to get latest API keys (in case they were updated)
+    from pathlib import Path
+    from dotenv import load_dotenv
+    backend_path = Path(__file__).resolve().parents[3]
+    env_path = backend_path / ".env"
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+    
     # Prepare posts for analysis (focus on negative posts and recent ones)
     negative_posts = [p for p in posts if p.get('sentiment_label') == 'negative']
     recent_posts = [p for p in posts if p.get('created_at')]
@@ -803,9 +811,19 @@ def generate_whats_happening_fallback(
 async def get_whats_happening(request: WhatsHappeningRequest):
     """Generate What's Happening insights based on filtered posts using LLM."""
     try:
+        # Reload .env to get latest API keys (in case they were updated)
+        from pathlib import Path
+        from dotenv import load_dotenv
+        backend_path = Path(__file__).resolve().parents[3]
+        env_path = backend_path / ".env"
+        if env_path.exists():
+            load_dotenv(env_path, override=True)
+        
         api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
         llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
         llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic']
+        
+        logger.info(f"get_whats_happening: OpenAI key set: {bool(os.getenv('OPENAI_API_KEY'))}, Anthropic key set: {bool(os.getenv('ANTHROPIC_API_KEY'))}, Provider: {llm_provider}, LLM available: {llm_available}")
         
         insights = await generate_whats_happening_insights_with_llm(
             request.posts,

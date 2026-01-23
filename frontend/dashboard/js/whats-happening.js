@@ -10,11 +10,24 @@ let currentState = null;
 let statsCardsClickHandlerAttached = false;
 
 export async function updateWhatsHappening(state) {
+    console.log('[whats-happening.js] updateWhatsHappening() called');
+    console.log('[whats-happening.js] State:', {
+        hasPosts: !!state.posts,
+        postsCount: state.posts?.length || 0,
+        hasFilteredPosts: !!state.filteredPosts,
+        filteredPostsCount: state.filteredPosts?.length || 0
+    });
+    
     // Store state reference for click handlers
     currentState = state;
     
     const posts = state.filteredPosts || [];
     const allPosts = state.posts || [];
+    
+    console.log('[whats-happening.js] Posts for analysis:', {
+        filteredPosts: posts.length,
+        allPosts: allPosts.length
+    });
     
     // Show overlay IMMEDIATELY at the start of the function, before any async operations
     // Always show overlay when analysis starts, regardless of posts count
@@ -142,9 +155,11 @@ export async function updateWhatsHappening(state) {
             if (typeof apiInstance.getWhatsHappeningInsights === 'function') {
                 // Get analysis focus from settings
                 const analysisFocus = localStorage.getItem('analysisFocus') || '';
+                console.log('[whats-happening.js] Calling LLM API for insights...');
                 const response = await apiInstance.getWhatsHappeningInsights(posts, statsForLLM, activeFiltersDescription, analysisFocus);
                 insights = response.insights || [];
                 llmAvailable = response.llm_available !== false;
+                console.log('[whats-happening.js] LLM API response received, insights:', insights.length);
                 analysisCompleted = true;
             } else {
                 throw new Error('Method not available in API class');
@@ -164,6 +179,7 @@ export async function updateWhatsHappening(state) {
             
             // Get analysis focus from settings
             const analysisFocus = localStorage.getItem('analysisFocus') || '';
+            console.log('[whats-happening.js] Calling LLM API via fetch...');
             const response = await fetch(`${baseURL}/api/whats-happening`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -182,10 +198,11 @@ export async function updateWhatsHappening(state) {
             const data = await response.json();
             insights = data.insights || [];
             llmAvailable = data.llm_available !== false;
+            console.log('[whats-happening.js] LLM API response received, insights:', insights.length);
             analysisCompleted = true;
         }
     } catch (error) {
-        console.warn('Failed to get LLM insights:', error);
+        console.warn('[whats-happening.js] Failed to get LLM insights:', error);
         // Mark analysis as completed even on error so overlay hides
         analysisCompleted = true;
         // Refresh button is always visible - no need to show/hide it
@@ -228,21 +245,9 @@ export async function updateWhatsHappening(state) {
             });
         }
     } finally {
-        // Always hide overlay when analysis is complete (or failed)
+        // Clear the safety timeout - overlay will be hidden after displaying results
         clearTimeout(overlayTimeout);
-        console.log('[whats-happening.js] Hiding overlay, analysisCompleted:', analysisCompleted);
-        if (overlay) {
-            // Always hide overlay, regardless of completion status
-            setTimeout(() => {
-                if (overlay) {
-                    overlay.style.setProperty('display', 'none', 'important');
-                    overlay.style.setProperty('visibility', 'hidden', 'important');
-                    overlay.style.setProperty('opacity', '0', 'important');
-                    console.log('[whats-happening.js] Overlay hidden');
-                }
-            }, analysisCompleted ? 300 : 500);
-        }
-        // Refresh button is always visible - no need to show/hide it
+        // Don't hide overlay here - wait until after displaying results
     }
     
     // Update stats cards with click handlers
@@ -428,8 +433,13 @@ export async function updateWhatsHappening(state) {
     
     // Update What's Happening content with LLM insights
     const content = document.getElementById('whatsHappeningContent');
-    if (!content) return;
+    if (!content) {
+        console.error('[whats-happening.js] Content element #whatsHappeningContent not found!');
+        console.log('[whats-happening.js] Available elements:', Array.from(document.querySelectorAll('[id*="whats"]')).map(el => el.id));
+        return;
+    }
     
+    console.log('[whats-happening.js] Content element found, updating with', insights.length, 'insights');
     let contentHTML = '';
     
     // Store insights globally for drawer access
@@ -473,7 +483,17 @@ export async function updateWhatsHappening(state) {
         contentHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No significant alerts at this time.</div>';
     }
     
+    console.log('[whats-happening.js] Setting contentHTML, length:', contentHTML.length);
+    console.log('[whats-happening.js] Content element exists:', !!content);
+    
+    if (!content) {
+        console.error('[whats-happening.js] Content element not found!');
+        return;
+    }
+    
     content.innerHTML = contentHTML;
+    console.log('[whats-happening.js] Content HTML set successfully');
+    // Don't hide overlay here - wait for recommended actions to complete
     
     // Update Recommended Actions with full context (using stats from LLM analysis)
     // Note: activeFilters was already declared earlier in the function
@@ -495,9 +515,34 @@ export async function updateWhatsHappening(state) {
     const topIssue = topIssueInsight ? [topIssueInsight.title.replace('Top Issue: ', '').replace(/"/g, ''), topIssueInsight.count] : null;
     
     // Update recommended actions (this is async but we don't wait for it)
-    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters).catch(error => {
-        console.error('Error in updateRecommendedActions:', error);
-    });
+    // But we wait for it to complete before hiding overlay
+    updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters)
+        .then(() => {
+            console.log('[whats-happening.js] Recommended actions updated, hiding overlay now');
+            // Hide overlay AFTER recommended actions are also displayed
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.setProperty('display', 'none', 'important');
+                    overlay.style.setProperty('visibility', 'hidden', 'important');
+                    overlay.style.setProperty('opacity', '0', 'important');
+                    console.log('[whats-happening.js] Overlay hidden after all content display');
+                }
+            }, 200); // Small delay to ensure content is rendered
+        })
+        .catch(error => {
+            console.error('Error in updateRecommendedActions:', error);
+            // Hide overlay even on error, but with a delay
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.setProperty('display', 'none', 'important');
+                    overlay.style.setProperty('visibility', 'hidden', 'important');
+                    overlay.style.setProperty('opacity', '0', 'important');
+                    console.log('[whats-happening.js] Overlay hidden after error');
+                }
+            }, 500);
+        });
+    
+    // Don't hide overlay here anymore - wait for recommended actions to complete
 }
 
 // Refresh What's Happening analysis
@@ -806,12 +851,16 @@ window.openInsightDrawerByIndex = function(index) {
 
 // Open drawer for insight posts
 function openInsightDrawer(insightType, insight) {
+    console.log('[whats-happening.js] openInsightDrawer called:', { insightType, insight });
+    
     if (!currentState) {
-        console.error('No state available for insight drawer');
+        console.error('[whats-happening.js] No state available for insight drawer');
         return;
     }
     
     const posts = currentState.filteredPosts || [];
+    console.log('[whats-happening.js] Available posts:', posts.length);
+    
     let filteredPosts = [];
     let title = '';
     let description = '';
@@ -827,35 +876,74 @@ function openInsightDrawer(insightType, insight) {
         });
         title = 'Spike in Negative Feedback';
         description = `${insight.description || 'Recent spike in negative feedback detected'}`;
+        console.log('[whats-happening.js] Spike filter: found', filteredPosts.length, 'posts');
     } else if (insightType === 'top_product') {
         // Extract product name from title
         const productName = insight.title.replace('Top Product Impacted: ', '').trim();
+        console.log('[whats-happening.js] Filtering for product:', productName);
+        
+        // Use getProductLabel to match products more accurately
         filteredPosts = posts.filter(p => {
-            if (p.sentiment_label !== 'negative') return false;
+            const detectedProduct = getProductLabel(p.id, p.content, p.language);
             const content = (p.content || '').toLowerCase();
             const productLower = productName.toLowerCase();
-            // Check if product is mentioned in content
-            return content.includes(productLower);
+            
+            // Check if product matches detected product or is mentioned in content
+            const matchesDetected = detectedProduct && detectedProduct.toLowerCase() === productLower;
+            const matchesContent = content.includes(productLower);
+            
+            return matchesDetected || matchesContent;
         });
+        
         title = `Posts about ${productName}`;
         description = `${insight.description || `Posts mentioning ${productName}`}`;
+        console.log('[whats-happening.js] Product filter: found', filteredPosts.length, 'posts for', productName);
     } else if (insightType === 'top_issue') {
         // Extract issue keyword from title
         const issueText = insight.title.replace('Top Issue: ', '').replace(/"/g, '').trim();
         const issueKeyword = issueText.toLowerCase();
+        console.log('[whats-happening.js] Filtering for issue:', issueText);
+        
+        // Split issue text into keywords for better matching
+        const issueKeywords = issueKeyword.split(/\s+/).filter(k => k.length > 3); // Only words longer than 3 chars
+        
         filteredPosts = posts.filter(p => {
             if (p.sentiment_label !== 'negative') return false;
             const content = (p.content || '').toLowerCase();
-            // Check if issue keyword is mentioned in content
-            return content.includes(issueKeyword);
+            
+            // Check if any keyword is mentioned in content
+            return issueKeywords.some(keyword => content.includes(keyword)) || content.includes(issueKeyword);
         });
+        
         title = `Posts about "${issueText}"`;
         description = `${insight.description || `Posts mentioning ${issueText}`}`;
+        console.log('[whats-happening.js] Issue filter: found', filteredPosts.length, 'posts for', issueText);
+    } else {
+        // For other insight types, try to match based on description or title
+        console.log('[whats-happening.js] Unknown insight type:', insightType, 'trying generic filter');
+        const searchText = (insight.title + ' ' + (insight.description || '')).toLowerCase();
+        const searchKeywords = searchText.split(/\s+/).filter(k => k.length > 3);
+        
+        filteredPosts = posts.filter(p => {
+            const content = (p.content || '').toLowerCase();
+            return searchKeywords.some(keyword => content.includes(keyword));
+        });
+        
+        title = insight.title || 'Related Posts';
+        description = insight.description || '';
+        console.log('[whats-happening.js] Generic filter: found', filteredPosts.length, 'posts');
+    }
+    
+    // If no posts found with filters, show all negative posts as fallback
+    if (filteredPosts.length === 0 && posts.length > 0) {
+        console.warn('[whats-happening.js] No posts found with filters, showing all negative posts as fallback');
+        filteredPosts = posts.filter(p => p.sentiment_label === 'negative').slice(0, 20);
     }
     
     // Sort by date (most recent first)
     filteredPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
+    console.log('[whats-happening.js] Opening drawer with', filteredPosts.length, 'posts');
     // Open drawer with filtered posts
     openInsightPostsDrawer(filteredPosts, title, description, insight);
 };
@@ -976,7 +1064,18 @@ function openInsightPostsDrawer(posts, title, description, insight) {
         </div>
     `;
     
+    console.log('[whats-happening.js] Setting drawerContent.innerHTML, HTML length:', html.length);
     drawerContent.innerHTML = html;
+    console.log('[whats-happening.js] Drawer content set, checking if posts are visible...');
+    
+    // Verify posts are rendered
+    setTimeout(() => {
+        const renderedPosts = drawerContent.querySelectorAll('.drawer-post-item');
+        console.log('[whats-happening.js] Rendered posts count:', renderedPosts.length);
+        if (renderedPosts.length === 0 && posts.length > 0) {
+            console.error('[whats-happening.js] No posts rendered despite', posts.length, 'posts provided');
+        }
+    }, 100);
 }
 
 function getActiveFilters(state) {

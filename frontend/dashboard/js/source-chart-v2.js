@@ -257,20 +257,15 @@ function renderSourceChart(sourceData, sentimentBySource) {
         canvasElement.style.display = 'block';
         canvasElement.style.visibility = 'visible';
         canvasElement.style.opacity = '1';
+        // Remove any inline styles that might interfere
+        canvasElement.style.width = '';
+        canvasElement.style.height = '';
         
         const ctx = canvasElement.getContext('2d');
         if (!ctx) {
             console.error('[source-chart-v2.js] Failed to get 2D context');
             return;
         }
-        
-        // Don't set explicit width/height on canvas - let Chart.js handle it with responsive: true
-        // Setting width/height directly can interfere with Chart.js internal sizing
-        // Chart.js will use the container dimensions automatically
-        console.log('[source-chart-v2.js] Canvas ready for Chart.js, container:', {
-            width: containerRect.width,
-            height: containerRect.height
-        });
         
         // Ensure overlay is hidden BEFORE creating chart
         if (overlay) {
@@ -281,6 +276,18 @@ function renderSourceChart(sourceData, sentimentBySource) {
             overlay.setAttribute('hidden', '');
             console.log('[source-chart-v2.js] Overlay forcefully hidden before chart creation');
         }
+        
+        // Don't set explicit width/height on canvas - let Chart.js handle it with responsive: true
+        // Chart.js will use the container dimensions automatically
+        console.log('[source-chart-v2.js] Canvas ready for Chart.js, container:', {
+            width: containerRect.width,
+            height: containerRect.height,
+            canvasStyle: {
+                display: canvasElement.style.display,
+                width: canvasElement.style.width,
+                height: canvasElement.style.height
+            }
+        });
         
         // Small delay to ensure overlay is fully hidden and DOM is stable
         setTimeout(() => {
@@ -325,6 +332,15 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
     try {
         console.log('[source-chart-v2.js] Creating Chart.js instance...');
         console.log('[source-chart-v2.js] Chart available?', typeof Chart !== 'undefined');
+        console.log('[source-chart-v2.js] Chart data:', {
+            labels: sortedSources,
+            positiveData: positiveData,
+            negativeData: negativeData,
+            neutralData: neutralData,
+            hasPositiveValues: positiveData.some(v => v > 0),
+            hasNegativeValues: negativeData.some(v => v > 0),
+            hasNeutralValues: neutralData.some(v => v > 0)
+        });
         sourceChart = new Chart(ctx, {
         type: 'bar',
         data: {
@@ -356,6 +372,14 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
         options: {
             responsive: true,
             maintainAspectRatio: false, // Let container control height
+            animation: {
+                duration: 0 // Disable animation for immediate rendering
+            },
+            devicePixelRatio: window.devicePixelRatio || 1, // Handle high DPI displays
+            animation: {
+                duration: 0 // Disable animation for immediate rendering
+            },
+            devicePixelRatio: window.devicePixelRatio || 1, // Handle high DPI displays
             layout: {
                 padding: {
                     bottom: 5,
@@ -522,6 +546,7 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
                 // Log final canvas state
                 const finalRect = canvas.getBoundingClientRect();
                 const finalStyle = window.getComputedStyle(canvas);
+                const chartData = sourceChart?.data;
                 console.log('[source-chart-v2.js] Final canvas state:', {
                     width: canvas.width,
                     height: canvas.height,
@@ -532,17 +557,38 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
                     visibility: finalStyle.visibility,
                     opacity: finalStyle.opacity,
                     chartVisible: sourceChart && !sourceChart.destroyed,
-                    chartData: sourceChart?.data ? {
-                        labels: sourceChart.data.labels?.length || 0,
-                        datasets: sourceChart.data.datasets?.length || 0,
-                        firstDatasetData: sourceChart.data.datasets?.[0]?.data || []
+                    chartData: chartData ? {
+                        labels: chartData.labels || [],
+                        datasetsCount: chartData.datasets?.length || 0,
+                        datasets: chartData.datasets?.map(ds => ({
+                            label: ds.label,
+                            data: ds.data || [],
+                            dataLength: ds.data?.length || 0
+                        })) || []
                     } : null
                 });
                 
+                // Check if chart actually has data to render
+                if (chartData && chartData.datasets && chartData.datasets.length > 0) {
+                    const hasData = chartData.datasets.some(ds => ds.data && ds.data.length > 0 && ds.data.some(v => v > 0));
+                    console.log('[source-chart-v2.js] Chart has data to render:', hasData);
+                    
+                    if (!hasData) {
+                        console.warn('[source-chart-v2.js] Chart has no data values > 0, chart will be empty');
+                    }
+                }
+                
                 // Force one more update with animation to ensure rendering
                 if (sourceChart && !sourceChart.destroyed) {
-                    sourceChart.update('active');
-                    console.log('[source-chart-v2.js] Final update() called with active mode');
+                    // Try to force a full re-render by destroying and recreating if needed
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        // Clear canvas first
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        // Then update chart
+                        sourceChart.update('active');
+                        console.log('[source-chart-v2.js] Final update() called with active mode after clear');
+                    }
                 }
             }
         }, 200);

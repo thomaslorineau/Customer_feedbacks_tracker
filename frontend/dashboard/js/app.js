@@ -1,7 +1,7 @@
 // Main application entry point
 import { API } from './api.js';
 import { State } from './state.js';
-import { initDashboard, updateDashboard } from './dashboard.js';
+import { initDashboard, updateDashboard } from './dashboard.js?v=2.4';
 import { initCharts } from './charts.js';
 import { initSourceChart } from './source-chart-v2.js?v=2.2';
 import { initSentimentChart } from './sentiment-chart.js';
@@ -99,6 +99,9 @@ class App {
     }
     
     async init() {
+        console.log('[App] init() called');
+        console.log('[App] State:', { hasState: !!this.state, hasApi: !!this.api });
+        
         // Initialize theme
         initializeTheme();
         
@@ -153,9 +156,12 @@ class App {
         
         // Initialize dashboard (this will set default date filters, but posts are already loaded)
         try {
+            console.log('[App] Calling initDashboard()...');
             initDashboard(this.state);
+            console.log('[App] initDashboard() completed');
         } catch (error) {
-            console.error('App: Error initializing dashboard:', error);
+            console.error('[App] Error initializing dashboard:', error);
+            console.error('[App] Error stack:', error.stack);
         }
         
         // Initialize source chart (with state for filtering)
