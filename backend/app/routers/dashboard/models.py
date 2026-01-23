@@ -105,6 +105,7 @@ class ImprovementInsight(BaseModel):
     icon: str = Field(default="💡", description="Emoji icon for the insight")
     metric: str = Field(default="", description="Metric or value if applicable")
     roi_impact: Optional[str] = Field(None, description="ROI or customer impact estimate")
+    related_post_ids: Optional[List[int]] = Field(default=[], description="IDs of posts related to this insight")
 
 
 class ImprovementsAnalysisRequest(BaseModel):

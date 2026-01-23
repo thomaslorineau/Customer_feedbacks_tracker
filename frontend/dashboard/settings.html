@@ -1304,6 +1304,103 @@
             </div>
         </div>
 
+        <!-- Section: Jira Integration -->
+        <div class="accordion" data-accordion="jira">
+            <div class="accordion-header" onclick="toggleAccordion('jira')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🎫</span>
+                    <span>Jira Integration</span>
+                    <span class="accordion-badge" id="jiraBadge">--</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 Jira Integration</h4>
+                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                            Configure Jira to create tickets directly from insights. You can create tickets from the "What's Happening" and "Improvements" drawers.
+                        </p>
+                    </div>
+
+                    <div id="jiraConfigStatus" style="margin-bottom: 1.5rem;">
+                        <!-- Jira config status will be rendered here -->
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="jiraServerUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                            Jira Server URL <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="jiraServerUrl" 
+                            placeholder="https://yourcompany.atlassian.net"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                        />
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Your Jira server URL (e.g., https://yourcompany.atlassian.net)
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="jiraUsername" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                            Username/Email <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="jiraUsername" 
+                            placeholder="your.email@company.com"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                        />
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Your Jira username or email address
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="jiraApiToken" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                            API Token <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="password" 
+                            id="jiraApiToken" 
+                            placeholder="Your Jira API token"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                        />
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Get your API token from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color: var(--accent-primary);">Atlassian Account Settings</a>
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="jiraProjectKey" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                            Project Key <span style="color: #ef4444;">*</span>
+                        </label>
+                        <input 
+                            type="text" 
+                            id="jiraProjectKey" 
+                            placeholder="PROJ"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                        />
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Your Jira project key (e.g., PROJ, DEV, BUG)
+                        </p>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button onclick="saveJiraConfig()" class="btn primary" style="padding: 0.75rem 1.5rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            Save Configuration
+                        </button>
+                        <button onclick="testJiraConnection()" class="btn" style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            Test Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Section 2: Scrapers API Keys (Priorité Haute) -->
         <div class="accordion" data-accordion="scrapers-api-keys">
             <div class="accordion-header" onclick="toggleAccordion('scrapers-api-keys')">

@@ -475,13 +475,75 @@ export async function updateWhatsHappening(state) {
     // Store insights globally for drawer access
     window.currentInsights = insights;
     
+    // Helper function to calculate actual post count for an insight
+    function calculateActualPostCount(insight, posts) {
+        let filteredPosts = [];
+        
+        if (insight.type === 'spike') {
+            const now = new Date();
+            const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+            filteredPosts = posts.filter(p => {
+                const postDate = new Date(p.created_at);
+                return postDate >= last48h && p.sentiment_label === 'negative';
+            });
+        } else if (insight.type === 'top_product') {
+            const productName = insight.title.replace('Top Product Impacted: ', '').trim();
+            filteredPosts = posts.filter(p => {
+                const detectedProduct = getProductLabel(p.id, p.content, p.language);
+                const content = (p.content || '').toLowerCase();
+                const productLower = productName.toLowerCase();
+                const matchesDetected = detectedProduct && detectedProduct.toLowerCase() === productLower;
+                const matchesContent = content.includes(productLower);
+                return matchesDetected || matchesContent;
+            });
+        } else if (insight.type === 'top_issue') {
+            const issueText = insight.title.replace('Top Issue: ', '').replace(/"/g, '').trim();
+            const issueKeyword = issueText.toLowerCase();
+            const issueKeywords = issueKeyword.split(/\s+/).filter(k => k.length > 3);
+            filteredPosts = posts.filter(p => {
+                if (p.sentiment_label !== 'negative') return false;
+                const content = (p.content || '').toLowerCase();
+                return issueKeywords.some(keyword => content.includes(keyword)) || content.includes(issueKeyword);
+            });
+        } else {
+            // Generic filter
+            const searchText = (insight.title + ' ' + (insight.description || '')).toLowerCase();
+            const searchKeywords = searchText.split(/\s+/).filter(k => k.length > 3);
+            filteredPosts = posts.filter(p => {
+                const content = (p.content || '').toLowerCase();
+                return searchKeywords.some(keyword => content.includes(keyword));
+            });
+        }
+        
+        // Fallback if no posts found
+        if (filteredPosts.length === 0 && posts.length > 0) {
+            filteredPosts = posts.filter(p => p.sentiment_label === 'negative').slice(0, 20);
+        }
+        
+        return filteredPosts.length;
+    }
+    
+    // Pre-calculate actual counts for all insights
+    const insightsWithActualCounts = insights.map(insight => {
+        const actualCount = calculateActualPostCount(insight, posts);
+        return {
+            ...insight,
+            actualCount: actualCount,
+            displayCount: actualCount > 0 ? actualCount : insight.count || 0
+        };
+    });
+    
+    // Update stored insights with actual counts
+    window.currentInsights = insightsWithActualCounts;
+    
     // Render insights from LLM (or fallback)
-    if (insights && insights.length > 0) {
-        insights.forEach((insight, index) => {
+    if (insightsWithActualCounts && insightsWithActualCounts.length > 0) {
+        insightsWithActualCounts.forEach((insight, index) => {
             const insightId = `insight-${index}`;
-            const clickableClass = insight.count > 0 ? 'clickable-insight' : '';
-            const cursorStyle = insight.count > 0 ? 'cursor: pointer;' : '';
-            const onClickHandler = insight.count > 0 ? `onclick="openInsightDrawerByIndex(${index})"` : '';
+            const displayCount = insight.displayCount || 0;
+            const clickableClass = displayCount > 0 ? 'clickable-insight' : '';
+            const cursorStyle = displayCount > 0 ? 'cursor: pointer;' : '';
+            const onClickHandler = displayCount > 0 ? `onclick="openInsightDrawerByIndex(${index})"` : '';
             
             if (insight.type === 'spike') {
                 contentHTML += `
@@ -490,7 +552,7 @@ export async function updateWhatsHappening(state) {
                         <div class="alert-box-content">
                             <h3>${insight.title}</h3>
                             <p>${insight.description}</p>
-                            ${insight.count > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: rgba(255, 255, 255, 0.9); font-weight: 600;">Click to view ${insight.count} related posts →</p>` : ''}
+                            ${displayCount > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: rgba(255, 255, 255, 0.9); font-weight: 600;">Click to view ${displayCount} related posts →</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -501,7 +563,7 @@ export async function updateWhatsHappening(state) {
                         <div class="insight-box-content">
                             <h4>${insight.title}</h4>
                             <p>${insight.description}</p>
-                            ${insight.count > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: var(--accent-primary); font-weight: 600;">Click to view ${insight.count} related posts →</p>` : ''}
+                            ${displayCount > 0 ? `<p style="margin-top: 8px; font-size: 0.9em; color: var(--accent-primary); font-weight: 600;">Click to view ${displayCount} related posts →</p>` : ''}
                         </div>
                     </div>
                 `;
@@ -716,27 +778,9 @@ function closeFilteredPostsDrawer() {
     document.body.classList.remove('drawer-open');
     document.body.style.paddingRight = '';
     
-    // Clear filters when drawer is closed
-    if (currentState) {
-        // Reset sentiment filter
-        currentState.setFilter('sentiment', 'all');
-        
-        // Reset date filters
-        currentState.setFilter('dateFrom', '');
-        currentState.setFilter('dateTo', '');
-        
-        // Sync UI elements
-        const sentimentFilter = document.getElementById('sentimentFilter');
-        if (sentimentFilter) sentimentFilter.value = 'all';
-        
-        const globalDateFrom = document.getElementById('globalDateFrom');
-        const globalDateTo = document.getElementById('globalDateTo');
-        if (globalDateFrom) globalDateFrom.value = '';
-        if (globalDateTo) globalDateTo.value = '';
-        
-        // Update dashboard to reflect cleared filters
-        updateDashboard();
-    }
+    // Note: We don't clear filters or update dashboard when closing the drawer
+    // to avoid triggering automatic analysis refresh
+    // The drawer is just a view, closing it shouldn't affect the current state
 }
 
 function updateFilteredPostsDrawer(state) {
@@ -973,9 +1017,20 @@ function openInsightDrawer(insightType, insight) {
     // Sort by date (most recent first)
     filteredPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     
-    console.log('[whats-happening.js] Opening drawer with', filteredPosts.length, 'posts');
-    // Open drawer with filtered posts
-    openInsightPostsDrawer(filteredPosts, title, description, insight);
+    // Recalculer le count réel après filtrage
+    const actualCount = filteredPosts.length;
+    
+    // Si le count diffère de celui du LLM, logger un warning
+    if (insight.count && actualCount !== insight.count) {
+        console.warn(`[whats-happening.js] Count mismatch: LLM estimated ${insight.count}, actual filtered: ${actualCount}`);
+    }
+    
+    console.log('[whats-happening.js] Opening drawer with', actualCount, 'posts (LLM estimated:', insight.count || 'N/A', ')');
+    // Open drawer with filtered posts, en passant le count réel
+    openInsightPostsDrawer(filteredPosts, title, description, {
+        ...insight,
+        count: actualCount // Utiliser le count réel après filtrage
+    });
 };
 
 // Open drawer for insight posts
@@ -1048,9 +1103,20 @@ function openInsightPostsDrawer(posts, title, description, insight) {
         </div>
         <div class="drawer-info">
             <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(description)}</p>
-            <div class="drawer-stats">
-                <span class="drawer-stat-value">${posts.length}</span>
-                <span class="drawer-stat-label">posts</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <div class="drawer-stats">
+                    <span class="drawer-stat-value">${posts.length}</span>
+                    <span class="drawer-stat-label">posts</span>
+                    ${insight && insight.count && insight.count !== posts.length ? 
+                        `<span class="drawer-stat-note" style="font-size: 0.85em; color: var(--text-muted); margin-left: 8px;">
+                            (LLM estimated: ${insight.count})
+                        </span>` : ''}
+                </div>
+                <button onclick="createJiraTicketFromInsight('${escapeHtml(title)}', \`${escapeHtml(description)}\`, ${posts.length})" 
+                        style="padding: 8px 16px; background: #0052CC; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                    <span>🎫</span>
+                    <span>Create Jira Ticket</span>
+                </button>
             </div>
         </div>
         <div class="drawer-posts">
@@ -1107,6 +1173,59 @@ function openInsightPostsDrawer(posts, title, description, insight) {
         }
     }, 100);
 }
+
+// Create Jira ticket from insight
+window.createJiraTicketFromInsight = async function(title, description, postsCount) {
+    // Check if Jira is configured
+    try {
+        const configResponse = await fetch('/api/jira/config');
+        if (!configResponse.ok) {
+            alert('Error: Could not check Jira configuration');
+            return;
+        }
+        
+        const config = await configResponse.json();
+        if (!config.configured) {
+            alert('Jira is not configured. Please configure it in Settings first.');
+            return;
+        }
+        
+        // Prepare ticket description with post count
+        const ticketDescription = `${description}\n\nRelated posts: ${postsCount}`;
+        
+        // Show confirmation dialog
+        const confirmed = confirm(`Create a Jira ticket for:\n\n${title}\n\nDescription:\n${description.substring(0, 200)}...`);
+        if (!confirmed) return;
+        
+        // Create ticket
+        const response = await fetch('/api/jira/create-ticket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                description: ticketDescription,
+                issue_type: 'Bug',
+                priority: 'Medium',
+                labels: ['customer-feedback', 'ai-insight']
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`✅ Jira ticket created successfully!\n\nTicket: ${result.ticket_key}\n\nYou can view it at:\n${result.ticket_url}`);
+            // Optionally open the ticket in a new tab
+            if (result.ticket_url) {
+                window.open(result.ticket_url, '_blank');
+            }
+        } else {
+            alert(`❌ Failed to create Jira ticket:\n\n${result.error || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error creating Jira ticket:', error);
+        alert(`Error creating Jira ticket: ${error.message}`);
+    }
+};
 
 function getActiveFilters(state) {
     const filters = {

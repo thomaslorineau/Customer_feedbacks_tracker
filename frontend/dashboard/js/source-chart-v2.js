@@ -183,26 +183,41 @@ function renderSourceChart(sourceData, sentimentBySource) {
         zIndex: computedStyle.zIndex
     });
     
-    // Check if overlay is blocking and force hide it if visible
+    // Check if overlay is blocking - but DON'T force hide if LLM analysis is in progress
     const overlay = document.getElementById('whatsHappeningOverlay');
     if (overlay) {
         const overlayStyle = window.getComputedStyle(overlay);
         const isOverlayVisible = overlayStyle.display !== 'none' && overlayStyle.visibility !== 'hidden';
-        console.log('[source-chart-v2.js] Overlay state:', {
-            display: overlayStyle.display,
-            visibility: overlayStyle.visibility,
-            opacity: overlayStyle.opacity,
-            zIndex: overlayStyle.zIndex,
-            isVisible: isOverlayVisible
-        });
         
-        // Force hide overlay if it's blocking (should have been hidden by whats-happening.js)
         if (isOverlayVisible) {
-            console.warn('[source-chart-v2.js] Overlay is still visible, forcing hide...');
-            overlay.style.setProperty('display', 'none', 'important');
-            overlay.style.setProperty('visibility', 'hidden', 'important');
-            overlay.style.setProperty('opacity', '0', 'important');
-            overlay.style.setProperty('z-index', '-1', 'important');
+            // Check if LLM analysis is in progress by looking for "Analyzing with AI..." text
+            const overlayText = overlay.textContent || '';
+            const isAnalyzing = overlayText.includes('Analyzing') || overlayText.includes('AI');
+            
+            // Also check if content is empty (analysis just started)
+            const content = document.getElementById('whatsHappeningContent');
+            const hasContent = content && content.innerHTML.trim() !== '';
+            
+            if (isAnalyzing || !hasContent) {
+                // LLM analysis is in progress - don't hide overlay
+                console.log('[source-chart-v2.js] Overlay visible but LLM analysis in progress, keeping it visible');
+                // Set a timeout to detect if overlay is stuck (loop detection)
+                if (!overlay.dataset.chartHideTimeout) {
+                    overlay.dataset.chartHideTimeout = 'set';
+                    setTimeout(() => {
+                        const stillVisible = window.getComputedStyle(overlay).display !== 'none';
+                        const stillAnalyzing = overlay.textContent.includes('Analyzing');
+                        if (stillVisible && stillAnalyzing) {
+                            console.error('[source-chart-v2.js] ERROR: Overlay stuck in analyzing state for >5s - possible loop!');
+                        }
+                    }, 5000);
+                }
+            } else {
+                // Analysis should be complete but overlay is still visible - this might be an error
+                console.warn('[source-chart-v2.js] Overlay visible but analysis appears complete - checking if this is an error...');
+                // Don't force hide - let whats-happening.js handle it
+                // Only log a warning if it's been visible for a while
+            }
         }
     }
     

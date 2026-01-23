@@ -1045,3 +1045,138 @@ function saveAnalysisFocus() {
         showSuccess('Analysis focus cleared - using general analysis');
     }
 }
+
+// Jira Configuration Management
+async function loadJiraConfig() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/jira/config`);
+        if (!response.ok) throw new Error('Failed to load Jira config');
+        
+        const config = await response.json();
+        
+        // Update form fields
+        const serverUrlInput = document.getElementById('jiraServerUrl');
+        const usernameInput = document.getElementById('jiraUsername');
+        const apiTokenInput = document.getElementById('jiraApiToken');
+        const projectKeyInput = document.getElementById('jiraProjectKey');
+        
+        if (serverUrlInput) serverUrlInput.value = config.server_url || '';
+        if (usernameInput) usernameInput.value = config.username || '';
+        if (apiTokenInput) apiTokenInput.value = ''; // Never show token for security
+        if (projectKeyInput) projectKeyInput.value = config.project_key || '';
+        
+        // Update badge
+        const badge = document.getElementById('jiraBadge');
+        if (badge) {
+            badge.textContent = config.configured ? '✓ Configured' : 'Not configured';
+            badge.style.color = config.configured ? '#34d399' : '#ef4444';
+        }
+        
+        // Update status
+        const statusDiv = document.getElementById('jiraConfigStatus');
+        if (statusDiv) {
+            if (config.configured) {
+                statusDiv.innerHTML = `
+                    <div style="background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: 6px; padding: 0.75rem; color: #34d399;">
+                        ✓ Jira is configured and ready to use
+                    </div>
+                `;
+            } else {
+                statusDiv.innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.75rem; color: #ef4444;">
+                        ⚠ Jira is not configured. Please fill all required fields.
+                    </div>
+                `;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading Jira config:', error);
+        const statusDiv = document.getElementById('jiraConfigStatus');
+        if (statusDiv) {
+            statusDiv.innerHTML = `
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 0.75rem; color: #ef4444;">
+                    Error loading Jira configuration
+                </div>
+            `;
+        }
+    }
+}
+
+async function saveJiraConfig() {
+    const serverUrl = document.getElementById('jiraServerUrl')?.value.trim() || '';
+    const username = document.getElementById('jiraUsername')?.value.trim() || '';
+    const apiToken = document.getElementById('jiraApiToken')?.value.trim() || '';
+    const projectKey = document.getElementById('jiraProjectKey')?.value.trim() || '';
+    
+    if (!serverUrl || !username || !apiToken || !projectKey) {
+        showError('Please fill all required fields');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/jira/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                server_url: serverUrl,
+                username: username,
+                api_token: apiToken,
+                project_key: projectKey
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save Jira config');
+        }
+        
+        const result = await response.json();
+        showSuccess('Jira configuration saved successfully!');
+        
+        // Clear API token field for security
+        const apiTokenInput = document.getElementById('jiraApiToken');
+        if (apiTokenInput) apiTokenInput.value = '';
+        
+        // Reload config to update badge
+        await loadJiraConfig();
+    } catch (error) {
+        console.error('Error saving Jira config:', error);
+        showError(`Failed to save Jira configuration: ${error.message}`);
+    }
+}
+
+async function testJiraConnection() {
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/jira/test-connection`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showSuccess(result.message || 'Connection successful!');
+        } else {
+            showError(result.error || 'Connection failed');
+        }
+    } catch (error) {
+        console.error('Error testing Jira connection:', error);
+        showError(`Failed to test connection: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// Make functions available globally
+window.saveJiraConfig = saveJiraConfig;
+window.testJiraConnection = testJiraConnection;
+
+// Load Jira config on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadJiraConfig();
+});

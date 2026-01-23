@@ -1509,7 +1509,7 @@ body {
 
 /* What's Happening Styles */
 .whats-happening-header {
-    display: flex;
+    display: flex !important; /* Force static display - never change dynamically */
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
@@ -1522,6 +1522,7 @@ body {
     width: 100%;
     box-sizing: border-box;
     min-height: 40px; /* Fixed height to prevent movement */
+    height: auto; /* Allow content to determine height but maintain min-height */
 }
 
 .whats-happening-header h2 {
@@ -2452,7 +2453,7 @@ body.dark-mode .llm-analysis-overlay {
 
 /* Refresh Analysis Button */
 .btn-refresh-analysis {
-    display: inline-flex;
+    display: inline-flex !important; /* Force static display - never change dynamically */
     align-items: center;
     gap: 8px;
     padding: 8px 16px;
@@ -2469,6 +2470,9 @@ body.dark-mode .llm-analysis-overlay {
     flex-shrink: 0;
     min-width: 160px;
     justify-content: center;
+    position: relative; /* Ensure it doesn't move */
+    visibility: visible !important; /* Always visible */
+    opacity: 1 !important; /* Always opaque */
 }
 
 .btn-refresh-analysis:hover {

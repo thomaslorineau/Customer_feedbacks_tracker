@@ -6,10 +6,15 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 import logging
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 
 from .. import db
 from ..auth.dependencies import require_auth
 from ..auth.models import TokenData
+from ..utils.jira_client import (
+    load_jira_config, is_jira_configured, create_jira_ticket, test_jira_connection
+)
 
 logger = logging.getLogger(__name__)
 
@@ -752,4 +757,110 @@ async def reveal_key(provider: str = Query(..., description="Provider name (open
         "provider": provider,
         "key": key_value
     }
+
+
+# ============================================================================
+# JIRA CONFIGURATION ENDPOINTS
+# ============================================================================
+
+class JiraConfigPayload(BaseModel):
+    """Payload for Jira configuration."""
+    server_url: Optional[str] = Field(None, description="Jira server URL (e.g., https://yourcompany.atlassian.net)")
+    username: Optional[str] = Field(None, description="Jira username or email")
+    api_token: Optional[str] = Field(None, description="Jira API token")
+    project_key: Optional[str] = Field(None, description="Jira project key (e.g., PROJ)")
+
+
+@router.get("/api/jira/config")
+async def get_jira_config():
+    """Get current Jira configuration (without sensitive data)."""
+    config = load_jira_config()
+    return {
+        "server_url": config['server_url'] if config['server_url'] else '',
+        "username": config['username'] if config['username'] else '',
+        "project_key": config['project_key'] if config['project_key'] else '',
+        "configured": is_jira_configured()
+    }
+
+
+@router.post("/api/jira/config")
+async def save_jira_config(payload: JiraConfigPayload):
+    """Save Jira configuration to .env file."""
+    backend_path = Path(__file__).resolve().parents[2]
+    env_path = backend_path / ".env"
+    
+    # Read existing .env file
+    env_lines = []
+    if env_path.exists():
+        with open(env_path, 'r', encoding='utf-8') as f:
+            env_lines = f.readlines()
+    
+    # Update or add Jira config variables
+    jira_vars = {
+        'JIRA_SERVER_URL': payload.server_url or '',
+        'JIRA_USERNAME': payload.username or '',
+        'JIRA_API_TOKEN': payload.api_token or '',
+        'JIRA_PROJECT_KEY': payload.project_key or ''
+    }
+    
+    # Update existing lines or add new ones
+    updated_vars = set()
+    for i, line in enumerate(env_lines):
+        for var_name, var_value in jira_vars.items():
+            if line.startswith(f'{var_name}='):
+                env_lines[i] = f'{var_name}={var_value}\n'
+                updated_vars.add(var_name)
+                break
+    
+    # Add missing variables
+    for var_name, var_value in jira_vars.items():
+        if var_name not in updated_vars:
+            env_lines.append(f'{var_name}={var_value}\n')
+    
+    # Write back to .env
+    with open(env_path, 'w', encoding='utf-8') as f:
+        f.writelines(env_lines)
+    
+    # Update environment variables for current process
+    for var_name, var_value in jira_vars.items():
+        os.environ[var_name] = var_value
+    
+    return {
+        "success": True,
+        "message": "Jira configuration saved successfully",
+        "configured": is_jira_configured()
+    }
+
+
+@router.post("/api/jira/test-connection")
+async def test_jira():
+    """Test Jira connection and authentication."""
+    result = await test_jira_connection()
+    return result
+
+
+class CreateJiraTicketPayload(BaseModel):
+    """Payload for creating a Jira ticket."""
+    title: str = Field(..., description="Ticket title/summary")
+    description: str = Field(..., description="Ticket description")
+    issue_type: str = Field(default="Bug", description="Issue type (Bug, Task, Story, etc.)")
+    priority: str = Field(default="Medium", description="Priority level (Lowest, Low, Medium, High, Highest)")
+    labels: Optional[List[str]] = Field(default=None, description="Optional list of labels")
+
+
+@router.post("/api/jira/create-ticket")
+async def create_ticket(payload: CreateJiraTicketPayload):
+    """Create a Jira ticket."""
+    result = await create_jira_ticket(
+        title=payload.title,
+        description=payload.description,
+        issue_type=payload.issue_type,
+        priority=payload.priority,
+        labels=payload.labels
+    )
+    
+    if not result.get('success'):
+        raise HTTPException(status_code=400, detail=result.get('error', 'Failed to create ticket'))
+    
+    return result
 

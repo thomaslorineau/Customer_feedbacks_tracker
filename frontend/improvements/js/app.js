@@ -870,21 +870,49 @@ async function loadImprovementsAnalysis() {
         
         const analysis = await analysisResponse.json();
         
+        // Store posts globally for drawer access
+        window.currentImprovementsPosts = postsData.posts || [];
+        window.currentImprovementsInsights = analysis.insights || [];
+        
         // Display insights
         if (analysis.insights && analysis.insights.length > 0) {
-            insightsContainer.innerHTML = analysis.insights.map(insight => `
+            insightsContainer.innerHTML = analysis.insights.map((insight, index) => {
+                // Use related_post_ids count as the source of truth
+                const postsCount = insight.related_post_ids ? insight.related_post_ids.length : 0;
+                const hasPosts = postsCount > 0;
+                
+                // Extract count from metric if it exists (for display purposes)
+                let metricDisplay = insight.metric || '';
+                // Only show metric if it's meaningful and provides additional context
+                const metricCountMatch = metricDisplay.match(/(\d+)\s*posts?/i);
+                const metricCount = metricCountMatch ? parseInt(metricCountMatch[1]) : null;
+                // Don't show metric if:
+                // 1. It's empty
+                // 2. It's just a number without context (e.g., "7")
+                // 3. It's just a post count that matches or is similar to postsCount (we already show "X related posts")
+                const isJustNumber = /^\d+$/.test(metricDisplay.trim());
+                const isPostCountOnly = /^\d+\s*posts?$/i.test(metricDisplay.trim());
+                const shouldShowMetric = metricDisplay && metricDisplay.trim() !== '' && 
+                                       !isJustNumber && // Not just a number
+                                       !isPostCountOnly && // Not just "X posts" (we already show that)
+                                       (metricCount === null || metricCount !== postsCount); // Different from actual count or not a post count
+                
+                return `
                 <div class="insight-card" style="margin-bottom: 16px; padding: 16px; background: rgba(255, 255, 255, 0.5); border-radius: 8px; border-left: 4px solid var(--accent-primary);">
                     <div style="display: flex; align-items: start; gap: 12px;">
                         <span style="font-size: 1.5em;">${insight.icon || '💡'}</span>
                         <div style="flex: 1;">
                             <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: var(--text-primary);">${escapeHtml(insight.title)}</h3>
                             <p style="margin: 0 0 8px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(insight.description)}</p>
-                            ${insight.metric ? `<div style="font-weight: 600; color: var(--accent-primary);">${escapeHtml(insight.metric)}</div>` : ''}
+                            ${shouldShowMetric ? `<div style="margin-top: 8px; margin-bottom: 4px; font-weight: 600; color: var(--accent-primary); font-size: 0.95em;">${escapeHtml(metricDisplay)}</div>` : ''}
+                            ${hasPosts ? `<div style="margin-top: ${shouldShowMetric ? '4' : '8'}px; margin-bottom: 8px; font-weight: 600; color: var(--accent-primary);">${postsCount} related posts</div>` : ''}
                             ${insight.roi_impact ? `<div style="margin-top: 8px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; color: #d97706; font-size: 0.9em;"><strong>Impact:</strong> ${escapeHtml(insight.roi_impact)}</div>` : ''}
+                            ${hasPosts ? `<button onclick="openImprovementInsightDrawer(${index})" style="margin-top: 12px; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500;">View ${postsCount} related posts →</button>` : ''}
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else {
             insightsContainer.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-muted);">No insights available at this time.</div>';
         }
@@ -928,6 +956,213 @@ async function loadImprovementsAnalysis() {
         }, 300);
     }
 }
+
+// Open drawer for improvement insight posts
+window.openImprovementInsightDrawer = function(index) {
+    if (!window.currentImprovementsInsights || !window.currentImprovementsInsights[index]) {
+        console.error('[improvements] Insight not found at index:', index);
+        return;
+    }
+    
+    if (!window.currentImprovementsPosts || window.currentImprovementsPosts.length === 0) {
+        console.error('[improvements] No posts available for drawer');
+        return;
+    }
+    
+    const insight = window.currentImprovementsInsights[index];
+    const allPosts = window.currentImprovementsPosts;
+    
+    // Filter posts based on related_post_ids if available
+    let filteredPosts = [];
+    const expectedCount = insight.related_post_ids ? insight.related_post_ids.length : 0;
+    
+    if (insight.related_post_ids && insight.related_post_ids.length > 0) {
+        filteredPosts = allPosts.filter(post => insight.related_post_ids.includes(post.id));
+        
+        // Log if there's a mismatch
+        if (filteredPosts.length !== expectedCount) {
+            console.warn(`[improvements] Count mismatch: Expected ${expectedCount} posts from related_post_ids, but found ${filteredPosts.length} in available posts`);
+        }
+    } else {
+        // Fallback: try to match based on title/description keywords
+        const searchText = (insight.title + ' ' + (insight.description || '')).toLowerCase();
+        const searchKeywords = searchText.split(/\s+/).filter(k => k.length > 3);
+        filteredPosts = allPosts.filter(post => {
+            const content = (post.content || '').toLowerCase();
+            return searchKeywords.some(keyword => content.includes(keyword));
+        }).slice(0, 50); // Limit to 50 posts
+    }
+    
+    // Sort by date (most recent first)
+    filteredPosts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // Use actual filtered count, not the expected count
+    const actualCount = filteredPosts.length;
+    
+    console.log('[improvements] Opening drawer with', actualCount, 'posts (expected:', expectedCount, ') for insight:', insight.title);
+    openImprovementInsightPostsDrawer(filteredPosts, insight.title, insight.description || '', {
+        ...insight,
+        actual_post_count: actualCount,
+        expected_post_count: expectedCount
+    });
+};
+
+// Open drawer for improvement insight posts
+function openImprovementInsightPostsDrawer(posts, title, description, insight) {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (!drawer) {
+        console.error('[improvements] Drawer not found');
+        return;
+    }
+    
+    const drawerContent = document.getElementById('filteredPostsDrawerContent');
+    if (!drawerContent) {
+        console.error('[improvements] Drawer content not found');
+        return;
+    }
+    
+    // Calculate scrollbar width before hiding it
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    document.body.classList.add('drawer-open');
+    drawer.classList.add('open');
+    
+    // Helper functions
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function truncateText(text, maxLength) {
+        if (!text) return 'No content';
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + '...';
+    }
+    
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+    
+    function getSourceIcon(source) {
+        const icons = {
+            'X/Twitter': '🐦',
+            'Twitter': '🐦',
+            'Reddit': '🔴',
+            'Trustpilot': '⭐',
+            'OVH Forum': '💬',
+            'News': '📰',
+            'GitHub': '🐙',
+            'LinkedIn': '💼',
+            'Google News': '📰',
+            'Stack Overflow': '💬',
+            'Mastodon': '🐘'
+        };
+        return icons[source] || '📝';
+    }
+    
+    // Import getProductLabel dynamically
+    let getProductLabel = null;
+    (async () => {
+        try {
+            const productDetection = await import('/dashboard/js/product-detection.js');
+            getProductLabel = productDetection.getProductLabel;
+        } catch (e) {
+            console.warn('[improvements] Could not load product-detection.js:', e);
+        }
+    })();
+    
+    // Build HTML
+    let html = `
+        <div class="drawer-header">
+            <h3>${escapeHtml(title)}</h3>
+            <button class="drawer-close" onclick="closeFilteredPostsDrawer()" aria-label="Close drawer">×</button>
+        </div>
+        <div class="drawer-info">
+            <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(description)}</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                <div class="drawer-stats">
+                    <span class="drawer-stat-value">${posts.length}</span>
+                    <span class="drawer-stat-label">posts</span>
+                    ${insight && insight.expected_post_count && insight.expected_post_count !== posts.length ? 
+                        `<span class="drawer-stat-note" style="font-size: 0.85em; color: var(--text-muted); margin-left: 8px;">
+                            (Backend estimated: ${insight.expected_post_count})
+                        </span>` : ''}
+                </div>
+                <button onclick="createJiraTicketFromInsight('${escapeHtml(title)}', \`${escapeHtml(description)}\`, ${posts.length})" 
+                        style="padding: 8px 16px; background: #0052CC; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                    <span>🎫</span>
+                    <span>Create Jira Ticket</span>
+                </button>
+            </div>
+        </div>
+        <div class="drawer-posts">
+    `;
+    
+    if (posts.length === 0) {
+        html += `
+            <div class="drawer-empty">
+                <p>No posts found matching this insight.</p>
+            </div>
+        `;
+    } else {
+        posts.forEach(post => {
+            const sourceIcon = getSourceIcon(post.source);
+            const timeAgo = getTimeAgo(post.created_at);
+            const sentiment = post.sentiment_label || 'neutral';
+            const category = getProductLabel ? getProductLabel(post.id, post.content, post.language) : null;
+            
+            html += `
+                <div class="drawer-post-item">
+                    <div class="drawer-post-header">
+                        <div class="drawer-post-source">
+                            <span class="drawer-source-icon">${sourceIcon}</span>
+                            <span class="drawer-source-name">${escapeHtml(post.source || 'Unknown')}</span>
+                            ${category && category !== 'General' ? `<span class="drawer-post-category" style="margin-left: 8px; padding: 3px 8px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.75em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : ''}
+                            <span class="drawer-post-time">${timeAgo}</span>
+                        </div>
+                        <span class="drawer-sentiment-badge sentiment-${sentiment}">${sentiment}</span>
+                    </div>
+                    <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>
+                    <div class="drawer-post-meta">
+                        ${category && category !== 'General' ? `<span class="drawer-post-category" style="padding: 4px 10px; background: rgba(0, 212, 255, 0.12); border-radius: 6px; color: var(--accent-primary); font-size: 0.8em; font-weight: 500; border: 1px solid rgba(0, 212, 255, 0.25);">📦 ${escapeHtml(category)}</span>` : '<span class="drawer-post-category" style="padding: 4px 10px; background: var(--bg-secondary, #f3f4f6); border-radius: 6px; color: var(--text-secondary, #6b7280); font-size: 0.8em;">General</span>'}
+                        ${post.url ? `<a href="${post.url}" target="_blank" class="drawer-post-link">View post →</a>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    }
+    
+    html += `
+        </div>
+    `;
+    
+    drawerContent.innerHTML = html;
+}
+
+// Close drawer function
+window.closeFilteredPostsDrawer = function() {
+    const drawer = document.getElementById('filteredPostsDrawer');
+    if (drawer) {
+        drawer.classList.remove('open');
+        document.body.classList.remove('drawer-open');
+        document.body.style.paddingRight = '';
+    }
+    // Note: We don't trigger any analysis or refresh when closing the drawer
+    // The drawer is just a view, closing it shouldn't affect the current state
+};
 
 // Refresh Improvements Analysis
 window.refreshImprovementsAnalysis = async function() {

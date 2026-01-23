@@ -1,5 +1,0 @@
-[33m338cf77[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m, [m[1;31mgithub/master[m[33m)[m Refactor: Unify post cards between dashboard and data collection pages - Create shared post-card.js component - Improve Preview and Save buttons design (modern, clean style) - Use shared component in both pages for consistency
-[33m0068bc2[m[33m ([m[1;31morigin/develop[m[33m, [m[1;31mgithub/develop[m[33m, [m[1;32mdevelop[m[33m)[m Amélioration utilisation espace Distribution per Product: restauration affichage +X products avec meilleure utilisation de l'espace
-[33m1fcdbae[m Amélioration du système de détection de pertinence: exclusion domaines non-OVH, exigence marque OVH, optimisation nettoyage
-[33mf688d4b[m fix: Harmonisation du filtrage des posts entre dashboard et data collection (exclusion samples et relevance_score=0)
-[33mad556f7[m fix: Retrait de l'authentification des endpoints cleanup pour cohérence avec le frontend

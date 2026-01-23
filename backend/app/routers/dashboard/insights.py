@@ -1310,9 +1310,35 @@ CRITICAL INSTRUCTIONS:
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
                 data = json.loads(json_match.group())
-                insights = [ImprovementInsight(**insight) for insight in data.get('insights', [])]
+                insights_data = data.get('insights', [])
+                
+                # Match posts to insights based on keywords
+                insights_with_posts = []
+                for insight_data in insights_data:
+                    # Extract keywords from insight title and description
+                    insight_text = (insight_data.get('title', '') + ' ' + insight_data.get('description', '')).lower()
+                    insight_keywords = [w for w in insight_text.split() if len(w) > 3]  # Words longer than 3 chars
+                    
+                    # Find matching posts
+                    matching_post_ids = []
+                    if posts:
+                        for post in posts:
+                            post_content = (post.get('content', '') or '').lower()
+                            # Check if any keyword appears in post content
+                            if any(keyword in post_content for keyword in insight_keywords):
+                                post_id = post.get('id')
+                                if post_id and post_id not in matching_post_ids:
+                                    matching_post_ids.append(post_id)
+                    
+                    # Limit to 50 posts max per insight
+                    matching_post_ids = matching_post_ids[:50]
+                    
+                    # Add related_post_ids to insight
+                    insight_data['related_post_ids'] = matching_post_ids
+                    insights_with_posts.append(ImprovementInsight(**insight_data))
+                
                 return ImprovementsAnalysisResponse(
-                    insights=insights,
+                    insights=insights_with_posts,
                     roi_summary=data.get('roi_summary', ''),
                     key_findings=data.get('key_findings', []),
                     llm_available=True
