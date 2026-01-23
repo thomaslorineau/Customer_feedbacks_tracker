@@ -313,20 +313,24 @@
 
         .search-input {
             width: 100%;
-            padding: 10px 40px 10px 16px;
+            padding: 10px 16px 10px 45px;
             border: 1px solid var(--border-color);
             border-radius: 8px;
             background: var(--input-bg);
             color: var(--text-primary);
             font-size: 0.95em;
+            box-sizing: border-box;
         }
 
         .search-icon {
             position: absolute;
-            right: 12px;
+            left: 14px;
             top: 50%;
             transform: translateY(-50%);
             color: var(--text-muted);
+            width: 18px;
+            height: 18px;
+            pointer-events: none;
         }
 
         .filter-select {
@@ -594,6 +598,9 @@
             <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScraping()" title="Cancel current scraping job">
                 ❌ Cancel
             </button>
+            <button class="btn-scrape-compact" id="generateImprovementsReportBtn" title="Generate PowerPoint report with improvements insights" style="background: var(--accent-primary); color: white;">
+                📊 PowerPoint
+            </button>
             <span class="beta-badge" title="Application en version beta">BETA</span>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
@@ -685,10 +692,10 @@
             </div>
         </div>
 
-        <!-- Posts to Review Section -->
+        <!-- Top Ranked Posts Section -->
         <div class="posts-review-section">
             <div class="posts-review-header">
-                <h2>Posts to Review for Improvement</h2>
+                <h2>Top ranked posts for improvements</h2>
             </div>
 
             <!-- Search and Filters -->
@@ -700,11 +707,13 @@
                         <path d="m21 21-4.35-4.35"/>
                     </svg>
                 </div>
-                <input type="date" id="improvementsDateFrom" class="filter-select" title="From Date">
                 <select id="improvementsLanguage" class="filter-select">
                     <option value="all">All Languages</option>
                     <option value="fr">🇫🇷 French</option>
                     <option value="en">🇬🇧 English</option>
+                </select>
+                <select id="improvementsProduct" class="filter-select">
+                    <option value="all">All Products</option>
                 </select>
                 <select id="improvementsSource" class="filter-select">
                     <option value="all">All Sources</option>
@@ -716,11 +725,24 @@
                     <option value="OVH Forum">💬 OVH Forum</option>
                     <option value="Google News">📰 Google News</option>
                 </select>
+                <select id="improvementsAnswered" class="filter-select">
+                    <option value="all">All Status</option>
+                    <option value="1">Answered</option>
+                    <option value="0">Not Answered</option>
+                </select>
+                <select id="improvementsPeriodPosts" class="filter-select">
+                    <option value="30">Last 30 days</option>
+                    <option value="60">Last 60 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="180">Last 6 months</option>
+                    <option value="365">Last year</option>
+                </select>
                 <select id="improvementsSort" class="filter-select">
                     <option value="opportunity_score">Sort by Opportunity Score</option>
                     <option value="recent">Sort by Recent</option>
                     <option value="engagement">Sort by Engagement</option>
                 </select>
+                <button id="clearImprovementsFiltersBtn" class="filter-btn" style="background: #ef4444; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">Clear Filters</button>
             </div>
 
             <!-- Results Header -->

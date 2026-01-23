@@ -46,7 +46,8 @@ def generate_powerpoint_report(
     recommended_actions: List[Dict],
     stats: Dict,
     llm_analysis: Optional[str] = None,
-    chart_images: Optional[Dict[str, bytes]] = None
+    chart_images: Optional[Dict[str, bytes]] = None,
+    improvements_analysis: Optional[List[Dict]] = None
 ) -> bytes:
     """
     Generate a PowerPoint report with charts and insights.
@@ -80,156 +81,258 @@ def generate_powerpoint_report(
     title = slide.shapes.title
     subtitle = slide.placeholders[1]
     
-    title.text = "OVH Customer Feedback Report"
-    subtitle.text = f"Generated on {datetime.now().strftime('%B %d, %Y')}\nBased on {len(posts)} feedback posts"
-    
-    # Slide 2: Executive Summary
-    bullet_slide_layout = prs.slide_layouts[1]
-    slide = prs.slides.add_slide(bullet_slide_layout)
-    shapes = slide.shapes
-    title_shape = shapes.title
-    body_shape = shapes.placeholders[1]
-    
-    title_shape.text = "Executive Summary"
-    tf = body_shape.text_frame
-    tf.text = f"Total Posts Analyzed: {stats.get('total', len(posts))}"
-    
-    p = tf.add_paragraph()
-    p.text = f"Positive: {stats.get('positive', 0)} | Negative: {stats.get('negative', 0)} | Neutral: {stats.get('neutral', 0)}"
-    p.level = 0
-    
-    if filters.get('search'):
-        p = tf.add_paragraph()
-        p.text = f"Search Filter: \"{filters['search']}\""
-        p.level = 0
-    
+    # Build filter description
+    filter_parts = []
     if filters.get('dateFrom') or filters.get('dateTo'):
         date_range = f"{filters.get('dateFrom', 'Start')} to {filters.get('dateTo', 'End')}"
-        p = tf.add_paragraph()
-        p.text = f"Date Range: {date_range}"
-        p.level = 0
+        filter_parts.append(f"Period: {date_range}")
+    if filters.get('search'):
+        filter_parts.append(f"Search: \"{filters['search']}\"")
+    if filters.get('sentiment') and filters['sentiment'] != 'all':
+        filter_parts.append(f"Sentiment: {filters['sentiment']}")
+    if filters.get('language') and filters['language'] != 'all':
+        filter_parts.append(f"Language: {filters['language']}")
+    if filters.get('source') and filters['source'] != 'all':
+        filter_parts.append(f"Source: {filters['source']}")
+    if filters.get('product') and filters['product'] != 'all':
+        filter_parts.append(f"Product: {filters['product']}")
     
-    # Slide 3: Combined slide with charts, key takeaways, and LLM analysis
-    # Use blank layout for custom layout
+    filter_text = " | ".join(filter_parts) if filter_parts else "All posts"
+    
+    # Adjust title based on report type
+    if improvements_analysis:
+        title.text = "OVH Improvements Opportunities Report"
+    else:
+        title.text = "OVH Customer Feedback Report"
+    subtitle.text = f"Generated on {datetime.now().strftime('%B %d, %Y')}\nBased on {len(posts)} feedback posts\n{filter_text}"
+    
+    # Slide 2: AI Analysis (Page 1) - Beautifully formatted
     blank_slide_layout = prs.slide_layouts[6]  # Blank layout
     slide = prs.slides.add_slide(blank_slide_layout)
     
     # Add title
     title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.6))
     title_frame = title_box.text_frame
-    title_frame.text = "Dashboard Overview & Insights"
+    title_frame.text = "AI-Powered Analysis"
     title_paragraph = title_frame.paragraphs[0]
-    title_paragraph.font.size = Pt(24)
+    title_paragraph.font.size = Pt(32)
     title_paragraph.font.bold = True
-    title_paragraph.font.color.rgb = RGBColor(0, 0, 0)
+    title_paragraph.font.color.rgb = RGBColor(0, 153, 255)  # OVH blue
     
-    # Add charts in a 2x2 grid (or 3 charts if available)
+    # Add filter info box
+    from pptx.enum.shapes import MSO_SHAPE
+    filter_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(0.9), Inches(9), Inches(0.5))
+    filter_box.fill.solid()
+    filter_box.fill.fore_color.rgb = RGBColor(245, 247, 250)  # Light gray
+    filter_box.line.color.rgb = RGBColor(200, 200, 200)
+    filter_box.line.width = Pt(1)
+    
+    filter_textbox = slide.shapes.add_textbox(Inches(0.6), Inches(1), Inches(8.8), Inches(0.3))
+    filter_frame = filter_textbox.text_frame
+    filter_frame.text = f"📊 Analysis Period: {filter_text}"
+    filter_para = filter_frame.paragraphs[0]
+    filter_para.font.size = Pt(12)
+    filter_para.font.color.rgb = RGBColor(100, 100, 100)
+    
+    # Add stats summary
+    stats_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(1.5), Inches(9), Inches(0.8))
+    stats_box.fill.solid()
+    stats_box.fill.fore_color.rgb = RGBColor(255, 255, 255)
+    stats_box.line.color.rgb = RGBColor(0, 212, 255)
+    stats_box.line.width = Pt(2)
+    
+    stats_textbox = slide.shapes.add_textbox(Inches(0.6), Inches(1.6), Inches(8.8), Inches(0.6))
+    stats_frame = stats_textbox.text_frame
+    stats_frame.text = f"📈 Total Posts: {stats.get('total', len(posts))} | "
+    stats_para = stats_frame.paragraphs[0]
+    stats_para.font.size = Pt(14)
+    stats_para.font.bold = True
+    
+    p = stats_frame.add_paragraph()
+    p.text = f"✅ Positive: {stats.get('positive', 0)} | "
+    p.font.size = Pt(14)
+    p.font.color.rgb = RGBColor(34, 197, 94)  # Green
+    
+    p = stats_frame.add_paragraph()
+    p.text = f"❌ Negative: {stats.get('negative', 0)} | "
+    p.font.size = Pt(14)
+    p.font.color.rgb = RGBColor(239, 68, 68)  # Red
+    
+    p = stats_frame.add_paragraph()
+    p.text = f"⚪ Neutral: {stats.get('neutral', 0)}"
+    p.font.size = Pt(14)
+    p.font.color.rgb = RGBColor(156, 163, 175)  # Gray
+    
+    # Format stats as inline
+    stats_frame.paragraphs[0].text = f"📈 Total: {stats.get('total', len(posts))} | ✅ Positive: {stats.get('positive', 0)} | ❌ Negative: {stats.get('negative', 0)} | ⚪ Neutral: {stats.get('neutral', 0)}"
+    stats_frame.paragraphs[0].font.size = Pt(14)
+    stats_frame.paragraphs[0].font.bold = True
+    # Remove extra paragraphs
+    while len(stats_frame.paragraphs) > 1:
+        p = stats_frame.paragraphs[1]
+        stats_frame._element.remove(p._element)
+    
+    # Add LLM Analysis in a beautiful box
+    analysis_top = Inches(2.5)
+    analysis_height = Inches(4.0)  # Reduced to leave room for actions if needed
+    
+    if llm_analysis:
+        analysis_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), analysis_top, Inches(9), analysis_height)
+        analysis_box.fill.solid()
+        analysis_box.fill.fore_color.rgb = RGBColor(240, 248, 255)  # Light blue background
+        analysis_box.line.color.rgb = RGBColor(0, 153, 255)  # OVH blue border
+        analysis_box.line.width = Pt(3)
+        
+        analysis_textbox = slide.shapes.add_textbox(Inches(0.7), analysis_top + Inches(0.3), Inches(8.6), analysis_height - Inches(0.6))
+        analysis_frame = analysis_textbox.text_frame
+        analysis_frame.word_wrap = True
+        
+        # Parse and format LLM analysis
+        analysis_lines = llm_analysis.split('\n')
+        bullet_points = []
+        for line in analysis_lines:
+            line = line.strip()
+            if line:
+                line = line.lstrip('•-*').strip()
+                if line:
+                    bullet_points.append(line)
+        
+        # Add title
+        analysis_frame.text = "💡 Key Insights"
+        title_para = analysis_frame.paragraphs[0]
+        title_para.font.size = Pt(20)
+        title_para.font.bold = True
+        title_para.font.color.rgb = RGBColor(0, 153, 255)
+        title_para.space_after = Pt(12)
+        
+        # Add insights as formatted bullets
+        # If improvements_analysis is provided, use it instead of llm_analysis
+        if improvements_analysis and len(improvements_analysis) > 0:
+            # Use improvements insights
+            for i, insight in enumerate(improvements_analysis[:5]):  # Max 5 insights
+                p = analysis_frame.add_paragraph()
+                title_text = insight.get('title', '') if isinstance(insight, dict) else getattr(insight, 'title', '')
+                desc_text = insight.get('description', '') if isinstance(insight, dict) else getattr(insight, 'description', '')
+                if title_text and desc_text:
+                    p.text = f"• {title_text}: {desc_text[:100]}..." if len(desc_text) > 100 else f"• {title_text}: {desc_text}"
+                elif title_text:
+                    p.text = f"• {title_text}"
+                elif desc_text:
+                    p.text = f"• {desc_text[:120]}..." if len(desc_text) > 120 else f"• {desc_text}"
+                else:
+                    continue
+                p.level = 0
+                p.font.size = Pt(12)
+                p.font.color.rgb = RGBColor(0, 0, 0)
+                p.space_after = Pt(8)
+                p.space_before = Pt(4)
+        else:
+            # Use LLM analysis bullets
+            for i, point in enumerate(bullet_points[:5]):  # Max 5 insights
+                p = analysis_frame.add_paragraph()
+                p.text = f"• {point}"
+                p.level = 0
+                p.font.size = Pt(13)
+                p.font.color.rgb = RGBColor(0, 0, 0)
+                p.space_after = Pt(8)
+                p.space_before = Pt(4)
+    
+    # Add recommended actions if available (only if there's space)
+    if recommended_actions and llm_analysis:
+        # Adjust analysis height to leave room for actions
+        analysis_height = Inches(3.5)
+        actions_top = analysis_top + analysis_height + Inches(0.2)
+        actions_height = Inches(1.0)
+        
+        # Check if actions fit on slide
+        if actions_top + actions_height <= Inches(7.5):
+            actions_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), actions_top, Inches(9), actions_height)
+            actions_box.fill.solid()
+            actions_box.fill.fore_color.rgb = RGBColor(255, 250, 240)  # Light beige
+            actions_box.line.color.rgb = RGBColor(245, 158, 11)  # Orange border
+            actions_box.line.width = Pt(2)
+            
+            actions_textbox = slide.shapes.add_textbox(Inches(0.7), actions_top + Inches(0.1), Inches(8.6), actions_height - Inches(0.2))
+            actions_frame = actions_textbox.text_frame
+            actions_frame.word_wrap = True
+            actions_frame.text = "🎯 Recommended Actions"
+            
+            title_para = actions_frame.paragraphs[0]
+            title_para.font.size = Pt(14)
+            title_para.font.bold = True
+            title_para.font.color.rgb = RGBColor(245, 158, 11)
+            title_para.space_after = Pt(4)
+            
+            for action in recommended_actions[:2]:  # Max 2 actions to fit
+                p = actions_frame.add_paragraph()
+                p.text = f"• {action.get('text', 'N/A')[:80]}..." if len(action.get('text', '')) > 80 else f"• {action.get('text', 'N/A')}"
+                p.level = 0
+                p.font.size = Pt(10)
+                priority = action.get('priority', 'medium').lower()
+                if priority == 'high':
+                    p.font.color.rgb = RGBColor(239, 68, 68)
+                elif priority == 'medium':
+                    p.font.color.rgb = RGBColor(245, 158, 11)
+                else:
+                    p.font.color.rgb = RGBColor(34, 197, 94)
+                p.space_after = Pt(2)
+    
+    # Slide 3: Charts (Page 2) - Clean layout
+    slide = prs.slides.add_slide(blank_slide_layout)
+    
+    # Add title
+    title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.6))
+    title_frame = title_box.text_frame
+    title_frame.text = "Data Visualization"
+    title_paragraph = title_frame.paragraphs[0]
+    title_paragraph.font.size = Pt(32)
+    title_paragraph.font.bold = True
+    title_paragraph.font.color.rgb = RGBColor(0, 153, 255)  # OVH blue
+    
+    # Add charts in a clean grid layout
     chart_images_dict = chart_images or {}
+    
+    # Calculate positions for 2x2 grid (or 3 charts)
+    chart_width = Inches(4.2)
+    chart_height = Inches(2.8)
+    chart_spacing = Inches(0.3)
+    
     chart_positions = [
-        ('timeline', Inches(0.5), Inches(1), Inches(4.5), Inches(2.5)),
-        ('source', Inches(5.5), Inches(1), Inches(4.5), Inches(2.5)),
-        ('sentiment', Inches(0.5), Inches(3.8), Inches(4.5), Inches(2.5))
+        ('timeline', Inches(0.5), Inches(1.2), chart_width, chart_height),
+        ('source', Inches(5.1), Inches(1.2), chart_width, chart_height),
+        ('sentiment', Inches(2.8), Inches(4.3), chart_width, chart_height)
     ]
     
     charts_added = 0
     for chart_type, left, top, width, height in chart_positions:
         if chart_type in chart_images_dict and chart_images_dict[chart_type]:
             try:
-                slide.shapes.add_picture(io.BytesIO(chart_images_dict[chart_type]), left, top, width, height)
+                # Add chart
+                chart_pic = slide.shapes.add_picture(io.BytesIO(chart_images_dict[chart_type]), left, top, width, height)
                 charts_added += 1
+                
+                # Add chart label below
+                label_top = top + height + Inches(0.1)
+                label_textbox = slide.shapes.add_textbox(left, label_top, width, Inches(0.3))
+                label_frame = label_textbox.text_frame
+                label_frame.text = chart_type.replace('_', ' ').title()
+                label_para = label_frame.paragraphs[0]
+                label_para.font.size = Pt(11)
+                label_para.font.bold = True
+                label_para.font.color.rgb = RGBColor(100, 100, 100)
+                label_para.alignment = PP_ALIGN.CENTER
             except Exception as e:
                 logger.warning(f"Failed to add {chart_type} chart: {e}")
     
-    # Key Takeaways box (right side, below source chart)
-    takeaways_left = Inches(5.5)
-    takeaways_top = Inches(3.8)
-    takeaways_width = Inches(4.5)
-    takeaways_height = Inches(2.5)
-    
-    # Add background shape for key takeaways
-    from pptx.enum.shapes import MSO_SHAPE
-    takeaways_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, takeaways_left, takeaways_top, takeaways_width, takeaways_height)
-    takeaways_shape.fill.solid()
-    takeaways_shape.fill.fore_color.rgb = RGBColor(240, 248, 255)  # Light blue background
-    takeaways_shape.line.color.rgb = RGBColor(0, 212, 255)  # Cyan border
-    takeaways_shape.line.width = Pt(2)
-    
-    # Add text to key takeaways box
-    takeaways_textbox = slide.shapes.add_textbox(takeaways_left + Inches(0.2), takeaways_top + Inches(0.2), takeaways_width - Inches(0.4), takeaways_height - Inches(0.4))
-    takeaways_frame = takeaways_textbox.text_frame
-    takeaways_frame.word_wrap = True
-    takeaways_frame.text = "Key Takeaways"
-    
-    # Format title
-    takeaways_title = takeaways_frame.paragraphs[0]
-    takeaways_title.font.size = Pt(16)
-    takeaways_title.font.bold = True
-    takeaways_title.font.color.rgb = RGBColor(0, 0, 0)
-    takeaways_title.space_after = Pt(8)
-    
-    # Add recommended actions as bullets
-    if recommended_actions:
-        for action in recommended_actions[:3]:  # Top 3 actions
-            p = takeaways_frame.add_paragraph()
-            p.text = f"• {action.get('text', 'N/A')}"
-            p.level = 0
-            p.font.size = Pt(11)
-            p.space_after = Pt(4)
-            
-            # Color by priority
-            priority = action.get('priority', 'medium').lower()
-            if priority == 'high':
-                p.font.color.rgb = RGBColor(239, 68, 68)  # Red
-            elif priority == 'medium':
-                p.font.color.rgb = RGBColor(245, 158, 11)  # Orange
-            else:
-                p.font.color.rgb = RGBColor(34, 197, 94)  # Green
-    
-    # LLM Analysis box (below sentiment chart, full width)
-    if llm_analysis:
-        analysis_left = Inches(0.5)
-        analysis_top = Inches(6.5)
-        analysis_width = Inches(9)
-        analysis_height = Inches(1)
-        
-        # Add background shape for LLM analysis
-        analysis_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, analysis_left, analysis_top, analysis_width, analysis_height)
-        analysis_shape.fill.solid()
-        analysis_shape.fill.fore_color.rgb = RGBColor(255, 250, 240)  # Light beige background
-        analysis_shape.line.color.rgb = RGBColor(245, 158, 11)  # Orange border
-        analysis_shape.line.width = Pt(2)
-        
-        # Add LLM analysis text
-        analysis_textbox = slide.shapes.add_textbox(analysis_left + Inches(0.2), analysis_top + Inches(0.15), analysis_width - Inches(0.4), analysis_height - Inches(0.3))
-        analysis_frame = analysis_textbox.text_frame
-        analysis_frame.word_wrap = True
-        
-        # Parse LLM analysis into bullet points
-        analysis_lines = llm_analysis.split('\n')
-        bullet_points = []
-        for line in analysis_lines:
-            line = line.strip()
-            if line:
-                # Remove existing bullets if any
-                line = line.lstrip('•-*').strip()
-                bullet_points.append(line)
-        
-        # Take first 2-3 bullet points
-        for i, point in enumerate(bullet_points[:3]):
-            if i == 0:
-                analysis_frame.text = f"• {point}"
-            else:
-                p = analysis_frame.add_paragraph()
-                p.text = f"• {point}"
-                p.level = 0
-            
-            if i < len(bullet_points[:3]) - 1:
-                analysis_frame.paragraphs[i].space_after = Pt(4)
-        
-        # Format analysis text
-        for paragraph in analysis_frame.paragraphs:
-            paragraph.font.size = Pt(11)
-            paragraph.font.color.rgb = RGBColor(0, 0, 0)
+    # If no charts were added, add a message
+    if charts_added == 0:
+        no_charts_textbox = slide.shapes.add_textbox(Inches(2), Inches(3), Inches(6), Inches(1.5))
+        no_charts_frame = no_charts_textbox.text_frame
+        no_charts_frame.text = "No charts available for this report."
+        no_charts_para = no_charts_frame.paragraphs[0]
+        no_charts_para.font.size = Pt(16)
+        no_charts_para.font.color.rgb = RGBColor(150, 150, 150)
+        no_charts_para.alignment = PP_ALIGN.CENTER
     
     # Save to bytes
     pptx_bytes = io.BytesIO()

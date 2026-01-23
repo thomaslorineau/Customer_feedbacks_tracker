@@ -64,6 +64,10 @@ export function initDashboard(appState) {
         if (globalDateFrom) globalDateFrom.value = '';
         if (globalDateTo) globalDateTo.value = '';
         
+        // Reset date range preset selector
+        const dateRangePreset = document.getElementById('dateRangePreset');
+        if (dateRangePreset) dateRangePreset.value = 'all';
+        
         // Also reset all filter selects to 'all'
         const sentimentFilter = document.getElementById('sentimentFilter');
         const languageFilter = document.getElementById('languageFilter');
@@ -226,6 +230,35 @@ function initializeDefaultDateRange() {
         } else if (!hasDateToState && globalDateTo) {
             globalDateTo.value = '';
         }
+        
+        // Sync date range preset selector
+        const dateRangePreset = document.getElementById('dateRangePreset');
+        if (dateRangePreset && globalDateFrom && globalDateTo) {
+            if (hasDateFromState && hasDateToState && state.filters.dateFrom && state.filters.dateTo) {
+                // Detect preset based on dates
+                const fromDate = new Date(state.filters.dateFrom);
+                const toDate = new Date(state.filters.dateTo);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                toDate.setHours(0, 0, 0, 0);
+                
+                if (toDate.getTime() === today.getTime()) {
+                    const diffTime = today - fromDate;
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays === 30) dateRangePreset.value = '30';
+                    else if (diffDays === 60) dateRangePreset.value = '60';
+                    else if (diffDays === 90) dateRangePreset.value = '90';
+                    else if (diffDays === 180) dateRangePreset.value = '180';
+                    else if (diffDays === 365) dateRangePreset.value = '365';
+                    else dateRangePreset.value = 'custom';
+                } else {
+                    dateRangePreset.value = 'custom';
+                }
+            } else {
+                dateRangePreset.value = 'all';
+            }
+        }
+        
         state.applyFilters();
     }
     
@@ -340,6 +373,93 @@ function setupEventListeners() {
     const globalDateFrom = document.getElementById('globalDateFrom');
     const globalDateTo = document.getElementById('globalDateTo');
     const clearDatesBtn = document.getElementById('clearDatesBtn');
+    const dateRangePreset = document.getElementById('dateRangePreset');
+    
+    // Function to detect current preset based on dates (accessible globally)
+    window.detectCurrentPreset = function() {
+        if (!globalDateFrom || !globalDateTo) return 'custom';
+        
+        const dateFrom = globalDateFrom.value;
+        const dateTo = globalDateTo.value;
+        
+        if (!dateFrom || !dateTo) {
+            return 'all';
+        }
+        
+        const fromDate = new Date(dateFrom);
+        const toDate = new Date(dateTo);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        toDate.setHours(0, 0, 0, 0);
+        
+        // Check if toDate is today
+        if (toDate.getTime() !== today.getTime()) {
+            return 'custom';
+        }
+        
+        // Calculate days difference
+        const diffTime = today - fromDate;
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Match to preset
+        if (diffDays === 30) return '30';
+        if (diffDays === 60) return '60';
+        if (diffDays === 90) return '90';
+        if (diffDays === 180) return '180';
+        if (diffDays === 365) return '365';
+        
+        return 'custom';
+    };
+    
+    // Function to apply date range preset
+    function applyDateRangePreset(days) {
+        if (days === 'all') {
+            // Clear all date filters
+            state.setFilter('dateFrom', '');
+            state.setFilter('dateTo', '');
+            if (globalDateFrom) globalDateFrom.value = '';
+            if (globalDateTo) globalDateTo.value = '';
+        } else if (days === 'custom') {
+            // Don't change dates, just mark as custom
+            // The dates will be set by the date inputs
+            return;
+        } else {
+            // Calculate date range
+            const daysNum = parseInt(days);
+            const today = new Date();
+            const dateFrom = new Date(today);
+            dateFrom.setDate(dateFrom.getDate() - daysNum);
+            
+            const dateFromStr = dateFrom.toISOString().split('T')[0];
+            const dateToStr = today.toISOString().split('T')[0];
+            
+            // Apply filters
+            state.setFilter('dateFrom', dateFromStr);
+            state.setFilter('dateTo', dateToStr);
+            
+            // Update inputs
+            if (globalDateFrom) globalDateFrom.value = dateFromStr;
+            if (globalDateTo) globalDateTo.value = dateToStr;
+            
+            // Sync with local date inputs
+            const dateFromInput = document.getElementById('dateFrom');
+            const dateToInput = document.getElementById('dateTo');
+            if (dateFromInput) dateFromInput.value = dateFromStr;
+            if (dateToInput) dateToInput.value = dateToStr;
+        }
+        
+        updateDefaultDateRangeIndicator();
+        updateResetFiltersButtonVisibility();
+        updateDashboard();
+    }
+    
+    // Date range preset selector
+    if (dateRangePreset) {
+        dateRangePreset.addEventListener('change', (e) => {
+            const presetValue = e.target.value;
+            applyDateRangePreset(presetValue);
+        });
+    }
     
     if (globalDateFrom) {
         globalDateFrom.addEventListener('change', (e) => {
@@ -348,6 +468,11 @@ function setupEventListeners() {
             // Sync with local date inputs
             const dateFromInput = document.getElementById('dateFrom');
             if (dateFromInput) dateFromInput.value = dateValue;
+            // Update preset selector to "custom" if dates don't match a preset
+            if (dateRangePreset && window.detectCurrentPreset) {
+                const detectedPreset = window.detectCurrentPreset();
+                dateRangePreset.value = detectedPreset;
+            }
             updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
@@ -361,6 +486,11 @@ function setupEventListeners() {
             // Sync with local date inputs
             const dateToInput = document.getElementById('dateTo');
             if (dateToInput) dateToInput.value = dateValue;
+            // Update preset selector to "custom" if dates don't match a preset
+            if (dateRangePreset && window.detectCurrentPreset) {
+                const detectedPreset = window.detectCurrentPreset();
+                dateRangePreset.value = detectedPreset;
+            }
             updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
@@ -374,6 +504,8 @@ function setupEventListeners() {
             state.setFilter('dateTo', '');
             if (globalDateFrom) globalDateFrom.value = '';
             if (globalDateTo) globalDateTo.value = '';
+            // Reset preset selector to "all"
+            if (dateRangePreset) dateRangePreset.value = 'all';
             // Sync with local date inputs
             const dateFromInput = document.getElementById('dateFrom');
             const dateToInput = document.getElementById('dateTo');
@@ -1236,34 +1368,11 @@ function clearTimelineFilter() {
 }
 
 function updateDefaultDateRangeIndicator() {
-    const indicator = document.getElementById('globalDefaultDateRangeIndicator');
-    if (!indicator) return;
-    
-    const globalDateFrom = document.getElementById('globalDateFrom');
-    const globalDateTo = document.getElementById('globalDateTo');
-    
-    if (!globalDateFrom || !globalDateTo) return;
-    
-    const dateFrom = globalDateFrom.value;
-    const dateTo = globalDateTo.value;
-    
-    // Check if current dates match default (last 12 months)
-    if (dateFrom && dateTo) {
-        const now = new Date();
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(now.getMonth() - 12);
-        
-        const defaultFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-        const defaultToStr = now.toISOString().split('T')[0];
-        
-        if (dateFrom === defaultFromStr && dateTo === defaultToStr) {
-            indicator.style.display = 'inline';
-            indicator.textContent = '(12 derniers mois par défaut)';
-        } else {
-            indicator.style.display = 'none';
-        }
-    } else {
-        indicator.style.display = 'none';
+    // Sync date range preset selector instead of showing indicator
+    const dateRangePreset = document.getElementById('dateRangePreset');
+    if (dateRangePreset && window.detectCurrentPreset) {
+        const detectedPreset = window.detectCurrentPreset();
+        dateRangePreset.value = detectedPreset;
     }
 }
 
@@ -2501,13 +2610,11 @@ async function generatePowerPointReport() {
     const btn = document.getElementById('generateReportBtn');
     if (!btn) return;
     
-    const btnText = btn.querySelector('.btn-text');
-    const btnSpinner = btn.querySelector('.btn-spinner');
+    const originalText = btn.textContent;
     
     // Show loading state
     btn.disabled = true;
-    if (btnText) btnText.textContent = 'Generating...';
-    if (btnSpinner) btnSpinner.style.display = 'block';
+    btn.textContent = '⏳ Generating...';
     
     try {
         // Get current filters and state
@@ -2535,17 +2642,28 @@ async function generatePowerPointReport() {
         formData.append('include_analysis', 'true');
         
         // Add chart images if available
+        // Convert base64 data URI directly to blob (avoid CSP issues with fetch)
+        function base64ToBlob(base64, mimeType = 'image/png') {
+            const base64Data = base64.split(',')[1] || base64;
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: mimeType });
+        }
+        
         if (chartImages.timeline) {
-            // Convert base64 to blob
-            const timelineBlob = await fetch(chartImages.timeline).then(r => r.blob());
+            const timelineBlob = base64ToBlob(chartImages.timeline);
             formData.append('timeline_chart', timelineBlob, 'timeline.png');
         }
         if (chartImages.source) {
-            const sourceBlob = await fetch(chartImages.source).then(r => r.blob());
+            const sourceBlob = base64ToBlob(chartImages.source);
             formData.append('source_chart', sourceBlob, 'source.png');
         }
         if (chartImages.sentiment) {
-            const sentimentBlob = await fetch(chartImages.sentiment).then(r => r.blob());
+            const sentimentBlob = base64ToBlob(chartImages.sentiment);
             formData.append('sentiment_chart', sentimentBlob, 'sentiment.png');
         }
         
@@ -2582,8 +2700,7 @@ async function generatePowerPointReport() {
     } finally {
         // Reset button state
         btn.disabled = false;
-        if (btnText) btnText.textContent = '📊 PowerPoint';
-        if (btnSpinner) btnSpinner.style.display = 'none';
+        btn.textContent = originalText;
     }
 }
 

@@ -265,7 +265,7 @@ async function loadProductDistribution() {
     try {
         console.log('Loading product distribution...');
         // Add date filter to product opportunities
-        const dateFrom = getDateFrom(currentPeriodDays);
+            const dateFrom = getDateFrom(currentPeriodDays);
         const response = await fetch(`/api/product-opportunities?date_from=${dateFrom}`);
         console.log('Product distribution response status:', response.status, response.statusText);
         
@@ -374,7 +374,11 @@ async function loadPostsForImprovement(resetOffset = false, productFilter = null
     try {
         const search = document.getElementById('improvementsSearch')?.value || '';
         const language = document.getElementById('improvementsLanguage')?.value || 'all';
+        const product = document.getElementById('improvementsProduct')?.value || 'all';
         const source = document.getElementById('improvementsSource')?.value || 'all';
+        const answered = document.getElementById('improvementsAnswered')?.value || 'all';
+        const periodPosts = document.getElementById('improvementsPeriodPosts')?.value || currentPeriodDays.toString();
+        const periodDays = parseInt(periodPosts, 10);
         const sortBy = document.getElementById('improvementsSort')?.value || 'opportunity_score';
         
         const params = new URLSearchParams({
@@ -383,18 +387,23 @@ async function loadPostsForImprovement(resetOffset = false, productFilter = null
             sort_by: sortBy
         });
         
-        // Add date filter
-        const dateFrom = getDateFrom(currentPeriodDays);
+        // Add date filter from period selector
+        const dateFrom = getDateFrom(periodDays);
         params.append('date_from', dateFrom);
         
-        // Add product filter if active (use search parameter for product filtering)
+        // Add search filter (product or keyword search)
         if (filterProduct) {
             params.append('search', filterProduct);
+        } else if (product !== 'all') {
+            params.append('search', product);
         } else if (search) {
             params.append('search', search);
         }
+        
+        // Add other filters
         if (language !== 'all') params.append('language', language);
         if (source !== 'all') params.append('source', source);
+        if (answered !== 'all') params.append('is_answered', answered);
         
         console.log('Loading posts for improvement with params:', params.toString());
         const response = await fetch(`/api/posts-for-improvement?${params}`);
@@ -612,7 +621,28 @@ function setupEventListeners() {
         periodFilter.addEventListener('change', async (e) => {
             currentPeriodDays = parseInt(e.target.value, 10);
             console.log('Period filter changed to:', currentPeriodDays, 'days');
+            // Sync posts period filter
+            const periodPostsFilter = document.getElementById('improvementsPeriodPosts');
+            if (periodPostsFilter) {
+                periodPostsFilter.value = currentPeriodDays.toString();
+            }
             await reloadAllData();
+        });
+    }
+    
+    // Period filter for posts section (sync with main filter)
+    const periodPostsFilter = document.getElementById('improvementsPeriodPosts');
+    if (periodPostsFilter) {
+        // Sync with main period filter
+        periodPostsFilter.value = currentPeriodDays.toString();
+        periodPostsFilter.addEventListener('change', (e) => {
+            const days = parseInt(e.target.value, 10);
+            // Sync main filter
+            if (periodFilter) {
+                periodFilter.value = days.toString();
+                currentPeriodDays = days;
+            }
+            loadPostsForImprovement(true);
         });
     }
     
@@ -629,7 +659,7 @@ function setupEventListeners() {
     }
     
     // Filters
-    const filters = ['improvementsLanguage', 'improvementsSource', 'improvementsSort'];
+    const filters = ['improvementsLanguage', 'improvementsSource', 'improvementsProduct', 'improvementsAnswered', 'improvementsPeriodPosts', 'improvementsSort'];
     filters.forEach(filterId => {
         const filter = document.getElementById(filterId);
         if (filter) {
@@ -638,6 +668,206 @@ function setupEventListeners() {
             });
         }
     });
+    
+    // Clear filters button
+    const clearFiltersBtn = document.getElementById('clearImprovementsFiltersBtn');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            clearImprovementsFilters();
+        });
+    }
+    
+    // Load products into product filter
+    loadProductsForFilter();
+    
+    // PowerPoint report button
+    const generateReportBtn = document.getElementById('generateImprovementsReportBtn');
+    if (generateReportBtn) {
+        generateReportBtn.addEventListener('click', () => {
+            generateImprovementsPowerPointReport();
+        });
+    }
+}
+
+// Generate PowerPoint report for improvements page
+async function generateImprovementsPowerPointReport() {
+    const btn = document.getElementById('generateImprovementsReportBtn');
+    if (!btn) return;
+    
+    const originalText = btn.textContent;
+    
+    // Show loading state
+    btn.disabled = true;
+    btn.textContent = '⏳ Generating...';
+    
+    try {
+        // Get current filters
+        const periodDays = parseInt(document.getElementById('improvementsPeriod')?.value || '30', 10);
+        const dateFrom = getDateFrom(periodDays);
+        const search = document.getElementById('improvementsSearch')?.value || '';
+        const language = document.getElementById('improvementsLanguage')?.value || 'all';
+        const product = document.getElementById('improvementsProduct')?.value || 'all';
+        const source = document.getElementById('improvementsSource')?.value || 'all';
+        const answered = document.getElementById('improvementsAnswered')?.value || 'all';
+        
+        const filters = {
+            search: search,
+            sentiment: 'all',
+            language: language !== 'all' ? language : 'all',
+            product: product !== 'all' ? product : 'all',
+            source: source !== 'all' ? source : 'all',
+            dateFrom: dateFrom,
+            dateTo: new Date().toISOString().split('T')[0]
+        };
+        
+        // Get improvements analysis insights
+        const insights = window.currentImprovementsInsights || [];
+        const improvementsAnalysis = insights.map(insight => ({
+            title: insight.title || insight.get?.('title', ''),
+            description: insight.description || insight.get?.('description', ''),
+            metric: insight.metric || insight.get?.('metric', ''),
+            roi_impact: insight.roi_impact || insight.get?.('roi_impact', '')
+        }));
+        
+        // Prepare FormData
+        const formData = new FormData();
+        formData.append('filters', JSON.stringify(filters));
+        formData.append('include_recommendations', 'true');
+        formData.append('include_analysis', 'true');
+        formData.append('improvements_analysis', JSON.stringify(improvementsAnalysis));
+        formData.append('report_type', 'improvements');
+        
+        // Call API to generate report
+        const response = await fetch('/api/generate-powerpoint-report', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to generate report' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        // Get the file as blob
+        const blob = await response.blob();
+        
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `OVH_Improvements_Report_${new Date().toISOString().split('T')[0]}.pptx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        // Show success message
+        showToast('PowerPoint report generated successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error generating PowerPoint report:', error);
+        showToast(`Failed to generate report: ${error.message}`, 'error');
+    } finally {
+        // Reset button state
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+// Show toast notification (simple implementation)
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 16px 24px;
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#0099ff'};
+        color: white;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 10000;
+        font-weight: 600;
+        animation: slideIn 0.3s ease-out;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => {
+            document.body.removeChild(toast);
+        }, 300);
+    }, 3000);
+}
+
+// Load products into product filter dropdown
+async function loadProductsForFilter() {
+    try {
+        const response = await fetch('/api/posts');
+        if (!response.ok) return;
+        
+        const posts = await response.json();
+        if (!Array.isArray(posts)) return;
+        
+        // Import product detection
+        const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+        
+        // Get unique products
+        const products = new Set();
+        posts.forEach(post => {
+            const product = getProductLabel(post.id, post.content, post.language);
+            if (product) {
+                products.add(product);
+            }
+        });
+        
+        // Sort products alphabetically
+        const sortedProducts = Array.from(products).sort();
+        
+        // Update select
+        const productSelect = document.getElementById('improvementsProduct');
+        if (productSelect) {
+            // Keep "All Products" option
+            const allOption = productSelect.querySelector('option[value="all"]');
+            productSelect.innerHTML = '';
+            if (allOption) {
+                productSelect.appendChild(allOption);
+            }
+            
+            // Add product options
+            sortedProducts.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product;
+                option.textContent = product;
+                productSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading products for filter:', error);
+    }
+}
+
+// Clear all filters
+function clearImprovementsFilters() {
+    const searchInput = document.getElementById('improvementsSearch');
+    const languageSelect = document.getElementById('improvementsLanguage');
+    const productSelect = document.getElementById('improvementsProduct');
+    const sourceSelect = document.getElementById('improvementsSource');
+    const answeredSelect = document.getElementById('improvementsAnswered');
+    const periodPostsSelect = document.getElementById('improvementsPeriodPosts');
+    const sortSelect = document.getElementById('improvementsSort');
+    
+    if (searchInput) searchInput.value = '';
+    if (languageSelect) languageSelect.value = 'all';
+    if (productSelect) productSelect.value = 'all';
+    if (sourceSelect) sourceSelect.value = 'all';
+    if (answeredSelect) answeredSelect.value = 'all';
+    if (periodPostsSelect) periodPostsSelect.value = currentPeriodDays.toString();
+    if (sortSelect) sortSelect.value = 'opportunity_score';
+    
+    // Reload posts
+    loadPostsForImprovement(true);
 }
 
 // Initialize app
@@ -646,6 +876,10 @@ async function init() {
     initializeTheme();
     setupThemeToggle();
     setupEventListeners();
+    // Load products after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        loadProductsForFilter();
+    }, 500);
     
     // Show LLM analysis overlay IMMEDIATELY on page load
     const showImprovementsOverlay = () => {
@@ -1448,7 +1682,7 @@ window.openPainPointDrawer = function(painPointTitle, painPointIndex) {
 async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
     try {
         // Get date filter
-        const dateFrom = getDateFrom(currentPeriodDays);
+            const dateFrom = getDateFrom(currentPeriodDays);
         
         // Import product detection function early
         const { getProductLabel } = await import('/dashboard/js/product-detection.js');

@@ -1523,6 +1523,8 @@ body {
     box-sizing: border-box;
     min-height: 40px; /* Fixed height to prevent movement */
     height: auto; /* Allow content to determine height but maintain min-height */
+    /* Prevent any transform or position changes */
+    transform: none !important;
 }
 
 .whats-happening-header h2 {
@@ -2469,19 +2471,30 @@ body.dark-mode .llm-analysis-overlay {
     white-space: nowrap;
     flex-shrink: 0;
     min-width: 160px;
+    max-width: 160px; /* Fixed width to prevent movement */
     justify-content: center;
-    position: relative; /* Ensure it doesn't move */
+    position: relative !important; /* Ensure it doesn't move */
     visibility: visible !important; /* Always visible */
     opacity: 1 !important; /* Always opaque */
+    /* Prevent any transform or position changes */
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
 }
 
 .btn-refresh-analysis:hover {
     background: var(--accent-secondary);
     box-shadow: 0 4px 8px rgba(0, 153, 255, 0.3);
+    /* No transform on hover to prevent movement */
+    transform: none !important;
 }
 
 .btn-refresh-analysis:active {
     box-shadow: 0 2px 4px rgba(0, 153, 255, 0.2);
+    /* No transform on active to prevent movement */
+    transform: none !important;
 }
 
 .btn-refresh-analysis:disabled {
@@ -2490,8 +2503,13 @@ body.dark-mode .llm-analysis-overlay {
 }
 
 .btn-refresh-analysis svg {
-    animation: spin 1s linear infinite;
     flex-shrink: 0;
+    /* Animation removed to prevent button movement */
+}
+
+/* Only animate SVG when button is actively refreshing */
+.btn-refresh-analysis.refreshing svg {
+    animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

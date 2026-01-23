@@ -518,6 +518,16 @@ async def generate_powerpoint_report_endpoint(request: Request):
     
     include_recommendations = form.get('include_recommendations', 'true').lower() == 'true'
     include_analysis = form.get('include_analysis', 'true').lower() == 'true'
+    report_type = form.get('report_type', 'dashboard')  # 'dashboard' or 'improvements'
+    improvements_analysis_str = form.get('improvements_analysis', '[]')
+    
+    # Parse improvements analysis if provided
+    improvements_analysis = []
+    if improvements_analysis_str:
+        try:
+            improvements_analysis = json.loads(improvements_analysis_str) if isinstance(improvements_analysis_str, str) else improvements_analysis_str
+        except:
+            improvements_analysis = []
     
     # Get chart images
     timeline_file = form.get('timeline_chart')
@@ -628,24 +638,70 @@ async def generate_powerpoint_report_endpoint(request: Request):
             except Exception as e:
                 logger.warning(f"Failed to get recommended actions for report: {e}")
         
-        # Generate LLM analysis if requested
+        # Generate LLM analysis using What's Happening insights if requested
         llm_analysis = None
         if include_analysis:
             try:
-                import httpx
-                api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-                if api_key:
-                    # Generate brief analysis
-                    prompt = f"""Analyze the following customer feedback data and provide 2-3 key bullet points (one sentence each):
+                # Use the What's Happening endpoint to get proper insights
+                from .dashboard.insights import generate_whats_happening_insights_with_llm
+                
+                # Build active filters string
+                active_filters_parts = []
+                if filters.get('dateFrom') or filters.get('dateTo'):
+                    date_range = f"{filters.get('dateFrom', 'Start')} to {filters.get('dateTo', 'End')}"
+                    active_filters_parts.append(f"Period: {date_range}")
+                if filters.get('search'):
+                    active_filters_parts.append(f"Search: {filters['search']}")
+                if filters.get('sentiment') and filters['sentiment'] != 'all':
+                    active_filters_parts.append(f"Sentiment: {filters['sentiment']}")
+                if filters.get('language') and filters['language'] != 'all':
+                    active_filters_parts.append(f"Language: {filters['language']}")
+                if filters.get('source') and filters['source'] != 'all':
+                    active_filters_parts.append(f"Source: {filters['source']}")
+                if filters.get('product') and filters['product'] != 'all':
+                    active_filters_parts.append(f"Product: {filters['product']}")
+                
+                active_filters_str = " | ".join(active_filters_parts) if active_filters_parts else "All posts"
+                
+                # Get insights from What's Happening
+                insights = await generate_whats_happening_insights_with_llm(
+                    filtered_posts,
+                    stats,
+                    active_filters_str,
+                    ""
+                )
+                
+                # Format insights as analysis text
+                if insights:
+                    insight_texts = []
+                    for insight in insights[:5]:  # Top 5 insights
+                        title = insight.title if hasattr(insight, 'title') else insight.get('title', '')
+                        description = insight.description if hasattr(insight, 'description') else insight.get('description', '')
+                        if title and description:
+                            insight_texts.append(f"{title}: {description}")
+                        elif title:
+                            insight_texts.append(title)
+                        elif description:
+                            insight_texts.append(description)
+                    
+                    if insight_texts:
+                        llm_analysis = "\n".join(insight_texts)
+            except Exception as e:
+                logger.warning(f"Error generating LLM analysis from insights: {type(e).__name__}: {e}")
+                # Fallback to simple analysis
+                try:
+                    import httpx
+                    api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+                    if api_key:
+                        prompt = f"""Analyze the following customer feedback data and provide 3-4 key insights (one sentence each):
 - Total posts: {stats['total']}
 - Positive: {stats['positive']}, Negative: {stats['negative']}, Neutral: {stats['neutral']}
-- Active filters: {filters}
+- Active filters: {active_filters_str if 'active_filters_str' in locals() else filters}
 
 Format as bullet points, professional and executive-friendly."""
-                    
-                    llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-                    if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
-                        try:
+                        
+                        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+                        if llm_provider == 'openai' or (not os.getenv('LLM_PROVIDER') and api_key):
                             async with httpx.AsyncClient(timeout=30.0) as client:
                                 response = await client.post(
                                     'https://api.openai.com/v1/chat/completions',
@@ -657,27 +713,15 @@ Format as bullet points, professional and executive-friendly."""
                                             {'role': 'user', 'content': prompt}
                                         ],
                                         'temperature': 0.7,
-                                        'max_tokens': 200
+                                        'max_tokens': 300
                                     }
                                 )
                                 response.raise_for_status()
                                 result = response.json()
                                 llm_analysis = result['choices'][0]['message']['content'].strip()
-                        except httpx.HTTPStatusError as e:
-                            if e.response.status_code == 401:
-                                logger.warning(f"LLM API authentication failed (401) for PowerPoint report. Skipping LLM analysis.")
-                            else:
-                                logger.warning(f"LLM API error ({e.response.status_code}) for PowerPoint report: {e}. Skipping LLM analysis.")
-                            llm_analysis = None
-                        except Exception as e:
-                            logger.warning(f"Failed to generate LLM analysis for report: {type(e).__name__}: {e}")
-                            llm_analysis = None
-                    elif llm_provider == 'anthropic':
-                        # Anthropic handling would go here if needed
-                        pass
-            except Exception as e:
-                logger.warning(f"Error generating LLM analysis: {type(e).__name__}: {e}")
-                llm_analysis = None
+                except Exception as e2:
+                    logger.warning(f"Failed to generate fallback LLM analysis: {type(e2).__name__}: {e2}")
+                    llm_analysis = None
         
         # Generate PowerPoint with chart images
         pptx_bytes = powerpoint_generator.generate_powerpoint_report(
@@ -686,7 +730,8 @@ Format as bullet points, professional and executive-friendly."""
             recommended_actions=recommended_actions,
             stats=stats,
             llm_analysis=llm_analysis,
-            chart_images=chart_images
+            chart_images=chart_images,
+            improvements_analysis=improvements_analysis if report_type == 'improvements' else None
         )
         
         # Return as file download
