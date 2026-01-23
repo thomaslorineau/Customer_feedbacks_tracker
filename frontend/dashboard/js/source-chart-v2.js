@@ -163,7 +163,10 @@ function renderSourceChart(sourceData, sentimentBySource) {
     ];
     
     // Create chart
-    sourceChart = new Chart(ctx, {
+    try {
+        console.log('[source-chart-v2.js] Creating Chart.js instance...');
+        console.log('[source-chart-v2.js] Chart available?', typeof Chart !== 'undefined');
+        sourceChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: sortedSources,
@@ -327,6 +330,11 @@ function renderSourceChart(sourceData, sentimentBySource) {
             }
         }
     });
+        console.log('[source-chart-v2.js] Chart created successfully');
+    } catch (error) {
+        console.error('[source-chart-v2.js] Error creating chart:', error);
+        console.error('[source-chart-v2.js] Error details:', error.message, error.stack);
+    }
 }
 
 /**
