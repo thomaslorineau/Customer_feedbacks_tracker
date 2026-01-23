@@ -125,6 +125,33 @@ function renderSourceChart(sourceData, sentimentBySource) {
     
     console.log(`[source-chart-v2.js] Rendering chart with ${Object.keys(sourceData).length} sources`);
     
+    // Check canvas dimensions and visibility
+    const rect = canvas.getBoundingClientRect();
+    const computedStyle = window.getComputedStyle(canvas);
+    console.log('[source-chart-v2.js] Canvas dimensions:', {
+        width: canvas.width,
+        height: canvas.height,
+        clientWidth: canvas.clientWidth,
+        clientHeight: canvas.clientHeight,
+        boundingRect: { width: rect.width, height: rect.height },
+        display: computedStyle.display,
+        visibility: computedStyle.visibility,
+        opacity: computedStyle.opacity,
+        zIndex: computedStyle.zIndex
+    });
+    
+    // Check if overlay is blocking
+    const overlay = document.getElementById('whatsHappeningOverlay');
+    if (overlay) {
+        const overlayStyle = window.getComputedStyle(overlay);
+        console.log('[source-chart-v2.js] Overlay state:', {
+            display: overlayStyle.display,
+            visibility: overlayStyle.visibility,
+            opacity: overlayStyle.opacity,
+            zIndex: overlayStyle.zIndex
+        });
+    }
+    
     const ctx = canvas.getContext('2d');
     
     // Destroy existing chart if it exists
@@ -330,7 +357,26 @@ function renderSourceChart(sourceData, sentimentBySource) {
             }
         }
     });
-        console.log('[source-chart-v2.js] Chart created successfully');
+    
+    // Log after chart creation
+    console.log('[source-chart-v2.js] Chart instance created:', {
+        chartId: sourceChart?.id,
+        dataPoints: sourceChart?.data?.datasets?.[0]?.data?.length || 0,
+        labels: sourceChart?.data?.labels?.length || 0
+    });
+    
+        // Log after chart creation
+        console.log('[source-chart-v2.js] Chart instance created:', {
+            chartId: sourceChart?.id,
+            dataPoints: sourceChart?.data?.datasets?.[0]?.data?.length || 0,
+            labels: sourceChart?.data?.labels?.length || 0
+        });
+        
+        // Force chart update to ensure rendering
+        if (sourceChart) {
+            sourceChart.update();
+            console.log('[source-chart-v2.js] Chart update() called');
+        }
     } catch (error) {
         console.error('[source-chart-v2.js] Error creating chart:', error);
         console.error('[source-chart-v2.js] Error details:', error.message, error.stack);
