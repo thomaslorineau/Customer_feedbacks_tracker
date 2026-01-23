@@ -163,32 +163,55 @@ function renderSourceChart(sourceData, sentimentBySource) {
         }
     }
     
-    // Ensure canvas has explicit dimensions for Chart.js
-    const container = canvas.parentElement;
-    if (container) {
-        const containerHeight = container.clientHeight || 320;
-        const containerWidth = container.clientWidth || 550;
-        // Set canvas dimensions explicitly (Chart.js needs this)
-        canvas.style.width = `${containerWidth}px`;
-        canvas.style.height = `${containerHeight}px`;
-        // Also set canvas internal dimensions
-        canvas.width = containerWidth;
-        canvas.height = containerHeight;
-        console.log('[source-chart-v2.js] Canvas dimensions set:', {
-            width: canvas.width,
-            height: canvas.height,
-            styleWidth: canvas.style.width,
-            styleHeight: canvas.style.height
-        });
-    }
-    
-    const ctx = canvas.getContext('2d');
-    
     // Destroy existing chart if it exists
     if (sourceChart) {
         sourceChart.destroy();
+        sourceChart = null;
     }
     
+    // Wait for next frame to ensure DOM is fully rendered
+    // This is critical for Chart.js to calculate dimensions correctly
+    requestAnimationFrame(() => {
+        // Re-get canvas in case DOM changed
+        const canvasElement = document.getElementById('sourceChart');
+        if (!canvasElement) {
+            console.warn('[source-chart-v2.js] Canvas not found in requestAnimationFrame');
+            return;
+        }
+        
+        // Get container dimensions for Chart.js
+        const container = canvasElement.parentElement;
+        if (!container) {
+            console.warn('[source-chart-v2.js] Container not found');
+            return;
+        }
+        
+        // Chart.js will handle dimensions with responsive: true
+        // We just need to ensure the container has dimensions
+        const containerRect = container.getBoundingClientRect();
+        if (containerRect.width === 0 || containerRect.height === 0) {
+            console.warn('[source-chart-v2.js] Container has zero dimensions, retrying...');
+            setTimeout(() => renderSourceChart(sourceData, sentimentBySource), 100);
+            return;
+        }
+        
+        console.log('[source-chart-v2.js] Container dimensions:', {
+            width: containerRect.width,
+            height: containerRect.height
+        });
+        
+        const ctx = canvasElement.getContext('2d');
+        if (!ctx) {
+            console.error('[source-chart-v2.js] Failed to get 2D context');
+            return;
+        }
+        
+        createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
+    });
+}
+
+// Separate function to create chart instance
+function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
     // Prepare data
     const sources = Object.keys(sourceData);
     const counts = Object.values(sourceData);
