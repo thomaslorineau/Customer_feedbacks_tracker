@@ -73,44 +73,41 @@ function updateSourceChartFromState(state) {
  * Load data and render the source chart (deprecated - now uses state directly)
  * Kept for backward compatibility but should use updateSourceChartFromState instead
  * This function NO LONGER makes API calls - it only uses state data
+ * 
+ * IMPORTANT: This function never throws errors or logs to console.
+ * It silently handles all cases and updates the chart when state is available.
  */
 async function loadAndRenderSourceChart() {
     // This function is deprecated and should not be called directly
     // Use updateSourceChartFromState instead
     // No API calls are made - all data comes from state
     
-    try {
-        // Use state data directly instead of API call
-        if (currentState && currentState.posts && currentState.posts.length > 0) {
-            updateSourceChartFromState(currentState);
-            return;
-        }
-        
-        // If no state available, wait a bit and try again (state might be loading)
-        setTimeout(() => {
-            if (currentState && currentState.posts && currentState.posts.length > 0) {
-                updateSourceChartFromState(currentState);
-            } else {
-                // Show empty state silently - no error message
-                const canvas = document.getElementById('sourceChart');
-                if (canvas) {
-                    try {
-                        const ctx = canvas.getContext('2d');
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.fillStyle = 'var(--text-muted)';
-                        ctx.font = '14px sans-serif';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
-                    } catch (e) {
-                        // Silently ignore canvas errors
-                    }
-                }
-            }
-        }, 500);
-    } catch (error) {
-        // Silently handle all errors - chart will update when state is available
-        // Do not log or throw errors to avoid console noise
+    // Silently return if no state available - chart will update via subscription
+    if (!currentState) {
+        return;
     }
+    
+    // Use state data directly instead of API call
+    if (currentState.posts && currentState.posts.length > 0) {
+        try {
+            updateSourceChartFromState(currentState);
+        } catch (e) {
+            // Silently ignore - chart will update when state is ready
+        }
+        return;
+    }
+    
+    // If no posts yet, wait a bit and try again (state might be loading)
+    // But don't show any error - chart will update via state subscription
+    setTimeout(() => {
+        if (currentState && currentState.posts && currentState.posts.length > 0) {
+            try {
+                updateSourceChartFromState(currentState);
+            } catch (e) {
+                // Silently ignore - chart will update when state is ready
+            }
+        }
+    }, 500);
 }
 
 /**
@@ -119,7 +116,7 @@ async function loadAndRenderSourceChart() {
 function renderSourceChart(sourceData, sentimentBySource) {
     const canvas = document.getElementById('sourceChart');
     if (!canvas) {
-        console.warn('Source chart canvas not found');
+        // Silently return if canvas not found - chart will render when canvas is available
         return;
     }
     
@@ -329,8 +326,16 @@ function renderSourceChart(sourceData, sentimentBySource) {
 
 /**
  * Refresh the source chart
+ * Uses state data directly - no API calls
  */
 export function refreshSourceChart() {
-    loadAndRenderSourceChart();
+    // Silently refresh - no errors if state not ready
+    if (currentState) {
+        try {
+            loadAndRenderSourceChart();
+        } catch (e) {
+            // Silently ignore - chart will update via state subscription
+        }
+    }
 }
 
