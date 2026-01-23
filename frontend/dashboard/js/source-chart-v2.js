@@ -264,17 +264,28 @@ function renderSourceChart(sourceData, sentimentBySource) {
             return;
         }
         
-        // Set explicit canvas dimensions based on container
-        // This helps Chart.js calculate correctly even with CSS height: auto
-        const containerHeight = Math.max(containerRect.height, 300); // Minimum 300px
-        canvasElement.width = containerRect.width;
-        canvasElement.height = containerHeight;
-        console.log('[source-chart-v2.js] Canvas dimensions set:', {
-            width: canvasElement.width,
-            height: canvasElement.height
+        // Don't set explicit width/height on canvas - let Chart.js handle it with responsive: true
+        // Setting width/height directly can interfere with Chart.js internal sizing
+        // Chart.js will use the container dimensions automatically
+        console.log('[source-chart-v2.js] Canvas ready for Chart.js, container:', {
+            width: containerRect.width,
+            height: containerRect.height
         });
         
-        createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
+        // Ensure overlay is hidden BEFORE creating chart
+        if (overlay) {
+            overlay.style.setProperty('display', 'none', 'important');
+            overlay.style.setProperty('visibility', 'hidden', 'important');
+            overlay.style.setProperty('opacity', '0', 'important');
+            overlay.style.setProperty('z-index', '-1', 'important');
+            overlay.setAttribute('hidden', '');
+            console.log('[source-chart-v2.js] Overlay forcefully hidden before chart creation');
+        }
+        
+        // Small delay to ensure overlay is fully hidden and DOM is stable
+        setTimeout(() => {
+            createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
+        }, 50);
     });
 }
 
@@ -344,7 +355,8 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
+            maintainAspectRatio: true,
+            aspectRatio: 1.75, // Approximate ratio based on container (561/320 ≈ 1.75)
             layout: {
                 padding: {
                     bottom: 5,
@@ -488,22 +500,42 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
     
     // Force chart update to ensure rendering
     if (sourceChart) {
-        sourceChart.update('none'); // 'none' mode for faster update
+        // Use 'active' mode to ensure full rendering
+        sourceChart.update('active');
         console.log('[source-chart-v2.js] Chart update() called');
         
-        // Force canvas to be visible after update
+        // Force canvas to be visible and ensure proper rendering
         setTimeout(() => {
             if (canvas) {
                 canvas.style.display = 'block';
                 canvas.style.visibility = 'visible';
                 canvas.style.opacity = '1';
+                
                 // Force a resize to ensure Chart.js recalculates dimensions
                 if (sourceChart && sourceChart.resize) {
                     sourceChart.resize();
+                    console.log('[source-chart-v2.js] Chart resize() called');
                 }
-                console.log('[source-chart-v2.js] Canvas visibility forced after update');
+                
+                // Force another update after resize
+                sourceChart.update('active');
+                
+                // Log final canvas state
+                const finalRect = canvas.getBoundingClientRect();
+                const finalStyle = window.getComputedStyle(canvas);
+                console.log('[source-chart-v2.js] Final canvas state:', {
+                    width: canvas.width,
+                    height: canvas.height,
+                    clientWidth: canvas.clientWidth,
+                    clientHeight: canvas.clientHeight,
+                    boundingRect: { width: finalRect.width, height: finalRect.height },
+                    display: finalStyle.display,
+                    visibility: finalStyle.visibility,
+                    opacity: finalStyle.opacity,
+                    chartVisible: sourceChart && !sourceChart.destroyed
+                });
             }
-        }, 100);
+        }, 200);
     }
     } catch (error) {
         console.error('[source-chart-v2.js] Error creating chart:', error);
