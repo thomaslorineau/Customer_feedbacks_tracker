@@ -117,6 +117,61 @@
             padding: 1.5rem;
         }
 
+        /* Sub-accordion styles */
+        .sub-accordion {
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            overflow: hidden;
+        }
+
+        .sub-accordion-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.875rem 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+
+        .sub-accordion-header:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .sub-accordion-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sub-accordion-chevron {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.3s ease;
+            color: var(--text-secondary);
+        }
+
+        .sub-accordion-header.active .sub-accordion-chevron {
+            transform: rotate(180deg);
+        }
+
+        .sub-accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+            padding: 0 1rem;
+        }
+
+        .sub-accordion-content.active {
+            max-height: 5000px;
+            padding: 1rem;
+        }
+
         .settings-section {
             background: transparent;
             border-radius: 0;
@@ -705,6 +760,32 @@
             }
         }
 
+        /* Pain Points Styles */
+        .pain-points-form {
+            max-width: 1000px;
+        }
+
+        .pain-point-item {
+            transition: all 0.2s ease;
+        }
+
+        .pain-point-item:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .pain-point-icon {
+            font-size: 1.5rem;
+        }
+
+        .pain-point-title {
+            font-weight: 600;
+        }
+
+        .pain-point-keywords {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
         /* API Keys Grouping */
         .api-keys-groups {
             display: flex;
@@ -1186,263 +1267,54 @@
                             <div class="skeleton-loader"></div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Section: Analysis Focus -->
-        <div class="accordion" data-accordion="analysis-focus">
-            <div class="accordion-header" onclick="toggleAccordion('analysis-focus')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">🎯</span>
-                    <span>Analysis Focus</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 Analysis Focus</h4>
-                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
-                            Configure the focus area for AI analysis in Dashboard and Improvements pages. This helps the AI prioritize specific aspects when analyzing customer feedback.
-                        </p>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label for="analysisFocusInput" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
-                            Focus Area (optional)
-                        </label>
-                        <input 
-                            type="text" 
-                            id="analysisFocusInput" 
-                            placeholder="e.g., product issues, support quality, pricing concerns, technical problems"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
-                        />
-                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
-                            Leave empty for general analysis, or specify a focus area to prioritize insights related to that topic. Examples: "product issues", "support quality", "pricing", "technical problems", "user experience".
-                        </p>
-                    </div>
-
-                    <button onclick="saveAnalysisFocus()" class="btn primary" style="padding: 0.75rem 1.5rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                        Save Focus Setting
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section Email Notifications -->
-        <div class="accordion" data-accordion="email-notifications">
-            <div class="accordion-header" onclick="toggleAccordion('email-notifications')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">📧</span>
-                    <span>Email Notifications</span>
-                    <span class="accordion-badge" id="emailNotificationsBadge">--</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <!-- Email Configuration Status -->
-                    <div id="emailConfigStatus" style="margin-bottom: 1.5rem;">
-                        <!-- Email config status will be rendered here -->
-                    </div>
-
-                    <!-- Explanation -->
-                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 2rem;">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 How it works</h4>
-                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
-                            <strong>Notification triggers</strong> automatically send emails when problematic posts are detected.
-                            Configure rules (negative sentiment, relevance score, sources, etc.) and emails will be sent to the addresses you specify.
-                        </p>
-                    </div>
-
-                    <!-- Notification Triggers -->
-                    <div style="margin-bottom: 2rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin: 0;">
-                                Notification Triggers
-                            </h3>
-                            <button onclick="openTriggerModal()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                                + Add Trigger
-                            </button>
+                    <!-- LLM Prompts for Custom Analysis Subsection -->
+                    <div class="sub-accordion" style="margin-top: 1.5rem;">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🎯</span>
+                                <span>LLM Prompts for Custom Analysis</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
                         </div>
-                        <div id="triggersContainer">
-                            <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Loading...</p>
-                        </div>
-                    </div>
-
-                    <!-- Email Configuration & Test -->
-                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
-                            Test Email Sending
-                        </h3>
-                        <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9em; line-height: 1.6;">
-                            Test your SMTP configuration by sending a test email. Make sure SMTP settings are configured in your <code style="background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4px;">.env</code> file.
-                        </p>
-                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                            <input type="email" id="testEmailInput" placeholder="email@example.com" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;">
-                            <button onclick="testEmailConnection()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                                Send Test Email
+                        <div class="sub-accordion-content">
+                            <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+                                <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                                    Configure custom prompts for LLM analysis in Dashboard and Improvements pages. These prompts help guide the AI to prioritize specific aspects when analyzing customer feedback.
+                                </p>
+                            </div>
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="analysisFocusInput" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    Custom LLM Prompts (optional)
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="analysisFocusInput" 
+                                    placeholder="e.g., product issues, support quality, pricing concerns, technical problems"
+                                    style="width: 100%; max-width: 600px; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem;"
+                                />
+                                <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5;">
+                                    Leave empty for general analysis, or specify custom prompts to guide the LLM analysis. 
+                                    Examples: "product issues", "support quality", "pricing", "technical problems", "user experience".
+                                </p>
+                            </div>
+                            <button class="btn-primary" onclick="saveAnalysisFocus()" style="margin-top: 0.5rem;">
+                                💾 Save LLM Prompts
                             </button>
                         </div>
                     </div>
-
-                    <!-- Notification History -->
-                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
-                            Notification History
-                        </h3>
-                        <div id="notificationsHistory">
-                            <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">Loading...</p>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Section: Jira Integration -->
-        <div class="accordion" data-accordion="jira">
-            <div class="accordion-header" onclick="toggleAccordion('jira')">
+        <!-- Section: Scraping Configuration -->
+        <div class="accordion" data-accordion="scraping-config" id="scraping-config">
+            <div class="accordion-header" onclick="toggleAccordion('scraping-config')">
                 <div class="accordion-title">
-                    <span class="accordion-title-icon">🎫</span>
-                    <span>Jira Integration</span>
-                    <span class="accordion-badge" id="jiraBadge">--</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
-                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 Jira Integration</h4>
-                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
-                            Configure Jira to create tickets directly from insights. You can create tickets from the "What's Happening" and "Improvements" drawers.
-                        </p>
-                    </div>
-
-                    <div id="jiraConfigStatus" style="margin-bottom: 1.5rem;">
-                        <!-- Jira config status will be rendered here -->
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label for="jiraServerUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
-                            Jira Server URL <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input 
-                            type="text" 
-                            id="jiraServerUrl" 
-                            placeholder="https://yourcompany.atlassian.net"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
-                        />
-                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
-                            Your Jira server URL (e.g., https://yourcompany.atlassian.net)
-                        </p>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label for="jiraUsername" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
-                            Username/Email <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input 
-                            type="text" 
-                            id="jiraUsername" 
-                            placeholder="your.email@company.com"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
-                        />
-                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
-                            Your Jira username or email address
-                        </p>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label for="jiraApiToken" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
-                            API Token <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input 
-                            type="password" 
-                            id="jiraApiToken" 
-                            placeholder="Your Jira API token"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
-                        />
-                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
-                            Get your API token from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color: var(--accent-primary);">Atlassian Account Settings</a>
-                        </p>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label for="jiraProjectKey" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
-                            Project Key <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input 
-                            type="text" 
-                            id="jiraProjectKey" 
-                            placeholder="PROJ"
-                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
-                        />
-                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
-                            Your Jira project key (e.g., PROJ, DEV, BUG)
-                        </p>
-                    </div>
-
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button onclick="saveJiraConfig()" class="btn primary" style="padding: 0.75rem 1.5rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
-                            Save Configuration
-                        </button>
-                        <button onclick="testJiraConnection()" class="btn" style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-weight: 500;">
-                            Test Connection
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section 2: Scrapers API Keys (Priorité Haute) -->
-        <div class="accordion" data-accordion="scrapers-api-keys">
-            <div class="accordion-header" onclick="toggleAccordion('scrapers-api-keys')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">🔑</span>
-                    <span>Scrapers API Keys</span>
-                    <span class="accordion-badge" id="scrapersApiKeysBadge">--</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <!-- Security Notice -->
-                    <div class="security-notice">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                        <div class="security-notice-content">
-                            <strong>Security Notice</strong>
-                            <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
-                               Keys are stored securely and are never displayed in full for security reasons.</p>
-                        </div>
-                    </div>
-
-                    <div id="scrapersApiKeysContainer">
-                        <!-- Loading skeleton -->
-                        <div class="api-key-card">
-                            <div class="skeleton-loader"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section 2: Base Keywords (Priorité Haute) -->
-        <div class="accordion" data-accordion="keywords" id="base-keywords">
-            <div class="accordion-header" onclick="toggleAccordion('keywords')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">🔍</span>
-                    <span>Base Keywords</span>
+                    <span class="accordion-title-icon">📥</span>
+                    <span>Scraping Configuration</span>
                 </div>
                 <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
@@ -1451,27 +1323,120 @@
             <div class="accordion-content">
                 <div class="settings-section">
                     <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
-                        These keywords are always used for scraping, even if you don't add custom keywords. 
-                        They include OVH brands, products, common problems, and leadership mentions. 
-                        You can modify them here, but they will always be included in scraping operations.
+                        Configure API keys for external services and keywords used for scraping customer feedback. 
+                        These settings control what data is collected and from which sources.
                     </p>
 
-                    <div id="baseKeywordsContainer">
-                        <!-- Loading skeleton -->
-                        <div class="api-key-card">
-                            <div class="skeleton-loader"></div>
+                    <!-- Scrapers API Keys Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🔑</span>
+                                <span>Scrapers API Keys</span>
+                                <span class="accordion-badge" id="scrapersApiKeysBadge" style="margin-left: 0.5rem;">--</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <!-- Security Notice -->
+                            <div class="security-notice" style="margin-bottom: 1rem;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                                <div class="security-notice-content">
+                                    <strong>Security Notice</strong>
+                                    <p>API keys are sensitive credentials. Never share them publicly or commit them to version control. 
+                                       Keys are stored securely and are never displayed in full for security reasons.</p>
+                                </div>
+                            </div>
+                            <div id="scrapersApiKeysContainer">
+                                <!-- Loading skeleton -->
+                                <div class="api-key-card">
+                                    <div class="skeleton-loader"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Base Keywords Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🔍</span>
+                                <span>Base Keywords</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem; line-height: 1.6;">
+                                These keywords are always used for scraping, even if you don't add custom keywords. 
+                                They include OVH brands, products, common problems, and leadership mentions. 
+                                You can modify them here, but they will always be included in scraping operations.
+                            </p>
+                            <div id="baseKeywordsContainer">
+                                <!-- Loading skeleton -->
+                                <div class="api-key-card">
+                                    <div class="skeleton-loader"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rate Limiting Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>⏱️</span>
+                                <span>Rate Limiting</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <!-- Improved explanation -->
+                            <div class="rate-limit-explanation" style="margin-bottom: 1.5rem;">
+                                <h4 style="font-size: 1rem; margin-bottom: 0.5rem;">What is Rate Limiting?</h4>
+                                <p style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 0.75rem;">
+                                    Rate limiting limits the number of API requests per minute to avoid exceeding quotas and protect against abuse.
+                                    These settings control the frequency of API calls during scraping.
+                                </p>
+                                <p style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 0.75rem;">
+                                    <strong>Why is it important?</strong><br>
+                                    External APIs (GitHub, Trustpilot, etc.) impose limits on the number of requests you can make.
+                                    Without rate limiting, you risk exceeding these limits and having your requests temporarily blocked.
+                                </p>
+                                <div class="rate-limit-example" style="font-size: 0.85rem;">
+                                    <strong>Example:</strong> 100 requests per 60 seconds = maximum 1.67 requests/second
+                                </div>
+                            </div>
+
+                            <div class="rate-limit-info" id="rateLimitInfo">
+                                <div class="info-card">
+                                    <div class="info-card-label">Requests per Window</div>
+                                    <div class="info-card-value">--</div>
+                                </div>
+                                <div class="info-card">
+                                    <div class="info-card-label">Window Duration</div>
+                                    <div class="info-card-value">--</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Section 3: Rate Limiting (Priorité Basse - Améliorer l'explication) -->
-        <div class="accordion" data-accordion="rate-limiting">
-            <div class="accordion-header" onclick="toggleAccordion('rate-limiting')">
+        <!-- Section: Application Settings -->
+        <div class="accordion" data-accordion="app-settings">
+            <div class="accordion-header" onclick="toggleAccordion('app-settings')">
                 <div class="accordion-title">
-                    <span class="accordion-title-icon">⏱️</span>
-                    <span>Rate Limiting</span>
+                    <span class="accordion-title-icon">⚙️</span>
+                    <span>Application Settings</span>
                 </div>
                 <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"/>
@@ -1479,126 +1444,287 @@
             </div>
             <div class="accordion-content">
                 <div class="settings-section">
-                    <!-- Improved explanation -->
-                    <div class="rate-limit-explanation">
-                        <h3>What is Rate Limiting?</h3>
-                        <p>
-                            Rate limiting limits the number of API requests per minute to avoid exceeding quotas and protect against abuse.
-                            These settings control the frequency of API calls during scraping.
-                        </p>
-                        <p>
-                            <strong>Why is it important?</strong><br>
-                            External APIs (GitHub, Trustpilot, etc.) impose limits on the number of requests you can make.
-                            Without rate limiting, you risk exceeding these limits and having your requests temporarily blocked.
-                        </p>
-                        <div class="rate-limit-example">
-                            <strong>Example:</strong> 100 requests per 60 seconds = maximum 1.67 requests/second
+                    <!-- Email Notifications Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>📧</span>
+                                <span>Email Notifications</span>
+                                <span class="accordion-badge" id="emailNotificationsBadge" style="margin-left: 0.5rem;">--</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
                         </div>
-                    </div>
+                        <div class="sub-accordion-content">
+                            <!-- Email Configuration Status -->
+                            <div id="emailConfigStatus" style="margin-bottom: 1.5rem;">
+                                <!-- Email config status will be rendered here -->
+                            </div>
 
-                    <div class="rate-limit-info" id="rateLimitInfo">
-                        <div class="info-card">
-                            <div class="info-card-label">Requests per Window</div>
-                            <div class="info-card-value">--</div>
-                        </div>
-                        <div class="info-card">
-                            <div class="info-card-label">Window Duration</div>
-                            <div class="info-card-value">--</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Section 4: Apparence (Priorité Basse) -->
-        <div class="accordion" data-accordion="appearance">
-            <div class="accordion-header" onclick="toggleAccordion('appearance')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">🎨</span>
-                    <span>Apparence</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <div class="appearance-options">
-                        <div class="appearance-option">
-                            <div class="appearance-option-label">
-                                <strong>Dark Mode</strong>
-                                <span>Toggle between light and dark theme</span>
-                            </div>
-                            <div class="appearance-toggle" id="themeToggle" onclick="toggleThemeFromSettings()">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Logo Upload Section -->
-                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
-                        <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
-                            OVHcloud Logo
-                        </h3>
-                        <div class="logo-upload-container">
-                            <div class="logo-preview-section">
-                                <div class="logo-preview">
-                                    <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
-                                    <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                                            <circle cx="8.5" cy="8.5" r="1.5"/>
-                                            <polyline points="21 15 16 10 5 21"/>
-                                        </svg>
-                                        <p>No logo</p>
-                                    </div>
-                                </div>
-                                <div class="logo-info" id="logoInfo">
-                                    <p class="logo-status">Chargement...</p>
-                                </div>
-                            </div>
-                            <div class="logo-upload-form">
-                                <label for="logoFileInput" class="upload-label">
-                                    <input type="file" id="logoFileInput" accept=".svg,.png,.jpg,.jpeg" style="display: none;">
-                                    <span class="upload-button">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                            <polyline points="17 8 12 3 7 8"/>
-                                            <line x1="12" y1="3" x2="12" y2="15"/>
-                                        </svg>
-                                        Choose File
-                                    </span>
-                                </label>
-                                <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
-                                    <span class="btn-text">Upload Logo</span>
-                                    <span class="btn-spinner" style="display:none;"></span>
-                                </button>
-                                <p class="upload-hint">
-                                    Accepted formats: SVG (recommended), PNG, JPG, JPEG<br>
-                                    Maximum size: 5MB
+                            <!-- Explanation -->
+                            <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 2rem;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 How it works</h4>
+                                <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                                    <strong>Notification triggers</strong> automatically send emails when problematic posts are detected.
+                                    Configure rules (negative sentiment, relevance score, sources, etc.) and emails will be sent to the addresses you specify.
                                 </p>
                             </div>
+
+                            <!-- Notification Triggers -->
+                            <div style="margin-bottom: 2rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                    <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin: 0;">
+                                        Notification Triggers
+                                    </h3>
+                                    <button onclick="openTriggerModal()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                        + Add Trigger
+                                    </button>
+                                </div>
+                                <div id="triggersContainer">
+                                    <p style="color: var(--text-secondary); text-align: center; padding: 2rem;">Loading...</p>
+                                </div>
+                            </div>
+
+                            <!-- Email Configuration & Test -->
+                            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                                <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                                    Test Email Sending
+                                </h3>
+                                <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9em; line-height: 1.6;">
+                                    Test your SMTP configuration by sending a test email. Make sure SMTP settings are configured in your <code style="background: var(--bg-secondary); padding: 0.2rem 0.4rem; border-radius: 4px;">.env</code> file.
+                                </p>
+                                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                    <input type="email" id="testEmailInput" placeholder="email@example.com" style="flex: 1; min-width: 200px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;">
+                                    <button onclick="testEmailConnection()" class="btn primary" style="padding: 0.5rem 1rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                        Send Test Email
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Notification History -->
+                            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                                <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                                    Notification History
+                                </h3>
+                                <div id="notificationsHistory">
+                                    <p style="color: var(--text-secondary); text-align: center; padding: 1rem;">Loading...</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Section 5: Environment & Version (Dernière section) -->
-        <div class="accordion" data-accordion="environment">
-            <div class="accordion-header" onclick="toggleAccordion('environment')">
-                <div class="accordion-title">
-                    <span class="accordion-title-icon">🌐</span>
-                    <span>Environment & Version</span>
-                </div>
-                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-            </div>
-            <div class="accordion-content">
-                <div class="settings-section">
-                    <div id="environmentInfo">
-                        <!-- Loading skeleton -->
-                        <div class="skeleton-loader" style="height: 100px;"></div>
+                    <!-- Jira Integration Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🎫</span>
+                                <span>Jira Integration</span>
+                                <span class="accordion-badge" id="jiraBadge" style="margin-left: 0.5rem;">--</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                                <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 Jira Integration</h4>
+                                <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                                    Configure Jira to create tickets directly from insights. You can create tickets from the "What's Happening" and "Improvements" drawers.
+                                </p>
+                            </div>
+
+                            <div id="jiraConfigStatus" style="margin-bottom: 1.5rem;">
+                                <!-- Jira config status will be rendered here -->
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="jiraServerUrl" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    Jira Server URL <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="jiraServerUrl" 
+                                    placeholder="https://yourcompany.atlassian.net"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                                />
+                                <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                                    Your Jira server URL (e.g., https://yourcompany.atlassian.net)
+                                </p>
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="jiraUsername" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    Username/Email <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="jiraUsername" 
+                                    placeholder="your.email@company.com"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                                />
+                                <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                                    Your Jira username or email address
+                                </p>
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="jiraApiToken" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    API Token <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input 
+                                    type="password" 
+                                    id="jiraApiToken" 
+                                    placeholder="Your Jira API token"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                                />
+                                <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                                    Get your API token from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color: var(--accent-primary);">Atlassian Account Settings</a>
+                                </p>
+                            </div>
+
+                            <div style="margin-bottom: 1.5rem;">
+                                <label for="jiraProjectKey" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                                    Project Key <span style="color: #ef4444;">*</span>
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="jiraProjectKey" 
+                                    placeholder="PROJ"
+                                    style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                                />
+                                <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                                    Your Jira project key (e.g., PROJ, DEV, BUG)
+                                </p>
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button onclick="saveJiraConfig()" class="btn primary" style="padding: 0.75rem 1.5rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                    Save Configuration
+                                </button>
+                                <button onclick="testJiraConnection()" class="btn" style="padding: 0.75rem 1.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-weight: 500;">
+                                    Test Connection
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Appearance Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🎨</span>
+                                <span>Appearance</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <div class="appearance-options">
+                                <div class="appearance-option">
+                                    <div class="appearance-option-label">
+                                        <strong>Dark Mode</strong>
+                                        <span>Toggle between light and dark theme</span>
+                                    </div>
+                                    <div class="appearance-toggle" id="themeToggle" onclick="toggleThemeFromSettings()">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Logo Upload Section -->
+                            <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border-color);">
+                                <h3 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">
+                                    OVHcloud Logo
+                                </h3>
+                                <div class="logo-upload-container">
+                                    <div class="logo-preview-section">
+                                        <div class="logo-preview">
+                                            <img id="logoPreview" src="" alt="OVHcloud Logo" style="display: none;" onerror="this.style.display='none'; document.getElementById('logoPlaceholder').style.display='flex';">
+                                            <div id="logoPlaceholder" class="logo-placeholder" style="display: flex;">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                                    <polyline points="21 15 16 10 5 21"/>
+                                                </svg>
+                                                <p>No logo</p>
+                                            </div>
+                                        </div>
+                                        <div class="logo-info" id="logoInfo">
+                                            <p class="logo-status">Chargement...</p>
+                                        </div>
+                                    </div>
+                                    <div class="logo-upload-form">
+                                        <label for="logoFileInput" class="upload-label">
+                                            <input type="file" id="logoFileInput" accept=".svg,.png,.jpg,.jpeg" style="display: none;">
+                                            <span class="upload-button">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                                    <polyline points="17 8 12 3 7 8"/>
+                                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                                </svg>
+                                                Choose File
+                                            </span>
+                                        </label>
+                                        <button id="uploadLogoBtn" class="upload-submit-btn" disabled>
+                                            <span class="btn-text">Upload Logo</span>
+                                            <span class="btn-spinner" style="display:none;"></span>
+                                        </button>
+                                        <p class="upload-hint">
+                                            Accepted formats: SVG (recommended), PNG, JPG, JPEG<br>
+                                            Maximum size: 5MB
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pain Points Configuration Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>📊</span>
+                                <span>Pain Points Configuration</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
+                                Configure the categories used to detect recurring pain points in customer feedback. 
+                                Each pain point has a title, icon, and list of keywords. Posts containing these keywords 
+                                are automatically categorized. A post can match multiple pain points if it contains keywords 
+                                from different categories. Only enabled pain points are used for detection.
+                            </p>
+
+                            <div id="painPointsContainer">
+                                <!-- Loading skeleton -->
+                                <div class="api-key-card">
+                                    <div class="skeleton-loader"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Environment & Version Subsection -->
+                    <div class="sub-accordion">
+                        <div class="sub-accordion-header" onclick="toggleSubAccordion(this)">
+                            <div class="sub-accordion-title">
+                                <span>🌐</span>
+                                <span>Environment & Version</span>
+                            </div>
+                            <svg class="sub-accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </div>
+                        <div class="sub-accordion-content">
+                            <div id="environmentInfo">
+                                <!-- Loading skeleton -->
+                                <div class="skeleton-loader" style="height: 100px;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1938,13 +2064,20 @@
                 const hash = window.location.hash.substring(1); // Remove #
                 // Map hash to accordion ID
                 const hashToAccordion = {
-                    'base-keywords': 'keywords',
-                    'email-notifications': 'email-notifications',
+                    'base-keywords': 'scraping-config',
+                    'content-analysis': 'app-settings',
+                    'pain-points': 'app-settings',
+                    'app-settings': 'app-settings',
+                    'llm-prompts': 'llm',
+                    'analysis-focus': 'llm', // Legacy hash support
+                    'environment': 'app-settings',
                     'llm': 'llm',
-                    'scrapers-api-keys': 'scrapers-api-keys',
-                    'rate-limiting': 'rate-limiting',
-                    'appearance': 'appearance',
-                    'environment': 'environment'
+                    'email-notifications': 'app-settings',
+                    'jira': 'app-settings',
+                    'appearance': 'app-settings',
+                    'scrapers-api-keys': 'scraping-config',
+                    'scraping-config': 'scraping-config',
+                    'rate-limiting': 'scraping-config'
                 };
                 const accordionId = hashToAccordion[hash];
                 if (accordionId) {
@@ -2410,6 +2543,22 @@
         // toggleHelpMenu is already defined above (before DOMContentLoaded)
 
         // Make toggleAccordion available globally
+        // Sub-accordion toggle function
+        window.toggleSubAccordion = function(headerElement) {
+            const content = headerElement.nextElementSibling;
+            if (!content || !content.classList.contains('sub-accordion-content')) return;
+            
+            const isActive = headerElement.classList.contains('active');
+            
+            if (isActive) {
+                headerElement.classList.remove('active');
+                content.classList.remove('active');
+            } else {
+                headerElement.classList.add('active');
+                content.classList.add('active');
+            }
+        };
+
         window.toggleAccordion = function(id) {
             const accordion = document.querySelector(`[data-accordion="${id}"]`);
             if (!accordion) return;

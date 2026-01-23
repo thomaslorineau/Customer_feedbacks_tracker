@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadVersion();
     loadConfiguration();
     loadBaseKeywords();
+    loadPainPoints();
     loadAnalysisFocus();
     updateThemeToggle();
 });
@@ -155,6 +156,15 @@ function initializeTheme() {
 
 // Load Configuration
 async function loadConfiguration() {
+    // Ensure renderEnvironmentInfo is called after both configData and versionData are loaded
+    const checkAndRender = () => {
+        if (configData && versionData) {
+            renderEnvironmentInfo();
+        }
+    };
+    
+    // Check immediately if both are already loaded
+    checkAndRender();
     try {
         const url = `${API_BASE_URL}/api/config`;
         console.log('Fetching configuration from:', url);
@@ -238,6 +248,25 @@ function toggleAccordion(id) {
     localStorage.setItem('settingsAccordionState', JSON.stringify(state));
 }
 
+// Sub-accordion Management
+function toggleSubAccordion(headerElement) {
+    const content = headerElement.nextElementSibling;
+    if (!content || !content.classList.contains('sub-accordion-content')) return;
+    
+    const isActive = headerElement.classList.contains('active');
+    
+    if (isActive) {
+        headerElement.classList.remove('active');
+        content.classList.remove('active');
+    } else {
+        headerElement.classList.add('active');
+        content.classList.add('active');
+    }
+}
+
+// Make functions available globally
+window.toggleSubAccordion = toggleSubAccordion;
+
 // Theme Toggle from Settings
 function toggleThemeFromSettings() {
     toggleTheme();
@@ -295,45 +324,63 @@ function renderLLM() {
         }
     ];
     
-    // Check if any LLM is configured
-    let configuredLLM = null;
+    // Check which LLMs are configured
+    let configuredLLMs = [];
     let configuredCount = 0;
     
     llmProviders.forEach(provider => {
         const keyData = configData.api_keys[provider.id];
         if (keyData && keyData.configured) {
             configuredCount++;
-            if (!configuredLLM) {
-                configuredLLM = provider.id;
-            }
+            configuredLLMs.push(provider);
         }
     });
     
-    // Determine active LLM provider
-    const activeLLM = configData.llm_provider && configuredLLM && 
+    // Determine active LLM provider (the one selected in config, or first configured)
+    const activeLLM = configData.llm_provider && 
                       configData.api_keys[configData.llm_provider]?.configured 
                       ? configData.llm_provider 
-                      : (configuredLLM || null);
+                      : (configuredLLMs.length > 0 ? configuredLLMs[0].id : null);
     
-    // Get provider name
+    // Get active provider name
     const activeProviderName = activeLLM ? llmProviders.find(p => p.id === activeLLM)?.name || activeLLM : null;
     
     // Render status
     statusContainer.innerHTML = `
         <div class="rate-limit-info" style="margin-bottom: 1.5rem; max-width: 600px;">
-            <div class="info-card">
-                <div class="info-card-label">LLM Status</div>
-                <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
-                    ${activeProviderName || 'Disabled'}
-                </div>
-            </div>
-            ${activeLLM ? `
+            ${configuredLLMs.length > 0 ? `
                 <div class="info-card">
                     <div class="info-card-label">Active Provider</div>
-                    <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
-                        ${activeLLM}
-                    </div>
+                    ${configuredLLMs.length > 1 ? `
+                        <select 
+                            id="llmProviderSelect" 
+                            class="filter-select" 
+                            style="width: 100%; margin-top: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; background: var(--bg-primary); color: var(--text-primary);"
+                            onchange="updateActiveLLMProvider(this.value)"
+                        >
+                            ${configuredLLMs.map(p => `
+                                <option value="${p.id}" ${p.id === activeLLM ? 'selected' : ''}>
+                                    ${p.icon} ${p.name}
+                                </option>
+                            `).join('')}
+                        </select>
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Select which LLM provider to use for AI analysis features.
+                        </p>
+                    ` : `
+                        <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize; margin-top: 0.5rem;">
+                            ${activeProviderName}
+                        </div>
+                    `}
                 </div>
+                ${configuredLLMs.length > 1 ? `
+                    <div class="info-card" style="margin-top: 0.75rem;">
+                        <div class="info-card-label">Configured Providers</div>
+                        <div class="info-card-value" style="font-size: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                            ${configuredLLMs.map(p => `<span style="padding: 0.25rem 0.75rem; background: var(--bg-secondary, #f3f4f6); border-radius: 4px; font-weight: 500;">${p.name}</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
             ` : `
                 <div class="info-card" style="border-left: 3px solid var(--warning, #f59e0b);">
                     <div class="info-card-label">Warning</div>
@@ -1023,7 +1070,210 @@ async function saveBaseKeywords() {
     }
 }
 
-// Analysis Focus Management
+// ============================================================================
+// PAIN POINTS MANAGEMENT
+// ============================================================================
+
+async function loadPainPoints() {
+    const container = document.getElementById('painPointsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '<div class="skeleton-loader" style="height: 200px;"></div>';
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/settings/pain-points`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const painPoints = data.pain_points || [];
+        
+        container.innerHTML = `
+            <div class="pain-points-form">
+                <div id="painPointsList" style="margin-bottom: 1.5rem;">
+                    ${painPoints.map((pp, index) => renderPainPointItem(pp, index)).join('')}
+                </div>
+                <button class="btn-primary" onclick="addPainPoint()" style="margin-bottom: 1rem;">
+                    + Add Pain Point
+                </button>
+                <button class="btn-primary" onclick="savePainPoints()" style="margin-left: 0.5rem;">
+                    💾 Save Pain Points
+                </button>
+            </div>
+        `;
+        
+        // Store data globally for updates
+        window.painPointsData = painPoints;
+    } catch (error) {
+        console.error('Error loading pain points:', error);
+        container.innerHTML = `
+            <div class="error-message">
+                <p>❌ Failed to load pain points: ${error.message}</p>
+                <button class="btn-secondary" onclick="loadPainPoints()">Retry</button>
+            </div>
+        `;
+    }
+}
+
+function renderPainPointItem(pp, index) {
+    const keywordsStr = Array.isArray(pp.keywords) ? pp.keywords.join(', ') : (pp.keywords || '');
+    return `
+        <div class="pain-point-item" data-index="${index}" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <div style="display: flex; gap: 1rem; align-items: start;">
+                <div style="flex: 1;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                        <input type="text" 
+                               class="pain-point-icon" 
+                               value="${pp.icon || '📊'}" 
+                               placeholder="📊"
+                               style="width: 60px; font-size: 1.5rem; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.25rem;"
+                               onchange="updatePainPointIcon(${index}, this.value)">
+                        <input type="text" 
+                               class="pain-point-title" 
+                               value="${pp.title || ''}" 
+                               placeholder="Pain Point Title"
+                               style="flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px;"
+                               onchange="updatePainPointTitle(${index}, this.value)">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                            <input type="checkbox" 
+                                   class="pain-point-enabled" 
+                                   ${pp.enabled !== false ? 'checked' : ''}
+                                   onchange="updatePainPointEnabled(${index}, this.checked)">
+                            <span>Enabled</span>
+                        </label>
+                        <button class="btn-danger" onclick="removePainPoint(${index})" style="padding: 0.5rem 1rem;">
+                            🗑️ Delete
+                        </button>
+                    </div>
+                    <textarea class="pain-point-keywords" 
+                              placeholder="Enter keywords separated by commas (e.g., slow, performance, lag)"
+                              style="width: 100%; min-height: 60px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 4px; font-family: inherit;"
+                              onchange="updatePainPointKeywords(${index}, this.value)">${keywordsStr}</textarea>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function addPainPoint() {
+    const container = document.getElementById('painPointsList');
+    if (!container) return;
+    
+    if (!window.painPointsData) {
+        window.painPointsData = [];
+    }
+    
+    const newIndex = window.painPointsData.length;
+    window.painPointsData.push({
+        title: '',
+        icon: '📊',
+        keywords: [],
+        enabled: true
+    });
+    
+    container.innerHTML += renderPainPointItem(window.painPointsData[newIndex], newIndex);
+}
+
+function removePainPoint(index) {
+    if (confirm('Are you sure you want to delete this pain point?')) {
+        if (window.painPointsData && window.painPointsData[index]) {
+            window.painPointsData.splice(index, 1);
+            loadPainPoints();
+        }
+    }
+}
+
+function updatePainPointIcon(index, icon) {
+    if (window.painPointsData && window.painPointsData[index]) {
+        window.painPointsData[index].icon = icon;
+    }
+}
+
+function updatePainPointTitle(index, title) {
+    if (window.painPointsData && window.painPointsData[index]) {
+        window.painPointsData[index].title = title;
+    }
+}
+
+function updatePainPointKeywords(index, keywordsStr) {
+    if (window.painPointsData && window.painPointsData[index]) {
+        window.painPointsData[index].keywords = keywordsStr.split(',').map(k => k.trim()).filter(k => k);
+    }
+}
+
+function updatePainPointEnabled(index, enabled) {
+    if (window.painPointsData && window.painPointsData[index]) {
+        window.painPointsData[index].enabled = enabled;
+    }
+}
+
+async function savePainPoints() {
+    const container = document.getElementById('painPointsContainer');
+    if (!container) return;
+    
+    // Collect current data from DOM
+    const painPoints = [];
+    const items = container.querySelectorAll('.pain-point-item');
+    
+    items.forEach((item) => {
+        const titleInput = item.querySelector('.pain-point-title');
+        const iconInput = item.querySelector('.pain-point-icon');
+        const keywordsTextarea = item.querySelector('.pain-point-keywords');
+        const enabledCheckbox = item.querySelector('.pain-point-enabled');
+        
+        if (titleInput && iconInput && keywordsTextarea) {
+            const title = titleInput.value.trim();
+            if (title) {
+                painPoints.push({
+                    title: title,
+                    icon: iconInput.value.trim() || '📊',
+                    keywords: keywordsTextarea.value.split(',').map(k => k.trim()).filter(k => k),
+                    enabled: enabledCheckbox ? enabledCheckbox.checked : true
+                });
+            }
+        }
+    });
+    
+    if (painPoints.length === 0) {
+        showError('Please add at least one pain point before saving.');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/settings/pain-points`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ pain_points: painPoints })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        const result = await response.json();
+        showSuccess(`Successfully saved ${result.count} pain point(s)!`);
+        loadPainPoints(); // Reload to refresh display
+    } catch (error) {
+        console.error('Error saving pain points:', error);
+        showError(`Failed to save pain points: ${error.message}`);
+    }
+}
+
+// Make functions available globally
+window.loadPainPoints = loadPainPoints;
+window.addPainPoint = addPainPoint;
+window.removePainPoint = removePainPoint;
+window.updatePainPointIcon = updatePainPointIcon;
+window.updatePainPointTitle = updatePainPointTitle;
+window.updatePainPointKeywords = updatePainPointKeywords;
+window.updatePainPointEnabled = updatePainPointEnabled;
+window.savePainPoints = savePainPoints;
+
+// LLM Prompts for Custom Analysis Management
 function loadAnalysisFocus() {
     const input = document.getElementById('analysisFocusInput');
     if (!input) return;
@@ -1040,9 +1290,9 @@ function saveAnalysisFocus() {
     localStorage.setItem('analysisFocus', focus);
     
     if (focus) {
-        showSuccess(`Analysis focus saved: "${focus}"`);
+        showSuccess(`LLM prompts saved: "${focus}"`);
     } else {
-        showSuccess('Analysis focus cleared - using general analysis');
+        showSuccess('LLM prompts cleared - using general analysis');
     }
 }
 
@@ -1172,9 +1422,46 @@ async function testJiraConnection() {
     }
 }
 
+// Update Active LLM Provider
+async function updateActiveLLMProvider(providerId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/llm-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                llm_provider: providerId,
+                openai_api_key: null,
+                anthropic_api_key: null,
+                mistral_api_key: null
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Failed to update provider' }));
+            throw new Error(errorData.detail || 'Failed to update provider');
+        }
+        
+        // Reload configuration to get updated provider
+        await loadConfiguration();
+        
+        // Re-render LLM section to show updated active provider
+        renderLLM();
+        
+        showSuccess(`Active provider set to ${providerId.charAt(0).toUpperCase() + providerId.slice(1)}`);
+    } catch (error) {
+        console.error('Error updating LLM provider:', error);
+        showError(`Failed to update provider: ${error.message}`);
+        
+        // Reload configuration to restore previous state
+        await loadConfiguration();
+        renderLLM();
+    }
+}
+
 // Make functions available globally
 window.saveJiraConfig = saveJiraConfig;
 window.testJiraConnection = testJiraConnection;
+window.updateActiveLLMProvider = updateActiveLLMProvider;
 
 // Load Jira config on page load
 document.addEventListener('DOMContentLoaded', () => {

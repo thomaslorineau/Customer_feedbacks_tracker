@@ -3,8 +3,11 @@ from typing import List
 from datetime import datetime, timedelta
 from collections import Counter
 import re
+import logging
 from .models import PainPoint, PainPointsResponse
 from ... import db
+
+logger = logging.getLogger(__name__)
 
 
 async def get_pain_points(days: int = 30, limit: int = 5) -> PainPointsResponse:
@@ -50,49 +53,61 @@ async def get_pain_points(days: int = 30, limit: int = 5) -> PainPointsResponse:
                 total_pain_points=0
             )
         
-        # Define pain point patterns/keywords
-        pain_patterns = {
-            'Performance Issues': {
-                'keywords': ['slow', 'lent', 'performance', 'lag', 'timeout', 'time out', 'slowly', 'slowness', 'slow response', 'slow loading', 'slowly loading'],
-                'icon': '🐌'
-            },
-            'Downtime & Outages': {
-                'keywords': ['down', 'outage', 'offline', 'unavailable', 'unreachable', 'not working', 'doesn\'t work', 'not accessible', 'service unavailable', 'error 503', 'error 502', 'error 500'],
-                'icon': '🔴'
-            },
-            'Billing Problems': {
-                'keywords': ['billing', 'invoice', 'payment', 'charge', 'charged', 'refund', 'cost', 'price', 'expensive', 'overcharge', 'facture', 'paiement', 'facturation'],
-                'icon': '💰'
-            },
-            'Support Issues': {
-                'keywords': ['support', 'ticket', 'help', 'assistance', 'response time', 'no response', 'no reply', 'customer service', 'service client'],
-                'icon': '🎧'
-            },
-            'Configuration Problems': {
-                'keywords': ['config', 'configuration', 'setup', 'install', 'installation', 'configure', 'setting', 'settings', 'cannot configure', 'can\'t configure'],
-                'icon': '⚙️'
-            },
-            'API & Integration Issues': {
-                'keywords': ['api', 'integration', 'endpoint', 'connection', 'connect', 'authentication', 'auth', 'token', 'credential'],
-                'icon': '🔌'
-            },
-            'Data Loss & Backup': {
-                'keywords': ['lost', 'delete', 'deleted', 'backup', 'restore', 'recovery', 'data loss', 'lost data', 'missing data'],
-                'icon': '💾'
-            },
-            'Security Concerns': {
-                'keywords': ['security', 'hack', 'breach', 'vulnerability', 'exploit', 'unauthorized', 'access', 'secure', 'protection'],
-                'icon': '🔒'
-            },
-            'Migration Problems': {
-                'keywords': ['migration', 'migrate', 'transfer', 'move', 'upgrade', 'update', 'migration failed', 'cannot migrate'],
-                'icon': '🚚'
-            },
-            'Network Issues': {
-                'keywords': ['network', 'connection', 'latency', 'bandwidth', 'ddos', 'attack', 'traffic', 'routing', 'dns'],
-                'icon': '🌐'
+        # Get pain point patterns/keywords from database
+        try:
+            pain_points_db = db.get_pain_points(enabled_only=True)
+            pain_patterns = {}
+            for pp in pain_points_db:
+                if pp.get('enabled', True):
+                    pain_patterns[pp['title']] = {
+                        'keywords': pp.get('keywords', []),
+                        'icon': pp.get('icon', '📊')
+                    }
+        except Exception as e:
+            logger.warning(f"Error loading pain points from database, using defaults: {e}")
+            # Fallback to default pain points if database fails
+            pain_patterns = {
+                'Performance Issues': {
+                    'keywords': ['slow', 'lent', 'performance', 'lag', 'timeout', 'time out', 'slowly', 'slowness', 'slow response', 'slow loading', 'slowly loading'],
+                    'icon': '🐌'
+                },
+                'Downtime & Outages': {
+                    'keywords': ['down', 'outage', 'offline', 'unavailable', 'unreachable', 'not working', 'doesn\'t work', 'not accessible', 'service unavailable', 'error 503', 'error 502', 'error 500'],
+                    'icon': '🔴'
+                },
+                'Billing Problems': {
+                    'keywords': ['billing', 'invoice', 'payment', 'charge', 'charged', 'refund', 'cost', 'price', 'expensive', 'overcharge', 'facture', 'paiement', 'facturation'],
+                    'icon': '💰'
+                },
+                'Support Issues': {
+                    'keywords': ['support', 'ticket', 'help', 'assistance', 'response time', 'no response', 'no reply', 'customer service', 'service client'],
+                    'icon': '🎧'
+                },
+                'Configuration Problems': {
+                    'keywords': ['config', 'configuration', 'setup', 'install', 'installation', 'configure', 'setting', 'settings', 'cannot configure', 'can\'t configure'],
+                    'icon': '⚙️'
+                },
+                'API & Integration Issues': {
+                    'keywords': ['api', 'integration', 'endpoint', 'connection', 'connect', 'authentication', 'auth', 'token', 'credential'],
+                    'icon': '🔌'
+                },
+                'Data Loss & Backup': {
+                    'keywords': ['lost', 'delete', 'deleted', 'backup', 'restore', 'recovery', 'data loss', 'lost data', 'missing data'],
+                    'icon': '💾'
+                },
+                'Security Concerns': {
+                    'keywords': ['security', 'hack', 'breach', 'vulnerability', 'exploit', 'unauthorized', 'access', 'secure', 'protection'],
+                    'icon': '🔒'
+                },
+                'Migration Problems': {
+                    'keywords': ['migration', 'migrate', 'transfer', 'move', 'upgrade', 'update', 'migration failed', 'cannot migrate'],
+                    'icon': '🚚'
+                },
+                'Network Issues': {
+                    'keywords': ['network', 'connection', 'latency', 'bandwidth', 'ddos', 'attack', 'traffic', 'routing', 'dns'],
+                    'icon': '🌐'
+                }
             }
-        }
         
         # Count pain points
         pain_point_counts = {}

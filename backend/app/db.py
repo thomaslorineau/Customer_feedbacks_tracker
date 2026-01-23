@@ -401,6 +401,45 @@ def init_db() -> None:
             except Exception:
                 pass
         
+        # Pain points table (editable pain point categories)
+        c.execute("CREATE SEQUENCE IF NOT EXISTS pain_points_id_seq START 1")
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pain_points (
+                id BIGINT PRIMARY KEY DEFAULT nextval('pain_points_id_seq'),
+                title TEXT NOT NULL UNIQUE,
+                icon TEXT NOT NULL,
+                keywords TEXT NOT NULL,
+                enabled INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Initialize pain points if table is empty
+        c.execute("SELECT COUNT(*) FROM pain_points")
+        pain_points_count = c.fetchone()[0]
+        if pain_points_count == 0:
+            default_pain_points = [
+                ('Performance Issues', '🐌', 'slow,lent,performance,lag,timeout,time out,slowly,slowness,slow response,slow loading,slowly loading'),
+                ('Downtime & Outages', '🔴', 'down,outage,offline,unavailable,unreachable,not working,doesn\'t work,not accessible,service unavailable,error 503,error 502,error 500'),
+                ('Billing Problems', '💰', 'billing,invoice,payment,charge,charged,refund,cost,price,expensive,overcharge,facture,paiement,facturation'),
+                ('Support Issues', '🎧', 'support,ticket,help,assistance,response time,no response,no reply,customer service,service client'),
+                ('Configuration Problems', '⚙️', 'config,configuration,setup,install,installation,configure,setting,settings,cannot configure,can\'t configure'),
+                ('API & Integration Issues', '🔌', 'api,integration,endpoint,connection,connect,authentication,auth,token,credential'),
+                ('Data Loss & Backup', '💾', 'lost,delete,deleted,backup,restore,recovery,data loss,lost data,missing data'),
+                ('Security Concerns', '🔒', 'security,hack,breach,vulnerability,exploit,unauthorized,access,secure,protection'),
+                ('Migration Problems', '🚚', 'migration,migrate,transfer,move,upgrade,update,migration failed,cannot migrate'),
+                ('Network Issues', '🌐', 'network,connection,latency,bandwidth,ddos,attack,traffic,routing,dns')
+            ]
+            for title, icon, keywords_str in default_pain_points:
+                try:
+                    c.execute(
+                        "INSERT INTO pain_points (title, icon, keywords) VALUES (?, ?, ?)",
+                        (title, icon, keywords_str)
+                    )
+                except Exception:
+                    pass  # Ignore duplicates
+        
         for keyword in DEFAULT_LEADERSHIP_KEYWORDS:
             try:
                 c.execute(
@@ -2344,6 +2383,92 @@ def delete_session(refresh_token: str) -> bool:
         logger.error(f"Error deleting session: {e}")
         conn.rollback()
         return False
+    finally:
+        conn.close()
+
+
+def get_pain_points(enabled_only: bool = False) -> List[Dict[str, Any]]:
+    """Get all pain points from database.
+    
+    Args:
+        enabled_only: If True, only return enabled pain points. If False, return all.
+    """
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        query = '''
+            SELECT id, title, icon, keywords, enabled, created_at, updated_at
+            FROM pain_points
+        '''
+        if enabled_only:
+            query += ' WHERE enabled = 1'
+        query += ' ORDER BY title'
+        
+        c.execute(query)
+        rows = c.fetchall()
+        
+        pain_points = []
+        for row in rows:
+            pain_points.append({
+                'id': row[0],
+                'title': row[1],
+                'icon': row[2],
+                'keywords': row[3].split(',') if row[3] else [],
+                'enabled': bool(row[4]),
+                'created_at': row[5],
+                'updated_at': row[6]
+            })
+        
+        return pain_points
+    finally:
+        conn.close()
+
+
+def save_pain_points(pain_points: List[Dict[str, Any]]) -> None:
+    """Save pain points to database (replaces all existing)."""
+    if not isinstance(pain_points, list):
+        raise ValueError("pain_points must be a list")
+    
+    conn, is_duckdb = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        import datetime
+        now = datetime.datetime.utcnow().isoformat()
+        
+        # Get existing pain points to preserve IDs
+        c.execute('SELECT id, title FROM pain_points')
+        existing = {row[1]: row[0] for row in c.fetchall()}
+        
+        # Update or insert pain points
+        for pp in pain_points:
+            title = str(pp.get('title', '')).strip()
+            icon = str(pp.get('icon', '📊')).strip()
+            keywords = pp.get('keywords', [])
+            enabled = 1 if pp.get('enabled', True) else 0
+            
+            if not title:
+                continue
+            
+            # Convert keywords list to comma-separated string
+            keywords_str = ','.join([str(k).strip() for k in keywords if k])
+            
+            if title in existing:
+                # Update existing
+                c.execute('''
+                    UPDATE pain_points
+                    SET icon = ?, keywords = ?, enabled = ?, updated_at = ?
+                    WHERE title = ?
+                ''', (icon, keywords_str, enabled, now, title))
+            else:
+                # Insert new
+                c.execute('''
+                    INSERT INTO pain_points (title, icon, keywords, enabled, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (title, icon, keywords_str, enabled, now, now))
+        
+        conn.commit()
     finally:
         conn.close()
 

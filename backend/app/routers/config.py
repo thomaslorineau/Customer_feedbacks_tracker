@@ -265,6 +265,19 @@ class KeywordsPayload(BaseModel):
     keywords: List[str] = Field(..., description="List of keywords")
 
 
+class PainPointPayload(BaseModel):
+    """Payload for a single pain point."""
+    title: str = Field(..., description="Pain point title")
+    icon: str = Field(..., description="Emoji icon")
+    keywords: List[str] = Field(..., description="List of keywords for detection")
+    enabled: bool = Field(default=True, description="Whether this pain point is enabled")
+
+
+class PainPointsPayload(BaseModel):
+    """Payload for multiple pain points."""
+    pain_points: List[PainPointPayload] = Field(..., description="List of pain points")
+
+
 class BaseKeywordsPayload(BaseModel):
     """Payload for updating base keywords."""
     brands: List[str] = Field(default_factory=list)
@@ -704,6 +717,103 @@ async def update_base_keywords(payload: BaseKeywordsPayload):
     except Exception as e:
         logger.error(f"Error updating base keywords: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update base keywords: {str(e)}")
+
+
+# ============================================================================
+# PAIN POINTS ENDPOINTS
+# ============================================================================
+
+@router.get(
+    '/settings/pain-points',
+    summary="Get Pain Points Configuration",
+    description="""
+    Returns all configured pain points from the database.
+    
+    **Features:**
+    - Returns all pain points (including disabled ones) for settings management
+    - Includes title, icon, and keywords for each pain point
+    - Used for detecting recurring issues in customer feedback
+    
+    **Returns:**
+    - `pain_points`: List of pain point configurations
+    
+    **Example Response:**
+    ```json
+    {
+        "pain_points": [
+            {
+                "id": 1,
+                "title": "Performance Issues",
+                "icon": "🐌",
+                "keywords": ["slow", "performance", "lag"],
+                "enabled": true
+            }
+        ]
+    }
+    ```
+    """,
+    tags=["Configuration", "Pain Points"]
+)
+async def get_pain_points_config():
+    """Get all pain points from database (including disabled ones for settings)."""
+    try:
+        pain_points = db.get_pain_points(enabled_only=False)
+        return {'pain_points': pain_points}
+    except Exception as e:
+        logger.error(f"Error getting pain points: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get pain points: {str(e)}")
+
+
+@router.post(
+    '/settings/pain-points',
+    summary="Update Pain Points Configuration",
+    description="""
+    Updates pain points configuration in the database.
+    
+    **Features:**
+    - Replaces all existing pain points with the provided list
+    - Each pain point must have a title, icon, and keywords list
+    - Keywords are used to detect mentions in post content
+    - A post can match multiple pain points if it contains keywords from different categories
+    
+    **Request Body:**
+    ```json
+    {
+        "pain_points": [
+            {
+                "title": "Performance Issues",
+                "icon": "🐌",
+                "keywords": ["slow", "performance", "lag"],
+                "enabled": true
+            }
+        ]
+    }
+    ```
+    
+    **Returns:**
+    - `success`: Boolean indicating success
+    - `count`: Number of pain points saved
+    """,
+    tags=["Configuration", "Pain Points"]
+)
+async def update_pain_points_config(payload: PainPointsPayload):
+    """Update pain points configuration."""
+    try:
+        # Convert to format expected by db.save_pain_points
+        pain_points_list = [
+            {
+                'title': pp.title,
+                'icon': pp.icon,
+                'keywords': pp.keywords,
+                'enabled': pp.enabled
+            }
+            for pp in payload.pain_points
+        ]
+        db.save_pain_points(pain_points_list)
+        return {'success': True, 'count': len(pain_points_list)}
+    except Exception as e:
+        logger.error(f"Error updating pain points: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update pain points: {str(e)}")
 
 
 @router.post(
