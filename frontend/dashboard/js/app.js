@@ -216,10 +216,21 @@ class App {
     }
 
     async loadPosts() {
+        console.log('[App] Starting loadPosts()...');
+        console.log('[App] API baseURL:', this.api.baseURL);
+        
         try {
+            console.log('[App] Calling api.getPosts(10000, 0)...');
             const posts = await this.api.getPosts(10000, 0);  // Get all posts to ensure complete sync
             
+            console.log('[App] Posts received from API:', {
+                isArray: Array.isArray(posts),
+                length: posts?.length || 0,
+                firstPost: posts?.[0] || null
+            });
+            
             if (!posts || posts.length === 0) {
+                console.warn('[App] No posts found in database');
                 this.showError('No posts found in database. Go to Feedbacks Collection to scrape some data.');
                 // Show empty state message
                 const postsList = document.getElementById('postsList');
@@ -230,20 +241,34 @@ class App {
             }
             
             // Filter valid posts (exclude samples and relevance_score = 0) to match data collection page
+            console.log('[App] Filtering valid posts...');
             const validPosts = this.filterValidPosts(posts);
+            console.log('[App] Valid posts after filtering:', {
+                originalCount: posts.length,
+                validCount: validPosts.length,
+                filteredOut: posts.length - validPosts.length
+            });
             
             // Set posts in state (will trigger dashboard update via subscription)
+            console.log('[App] Setting posts in state...');
             this.state.setPosts(validPosts);
+            console.log('[App] Posts set in state:', {
+                statePostsCount: this.state.posts?.length || 0,
+                stateFilteredPostsCount: this.state.filteredPosts?.length || 0
+            });
             
             // Hide loading indicator
             const loadingIndicator = document.getElementById('loadingIndicator');
             if (loadingIndicator) {
                 loadingIndicator.style.display = 'none';
             }
+            
+            console.log('[App] loadPosts() completed successfully');
         } catch (error) {
-            console.error('App: Failed to load posts:', error);
-            console.error('App: Error details:', error.message);
-            console.error('App: Error stack:', error.stack);
+            console.error('[App] Failed to load posts:', error);
+            console.error('[App] Error details:', error.message);
+            console.error('[App] Error stack:', error.stack);
+            console.error('[App] API baseURL was:', this.api.baseURL);
             
             // Hide loading indicator
             const loadingIndicator = document.getElementById('loadingIndicator');

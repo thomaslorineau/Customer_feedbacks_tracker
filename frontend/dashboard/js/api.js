@@ -31,34 +31,48 @@ export class API {
     
     async getPosts(limit = 100, offset = 0) {
         const url = `${this.baseURL}/posts?limit=${limit}&offset=${offset}`;
+        console.log('[API] Fetching posts from:', url);
         
         try {
             const response = await fetch(url);
+            console.log('[API] Response status:', response.status, response.statusText);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('API: Error response:', errorText);
+                console.error('[API] Error response:', errorText);
                 throw new Error(`Failed to fetch posts: ${response.status} ${response.statusText}. ${errorText}`);
             }
             
             const contentType = response.headers.get('content-type');
+            console.log('[API] Content-Type:', contentType);
             
             if (!contentType || !contentType.includes('application/json')) {
                 const text = await response.text();
-                console.error('API: Unexpected content type. Response:', text.substring(0, 200));
+                console.error('[API] Unexpected content type. Response:', text.substring(0, 200));
                 throw new Error(`Unexpected content type: ${contentType}`);
             }
             
             const data = await response.json();
+            console.log('[API] Data received:', {
+                isArray: Array.isArray(data),
+                length: Array.isArray(data) ? data.length : 'N/A',
+                type: typeof data,
+                firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
+            });
             
             if (!Array.isArray(data)) {
-                console.error('API: Expected array but got:', typeof data, data);
+                console.error('[API] Expected array but got:', typeof data, data);
                 throw new Error('API returned non-array data');
             }
             
+            console.log('[API] Returning', data.length, 'posts');
             return data;
         } catch (error) {
-            console.error('API: Fetch error:', error.message);
+            console.error('[API] Fetch error:', error.message);
+            console.error('[API] Error type:', error.name);
+            if (error.cause) {
+                console.error('[API] Error cause:', error.cause);
+            }
             throw error;
         }
     }
