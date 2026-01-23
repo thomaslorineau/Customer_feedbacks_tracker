@@ -72,34 +72,44 @@ function updateSourceChartFromState(state) {
 /**
  * Load data and render the source chart (deprecated - now uses state directly)
  * Kept for backward compatibility but should use updateSourceChartFromState instead
+ * This function NO LONGER makes API calls - it only uses state data
  */
 async function loadAndRenderSourceChart() {
+    // This function is deprecated and should not be called directly
+    // Use updateSourceChartFromState instead
+    // No API calls are made - all data comes from state
+    
     try {
         // Use state data directly instead of API call
         if (currentState && currentState.posts && currentState.posts.length > 0) {
             updateSourceChartFromState(currentState);
-        } else {
-            // If no state available, wait a bit and try again (state might be loading)
-            setTimeout(() => {
-                if (currentState && currentState.posts && currentState.posts.length > 0) {
-                    updateSourceChartFromState(currentState);
-                } else {
-                    // Show empty state
-                    const canvas = document.getElementById('sourceChart');
-                    if (canvas) {
+            return;
+        }
+        
+        // If no state available, wait a bit and try again (state might be loading)
+        setTimeout(() => {
+            if (currentState && currentState.posts && currentState.posts.length > 0) {
+                updateSourceChartFromState(currentState);
+            } else {
+                // Show empty state silently - no error message
+                const canvas = document.getElementById('sourceChart');
+                if (canvas) {
+                    try {
                         const ctx = canvas.getContext('2d');
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.fillStyle = 'var(--text-muted)';
                         ctx.font = '14px sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+                    } catch (e) {
+                        // Silently ignore canvas errors
                     }
                 }
-            }, 500);
-        }
+            }
+        }, 500);
     } catch (error) {
-        // Silently handle errors - chart will update when state is available
-        console.debug('Source chart: Waiting for state data', error);
+        // Silently handle all errors - chart will update when state is available
+        // Do not log or throw errors to avoid console noise
     }
 }
 
