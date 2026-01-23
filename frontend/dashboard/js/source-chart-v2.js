@@ -140,16 +140,27 @@ function renderSourceChart(sourceData, sentimentBySource) {
         zIndex: computedStyle.zIndex
     });
     
-    // Check if overlay is blocking
+    // Check if overlay is blocking and force hide it if visible
     const overlay = document.getElementById('whatsHappeningOverlay');
     if (overlay) {
         const overlayStyle = window.getComputedStyle(overlay);
+        const isOverlayVisible = overlayStyle.display !== 'none' && overlayStyle.visibility !== 'hidden';
         console.log('[source-chart-v2.js] Overlay state:', {
             display: overlayStyle.display,
             visibility: overlayStyle.visibility,
             opacity: overlayStyle.opacity,
-            zIndex: overlayStyle.zIndex
+            zIndex: overlayStyle.zIndex,
+            isVisible: isOverlayVisible
         });
+        
+        // Force hide overlay if it's blocking (should have been hidden by whats-happening.js)
+        if (isOverlayVisible) {
+            console.warn('[source-chart-v2.js] Overlay is still visible, forcing hide...');
+            overlay.style.setProperty('display', 'none', 'important');
+            overlay.style.setProperty('visibility', 'hidden', 'important');
+            overlay.style.setProperty('opacity', '0', 'important');
+            overlay.style.setProperty('z-index', '-1', 'important');
+        }
     }
     
     const ctx = canvas.getContext('2d');
