@@ -674,7 +674,6 @@ async function loadImprovementsAnalysis() {
     const analysisSection = document.getElementById('improvementsAnalysis');
     const insightsContainer = document.getElementById('improvementsInsights');
     const roiContainer = document.getElementById('improvementsROI');
-    const overlay = document.getElementById('improvementsOverlay');
     
     if (!analysisSection || !insightsContainer || !roiContainer) {
         console.warn('Improvements analysis containers not found');
@@ -683,15 +682,29 @@ async function loadImprovementsAnalysis() {
     
     // Show the analysis section FIRST so overlay can be visible
     analysisSection.style.display = 'block';
+    analysisSection.style.setProperty('position', 'relative', 'important');
+    
+    // Get overlay AFTER section is visible
+    let overlay = document.getElementById('improvementsOverlay');
     
     // Show overlay IMMEDIATELY during LLM analysis
     const showOverlay = () => {
-        if (overlay) {
+        // Re-get overlay in case it wasn't found initially
+        if (!overlay) {
+            overlay = document.getElementById('improvementsOverlay');
+        }
+        
+        if (overlay && analysisSection) {
+            // Ensure parent section is visible
+            analysisSection.style.setProperty('display', 'block', 'important');
+            analysisSection.style.setProperty('position', 'relative', 'important');
+            
             // Force display with !important equivalent by setting style directly
             overlay.style.setProperty('display', 'flex', 'important');
             overlay.style.setProperty('z-index', '1000', 'important');
             overlay.style.setProperty('visibility', 'visible', 'important');
             overlay.style.setProperty('opacity', '1', 'important');
+            overlay.style.setProperty('position', 'absolute', 'important');
             // Remove any inline style that might hide it
             overlay.removeAttribute('hidden');
             // Also remove the inline style="display: none" if present
@@ -709,7 +722,13 @@ async function loadImprovementsAnalysis() {
     });
     setTimeout(() => {
         showOverlay();
-    }, 100);
+    }, 50);
+    setTimeout(() => {
+        showOverlay();
+    }, 200);
+    setTimeout(() => {
+        showOverlay();
+    }, 500);
     
     // Set a timeout to hide overlay after max 60 seconds (safety measure)
     const overlayTimeout = setTimeout(() => {
@@ -850,8 +869,9 @@ async function loadImprovementsAnalysis() {
     } finally {
         // Always hide overlay, even if there was an error
         clearTimeout(overlayTimeout);
-        if (overlay) {
-            overlay.style.display = 'none';
+        const finalOverlay = document.getElementById('improvementsOverlay');
+        if (finalOverlay) {
+            finalOverlay.style.display = 'none';
         }
     }
 }

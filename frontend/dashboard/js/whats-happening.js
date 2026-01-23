@@ -53,11 +53,16 @@ export async function updateWhatsHappening(state) {
         overlay = showOverlay();
     }, 100);
     
+    // Don't hide overlay immediately if posts.length === 0
+    // Wait a bit to see if posts will be loaded
     if (posts.length === 0) {
-        // No posts available - hide overlay if it was shown
-        if (overlay) {
-            overlay.style.display = 'none';
-        }
+        // Wait a bit before hiding overlay in case posts are still loading
+        setTimeout(() => {
+            const currentOverlay = document.getElementById('whatsHappeningOverlay');
+            if (currentOverlay && (state.filteredPosts || []).length === 0) {
+                currentOverlay.style.display = 'none';
+            }
+        }, 2000);
         const statsCards = document.getElementById('statsCards');
         if (statsCards) {
             statsCards.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No data available</div>';
