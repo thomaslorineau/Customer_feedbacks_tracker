@@ -96,6 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadVersion();
     loadConfiguration();
     loadBaseKeywords();
+    loadAnalysisFocus();
     updateThemeToggle();
 });
 
@@ -1019,5 +1020,28 @@ async function saveBaseKeywords() {
     } catch (error) {
         console.error('Error saving base keywords:', error);
         showError(`Failed to save base keywords: ${error.message}`);
+    }
+}
+
+// Analysis Focus Management
+function loadAnalysisFocus() {
+    const input = document.getElementById('analysisFocusInput');
+    if (!input) return;
+    
+    const savedFocus = localStorage.getItem('analysisFocus') || '';
+    input.value = savedFocus;
+}
+
+function saveAnalysisFocus() {
+    const input = document.getElementById('analysisFocusInput');
+    if (!input) return;
+    
+    const focus = input.value.trim();
+    localStorage.setItem('analysisFocus', focus);
+    
+    if (focus) {
+        showSuccess(`Analysis focus saved: "${focus}"`);
+    } else {
+        showSuccess('Analysis focus cleared - using general analysis');
     }
 }

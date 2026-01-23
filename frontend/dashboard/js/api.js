@@ -150,15 +150,16 @@ export class API {
         return response.json();
     }
     
-    async getWhatsHappeningInsights(posts, stats, activeFilters) {
-        // Prepare posts data for LLM analysis
-        const postsForAnalysis = posts.slice(0, 30).map(p => ({
-            content: (p.content || '').substring(0, 400),
+    async getWhatsHappeningInsights(posts, stats, activeFilters, analysisFocus = '') {
+        // Prepare posts data for LLM analysis - include more posts for better analysis
+        const postsForAnalysis = posts.slice(0, 50).map(p => ({
+            content: (p.content || '').substring(0, 600), // Increased from 400 to 600 for more context
             sentiment: p.sentiment_label,
             source: p.source,
             created_at: p.created_at,
             language: p.language,
-            product: p.product || null
+            product: p.product || null,
+            url: p.url || null
         }));
         
         const response = await fetch(`${this.baseURL}/api/whats-happening`, {
@@ -167,7 +168,8 @@ export class API {
             body: JSON.stringify({
                 posts: postsForAnalysis,
                 stats: stats,
-                active_filters: activeFilters
+                active_filters: activeFilters,
+                analysis_focus: analysisFocus || ''
             })
         });
         if (!response.ok) {

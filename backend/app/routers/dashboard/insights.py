@@ -574,7 +574,8 @@ async def get_recommended_actions(request: RecommendedActionRequest):
 async def generate_whats_happening_insights_with_llm(
     posts: List[dict],
     stats: dict,
-    active_filters: str = ""
+    active_filters: str = "",
+    analysis_focus: str = ""
 ) -> List[WhatsHappeningInsight]:
     """Generate What's Happening insights using LLM API."""
     # Prepare posts for analysis (focus on negative posts and recent ones)
@@ -603,57 +604,80 @@ async def generate_whats_happening_insights_with_llm(
     recent_total = stats.get('recent_total', 0)
     spike_detected = stats.get('spike_detected', False)
     
-    prompt = f"""You are an OVHcloud customer feedback analyst. Analyze the following customer feedback posts and generate key insights for the "What's Happening" section.
+    # Build focus instruction based on analysis_focus setting
+    focus_instruction = ""
+    if analysis_focus:
+        focus_instruction = f"\n\nANALYSIS FOCUS: The user wants to focus the analysis on: {analysis_focus}. Prioritize insights related to this focus area while still providing a comprehensive analysis."
+    
+    prompt = f"""You are an OVHcloud customer feedback analyst. Your task is to deeply analyze the following customer feedback posts and extract the ESSENCE of what's happening - real problems, patterns, and actionable insights.
 
 CONTEXT:
 - Active filters: {active_filters if active_filters else "All posts (no filters)"}
 - Total posts analyzed: {total} (Positive: {positive}, Negative: {negative}, Neutral: {neutral})
 - Recent posts (last 48h): {recent_total} total, {recent_negative} negative
 - Spike detected: {spike_detected} {'⚠️ Significant increase in negative feedback!' if spike_detected else ''}
+{focus_instruction}
 
-POSTS TO ANALYZE:
+DETAILED POSTS TO ANALYZE (READ EACH ONE CAREFULLY):
 {json.dumps(posts_summary, indent=2, ensure_ascii=False)}
 
-Based on this analysis, generate 2-4 key insights. Focus on:
-1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be specific (e.g., "VPS", "Hosting", "Public Cloud", "API", "Domain", "DNS", etc.). If multiple products are mentioned, identify the most critical one.
-2. **Top Issue**: What is the main problem or concern mentioned across these posts? Extract the core issue, not just keywords. Be specific and actionable (e.g., "Payment processing delays", "Server downtime", "Support response time", etc.).
-3. **Spike Alert** (if spike_detected is true): Highlight the spike in negative feedback
-4. **Trend** (optional): Any notable trend or pattern you observe
+CRITICAL ANALYSIS REQUIREMENTS:
+1. **READ AND PARSE EACH POST**: Don't just look at keywords. Understand the actual problems, frustrations, and concerns expressed by customers.
+2. **EXTRACT THE ESSENCE**: Identify the core issues, not just surface-level mentions. What are customers REALLY complaining about?
+3. **FIND PATTERNS**: Look for recurring themes, even if expressed differently. Group similar concerns together.
+4. **BE SPECIFIC**: Instead of generic "support issues", identify "slow response time" or "unhelpful responses". Instead of "product problems", identify "VPS downtime" or "API rate limits".
+
+Generate 2-4 key insights focusing on:
+
+1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be SPECIFIC (e.g., "VPS", "Hosting", "Public Cloud", "API", "Domain", "DNS", "Email", "Storage", etc.). Count how many posts actually mention this product. Calculate the percentage accurately.
+
+2. **Top Issue**: What is the MAIN PROBLEM or concern mentioned across these posts? Extract the CORE ISSUE from the actual content. Be SPECIFIC and ACTIONABLE:
+   - Instead of "support": "Support response time exceeds 24 hours" or "Support agents lack technical knowledge"
+   - Instead of "downtime": "Frequent VPS outages during peak hours" or "Scheduled maintenance causes unexpected downtime"
+   - Instead of "pricing": "Price increases without notice" or "Hidden fees in billing"
+   Count how many posts mention this specific issue.
+
+3. **Spike Alert** (if spike_detected is true): Highlight the spike with accurate percentage and count.
+
+4. **Emerging Pattern** (optional): Any notable trend, pattern, or recurring theme you observe that could indicate a systemic issue.
 
 Format your response as a JSON array with this structure:
 [
   {{
     "type": "top_product",
-    "title": "Top Product Impacted: [Product Name]",
-    "description": "[Percentage]% of negative posts relate to [Product Name] issues. [Brief explanation based on actual posts]",
+    "title": "Top Product Impacted: [Specific Product Name]",
+    "description": "[X]% of negative posts ([count] posts) relate to [Product Name] issues. [Brief explanation based on ACTUAL post content - mention specific problems mentioned in posts]",
     "icon": "🎁",
-    "metric": "[percentage]%",
-    "count": [number]
+    "metric": "[X]%",
+    "count": [actual_number]
   }},
   {{
     "type": "top_issue",
-    "title": "Top Issue: [Issue Name]",
-    "description": "[Count] posts mention issues related to [Issue]. [Brief explanation based on actual posts]",
+    "title": "Top Issue: [Specific Issue Name]",
+    "description": "[Count] posts mention [specific issue]. [Explain the issue based on actual post content - quote or paraphrase what customers are saying]",
     "icon": "💬",
     "metric": "",
-    "count": [number]
+    "count": [actual_number]
   }},
   {{
     "type": "spike",
     "title": "Spike in Negative Feedback",
-    "description": "[Percentage]% increase in negative feedback. [Count] negative posts in past 48h.",
+    "description": "[Percentage]% increase in negative feedback. [Count] negative posts in past 48h. [Mention what customers are complaining about in these recent posts]",
     "icon": "⚠️",
     "metric": "+[percentage]%",
-    "count": [number]
+    "count": [actual_number]
   }}
 ]
 
-IMPORTANT:
-- Base insights on ACTUAL content from the posts, not assumptions
-- Be specific and reference actual issues/products mentioned
+CRITICAL INSTRUCTIONS:
+- READ EACH POST CAREFULLY and extract the REAL problems mentioned
+- Base ALL insights on ACTUAL content from the posts provided - quote or reference specific issues mentioned
+- Be SPECIFIC: Use exact product names, specific problems, and concrete examples from the posts
+- Calculate percentages and counts ACCURATELY based on the data provided
 - If a filter is active, acknowledge it in the insights
+- If analysis_focus is provided, prioritize insights related to that focus area
 - Use appropriate icons (🎁 for products, 💬 for issues, ⚠️ for alerts, 📊 for trends)
-- Ensure percentages and counts are accurate based on the data provided"""
+- DO NOT make generic statements - every insight must be backed by actual post content"""
 
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
@@ -795,7 +819,8 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         insights = await generate_whats_happening_insights_with_llm(
             request.posts,
             request.stats,
-            request.active_filters
+            request.active_filters,
+            request.analysis_focus or ""
         )
         return WhatsHappeningResponse(insights=insights, llm_available=llm_available)
     except Exception as e:
@@ -1062,53 +1087,71 @@ async def generate_improvements_analysis_with_llm(
         for p in products[:10]
     ]) if products else "No product data available."
     
-    prompt = f"""You are an OVHcloud product improvement analyst. Analyze the following improvement opportunities and generate key insights with ROI estimates.
+    # Get analysis focus from environment (could be passed as parameter in future)
+    analysis_focus = os.getenv('ANALYSIS_FOCUS', '')
+    focus_instruction = ""
+    if analysis_focus:
+        focus_instruction = f"\n\nANALYSIS FOCUS: Prioritize insights related to: {analysis_focus}"
+    
+    prompt = f"""You are an OVHcloud product improvement analyst. Your task is to deeply analyze customer feedback data and extract the ESSENCE of improvement opportunities - real problems, actionable insights, and concrete recommendations.
 
 CONTEXT:
 - Total posts analyzed: {total_posts}
 - Pain points identified: {len(pain_points)}
 - Products with opportunities: {len(products)}
+{focus_instruction}
 
-PAIN POINTS:
+PAIN POINTS IDENTIFIED:
 {pain_points_text}
 
 PRODUCT OPPORTUNITIES:
 {products_text}
 
+CRITICAL ANALYSIS REQUIREMENTS:
+1. **EXTRACT THE ESSENCE**: Don't just summarize the data. Identify the ROOT CAUSES and CORE PROBLEMS behind each pain point.
+2. **BE SPECIFIC**: Instead of generic statements, provide concrete, actionable insights:
+   - Instead of "Support issues": "Support response time exceeds 24 hours" or "Support agents lack technical knowledge"
+   - Instead of "Product problems": "VPS downtime during peak hours" or "API rate limits too restrictive"
+3. **FIND PATTERNS**: Look for recurring themes across pain points and products. What systemic issues emerge?
+4. **PRIORITIZE BY IMPACT**: Which improvements would have the highest ROI? Consider customer satisfaction, retention, and revenue impact.
+
 Based on this analysis, generate:
-1. **Key Findings** (3-5 bullet points): What are the main patterns and issues that emerge?
-2. **ROI & Customer Impact**: Estimate the potential ROI and customer impact of addressing these improvements
-3. **Priority Insights**: Which improvements would have the highest impact?
+1. **Key Findings** (3-5 bullet points): What are the MAIN PATTERNS and ROOT CAUSES that emerge? Be specific and reference actual pain points/products.
+2. **ROI & Customer Impact**: Estimate the potential ROI and customer impact. Be SPECIFIC about potential benefits:
+   - Customer satisfaction improvement: [specific percentage or metric]
+   - Retention impact: [specific estimate]
+   - Revenue impact: [specific estimate if possible]
+3. **Priority Insights**: Which improvements would have the HIGHEST IMPACT? Why? Reference specific pain points and products.
 
 Format your response as JSON with this structure:
 {{
   "key_findings": [
-    "Finding 1: [specific insight]",
-    "Finding 2: [specific insight]",
-    "Finding 3: [specific insight]"
+    "Finding 1: [specific insight referencing actual pain points/products]",
+    "Finding 2: [specific insight with concrete details]",
+    "Finding 3: [specific insight with actionable information]"
   ],
-  "roi_summary": "[2-3 sentences about ROI and customer impact. Be specific about potential benefits: customer satisfaction improvement, retention, revenue impact, etc.]",
+  "roi_summary": "[2-3 sentences about ROI and customer impact. Be SPECIFIC: mention actual numbers, percentages, or concrete estimates when possible. Reference specific pain points and products.]",
   "insights": [
     {{
       "type": "key_finding",
-      "title": "Key Finding Title",
-      "description": "Detailed description of the finding",
+      "title": "Key Finding Title [be specific]",
+      "description": "Detailed description referencing ACTUAL pain points/products from the data. Explain the root cause and why it matters.",
       "icon": "💡",
       "metric": "",
-      "roi_impact": "Potential impact: [specific estimate]"
+      "roi_impact": "Potential impact: [specific estimate with context]"
     }},
     {{
       "type": "roi",
       "title": "ROI & Customer Impact",
-      "description": "[Specific ROI estimate and customer impact]",
+      "description": "[Specific ROI estimate and customer impact. Reference actual pain points/products. Be concrete about potential benefits.]",
       "icon": "💰",
       "metric": "",
-      "roi_impact": "[ROI estimate]"
+      "roi_impact": "[ROI estimate with specific numbers if possible]"
     }},
     {{
       "type": "priority",
-      "title": "Priority Focus Area",
-      "description": "[Which improvements to prioritize and why]",
+      "title": "Priority Focus Area [be specific]",
+      "description": "[Which improvements to prioritize and why. Reference specific pain points/products. Explain the reasoning.]",
       "icon": "🎯",
       "metric": "",
       "roi_impact": ""
@@ -1116,7 +1159,13 @@ Format your response as JSON with this structure:
   ]
 }}
 
-Be specific and actionable. Reference actual products and pain points from the data provided."""
+CRITICAL INSTRUCTIONS:
+- Base ALL insights on ACTUAL data provided (pain points and products)
+- Be SPECIFIC: Use exact product names, specific problems, and concrete examples
+- Reference actual pain points and products in your findings
+- Provide ACTIONABLE insights that can guide product improvement decisions
+- If analysis_focus is provided, prioritize insights related to that focus area
+- DO NOT make generic statements - every insight must be backed by the data provided"""
 
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')

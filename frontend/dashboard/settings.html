@@ -1190,6 +1190,48 @@
             </div>
         </div>
 
+        <!-- Section: Analysis Focus -->
+        <div class="accordion" data-accordion="analysis-focus">
+            <div class="accordion-header" onclick="toggleAccordion('analysis-focus')">
+                <div class="accordion-title">
+                    <span class="accordion-title-icon">🎯</span>
+                    <span>Analysis Focus</span>
+                </div>
+                <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </div>
+            <div class="accordion-content">
+                <div class="settings-section">
+                    <div style="background: #e7f3ff; border-left: 4px solid #0099ff; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                        <h4 style="margin: 0 0 0.5rem 0; color: #004085; font-size: 1rem;">💡 Analysis Focus</h4>
+                        <p style="margin: 0; color: #004085; font-size: 0.9em; line-height: 1.6;">
+                            Configure the focus area for AI analysis in Dashboard and Improvements pages. This helps the AI prioritize specific aspects when analyzing customer feedback.
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label for="analysisFocusInput" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-primary);">
+                            Focus Area (optional)
+                        </label>
+                        <input 
+                            type="text" 
+                            id="analysisFocusInput" 
+                            placeholder="e.g., product issues, support quality, pricing concerns, technical problems"
+                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9em;"
+                        />
+                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em; line-height: 1.5;">
+                            Leave empty for general analysis, or specify a focus area to prioritize insights related to that topic. Examples: "product issues", "support quality", "pricing", "technical problems", "user experience".
+                        </p>
+                    </div>
+
+                    <button onclick="saveAnalysisFocus()" class="btn primary" style="padding: 0.75rem 1.5rem; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                        Save Focus Setting
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Section Email Notifications -->
         <div class="accordion" data-accordion="email-notifications">
             <div class="accordion-header" onclick="toggleAccordion('email-notifications')">

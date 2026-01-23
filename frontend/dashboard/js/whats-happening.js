@@ -73,22 +73,24 @@ export async function updateWhatsHappening(state) {
     const activeFilters = getActiveFilters(state);
     const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
     
-    // Show overlay during LLM analysis
+    // Show overlay during LLM analysis - ensure it's always visible during analysis
     const overlay = document.getElementById('whatsHappeningOverlay');
     if (overlay) {
         overlay.style.display = 'flex';
+        overlay.style.zIndex = '1000';
     }
     
-    // Set a timeout to hide overlay after max 30 seconds (safety measure)
+    // Set a timeout to hide overlay after max 60 seconds (safety measure - increased for better UX)
     const overlayTimeout = setTimeout(() => {
         if (overlay) {
             overlay.style.display = 'none';
         }
-    }, 30000);
+    }, 60000);
     
     // Call LLM API to generate insights
     let insights = [];
     let llmAvailable = false;
+    let analysisCompleted = false;
     try {
         // Try to use API class, but fallback to direct fetch if not available
         let apiInstance = null;
@@ -98,10 +100,12 @@ export async function updateWhatsHappening(state) {
             apiInstance = new API();
             
             if (typeof apiInstance.getWhatsHappeningInsights === 'function') {
-                const response = await apiInstance.getWhatsHappeningInsights(posts, statsForLLM, activeFiltersDescription);
+                // Get analysis focus from settings
+                const analysisFocus = localStorage.getItem('analysisFocus') || '';
+                const response = await apiInstance.getWhatsHappeningInsights(posts, statsForLLM, activeFiltersDescription, analysisFocus);
                 insights = response.insights || [];
                 llmAvailable = response.llm_available !== false;
-                console.log('LLM insights generated via API class:', insights);
+                analysisCompleted = true;
             } else {
                 throw new Error('Method not available in API class');
             }
@@ -118,13 +122,16 @@ export async function updateWhatsHappening(state) {
                 product: p.product || null
             }));
             
+            // Get analysis focus from settings
+            const analysisFocus = localStorage.getItem('analysisFocus') || '';
             const response = await fetch(`${baseURL}/api/whats-happening`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     posts: postsForAnalysis,
                     stats: statsForLLM,
-                    active_filters: activeFiltersDescription
+                    active_filters: activeFiltersDescription,
+                    analysis_focus: analysisFocus
                 })
             });
             
@@ -135,7 +142,7 @@ export async function updateWhatsHappening(state) {
             const data = await response.json();
             insights = data.insights || [];
             llmAvailable = data.llm_available !== false;
-            console.log('LLM insights generated via direct fetch:', insights);
+            analysisCompleted = true;
         }
     } catch (error) {
         console.warn('Failed to get LLM insights:', error);
@@ -183,10 +190,22 @@ export async function updateWhatsHappening(state) {
             });
         }
     } finally {
-        // Always hide overlay, even if there was an error
+        // Always hide overlay when analysis is complete
         clearTimeout(overlayTimeout);
-        if (overlay) {
-            overlay.style.display = 'none';
+        if (overlay && analysisCompleted) {
+            // Small delay to ensure smooth transition
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+            }, 300);
+        } else if (overlay && !analysisCompleted) {
+            // If analysis didn't complete, keep overlay visible for a bit longer
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.display = 'none';
+                }
+            }, 1000);
         }
         // Show refresh button if there was an error or LLM is not available
         const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');

@@ -78,6 +78,7 @@ class WhatsHappeningRequest(BaseModel):
     posts: List[dict] = Field(..., description="List of filtered posts to analyze")
     stats: dict = Field(default={}, description="Statistics about posts")
     active_filters: str = Field(default="", description="Description of active filters")
+    analysis_focus: str = Field(default="", description="Focus area for analysis (e.g., 'product issues', 'support quality', 'pricing')")
 
 
 class WhatsHappeningInsight(BaseModel):
