@@ -14,8 +14,13 @@ let currentState = null;
 /**
  * Initialize the source chart
  * IMPORTANT: This function NEVER makes API calls - it only uses state data
+ * Version 2.2 - source-chart-v2.js - NO API CALLS EVER
  */
 export function initSourceChart(state) {
+    // CRITICAL: This is source-chart-v2.js - NO API CALLS
+    // If you see this message, the new file is loaded correctly
+    console.log('[source-chart-v2.js] Initializing - NO API calls will be made');
+    
     // Ensure we never make API calls - only use state data
     if (!state) {
         return;
