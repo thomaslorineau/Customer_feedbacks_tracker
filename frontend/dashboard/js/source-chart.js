@@ -2,6 +2,9 @@
  * Posts by Source chart module
  * Displays distribution of posts by source (Reddit, Twitter, Trustpilot, etc.)
  * with click-to-filter functionality
+ * 
+ * Version: 2.1 - No API calls, uses state data only
+ * Last updated: 2025-01-23
  */
 
 let sourceChart = null;
@@ -9,28 +12,46 @@ let currentState = null;
 
 /**
  * Initialize the source chart
+ * IMPORTANT: This function NEVER makes API calls - it only uses state data
  */
 export function initSourceChart(state) {
+    // Ensure we never make API calls - only use state data
+    if (!state) {
+        return;
+    }
+    
     currentState = state;
     
     // Subscribe to state changes to update chart with filtered data
-    if (state) {
-        state.subscribe((updatedState) => {
-            currentState = updatedState;
+    state.subscribe((updatedState) => {
+        currentState = updatedState;
+        try {
             updateSourceChartFromState(updatedState);
-        });
-        
-        // Initial load from state (if posts are already loaded)
-        if (state.posts && state.posts.length > 0) {
-            updateSourceChartFromState(state);
-        } else {
-            // Wait a bit for posts to load, then update from state
-            setTimeout(() => {
-                if (currentState && currentState.posts && currentState.posts.length > 0) {
-                    updateSourceChartFromState(currentState);
-                }
-            }, 500);
+        } catch (e) {
+            // Silently ignore errors - chart will update when ready
         }
+    });
+    
+    // Initial load from state (if posts are already loaded)
+    // NEVER make API calls - only use state data
+    if (state.posts && state.posts.length > 0) {
+        try {
+            updateSourceChartFromState(state);
+        } catch (e) {
+            // Silently ignore errors - chart will update when ready
+        }
+    } else {
+        // Wait a bit for posts to load, then update from state
+        // NO API CALLS - only wait for state to be populated
+        setTimeout(() => {
+            if (currentState && currentState.posts && currentState.posts.length > 0) {
+                try {
+                    updateSourceChartFromState(currentState);
+                } catch (e) {
+                    // Silently ignore errors - chart will update when ready
+                }
+            }
+        }, 500);
     }
 }
 
