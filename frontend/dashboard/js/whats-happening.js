@@ -259,10 +259,40 @@ export async function updateWhatsHappening(state) {
     }
     
     // Calculate answered stats from filtered posts (for display in filtered context)
-    const answered = posts.filter(p => p.is_answered === 1 || p.is_answered === true).length;
-    const notAnswered = posts.filter(p => !p.is_answered || p.is_answered === 0 || p.is_answered === false).length;
+    // Debug: log first post to see structure
+    if (posts.length > 0) {
+        console.log('[whats-happening.js] First post structure:', {
+            id: posts[0].id,
+            has_is_answered: 'is_answered' in posts[0],
+            is_answered_value: posts[0].is_answered,
+            is_answered_type: typeof posts[0].is_answered
+        });
+    }
+    
     const totalForAnswered = posts.length;
+    
+    const answered = posts.filter(p => {
+        const val = p.is_answered;
+        // Check multiple formats: 1, true, '1', 'true', or any truthy value
+        return val === 1 || val === true || val === '1' || val === 'true';
+    }).length;
+    const notAnswered = posts.filter(p => {
+        const val = p.is_answered;
+        // Check multiple formats: 0, false, '0', 'false', null, undefined, or any falsy value
+        return !val || val === 0 || val === false || val === '0' || val === 'false' || val === null || val === undefined;
+    }).length;
+    
     const answeredPercentage = totalForAnswered > 0 ? ((answered / totalForAnswered) * 100).toFixed(0) : '0';
+    
+    console.log('[whats-happening.js] Answered calculation:', {
+        totalPosts: totalForAnswered,
+        answered,
+        notAnswered,
+        answeredPercentage,
+        postsWithIsAnswered: posts.filter(p => 'is_answered' in p).length,
+        postsWithoutIsAnswered: posts.filter(p => !('is_answered' in p)).length,
+        sampleValues: posts.slice(0, 5).map(p => ({ id: p.id, is_answered: p.is_answered, type: typeof p.is_answered }))
+    });
     
     // Calculate satisfaction (same logic as updatePositiveSatisfactionKPI)
     const satisfactionPositive = posts.filter(p => p.sentiment_label === 'positive').length;

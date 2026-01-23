@@ -949,6 +949,12 @@
                         onmouseout="this.style.background='#3b82f6'; this.style.transform='translateY(0)';">
                         📦 Check Product Labels
                     </button>
+                    <button onclick="recheckAnsweredStatus()" style="padding: 12px 24px; background: #10b981; border: none; border-radius: 8px; color: #ffffff; font-weight: 600; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease;" 
+                        title="Re-check answered status for existing posts (re-scrape metadata from URLs)"
+                        onmouseover="this.style.background='#059669'; this.style.transform='translateY(-1px)';"
+                        onmouseout="this.style.background='#10b981'; this.style.transform='translateY(0)';">
+                        ✅ Re-check Answered Status
+                    </button>
                 </div>
             </div>
         </section>
@@ -1859,26 +1865,29 @@
         }
 
         function loadFilters() {
+            // Don't restore filters from localStorage by default
+            // Filters should only be applied when user explicitly sets them
+            // This prevents unwanted filters from being active on page load
             const saved = localStorage.getItem('ovhTrackerFilters');
             if (saved) {
                 try {
                     const filters = JSON.parse(saved);
-                    const searchInput = document.getElementById('searchInput');
-                    const keywordFilter = document.getElementById('keywordFilter');
-                    const sourceFilter = document.getElementById('sourceFilter');
-                    const sentimentFilter = document.getElementById('sentimentFilter');
-                    const dateFrom = document.getElementById('dateFrom');
-                    const dateTo = document.getElementById('dateTo');
+                    // Only restore filters if they were explicitly saved (not empty)
+                    // Check if any filter has a meaningful value
+                    const hasActiveFilters = (
+                        (filters.searchInput && filters.searchInput.trim()) ||
+                        (filters.sourceFilter && filters.sourceFilter !== '') ||
+                        (filters.sentimentFilter && filters.sentimentFilter !== '') ||
+                        (filters.dateFrom && filters.dateFrom.trim()) ||
+                        (filters.dateTo && filters.dateTo.trim())
+                    );
                     
-                    if (searchInput) searchInput.value = filters.searchInput || '';
-                    if (keywordFilter) keywordFilter.value = filters.keywordFilter || '';
-                    if (sourceFilter) sourceFilter.value = filters.sourceFilter || '';
-                    if (sentimentFilter) sentimentFilter.value = filters.sentimentFilter || '';
-                    if (dateFrom) dateFrom.value = filters.dateFrom || '';
-                    if (dateTo) dateTo.value = filters.dateTo || '';
-                    console.log('✅ Filters restored from localStorage');
+                    // Only restore if there are active filters AND user wants to persist them
+                    // For now, we don't restore filters on page load to avoid confusion
+                    // Users can manually apply filters which will then be saved
+                    console.log('💡 Filters found in localStorage but not auto-applied. Use "Apply Filters" button to restore them.');
                 } catch (e) {
-                    console.log('Could not restore filters:', e);
+                    console.log('Could not parse saved filters:', e);
                 }
             }
         }
@@ -2348,21 +2357,54 @@
         
         async function checkProductLabels() {
             try {
-                console.log('Checking product labels...');
-                showToast('Analyzing product labels...', 'info');
+                const confirmed = confirm(
+                    '📦 Update Product Labels\n\n' +
+                    'This will detect and update product labels for all posts in the database.\n\n' +
+                    '⚠️ This may take some time depending on the number of posts.\n\n' +
+                    'Do you want to continue?'
+                );
                 
-                const response = await fetch(`${API_BASE}/admin/product-labels-stats`);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(errorText || `HTTP ${response.status}`);
+                if (!confirmed) {
+                    return;
                 }
                 
-                const stats = await response.json();
+                console.log('Updating product labels...');
+                showToast('Updating product labels in database...', 'info');
+                
+                // First update the product labels in the database
+                const updateResponse = await fetch(`${API_BASE}/admin/update-product-labels`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({}) // Update all posts
+                });
+                
+                if (!updateResponse.ok) {
+                    const errorText = await updateResponse.text();
+                    throw new Error(errorText || `HTTP ${updateResponse.status}`);
+                }
+                
+                const updateResult = await updateResponse.json();
+                console.log('Product labels update result:', updateResult);
+                
+                // Then get statistics
+                const statsResponse = await fetch(`${API_BASE}/admin/product-labels-stats`);
+                
+                if (!statsResponse.ok) {
+                    const errorText = await statsResponse.text();
+                    throw new Error(errorText || `HTTP ${statsResponse.status}`);
+                }
+                
+                const stats = await statsResponse.json();
                 
                 // Build detailed message with validation
-                let message = '📦 Product Labels Statistics\n\n';
-                message += `📊 Overview:\n`;
+                let message = '📦 Product Labels Update\n\n';
+                message += `✅ Update Results:\n`;
+                message += `• Posts updated: ${updateResult.updated_count}\n`;
+                message += `• Errors: ${updateResult.error_count}\n`;
+                message += `• Total posts processed: ${updateResult.total_posts}\n\n`;
+                message += `📊 Statistics:\n`;
                 message += `• Total posts: ${stats.total_posts}\n`;
                 message += `• Posts with product label: ${stats.posts_with_label} (${stats.coverage_percentage}%)\n`;
                 message += `• Posts without product label: ${stats.posts_without_label} (${(100 - stats.coverage_percentage).toFixed(2)}%)\n\n`;
@@ -2428,10 +2470,71 @@
                 alert(message);
                 
                 // Also log to console for detailed analysis
+                console.log('Product Labels Update Result:', updateResult);
                 console.log('Product Labels Stats:', stats);
                 
+                showToast(`Product labels updated: ${updateResult.updated_count} posts`, 'success');
+                
+                // Reload posts to show updated product labels
+                await loadPostsFromDB();
+                renderGallery();
+                
             } catch (e) {
-                console.error('Error checking product labels:', e);
+                console.error('Error updating product labels:', e);
+                showToast(`Error: ${e.message}`, 'error');
+            }
+        }
+        
+        async function recheckAnsweredStatus() {
+            try {
+                const confirmed = confirm(
+                    '✅ Re-check Answered Status\n\n' +
+                    'This will re-scrape metadata from post URLs to check if posts have been answered since they were scraped.\n\n' +
+                    '⚠️ Note: This may take some time depending on the number of posts.\n\n' +
+                    'Do you want to continue?'
+                );
+                
+                if (!confirmed) {
+                    return;
+                }
+                
+                console.log('Re-checking answered status...');
+                showToast('Re-checking answered status for posts...', 'info');
+                
+                const response = await fetch(`${API_BASE}/admin/recheck-answered-status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ limit: 100 }) // Check up to 100 most recent posts
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText || `HTTP ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                let message = '✅ Re-check Answered Status\n\n';
+                message += `📊 Results:\n`;
+                message += `• Total posts checked: ${result.total_posts}\n`;
+                message += `• Posts updated: ${result.updated_count}\n`;
+                message += `• Errors: ${result.error_count}\n`;
+                if (result.skipped_count) {
+                    message += `• Skipped: ${result.skipped_count}\n`;
+                }
+                message += `\n${result.message || result.note || ''}`;
+                
+                alert(message);
+                showToast(`Re-check completed: ${result.updated_count} posts updated`, 'success');
+                
+                // Reload posts to show updated answered status
+                await loadPostsFromDB();
+                renderGallery();
+                
+            } catch (e) {
+                console.error('Error re-checking answered status:', e);
                 showToast(`Error: ${e.message}`, 'error');
             }
         }
@@ -2724,8 +2827,13 @@
             document.getElementById('dateTo').value = '';
             document.getElementById('sortBy').value = 'date-desc';
             currentOffset = 0;
+            
+            // Also clear filters from localStorage
+            localStorage.removeItem('ovhTrackerFilters');
+            
             console.log('All filters cleared');
             updateActiveFiltersCount();
+            saveFilters(); // Save empty filters
             renderGallery();
         }
 

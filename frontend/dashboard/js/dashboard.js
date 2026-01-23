@@ -35,6 +35,50 @@ export function initDashboard(appState) {
         filteredPostsCount: state.filteredPosts?.length || 0
     });
     
+    // Ensure all filters are reset to default values on initialization (no filters active)
+    // This ensures the timeline displays all posts by default
+    // Wait a bit to ensure posts are loaded first, then reset filters
+    setTimeout(() => {
+        // Reset all filters to default values
+        state.filters.dateFrom = '';
+        state.filters.dateTo = '';
+        state.filters.sentiment = 'all';
+        state.filters.language = 'all';
+        state.filters.product = 'all';
+        state.filters.answered = 'all';
+        state.filters.source = '';
+        state.filters.search = '';
+        
+        // Reapply filters to update filteredPosts with no filters
+        // This ensures filteredPosts contains all posts when no filters are active
+        state.applyFilters();
+        
+        // Clear date inputs to ensure no default dates are displayed
+        const dateFromInput = document.getElementById('dateFrom');
+        const dateToInput = document.getElementById('dateTo');
+        const globalDateFrom = document.getElementById('globalDateFrom');
+        const globalDateTo = document.getElementById('globalDateTo');
+        
+        if (dateFromInput) dateFromInput.value = '';
+        if (dateToInput) dateToInput.value = '';
+        if (globalDateFrom) globalDateFrom.value = '';
+        if (globalDateTo) globalDateTo.value = '';
+        
+        // Also reset all filter selects to 'all'
+        const sentimentFilter = document.getElementById('sentimentFilter');
+        const languageFilter = document.getElementById('languageFilter');
+        const productFilter = document.getElementById('productFilter');
+        const answeredFilter = document.getElementById('answeredFilter');
+        
+        if (sentimentFilter) sentimentFilter.value = 'all';
+        if (languageFilter) languageFilter.value = 'all';
+        if (productFilter) productFilter.value = 'all';
+        if (answeredFilter) answeredFilter.value = 'all';
+        
+        // Force timeline chart update to ensure it displays with no filters
+        updateTimelineChart(state);
+    }, 200); // Wait 200ms to ensure posts are loaded
+    
     // Check for product filter from Improvements page
     const dashboardProductFilter = localStorage.getItem('dashboardProductFilter');
     if (dashboardProductFilter) {
@@ -62,11 +106,9 @@ export function initDashboard(appState) {
         }, 300);
     }
     
-    // Initialize default date range based on actual posts dates if no dates are set
-    // Wait a bit to ensure posts are loaded first
-    setTimeout(() => {
-        initializeDefaultDateRange();
-    }, 200);
+    // Don't initialize default date range automatically
+    // Users should explicitly set date filters if they want to filter by date
+    // This prevents unwanted filters from being active on page load
     
     // Initialize event listeners
     setupEventListeners();
@@ -153,31 +195,37 @@ function initializeDefaultDateRange() {
             state.applyFilters();
         }
     } else if (!hasDateFromState && !hasDateToState) {
-        // No dates set anywhere - set default date range to last 12 months to align with timeline
-        const now = new Date();
-        const twelveMonthsAgo = new Date();
-        twelveMonthsAgo.setMonth(now.getMonth() - 12);
-        
-        const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-        const dateToStr = now.toISOString().split('T')[0];
-        
-        // Set in inputs
-        if (dateFromInput) dateFromInput.value = dateFromStr;
-        if (dateToInput) dateToInput.value = dateToStr;
+        // No dates set anywhere - don't set default dates automatically
+        // Users should explicitly set date filters if they want to filter by date
+        // This prevents unwanted filters from being active on page load
+    } else {
+        // Dates are in state but not in inputs - sync inputs only if dates are not empty
+        // Don't sync empty dates to inputs (they should remain empty)
+        if (hasDateFromState && dateFromInput && state.filters.dateFrom) {
+            dateFromInput.value = state.filters.dateFrom;
+        } else if (!hasDateFromState && dateFromInput) {
+            // Ensure input is empty if state has no date
+            dateFromInput.value = '';
+        }
+        if (hasDateToState && dateToInput && state.filters.dateTo) {
+            dateToInput.value = state.filters.dateTo;
+        } else if (!hasDateToState && dateToInput) {
+            // Ensure input is empty if state has no date
+            dateToInput.value = '';
+        }
+        // Also sync global date inputs
         const globalDateFrom = document.getElementById('globalDateFrom');
         const globalDateTo = document.getElementById('globalDateTo');
-        if (globalDateFrom) globalDateFrom.value = dateFromStr;
-        if (globalDateTo) globalDateTo.value = dateToStr;
-        
-        // Set in state (without triggering notifications)
-        state.filters.dateFrom = dateFromStr;
-        state.filters.dateTo = dateToStr;
-        state.applyFilters();
-        updateDefaultDateRangeIndicator();
-    } else {
-        // Dates are in state but not in inputs - sync inputs
-        if (hasDateFromState && dateFromInput) dateFromInput.value = state.filters.dateFrom;
-        if (hasDateToState && dateToInput) dateToInput.value = state.filters.dateTo;
+        if (hasDateFromState && globalDateFrom && state.filters.dateFrom) {
+            globalDateFrom.value = state.filters.dateFrom;
+        } else if (!hasDateFromState && globalDateFrom) {
+            globalDateFrom.value = '';
+        }
+        if (hasDateToState && globalDateTo && state.filters.dateTo) {
+            globalDateTo.value = state.filters.dateTo;
+        } else if (!hasDateToState && globalDateTo) {
+            globalDateTo.value = '';
+        }
         state.applyFilters();
     }
     
@@ -321,23 +369,16 @@ function setupEventListeners() {
     
     if (clearDatesBtn) {
         clearDatesBtn.addEventListener('click', () => {
-            // Reset to default: last 12 months
-            const now = new Date();
-            const twelveMonthsAgo = new Date();
-            twelveMonthsAgo.setMonth(now.getMonth() - 12);
-            
-            const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-            const dateToStr = now.toISOString().split('T')[0];
-            
-            state.setFilter('dateFrom', dateFromStr);
-            state.setFilter('dateTo', dateToStr);
-            if (globalDateFrom) globalDateFrom.value = dateFromStr;
-            if (globalDateTo) globalDateTo.value = dateToStr;
+            // Clear dates (don't set default dates)
+            state.setFilter('dateFrom', '');
+            state.setFilter('dateTo', '');
+            if (globalDateFrom) globalDateFrom.value = '';
+            if (globalDateTo) globalDateTo.value = '';
             // Sync with local date inputs
             const dateFromInput = document.getElementById('dateFrom');
             const dateToInput = document.getElementById('dateTo');
-            if (dateFromInput) dateFromInput.value = dateFromStr;
-            if (dateToInput) dateToInput.value = dateToStr;
+            if (dateFromInput) dateFromInput.value = '';
+            if (dateToInput) dateToInput.value = '';
             updateDefaultDateRangeIndicator();
             updateResetFiltersButtonVisibility();
             updateDashboard();
@@ -1156,24 +1197,17 @@ function navigateProducts(direction) {
 function clearTimelineFilter() {
     if (!state) return;
     
-    // Reset to default: last 12 months
-    const now = new Date();
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(now.getMonth() - 12);
-    
-    const dateFromStr = twelveMonthsAgo.toISOString().split('T')[0];
-    const dateToStr = now.toISOString().split('T')[0];
-    
-    // Update date filters
+    // Clear all filters (don't set default dates)
     const dateFromInput = document.getElementById('dateFrom');
     const dateToInput = document.getElementById('dateTo');
     const globalDateFrom = document.getElementById('globalDateFrom');
     const globalDateTo = document.getElementById('globalDateTo');
     
-    if (dateFromInput) dateFromInput.value = dateFromStr;
-    if (dateToInput) dateToInput.value = dateToStr;
-    if (globalDateFrom) globalDateFrom.value = dateFromStr;
-    if (globalDateTo) globalDateTo.value = dateToStr;
+    // Clear date filters
+    if (dateFromInput) dateFromInput.value = '';
+    if (dateToInput) dateToInput.value = '';
+    if (globalDateFrom) globalDateFrom.value = '';
+    if (globalDateTo) globalDateTo.value = '';
     
     // Reset other timeline filters
     const sentimentFilter = document.getElementById('sentimentFilter');
@@ -1186,9 +1220,9 @@ function clearTimelineFilter() {
     if (productFilter) productFilter.value = 'all';
     if (answeredFilter) answeredFilter.value = 'all';
     
-    // Update state
-    state.setFilter('dateFrom', dateFromStr);
-    state.setFilter('dateTo', dateToStr);
+    // Update state - clear date filters (set to empty string, not default dates)
+    state.setFilter('dateFrom', '');
+    state.setFilter('dateTo', '');
     state.setFilter('sentiment', 'all');
     state.setFilter('language', 'all');
     state.setFilter('product', 'all');

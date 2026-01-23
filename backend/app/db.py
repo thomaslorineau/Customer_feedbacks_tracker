@@ -1402,6 +1402,8 @@ async def recheck_posts_answered_status(limit: Optional[int] = None, delay_betwe
         from .utils.post_metadata_fetcher import fetch_post_metadata_from_url
         
         # Process posts with delay to avoid rate limiting
+        import random
+        
         for post_id, url, source in posts:
             try:
                 if not url:
@@ -1420,9 +1422,18 @@ async def recheck_posts_answered_status(limit: Optional[int] = None, delay_betwe
                 else:
                     skipped_count += 1
                 
-                # Delay to avoid rate limiting
-                if delay_between_requests > 0:
-                    await asyncio.sleep(delay_between_requests)
+                # Variable delay based on source to avoid pattern detection
+                # Reddit needs longer delays, other sources can be faster
+                source_lower = (source or '').lower()
+                if 'reddit' in source_lower:
+                    # Random delay between 2-4 seconds for Reddit
+                    delay = random.uniform(2.0, 4.0)
+                else:
+                    # Shorter delay for other sources (0.5-1.5s)
+                    delay = delay_between_requests if delay_between_requests > 0 else random.uniform(0.5, 1.5)
+                
+                if delay > 0:
+                    await asyncio.sleep(delay)
                     
             except Exception as e:
                 error_count += 1

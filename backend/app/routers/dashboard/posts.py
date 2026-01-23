@@ -46,6 +46,25 @@ async def get_answered_stats():
     return stats
 
 
+@router.post("/posts/update-answered-status", tags=["Dashboard", "Posts"])
+async def update_all_posts_answered_status():
+    """
+    Met à jour le statut answered de tous les posts existants en fonction de leurs métadonnées.
+    Cette fonction analyse les posts existants et met à jour leur statut is_answered
+    en fonction des commentaires, réponses, etc. disponibles dans les métadonnées.
+    """
+    try:
+        updated_count = db.update_all_posts_answered_status_from_metadata()
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "message": f"Updated answered status for {updated_count} posts"
+        }
+    except Exception as e:
+        logger.error(f"Error updating answered status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to update answered status: {str(e)}")
+
+
 @router.get("/api/posts-for-improvement", tags=["Dashboard", "Posts"])
 async def get_posts_for_improvement(
     limit: int = Query(20, description="Maximum number of posts to return", ge=1, le=1000),

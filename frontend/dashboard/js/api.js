@@ -60,6 +60,26 @@ export class API {
                 firstItem: Array.isArray(data) && data.length > 0 ? data[0] : null
             });
             
+            // Check if is_answered field is present in posts
+            if (Array.isArray(data) && data.length > 0) {
+                const firstPost = data[0];
+                console.log('[API] First post fields:', Object.keys(firstPost));
+                console.log('[API] First post is_answered:', {
+                    has_is_answered: 'is_answered' in firstPost,
+                    value: firstPost.is_answered,
+                    type: typeof firstPost.is_answered
+                });
+                
+                // Count posts with is_answered field
+                const postsWithAnswered = data.filter(p => 'is_answered' in p).length;
+                const postsWithAnsweredTrue = data.filter(p => p.is_answered === 1 || p.is_answered === true).length;
+                console.log('[API] Posts with is_answered field:', {
+                    total: data.length,
+                    hasField: postsWithAnswered,
+                    answeredTrue: postsWithAnsweredTrue
+                });
+            }
+            
             if (!Array.isArray(data)) {
                 console.error('[API] Expected array but got:', typeof data, data);
                 throw new Error('API returned non-array data');

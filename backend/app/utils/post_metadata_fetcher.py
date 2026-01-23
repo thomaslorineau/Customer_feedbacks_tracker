@@ -4,10 +4,31 @@ Utility functions to fetch post metadata from URLs for re-checking answered stat
 import re
 import logging
 import httpx
+import asyncio
+import random
 from typing import Dict, Any, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# List of realistic User-Agents to rotate
+REDDIT_USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+]
+
+
+def get_random_user_agent() -> str:
+    """Get a random User-Agent from the list."""
+    return random.choice(REDDIT_USER_AGENTS)
+
+
+def get_random_delay(min_seconds: float = 1.0, max_seconds: float = 3.0) -> float:
+    """Get a random delay between min and max seconds."""
+    return random.uniform(min_seconds, max_seconds)
 
 
 async def fetch_reddit_post_metadata(url: str) -> Optional[Dict[str, Any]]:
@@ -32,12 +53,35 @@ async def fetch_reddit_post_metadata(url: str) -> Optional[Dict[str, Any]]:
         
         # Fetch post metadata from Reddit JSON API
         json_url = f"https://www.reddit.com/comments/{post_id}.json"
+        
+        # Use random User-Agent and headers to avoid detection
         headers = {
-            'User-Agent': 'OVH-Tracker-Bot/1.0 (Feedback Monitor)'
+            'User-Agent': get_random_user_agent(),
+            'Accept': 'application/json',
+            'Accept-Language': random.choice(['en-US,en;q=0.9', 'fr-FR,fr;q=0.9', 'en-GB,en;q=0.9']),
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Referer': 'https://www.reddit.com/',
+            'Origin': 'https://www.reddit.com',
         }
         
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # Add random delay before request to avoid pattern detection (1.5-3.5 seconds)
+        delay = get_random_delay(1.5, 3.5)
+        await asyncio.sleep(delay)
+        
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
             response = await client.get(json_url, headers=headers)
+            
+            # Handle 403 errors gracefully
+            # Reddit blocks requests for several reasons:
+            # 1. Rate limiting: Too many requests from same IP
+            # 2. Missing/incorrect User-Agent: Reddit requires descriptive User-Agent
+            # 3. Anti-bot detection: Reddit uses Cloudflare and other measures
+            # 4. No API authentication: Using public endpoints without OAuth
+            # 5. Suspicious patterns: Requests too fast or too regular
+            if response.status_code == 403:
+                logger.debug(f"Reddit API blocked request for {url} (403). Possible reasons: rate limiting, anti-bot measures, or missing authentication.")
+                return None
+            
             response.raise_for_status()
             data = response.json()
             
