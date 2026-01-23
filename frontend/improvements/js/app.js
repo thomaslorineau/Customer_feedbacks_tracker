@@ -824,24 +824,48 @@ async function loadImprovementsAnalysis() {
         // Get date_to (today)
         const dateTo = new Date().toISOString().split('T')[0];
         
+        // Prepare request body
+        const requestBody = {
+            pain_points: filteredPainPoints,
+            products: filteredProducts,
+            total_posts: postsData.total || 0,
+            posts: (postsData.posts || []).slice(0, 100), // Send up to 100 posts for analysis
+            analysis_focus: analysisFocus,
+            date_from: dateFrom,
+            date_to: dateTo,
+            product_filter: currentProductFilter || null
+        };
+        
+        // Log request size for debugging
+        const requestBodyStr = JSON.stringify(requestBody);
+        const requestSizeKB = (new Blob([requestBodyStr]).size / 1024).toFixed(2);
+        console.log(`[improvements] Request size: ${requestSizeKB} KB, Posts: ${requestBody.posts.length}`);
+        
         // Call LLM analysis endpoint with posts and filters
-        const analysisResponse = await fetch('/api/improvements-analysis', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                pain_points: filteredPainPoints,
-                products: filteredProducts,
-                total_posts: postsData.total || 0,
-                posts: (postsData.posts || []).slice(0, 100), // Send up to 100 posts for analysis
-                analysis_focus: analysisFocus,
-                date_from: dateFrom,
-                date_to: dateTo,
-                product_filter: currentProductFilter || null
-            })
-        });
+        // Add timeout to prevent hanging requests
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+        
+        let analysisResponse;
+        try {
+            analysisResponse = await fetch('/api/improvements-analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: requestBodyStr,
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+        } catch (fetchError) {
+            clearTimeout(timeoutId);
+            if (fetchError.name === 'AbortError') {
+                throw new Error('Request timeout: The analysis is taking too long. Please try again.');
+            }
+            throw new Error(`Network error: ${fetchError.message}. Please check if the server is running.`);
+        }
         
         if (!analysisResponse.ok) {
-            throw new Error('Failed to generate analysis');
+            const errorText = await analysisResponse.text();
+            throw new Error(`Failed to generate analysis (${analysisResponse.status}): ${errorText || analysisResponse.statusText}`);
         }
         
         const analysis = await analysisResponse.json();
