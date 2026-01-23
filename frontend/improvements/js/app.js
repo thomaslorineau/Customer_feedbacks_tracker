@@ -681,17 +681,42 @@ async function loadImprovementsAnalysis() {
         return;
     }
     
-    // Show overlay during LLM analysis
-    if (overlay) {
-        overlay.style.display = 'flex';
-    }
+    // Show the analysis section FIRST so overlay can be visible
+    analysisSection.style.display = 'block';
     
-    // Set a timeout to hide overlay after max 30 seconds (safety measure)
+    // Show overlay IMMEDIATELY during LLM analysis
+    const showOverlay = () => {
+        if (overlay) {
+            // Force display with !important equivalent by setting style directly
+            overlay.style.setProperty('display', 'flex', 'important');
+            overlay.style.setProperty('z-index', '1000', 'important');
+            overlay.style.setProperty('visibility', 'visible', 'important');
+            overlay.style.setProperty('opacity', '1', 'important');
+            // Remove any inline style that might hide it
+            overlay.removeAttribute('hidden');
+            // Also remove the inline style="display: none" if present
+            const currentStyle = overlay.getAttribute('style') || '';
+            if (currentStyle.includes('display: none')) {
+                overlay.setAttribute('style', currentStyle.replace(/display:\s*none[;]?/gi, ''));
+            }
+        }
+    };
+    
+    // Show overlay immediately and also on next frame to ensure it's visible
+    showOverlay();
+    requestAnimationFrame(() => {
+        showOverlay();
+    });
+    setTimeout(() => {
+        showOverlay();
+    }, 100);
+    
+    // Set a timeout to hide overlay after max 60 seconds (safety measure)
     const overlayTimeout = setTimeout(() => {
         if (overlay) {
             overlay.style.display = 'none';
         }
-    }, 30000);
+    }, 60000);
     
     try {
         // Get pain points and products data with current period filter
@@ -781,7 +806,7 @@ async function loadImprovementsAnalysis() {
                             <h3 style="margin: 0 0 8px 0; font-size: 1.1em; color: var(--text-primary);">${escapeHtml(insight.title)}</h3>
                             <p style="margin: 0 0 8px 0; color: var(--text-secondary); line-height: 1.6;">${escapeHtml(insight.description)}</p>
                             ${insight.metric ? `<div style="font-weight: 600; color: var(--accent-primary);">${escapeHtml(insight.metric)}</div>` : ''}
-                            ${insight.roi_impact ? `<div style="margin-top: 8px; padding: 8px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; color: #059669; font-size: 0.9em;"><strong>Impact:</strong> ${escapeHtml(insight.roi_impact)}</div>` : ''}
+                            ${insight.roi_impact ? `<div style="margin-top: 8px; padding: 8px; background: rgba(245, 158, 11, 0.1); border-radius: 6px; color: #d97706; font-size: 0.9em;"><strong>Impact:</strong> ${escapeHtml(insight.roi_impact)}</div>` : ''}
                         </div>
                     </div>
                 </div>
@@ -793,7 +818,7 @@ async function loadImprovementsAnalysis() {
         // Display ROI summary
         if (analysis.roi_summary) {
             roiContainer.innerHTML = `
-                <h3 style="margin: 0 0 12px 0; color: #059669; display: flex; align-items: center; gap: 8px;">
+                <h3 style="margin: 0 0 12px 0; color: #d97706; display: flex; align-items: center; gap: 8px;">
                     <span>💰</span>
                     <span>ROI & Customer Impact</span>
                 </h3>
@@ -802,9 +827,6 @@ async function loadImprovementsAnalysis() {
         } else {
             roiContainer.innerHTML = '';
         }
-        
-        // Show the analysis section
-        analysisSection.style.display = 'block';
         
     } catch (error) {
         console.error('Error loading improvements analysis:', error);

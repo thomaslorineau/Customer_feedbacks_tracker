@@ -17,10 +17,10 @@ export async function updateWhatsHappening(state) {
     const allPosts = state.posts || [];
     
     // Show overlay IMMEDIATELY at the start of the function, before any async operations
-    // Use requestAnimationFrame to ensure DOM is ready
+    // Always show overlay when analysis starts, regardless of posts count
     const showOverlay = () => {
         const overlay = document.getElementById('whatsHappeningOverlay');
-        if (overlay && posts.length > 0) {
+        if (overlay) {
             // Force display with !important equivalent by setting style directly
             overlay.style.setProperty('display', 'flex', 'important');
             overlay.style.setProperty('z-index', '1000', 'important');
@@ -29,8 +29,9 @@ export async function updateWhatsHappening(state) {
             // Remove any inline style that might hide it
             overlay.removeAttribute('hidden');
             // Also remove the inline style="display: none" if present
-            if (overlay.getAttribute('style') && overlay.getAttribute('style').includes('display: none')) {
-                overlay.setAttribute('style', overlay.getAttribute('style').replace(/display:\s*none[;]?/gi, ''));
+            const currentStyle = overlay.getAttribute('style') || '';
+            if (currentStyle.includes('display: none')) {
+                overlay.setAttribute('style', currentStyle.replace(/display:\s*none[;]?/gi, ''));
             }
         }
         return overlay;
@@ -38,7 +39,7 @@ export async function updateWhatsHappening(state) {
     
     // Try to show overlay immediately, and also on next frame to ensure it's visible
     let overlay = showOverlay();
-    if (!overlay || posts.length === 0) {
+    if (!overlay) {
         // If overlay doesn't exist yet, wait a bit and try again
         setTimeout(() => {
             overlay = showOverlay();
@@ -47,6 +48,10 @@ export async function updateWhatsHappening(state) {
     requestAnimationFrame(() => {
         overlay = showOverlay();
     });
+    // Also try after a small delay to ensure DOM is ready
+    setTimeout(() => {
+        overlay = showOverlay();
+    }, 100);
     
     if (posts.length === 0) {
         // No posts available - hide overlay if it was shown
