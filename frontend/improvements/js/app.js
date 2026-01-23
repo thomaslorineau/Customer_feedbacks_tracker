@@ -660,12 +660,22 @@ async function init() {
             overlay.style.setProperty('z-index', '1000', 'important');
             overlay.style.setProperty('visibility', 'visible', 'important');
             overlay.style.setProperty('opacity', '1', 'important');
+            overlay.style.setProperty('position', 'absolute', 'important');
             overlay.removeAttribute('hidden');
+            // Remove any inline style that might hide it
+            const currentStyle = overlay.getAttribute('style') || '';
+            if (currentStyle.includes('display: none')) {
+                overlay.setAttribute('style', currentStyle.replace(/display:\s*none[;]?/gi, ''));
+            }
         }
     };
+    // Multiple attempts to ensure overlay is visible
     showImprovementsOverlay();
     requestAnimationFrame(() => showImprovementsOverlay());
+    setTimeout(() => showImprovementsOverlay(), 50);
     setTimeout(() => showImprovementsOverlay(), 100);
+    setTimeout(() => showImprovementsOverlay(), 200);
+    setTimeout(() => showImprovementsOverlay(), 500);
     
     // Load version using the shared loader if available, otherwise use local function
     // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
@@ -878,42 +888,49 @@ async function loadImprovementsAnalysis() {
                 </button>
             </div>`;
         }
-        // Show refresh button on error
-        const refreshBtn = document.getElementById('refreshImprovementsAnalysisBtn');
-        if (refreshBtn) {
-            refreshBtn.style.display = 'flex';
-        }
+        // Refresh button is always visible - no need to show/hide it
         // Still show the section even if there's an error
         if (analysisSection) {
             analysisSection.style.display = 'block';
         }
     } finally {
-        // Always hide overlay, even if there was an error
+        // Always hide overlay after analysis is complete, with a small delay for smooth transition
         clearTimeout(overlayTimeout);
-        const finalOverlay = document.getElementById('improvementsOverlay');
-        if (finalOverlay) {
-            finalOverlay.style.display = 'none';
-        }
+        setTimeout(() => {
+            const finalOverlay = document.getElementById('improvementsOverlay');
+            if (finalOverlay) {
+                finalOverlay.style.display = 'none';
+            }
+        }, 300);
     }
 }
 
 // Refresh Improvements Analysis
 window.refreshImprovementsAnalysis = async function() {
-    const refreshBtn = document.getElementById('refreshImprovementsAnalysisBtn');
-    if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refreshing...';
-    }
+    // Show overlay IMMEDIATELY when refresh is clicked
+    const showOverlay = () => {
+        const analysisSection = document.getElementById('improvementsAnalysis');
+        const overlay = document.getElementById('improvementsOverlay');
+        if (analysisSection && overlay) {
+            // Show section first so overlay can be visible
+            analysisSection.style.setProperty('display', 'block', 'important');
+            analysisSection.style.setProperty('position', 'relative', 'important');
+            // Show overlay
+            overlay.style.setProperty('display', 'flex', 'important');
+            overlay.style.setProperty('z-index', '1000', 'important');
+            overlay.style.setProperty('visibility', 'visible', 'important');
+            overlay.style.setProperty('opacity', '1', 'important');
+            overlay.removeAttribute('hidden');
+        }
+    };
+    showOverlay();
+    requestAnimationFrame(() => showOverlay());
+    setTimeout(() => showOverlay(), 50);
     
     try {
         await loadImprovementsAnalysis();
     } catch (error) {
         console.error('Error refreshing improvements analysis:', error);
-    } finally {
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh Analysis';
-        }
     }
 };
 

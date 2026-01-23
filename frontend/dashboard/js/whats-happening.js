@@ -186,11 +186,7 @@ export async function updateWhatsHappening(state) {
         }
     } catch (error) {
         console.warn('Failed to get LLM insights:', error);
-        // Show refresh button on error
-        const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
-        if (refreshBtn) {
-            refreshBtn.style.display = 'flex';
-        }
+        // Refresh button is always visible - no need to show/hide it
         // Show error message with retry option instead of fallback
         const content = document.getElementById('whatsHappeningContent');
         if (content) {
@@ -247,13 +243,7 @@ export async function updateWhatsHappening(state) {
                 }
             }, 1000);
         }
-        // Show refresh button if there was an error or LLM is not available
-        const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
-        if (refreshBtn && (!llmAvailable || insights.length === 0)) {
-            refreshBtn.style.display = 'flex';
-        } else if (refreshBtn && llmAvailable && insights.length > 0) {
-            refreshBtn.style.display = 'none';
-        }
+        // Refresh button is always visible - no need to show/hide it
     }
     
     // Update stats cards with click handlers
@@ -513,11 +503,20 @@ export async function updateWhatsHappening(state) {
 
 // Refresh What's Happening analysis
 window.refreshWhatsHappening = async function() {
-    const refreshBtn = document.getElementById('refreshWhatsHappeningBtn');
-    if (refreshBtn) {
-        refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refreshing...';
-    }
+    // Show overlay IMMEDIATELY when refresh is clicked
+    const showOverlay = () => {
+        const overlay = document.getElementById('whatsHappeningOverlay');
+        if (overlay) {
+            overlay.style.setProperty('display', 'flex', 'important');
+            overlay.style.setProperty('z-index', '1000', 'important');
+            overlay.style.setProperty('visibility', 'visible', 'important');
+            overlay.style.setProperty('opacity', '1', 'important');
+            overlay.removeAttribute('hidden');
+        }
+    };
+    showOverlay();
+    requestAnimationFrame(() => showOverlay());
+    setTimeout(() => showOverlay(), 50);
     
     try {
         // Re-import and call updateWhatsHappening
@@ -531,11 +530,6 @@ window.refreshWhatsHappening = async function() {
         }
     } catch (error) {
         console.error('Error refreshing What\'s Happening:', error);
-    } finally {
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh Analysis';
-        }
     }
 };
 
