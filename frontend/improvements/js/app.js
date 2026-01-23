@@ -166,43 +166,47 @@ async function loadPainPoints() {
         if (currentProductFilter) {
             // Filter pain points by checking if their posts match the product
             const dateFrom = getDateFrom(currentPeriodDays);
-            const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}&search=${encodeURIComponent(currentProductFilter)}`);
+            
+            // Import product detection function first
+            const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+            
+            // Fetch posts with date filter (don't use search filter, we'll filter by product label instead)
+            const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}`);
             if (postsResponse.ok) {
                 const postsData = await postsResponse.json();
-                const productPosts = postsData.posts || [];
+                let allPosts = postsData.posts || [];
                 
-                // Import product detection function
-                const { getProductLabel } = await import('/dashboard/js/product-detection.js');
-                
-                // Filter pain points based on whether their keywords match posts with the product
-                filteredPainPoints = filteredPainPoints.filter(pp => {
-                    // Get keywords for this pain point
-                    const keywords = PAIN_POINT_KEYWORDS[pp.title] || [];
-                    if (keywords.length === 0) return false;
-                    
-                    // Check if any product post matches the pain point keywords
-                    return productPosts.some(post => {
-                        const content = (post.content || '').toLowerCase();
-                        const productLabel = getProductLabel(post.id, post.content, post.language);
-                        if (productLabel !== currentProductFilter) return false;
-                        return keywords.some(keyword => content.includes(keyword.toLowerCase()));
-                    });
+                // Filter posts to ensure they match the product label (more accurate than search)
+                const productPosts = allPosts.filter(post => {
+                    const productLabel = getProductLabel(post.id, post.content, post.language);
+                    return productLabel === currentProductFilter;
                 });
                 
-                // Recalculate post counts for filtered pain points
+                // Filter pain points based on whether their keywords match posts with the product
+                // AND recalculate post counts accurately
                 filteredPainPoints = filteredPainPoints.map(pp => {
+                    // Get keywords for this pain point
                     const keywords = PAIN_POINT_KEYWORDS[pp.title] || [];
+                    if (keywords.length === 0) return null;
+                    
+                    // Find matching posts for this pain point within the product posts
                     const matchingPosts = productPosts.filter(post => {
                         const content = (post.content || '').toLowerCase();
-                        const productLabel = getProductLabel(post.id, post.content, post.language);
-                        if (productLabel !== currentProductFilter) return false;
                         return keywords.some(keyword => content.includes(keyword.toLowerCase()));
                     });
+                    
+                    // Only include pain points that have matching posts
+                    if (matchingPosts.length === 0) return null;
+                    
                     return {
                         ...pp,
-                        posts_count: matchingPosts.length
+                        posts_count: matchingPosts.length,
+                        posts: matchingPosts.slice(0, 3) // Store sample posts for drawer
                     };
-                }).filter(pp => pp.posts_count > 0);
+                }).filter(pp => pp !== null && pp.posts_count > 0);
+                
+                // Sort by post count (descending) to show most relevant first
+                filteredPainPoints.sort((a, b) => b.posts_count - a.posts_count);
             }
         }
         
@@ -1076,14 +1080,36 @@ async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
         // Get date filter
         const dateFrom = getDateFrom(currentPeriodDays);
         
-        // Fetch posts with date filter
-        const response = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}`);
+        // Build API URL with filters
+        const params = new URLSearchParams({
+            limit: '1000',
+            offset: '0',
+            date_from: dateFrom
+        });
+        
+        // Add product filter if active
+        if (currentProductFilter) {
+            params.append('search', currentProductFilter);
+        }
+        
+        // Fetch posts with date and product filters
+        const response = await fetch(`/api/posts-for-improvement?${params.toString()}`);
         if (!response.ok) {
             throw new Error(`Failed to load posts: ${response.status}`);
         }
         
         const data = await response.json();
-        const allPosts = data.posts || [];
+        let allPosts = data.posts || [];
+        
+        // If product filter is active, also filter by product label to ensure accuracy
+        if (currentProductFilter) {
+            // Import product detection function
+            const { getProductLabel } = await import('/dashboard/js/product-detection.js');
+            allPosts = allPosts.filter(post => {
+                const productLabel = getProductLabel(post.id, post.content, post.language);
+                return productLabel === currentProductFilter;
+            });
+        }
         
         // Filter posts by keywords (case-insensitive)
         const filteredPosts = allPosts.filter(post => {
@@ -1115,6 +1141,10 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
         console.error('Pain points drawer content not found');
         return;
     }
+    
+    // Show drawer
+    drawer.style.display = 'block';
+    document.body.style.overflow = 'hidden';
     
     // Show drawer
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -1155,19 +1185,25 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
         return icons[source] || '📝';
     }
     
-    // Build HTML
+    // Build HTML with product filter indicator if active
+    const productFilterIndicator = currentProductFilter ? 
+        `<div style="margin-top: 8px; padding: 6px 12px; background: rgba(0, 153, 255, 0.1); border-radius: 6px; display: inline-block;">
+            <span style="color: var(--accent-primary); font-size: 0.85em; font-weight: 600;">📦 Filtered by: ${escapeHtml(currentProductFilter)}</span>
+        </div>` : '';
+    
     let html = `
         <div class="drawer-header">
             <div>
                 <h3>${painPoint.icon || '📊'} ${escapeHtml(title)}</h3>
                 <p style="margin: 8px 0 0 0; color: var(--text-secondary); font-size: 0.9em;">${escapeHtml(description)}</p>
+                ${productFilterIndicator}
             </div>
             <button class="drawer-close" onclick="closePainPointDrawer()" aria-label="Close drawer">×</button>
         </div>
         <div class="drawer-info">
             <div class="drawer-stats">
                 <span class="drawer-stat-value">${posts.length}</span>
-                <span class="drawer-stat-label">posts</span>
+                <span class="drawer-stat-label">posts${currentProductFilter ? ` (${escapeHtml(currentProductFilter)})` : ''}</span>
             </div>
         </div>
         <div class="drawer-posts">

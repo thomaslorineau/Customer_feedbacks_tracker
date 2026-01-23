@@ -21,10 +21,19 @@ export function initSourceChart(state) {
             currentState = updatedState;
             updateSourceChartFromState(updatedState);
         });
+        
+        // Initial load from state (if posts are already loaded)
+        if (state.posts && state.posts.length > 0) {
+            updateSourceChartFromState(state);
+        } else {
+            // Wait a bit for posts to load, then update from state
+            setTimeout(() => {
+                if (currentState && currentState.posts && currentState.posts.length > 0) {
+                    updateSourceChartFromState(currentState);
+                }
+            }, 500);
+        }
     }
-    
-    // Initial load
-    loadAndRenderSourceChart();
 }
 
 /**
@@ -63,24 +72,15 @@ function updateSourceChartFromState(state) {
 }
 
 /**
- * Load data and render the source chart
+ * Load data and render the source chart (deprecated - now uses state directly)
+ * Kept for backward compatibility but should use updateSourceChartFromState instead
  */
 async function loadAndRenderSourceChart() {
-    try {
-        const api = new API();
-        const response = await fetch(`${api.baseURL}/api/posts-by-source`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch source data: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        const sourceData = data.sources || {};
-        const sentimentBySource = data.sentiment_by_source || {};
-        
-        renderSourceChart(sourceData, sentimentBySource);
-        
-    } catch (error) {
-        console.error('Error loading source chart data:', error);
+    // Use state data directly instead of API call
+    if (currentState && currentState.posts && currentState.posts.length > 0) {
+        updateSourceChartFromState(currentState);
+    } else {
+        // If no state available, show empty state
         const canvas = document.getElementById('sourceChart');
         if (canvas) {
             const ctx = canvas.getContext('2d');
@@ -88,7 +88,7 @@ async function loadAndRenderSourceChart() {
             ctx.fillStyle = 'var(--text-muted)';
             ctx.font = '14px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('Unable to load data', canvas.width / 2, canvas.height / 2);
+            ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
         }
     }
 }

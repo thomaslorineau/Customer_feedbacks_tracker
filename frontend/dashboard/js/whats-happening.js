@@ -16,14 +16,51 @@ export async function updateWhatsHappening(state) {
     const posts = state.filteredPosts || [];
     const allPosts = state.posts || [];
     
+    // Show overlay IMMEDIATELY at the start of the function, before any async operations
+    // Use requestAnimationFrame to ensure DOM is ready
+    const showOverlay = () => {
+        const overlay = document.getElementById('whatsHappeningOverlay');
+        if (overlay && posts.length > 0) {
+            // Force display with !important equivalent by setting style directly
+            overlay.style.setProperty('display', 'flex', 'important');
+            overlay.style.setProperty('z-index', '1000', 'important');
+            overlay.style.setProperty('visibility', 'visible', 'important');
+            overlay.style.setProperty('opacity', '1', 'important');
+            // Remove any inline style that might hide it
+            overlay.removeAttribute('hidden');
+            // Also remove the inline style="display: none" if present
+            if (overlay.getAttribute('style') && overlay.getAttribute('style').includes('display: none')) {
+                overlay.setAttribute('style', overlay.getAttribute('style').replace(/display:\s*none[;]?/gi, ''));
+            }
+        }
+        return overlay;
+    };
+    
+    // Try to show overlay immediately, and also on next frame to ensure it's visible
+    let overlay = showOverlay();
+    if (!overlay || posts.length === 0) {
+        // If overlay doesn't exist yet, wait a bit and try again
+        setTimeout(() => {
+            overlay = showOverlay();
+        }, 50);
+    }
+    requestAnimationFrame(() => {
+        overlay = showOverlay();
+    });
+    
     if (posts.length === 0) {
-        // No posts available
+        // No posts available - hide overlay if it was shown
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
         const statsCards = document.getElementById('statsCards');
         if (statsCards) {
             statsCards.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">No data available</div>';
         }
-        document.getElementById('whatsHappeningContent').innerHTML = '';
-        document.getElementById('recommendedActions').innerHTML = '';
+        const whatsHappeningContent = document.getElementById('whatsHappeningContent');
+        if (whatsHappeningContent) whatsHappeningContent.innerHTML = '';
+        const recommendedActions = document.getElementById('recommendedActions');
+        if (recommendedActions) recommendedActions.innerHTML = '';
         return;
     }
     
@@ -72,13 +109,6 @@ export async function updateWhatsHappening(state) {
     // Get active filters description
     const activeFilters = getActiveFilters(state);
     const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
-    
-    // Show overlay during LLM analysis - ensure it's always visible during analysis
-    const overlay = document.getElementById('whatsHappeningOverlay');
-    if (overlay) {
-        overlay.style.display = 'flex';
-        overlay.style.zIndex = '1000';
-    }
     
     // Set a timeout to hide overlay after max 60 seconds (safety measure - increased for better UX)
     const overlayTimeout = setTimeout(() => {
