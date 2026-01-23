@@ -163,6 +163,25 @@ function renderSourceChart(sourceData, sentimentBySource) {
         }
     }
     
+    // Ensure canvas has explicit dimensions for Chart.js
+    const container = canvas.parentElement;
+    if (container) {
+        const containerHeight = container.clientHeight || 320;
+        const containerWidth = container.clientWidth || 550;
+        // Set canvas dimensions explicitly (Chart.js needs this)
+        canvas.style.width = `${containerWidth}px`;
+        canvas.style.height = `${containerHeight}px`;
+        // Also set canvas internal dimensions
+        canvas.width = containerWidth;
+        canvas.height = containerHeight;
+        console.log('[source-chart-v2.js] Canvas dimensions set:', {
+            width: canvas.width,
+            height: canvas.height,
+            styleWidth: canvas.style.width,
+            styleHeight: canvas.style.height
+        });
+    }
+    
     const ctx = canvas.getContext('2d');
     
     // Destroy existing chart if it exists
