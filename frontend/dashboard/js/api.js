@@ -128,25 +128,6 @@ export class API {
         }
     }
     
-    async getUIVersion() {
-        const response = await fetch(`${this.baseURL}/admin/get-ui-version`);
-        if (!response.ok) {
-            throw new Error(`Failed to get UI version: ${response.statusText}`);
-        }
-        return response.json();
-    }
-    
-    async setUIVersion(version) {
-        const response = await fetch(`${this.baseURL}/admin/set-ui-version`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ version })
-        });
-        if (!response.ok) {
-            throw new Error(`Failed to set UI version: ${response.statusText}`);
-        }
-        return response.json();
-    }
     
     async getRecommendedActions(posts, recentPosts, stats, maxActions = 5) {
         // Prepare posts data - include more context for LLM

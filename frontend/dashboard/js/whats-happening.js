@@ -639,6 +639,12 @@ export async function updateWhatsHappening(state) {
 
 // Refresh What's Happening analysis
 window.refreshWhatsHappening = async function() {
+    const btn = document.getElementById('refreshWhatsHappeningBtn');
+    if (btn) {
+        btn.classList.add('refreshing');
+        btn.disabled = true;
+    }
+    
     // Show overlay IMMEDIATELY when refresh is clicked
     const showOverlay = () => {
         const overlay = document.getElementById('whatsHappeningOverlay');
@@ -666,6 +672,11 @@ window.refreshWhatsHappening = async function() {
         }
     } catch (error) {
         console.error('Error refreshing What\'s Happening:', error);
+    } finally {
+        if (btn) {
+            btn.classList.remove('refreshing');
+            btn.disabled = false;
+        }
     }
 };
 

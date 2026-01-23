@@ -66,20 +66,19 @@
 - `whats-happening.js` - Analyse "What's Happening"
 - `world-map.js` - Carte mondiale
 - `settings.js` - Gestion paramètres
-- `version-switch.js` - Changement de version
 
 #### HTML (7 516 lignes - 6 fichiers)
 - `index.html` - Page principale (Scraping)
 - `logs.html` - Page des logs
-- `v2/index.html` - Dashboard Analytics
-- `v2/settings.html` - Page de configuration
+- `dashboard/index.html` - Dashboard Analytics
+- `dashboard/settings.html` - Page de configuration
 - `improvements/index.html` - Page d'améliorations
-- `test_api.html` - Page de test API
+- `dashboard/test-api.html` - Page de test API
 
 #### CSS (1 504 lignes - 3 fichiers)
 - `shared-theme.css` - Thème partagé (dark/light)
-- `v2/css/styles.css` - Styles dashboard
-- `v2/css/navigation.css` - Styles navigation
+- `dashboard/css/styles.css` - Styles dashboard
+- `dashboard/css/navigation.css` - Styles navigation
 
 ---
 
@@ -101,7 +100,7 @@
 
 ### Fichiers les plus volumineux
 1. `backend/app/main.py` - 2 167 lignes (API principale)
-2. `frontend/v2/index.html` - ~4 000 lignes (Dashboard)
+2. `frontend/dashboard/index.html` - ~4 000 lignes (Dashboard)
 3. `frontend/index.html` - ~5 000 lignes (Page scraping)
 
 ### Modules les plus complexes

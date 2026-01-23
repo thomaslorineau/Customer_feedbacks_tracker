@@ -31,10 +31,6 @@ from scripts.backup_db import backup_database
 # MODELS
 # ============================================================================
 
-class UIVersionPayload(BaseModel):
-    version: str = Field(..., pattern="^(v1|v2)$")
-
-
 # ============================================================================
 # CLEANUP ENDPOINTS
 # ============================================================================
@@ -350,66 +346,6 @@ async def update_product_labels(request: Request):
     except Exception as e:
         logger.error(f"Error updating product labels: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update product labels: {str(e)}")
-
-
-# ============================================================================
-# UI VERSION ENDPOINTS
-# ============================================================================
-
-@router.post("/admin/set-ui-version")
-async def set_ui_version(
-    payload: UIVersionPayload,
-    current_user: TokenData = Depends(require_admin)
-):
-    """Set the UI version (v1 or v2). Admin only."""
-    logger.info(f"Admin {current_user.username} set UI version to {payload.version}")
-    version_str = payload.version
-    if version_str not in ["v1", "v2"]:
-        raise HTTPException(status_code=400, detail="Version must be 'v1' or 'v2'")
-    
-    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
-    
-    # Read existing config
-    config_lines = []
-    if app_config_path.exists():
-        with open(app_config_path, "r", encoding="utf-8") as f:
-            config_lines = f.readlines()
-    
-    # Update or add UI_VERSION
-    updated = False
-    for i, line in enumerate(config_lines):
-        if line.startswith("UI_VERSION="):
-            config_lines[i] = f"UI_VERSION={version_str}\n"
-            updated = True
-            break
-    
-    if not updated:
-        config_lines.append(f"UI_VERSION={version_str}\n")
-    
-    # Write back
-    with open(app_config_path, "w", encoding="utf-8") as f:
-        f.writelines(config_lines)
-    
-    # Update environment variable for current process
-    os.environ['UI_VERSION'] = version_str
-    
-    return {"message": f"UI version set to {version_str}", "version": version_str}
-
-
-@router.get("/admin/get-ui-version")
-async def get_ui_version():
-    """Get the current UI version."""
-    app_config_path = Path(__file__).resolve().parents[2] / "backend" / ".app_config"
-    ui_version = "v2"  # default to v2
-    
-    if app_config_path.exists():
-        with open(app_config_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.startswith("UI_VERSION="):
-                    ui_version = line.split("=", 1)[1].strip()
-                    break
-    
-    return {"version": ui_version}
 
 
 # ============================================================================

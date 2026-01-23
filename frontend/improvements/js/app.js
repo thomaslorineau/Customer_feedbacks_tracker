@@ -177,9 +177,11 @@ async function loadPainPoints() {
                 let allPosts = postsData.posts || [];
                 
                 // Filter posts to ensure they match the product label (more accurate than search)
+                // Also filter by sentiment (negative/neutral only, matching backend logic)
                 const productPosts = allPosts.filter(post => {
                     const productLabel = getProductLabel(post.id, post.content, post.language);
-                    return productLabel === currentProductFilter;
+                    const sentiment = post.sentiment_label || 'neutral';
+                    return productLabel === currentProductFilter && (sentiment === 'negative' || sentiment === 'neutral');
                 });
                 
                 // Filter pain points based on whether their keywords match posts with the product
@@ -190,6 +192,7 @@ async function loadPainPoints() {
                     if (keywords.length === 0) return null;
                     
                     // Find matching posts for this pain point within the product posts
+                    // (productPosts are already filtered by sentiment)
                     const matchingPosts = productPosts.filter(post => {
                         const content = (post.content || '').toLowerCase();
                         return keywords.some(keyword => content.includes(keyword.toLowerCase()));
@@ -255,17 +258,21 @@ async function loadPainPoints() {
 }
 
 // Load product distribution
-async function loadProductDistribution() {
+async function loadProductDistribution(periodDays = null) {
     const productDistribution = document.getElementById('productDistribution');
     if (!productDistribution) {
         console.error('productDistribution element not found');
         return;
     }
     
+    // Use provided period or fall back to currentPeriodDays
+    const period = periodDays !== null ? periodDays : currentPeriodDays;
+    
     try {
-        console.log('Loading product distribution...');
+        console.log('Loading product distribution for period:', period, 'days');
         // Add date filter to product opportunities
-            const dateFrom = getDateFrom(currentPeriodDays);
+        const dateFrom = getDateFrom(period);
+        console.log('Product distribution date_from:', dateFrom);
         const response = await fetch(`/api/product-opportunities?date_from=${dateFrom}`);
         console.log('Product distribution response status:', response.status, response.statusText);
         
@@ -288,21 +295,23 @@ async function loadProductDistribution() {
         const remainingProducts = data.products.slice(5);
         
         productDistribution.innerHTML = topProducts.map(product => {
-            const negativeRatio = product.total_posts > 0 ? (product.negative_posts / product.total_posts) * 100 : 0;
-            const positiveRatio = 100 - negativeRatio;
+            // La barre représente maintenant le score d'opportunité directement (0-100)
+            const scorePercentage = Math.min(product.opportunity_score, 100);
             
             // Escape product name for onclick attribute
             const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
             return `
                 <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')" title="Click to filter this page by ${escapeHtml(product.product)}">
                     <div class="product-color" style="background: ${product.color};"></div>
-                    <div class="product-bar-container">
-                        <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
-                        <div class="product-bar" style="width: ${positiveRatio}%; background: rgba(107, 114, 128, 0.3); margin-left: ${negativeRatio}%;"></div>
+                    <div class="product-bar-container" style="position: relative;">
+                        <!-- Barre unique proportionnelle au score d'opportunité -->
+                        <div class="product-bar" style="width: ${scorePercentage}%; background: ${product.color}; height: 100%; position: relative;">
+                            <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: white; font-weight: 700; font-size: 0.85em; text-shadow: 0 1px 2px rgba(0,0,0,0.3); white-space: nowrap;">${product.negative_posts} negative post${product.negative_posts !== 1 ? 's' : ''}</span>
+                        </div>
                     </div>
                     <div class="product-info">
                         <span class="product-name">${escapeHtml(product.product)}</span>
-                        <span class="product-score">${product.opportunity_score}</span>
+                        <span class="product-score" style="${getScoreStyle(product.opportunity_score)}; padding: 6px 12px; border-radius: 10px; display: inline-block;">${Math.round(product.opportunity_score)}</span>
                     </div>
                 </div>
             `;
@@ -318,20 +327,22 @@ async function loadProductDistribution() {
                 const isExpanded = moreProductsIndicator.dataset.expanded === 'true';
                 if (!isExpanded) {
                     const allProductsHtml = data.products.slice(5).map(product => {
-                        const negativeRatio = product.total_posts > 0 ? (product.negative_posts / product.total_posts) * 100 : 0;
-                        const positiveRatio = 100 - negativeRatio;
+                        // La barre représente maintenant le score d'opportunité directement (0-100)
+                        const scorePercentage = Math.min(product.opportunity_score, 100);
                         // Escape product name for onclick attribute
                         const escapedProduct = escapeHtml(product.product).replace(/'/g, "\\'");
                         return `
                             <div class="product-item ${currentProductFilter === product.product ? 'active-filter' : ''}" data-product="${escapeHtml(product.product)}" style="cursor: pointer;" onclick="filterByProduct('${escapedProduct}')" title="Click to filter this page by ${escapeHtml(product.product)}">
                                 <div class="product-color" style="background: ${product.color};"></div>
-                                <div class="product-bar-container">
-                                    <div class="product-bar" style="width: ${negativeRatio}%; background: ${product.color};"></div>
-                                    <div class="product-bar" style="width: ${positiveRatio}%; background: rgba(107, 114, 128, 0.3); margin-left: ${negativeRatio}%;"></div>
+                                <div class="product-bar-container" style="position: relative;">
+                                    <!-- Barre unique proportionnelle au score d'opportunité -->
+                                    <div class="product-bar" style="width: ${scorePercentage}%; background: ${product.color}; height: 100%; position: relative;">
+                                        <span style="position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: white; font-weight: 700; font-size: 0.85em; text-shadow: 0 1px 2px rgba(0,0,0,0.3); white-space: nowrap;">${product.negative_posts} negative post${product.negative_posts !== 1 ? 's' : ''}</span>
+                                    </div>
                                 </div>
                                 <div class="product-info">
                                     <span class="product-name">${escapeHtml(product.product)}</span>
-                                    <span class="product-score">${product.opportunity_score}</span>
+                                    <span class="product-score" style="${getScoreStyle(product.opportunity_score)}; padding: 6px 12px; border-radius: 10px; display: inline-block;">${Math.round(product.opportunity_score)}</span>
                                 </div>
                             </div>
                         `;
@@ -485,10 +496,9 @@ async function loadPostsForImprovement(resetOffset = false, productFilter = null
                             ${comments > 0 ? `<span class="engagement-metric">💬 ${comments} replies</span>` : ''}
                         </div>
                     </div>
-                    <div class="post-score">${post.opportunity_score || 0}</div>
-                    <button class="post-action-btn" onclick="event.stopPropagation(); createImprovementTicket(${post.id})">
-                        + Create Improvement Ticket
-                    </button>
+                    <div class="post-score" style="${getScoreStyle(post.opportunity_score || 0)}; padding: 10px 16px; border-radius: 12px; font-size: 1.2em; min-width: 70px; text-align: center; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                        ${(post.opportunity_score || 0).toFixed(1)}
+                    </div>
                 </div>
             `;
         }).join('');
@@ -532,6 +542,38 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Get color style for opportunity score (gradient from green to red)
+function getScoreStyle(score) {
+    // Normalize score to 0-100 range
+    const normalizedScore = Math.max(0, Math.min(100, score));
+    
+    // Calculate color gradient: green (low) -> yellow (medium) -> red (high)
+    // 0-50: green to yellow
+    // 50-100: yellow to red
+    let r, g, b;
+    
+    if (normalizedScore <= 50) {
+        // Green (0, 200, 0) to Yellow (255, 200, 0)
+        const ratio = normalizedScore / 50;
+        r = Math.round(0 + (255 - 0) * ratio);
+        g = 200;
+        b = Math.round(0 + (0 - 0) * ratio);
+    } else {
+        // Yellow (255, 200, 0) to Red (255, 0, 0)
+        const ratio = (normalizedScore - 50) / 50;
+        r = 255;
+        g = Math.round(200 - (200 - 0) * ratio);
+        b = 0;
+    }
+    
+    // Calculate background color (lighter) and text color (darker for contrast)
+    const bgColor = `rgba(${r}, ${g}, ${b}, 0.15)`;
+    const textColor = `rgb(${r}, ${g}, ${b})`;
+    const borderColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+    
+    return `background: ${bgColor}; color: ${textColor}; border: 1px solid ${borderColor}; font-weight: 700;`;
 }
 
 function truncateText(text, maxLength) {
@@ -602,9 +644,10 @@ function createImprovementTicket(postId) {
 // Reload all data when period filter changes
 async function reloadAllData() {
     try {
+        console.log('reloadAllData called with currentPeriodDays:', currentPeriodDays);
         await Promise.all([
             loadPainPoints(),
-            loadProductDistribution(),
+            loadProductDistribution(currentPeriodDays), // Pass period explicitly
             loadPostsForImprovement(true)
         ]);
         await loadImprovementsAnalysis();
@@ -619,13 +662,15 @@ function setupEventListeners() {
     const periodFilter = document.getElementById('improvementsPeriod');
     if (periodFilter) {
         periodFilter.addEventListener('change', async (e) => {
-            currentPeriodDays = parseInt(e.target.value, 10);
-            console.log('Period filter changed to:', currentPeriodDays, 'days');
+            const newPeriodDays = parseInt(e.target.value, 10);
+            console.log('Period filter changed from', currentPeriodDays, 'to', newPeriodDays, 'days');
+            currentPeriodDays = newPeriodDays;
             // Sync posts period filter
             const periodPostsFilter = document.getElementById('improvementsPeriodPosts');
             if (periodPostsFilter) {
                 periodPostsFilter.value = currentPeriodDays.toString();
             }
+            console.log('Reloading all data with period:', currentPeriodDays);
             await reloadAllData();
         });
     }
@@ -635,14 +680,17 @@ function setupEventListeners() {
     if (periodPostsFilter) {
         // Sync with main period filter
         periodPostsFilter.value = currentPeriodDays.toString();
-        periodPostsFilter.addEventListener('change', (e) => {
+        periodPostsFilter.addEventListener('change', async (e) => {
             const days = parseInt(e.target.value, 10);
+            console.log('Posts period filter changed from', currentPeriodDays, 'to', days, 'days');
             // Sync main filter
             if (periodFilter) {
                 periodFilter.value = days.toString();
-                currentPeriodDays = days;
             }
-            loadPostsForImprovement(true);
+            currentPeriodDays = days;
+            console.log('Reloading all data with period:', currentPeriodDays);
+            // Recharger toutes les données avec la nouvelle période
+            await reloadAllData();
         });
     }
     
@@ -658,8 +706,8 @@ function setupEventListeners() {
         });
     }
     
-    // Filters
-    const filters = ['improvementsLanguage', 'improvementsSource', 'improvementsProduct', 'improvementsAnswered', 'improvementsPeriodPosts', 'improvementsSort'];
+    // Filters (improvementsPeriodPosts is handled separately above)
+    const filters = ['improvementsLanguage', 'improvementsSource', 'improvementsProduct', 'improvementsAnswered', 'improvementsSort'];
     filters.forEach(filterId => {
         const filter = document.getElementById(filterId);
         if (filter) {
@@ -1400,6 +1448,12 @@ window.closeFilteredPostsDrawer = function() {
 
 // Refresh Improvements Analysis
 window.refreshImprovementsAnalysis = async function() {
+    const btn = document.getElementById('refreshImprovementsAnalysisBtn');
+    if (btn) {
+        btn.classList.add('refreshing');
+        btn.disabled = true;
+    }
+    
     // Show overlay IMMEDIATELY when refresh is clicked
     const showOverlay = () => {
         const analysisSection = document.getElementById('improvementsAnalysis');
@@ -1424,6 +1478,11 @@ window.refreshImprovementsAnalysis = async function() {
         await loadImprovementsAnalysis();
     } catch (error) {
         console.error('Error refreshing improvements analysis:', error);
+    } finally {
+        if (btn) {
+            btn.classList.remove('refreshing');
+            btn.disabled = false;
+        }
     }
 };
 
@@ -1485,7 +1544,7 @@ function openPostPreviewModal(postId) {
                 <strong>Language:</strong> ${escapeHtml(post.language.toUpperCase())}
             </div>` : ''}
             <div style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 10px;">
-                <strong>Opportunity Score:</strong> ${post.opportunity_score || 0}
+                <strong>Opportunity Score:</strong> <span style="${getScoreStyle(post.opportunity_score || 0)}; padding: 4px 10px; border-radius: 8px; display: inline-block; margin-left: 8px;">${(post.opportunity_score || 0).toFixed(1)}</span>
             </div>
         </div>
         
@@ -1711,14 +1770,26 @@ async function loadPainPointPosts(painPointTitle, keywords, painPoint) {
             });
         }
         
+        // Filter posts by sentiment first (only negative/neutral, matching backend logic)
+        const sentimentFilteredPosts = allPosts.filter(post => {
+            const sentiment = post.sentiment_label || 'neutral';
+            return sentiment === 'negative' || sentiment === 'neutral';
+        });
+        
         // Then filter posts by keywords (case-insensitive)
-        const filteredPosts = allPosts.filter(post => {
+        const filteredPosts = sentimentFilteredPosts.filter(post => {
             const content = (post.content || '').toLowerCase();
             return keywords.some(keyword => content.includes(keyword.toLowerCase()));
         });
         
         // Sort by opportunity score (descending)
         filteredPosts.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
+        
+        // Update pain point posts_count to match the actual filtered posts count
+        if (painPoint) {
+            painPoint.posts_count = filteredPosts.length;
+            painPoint.posts = filteredPosts;
+        }
         
         // Open drawer with filtered posts
         openPainPointDrawerContent(painPointTitle, painPoint.description, filteredPosts, painPoint);
@@ -1802,7 +1873,7 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
         </div>
         <div class="drawer-info">
             <div class="drawer-stats">
-                <span class="drawer-stat-value">${posts.length}</span>
+                <span class="drawer-stat-value">${painPoint && painPoint.posts_count !== undefined ? painPoint.posts_count : posts.length}</span>
                 <span class="drawer-stat-label">posts${currentProductFilter ? ` (${escapeHtml(currentProductFilter)})` : ''}</span>
             </div>
         </div>
@@ -1833,7 +1904,7 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="drawer-sentiment-badge ${sentimentClass}">${sentiment}</span>
-                            ${post.opportunity_score ? `<span style="padding: 4px 8px; background: rgba(0, 153, 255, 0.1); border-radius: 4px; color: var(--accent-primary); font-size: 0.8em; font-weight: 600;">Score: ${post.opportunity_score}</span>` : ''}
+                            ${post.opportunity_score ? `<span style="${getScoreStyle(post.opportunity_score)}; padding: 4px 10px; border-radius: 8px; font-size: 0.8em; display: inline-block;">Score: ${post.opportunity_score.toFixed(1)}</span>` : ''}
                         </div>
                     </div>
                     <div class="drawer-post-content">${escapeHtml(truncateText(post.content || 'No content', 300))}</div>

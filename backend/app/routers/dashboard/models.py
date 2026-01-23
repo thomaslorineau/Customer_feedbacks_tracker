@@ -21,7 +21,7 @@ class PainPointsResponse(BaseModel):
 class ProductOpportunity(BaseModel):
     """Model for product opportunity score."""
     product: str = Field(..., description="Product name")
-    opportunity_score: int = Field(..., description="Opportunity score (0-100)")
+    opportunity_score: float = Field(..., description="Opportunity score (0-100)")
     negative_posts: int = Field(..., description="Number of negative posts")
     total_posts: int = Field(..., description="Total posts for this product")
     color: str = Field(..., description="Color for visualization")

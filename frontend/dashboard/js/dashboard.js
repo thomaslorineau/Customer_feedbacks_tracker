@@ -889,7 +889,7 @@ export function updateDashboard() {
 }
 
 function updateStatsBanner() {
-    // Stats banner might not exist in v2, so we skip it if not found
+    // Stats banner might not exist, so we skip it if not found
     const statsBanner = document.getElementById('statsBanner');
     if (!statsBanner) {
         // Element doesn't exist, skip silently

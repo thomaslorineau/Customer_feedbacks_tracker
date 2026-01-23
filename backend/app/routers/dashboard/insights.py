@@ -4,6 +4,7 @@ import json
 import re
 import logging
 import asyncio
+import math
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 import httpx
@@ -1007,11 +1008,12 @@ async def get_product_opportunities(
             'IP': ['ip address', 'ipv4', 'ipv6', 'ip block', 'ip range']
         }
         
-        # Count posts by product
-        product_stats = {}
+        # Group posts by product with their relevance scores
+        product_posts = {}
         for post in posts:
             content = (post.get('content', '') or '').lower()
-            is_negative = post.get('sentiment_label') == 'negative'
+            sentiment = post.get('sentiment_label', 'neutral')
+            relevance = post.get('relevance_score', 0.3) or 0.3  # Default to 0.3 if not set
             
             # Detect products mentioned in post
             # A post can match multiple products, so we count it for all matching products
@@ -1019,44 +1021,62 @@ async def get_product_opportunities(
             for product_name, keywords in product_keywords.items():
                 if any(keyword in content for keyword in keywords):
                     matched_products.append(product_name)
-                    if product_name not in product_stats:
-                        product_stats[product_name] = {
-                            'total': 0,
-                            'negative': 0
-                        }
-                    product_stats[product_name]['total'] += 1
-                    if is_negative:
-                        product_stats[product_name]['negative'] += 1
+                    if product_name not in product_posts:
+                        product_posts[product_name] = []
+                    product_posts[product_name].append({
+                        'sentiment': sentiment,
+                        'relevance': relevance
+                    })
         
         # Calculate opportunity scores and create ProductOpportunity objects
         products = []
         colors = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1', '#14b8a6', '#a855f7']
         
-        for idx, (product_name, stats) in enumerate(sorted(product_stats.items(), key=lambda x: x[1]['negative'], reverse=True)):
-            total = stats['total']
-            negative = stats['negative']
+        for idx, (product_name, post_list) in enumerate(product_posts.items()):
+            total = len(post_list)
+            negative_count = sum(1 for p in post_list if p['sentiment'] == 'negative')
             
-            # Calculate opportunity score (0-100)
-            # Higher score = more negative posts relative to total + volume factor
-            # Formula: (negative_ratio * 60) + (volume_factor * 40)
-            # This balances both the percentage of negative feedback and the absolute volume
-            if total > 0:
-                negative_ratio = negative / total
-                # Volume factor: more posts = higher score, capped at 40 points
-                # Scale: 1 post = 4 points, 10 posts = 20 points, 50+ posts = 40 points
-                volume_factor = min(negative / 50.0, 1.0) * 40
-                # Ratio factor: percentage of negative posts, capped at 60 points
-                ratio_factor = negative_ratio * 60
-                opportunity_score = int(min(ratio_factor + volume_factor, 100))
+            # Calculate opportunity score (0-100) based on weighted relevance
+            # Nouvelle formule : le score augmente avec le nombre de posts négatifs
+            # Chaque post négatif contribue selon sa pertinence, avec un bonus pour le volume
+            negative_weighted_sum = 0
+            negative_count_calc = 0
+            
+            for post_data in post_list:
+                relevance = post_data['relevance']
+                sentiment = post_data['sentiment']
+                
+                # Seuls les posts négatifs comptent pour l'opportunité
+                if sentiment == 'negative':
+                    negative_weighted_sum += relevance
+                    negative_count_calc += 1
+            
+            if negative_count_calc > 0:
+                # Pertinence moyenne des posts négatifs
+                avg_relevance = negative_weighted_sum / negative_count_calc
+                
+                # Score de base : nombre de posts négatifs × pertinence moyenne
+                # Plus il y a de posts négatifs, plus le score augmente
+                # Facteur de volume : logarithme pour éviter que ça explose
+                # 1 post = ~10 points, 5 posts = ~30 points, 10 posts = ~50 points, 20+ posts = ~100 points
+                volume_factor = min(math.log(negative_count_calc + 1) * 10, 50)  # Max 50 points pour le volume
+                
+                # Pertinence factor : moyenne pondérée (max 50 points)
+                relevance_factor = avg_relevance * 50
+                
+                # Score final : volume + pertinence (plafonné à 100)
+                opportunity_score = min(volume_factor + relevance_factor, 100)
             else:
                 opportunity_score = 0
+            
+            opportunity_score = round(opportunity_score, 1)
             
             color = colors[idx % len(colors)]
             
             products.append(ProductOpportunity(
                 product=product_name,
                 opportunity_score=opportunity_score,
-                negative_posts=negative,
+                negative_posts=negative_count,
                 total_posts=total,
                 color=color
             ))
