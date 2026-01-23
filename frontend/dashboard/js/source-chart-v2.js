@@ -65,7 +65,18 @@ export function initSourceChart(state) {
  * Update chart from state (uses filtered posts)
  */
 function updateSourceChartFromState(state) {
+    if (!state) {
+        console.warn('[source-chart-v2.js] No state provided to updateSourceChartFromState');
+        return;
+    }
+    
     const posts = state.filteredPosts || state.posts || [];
+    console.log(`[source-chart-v2.js] Updating chart with ${posts.length} posts`);
+    
+    if (posts.length === 0) {
+        console.warn('[source-chart-v2.js] No posts available to render chart');
+        return;
+    }
     
     // Count posts by source
     const sourceData = {};
@@ -93,6 +104,7 @@ function updateSourceChartFromState(state) {
         }
     });
     
+    console.log(`[source-chart-v2.js] Source data:`, sourceData);
     renderSourceChart(sourceData, sentimentBySource);
 }
 
@@ -107,9 +119,11 @@ function updateSourceChartFromState(state) {
 function renderSourceChart(sourceData, sentimentBySource) {
     const canvas = document.getElementById('sourceChart');
     if (!canvas) {
-        // Silently return if canvas not found - chart will render when canvas is available
+        console.warn('[source-chart-v2.js] Canvas element "sourceChart" not found');
         return;
     }
+    
+    console.log(`[source-chart-v2.js] Rendering chart with ${Object.keys(sourceData).length} sources`);
     
     const ctx = canvas.getContext('2d');
     
