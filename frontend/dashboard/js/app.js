@@ -3,7 +3,7 @@ import { API } from './api.js';
 import { State } from './state.js';
 import { initDashboard, updateDashboard } from './dashboard.js';
 import { initCharts } from './charts.js';
-import { initSourceChart } from './source-chart.js';
+import { initSourceChart } from './source-chart-v2.js';
 import { initSentimentChart } from './sentiment-chart.js';
 // Version loading is handled by version-loader.js module (loaded via script tag in HTML)
 

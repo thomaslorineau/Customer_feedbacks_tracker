@@ -3,7 +3,8 @@
  * Displays distribution of posts by source (Reddit, Twitter, Trustpilot, etc.)
  * with click-to-filter functionality
  * 
- * Version: 2.1 - No API calls, uses state data only
+ * Version: 2.2 - No API calls, uses state data only
+ * File renamed to source-chart-v2.js to force browser cache refresh
  * Last updated: 2025-01-23
  */
 
