@@ -186,6 +186,14 @@ function renderSourceChart(sourceData, sentimentBySource) {
             return;
         }
         
+        // Ensure container is visible
+        const containerStyle = window.getComputedStyle(container);
+        if (containerStyle.display === 'none' || containerStyle.visibility === 'hidden') {
+            console.warn('[source-chart-v2.js] Container is hidden, making visible...');
+            container.style.display = 'flex';
+            container.style.visibility = 'visible';
+        }
+        
         // Chart.js will handle dimensions with responsive: true
         // We just need to ensure the container has dimensions
         const containerRect = container.getBoundingClientRect();
@@ -197,14 +205,31 @@ function renderSourceChart(sourceData, sentimentBySource) {
         
         console.log('[source-chart-v2.js] Container dimensions:', {
             width: containerRect.width,
-            height: containerRect.height
+            height: containerRect.height,
+            display: containerStyle.display,
+            visibility: containerStyle.visibility
         });
+        
+        // Ensure canvas is visible and has proper dimensions
+        canvasElement.style.display = 'block';
+        canvasElement.style.visibility = 'visible';
+        canvasElement.style.opacity = '1';
         
         const ctx = canvasElement.getContext('2d');
         if (!ctx) {
             console.error('[source-chart-v2.js] Failed to get 2D context');
             return;
         }
+        
+        // Set explicit canvas dimensions based on container
+        // This helps Chart.js calculate correctly even with CSS height: auto
+        const containerHeight = Math.max(containerRect.height, 300); // Minimum 300px
+        canvasElement.width = containerRect.width;
+        canvasElement.height = containerHeight;
+        console.log('[source-chart-v2.js] Canvas dimensions set:', {
+            width: canvasElement.width,
+            height: canvasElement.height
+        });
         
         createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
     });
@@ -418,18 +443,25 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
         labels: sourceChart?.data?.labels?.length || 0
     });
     
-        // Log after chart creation
-        console.log('[source-chart-v2.js] Chart instance created:', {
-            chartId: sourceChart?.id,
-            dataPoints: sourceChart?.data?.datasets?.[0]?.data?.length || 0,
-            labels: sourceChart?.data?.labels?.length || 0
-        });
+    // Force chart update to ensure rendering
+    if (sourceChart) {
+        sourceChart.update('none'); // 'none' mode for faster update
+        console.log('[source-chart-v2.js] Chart update() called');
         
-        // Force chart update to ensure rendering
-        if (sourceChart) {
-            sourceChart.update();
-            console.log('[source-chart-v2.js] Chart update() called');
-        }
+        // Force canvas to be visible after update
+        setTimeout(() => {
+            if (canvas) {
+                canvas.style.display = 'block';
+                canvas.style.visibility = 'visible';
+                canvas.style.opacity = '1';
+                // Force a resize to ensure Chart.js recalculates dimensions
+                if (sourceChart && sourceChart.resize) {
+                    sourceChart.resize();
+                }
+                console.log('[source-chart-v2.js] Canvas visibility forced after update');
+            }
+        }, 100);
+    }
     } catch (error) {
         console.error('[source-chart-v2.js] Error creating chart:', error);
         console.error('[source-chart-v2.js] Error details:', error.message, error.stack);
