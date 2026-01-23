@@ -325,6 +325,33 @@ async def get_product_labels_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/admin/update-product-labels")
+async def update_product_labels(request: Request):
+    """
+    Met à jour les product labels de tous les posts en détectant automatiquement le produit.
+    Cette fonction analyse le contenu de chaque post et met à jour la colonne 'product' dans la base de données.
+    
+    Args:
+        request: Request body avec optionnellement 'limit' pour limiter le nombre de posts traités
+    
+    Returns:
+        Statistiques sur les mises à jour effectuées
+    """
+    try:
+        body = await request.json()
+        limit = body.get('limit')  # None = all posts
+        
+        logger.info(f"Starting product labels update (limit: {limit or 'all'})...")
+        
+        result = db.update_all_posts_product_labels(limit=limit)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error updating product labels: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to update product labels: {str(e)}")
+
+
 # ============================================================================
 # UI VERSION ENDPOINTS
 # ============================================================================
@@ -695,3 +722,35 @@ async def clear_logs_api(source: Optional[str] = None, older_than_days: Optional
     """Clear scraping logs."""
     deleted = db.clear_scraping_logs(source=source, older_than_days=older_than_days)
     return {"deleted": deleted, "message": f"Deleted {deleted} log entries"}
+
+
+@router.post("/admin/recheck-answered-status")
+async def recheck_answered_status(request: Request):
+    """
+    Re-vérifie le statut answered des posts existants en re-scrapant leurs métadonnées depuis leurs URLs.
+    
+    Cette fonction récupère les posts existants qui ne sont pas marqués comme answered
+    et re-scrape leurs métadonnées (comments, replies, etc.) depuis leurs URLs pour
+    mettre à jour leur statut is_answered si une réponse a été apportée entre temps.
+    
+    Args:
+        request: Request body avec optionnellement 'limit' pour limiter le nombre de posts traités
+    
+    Returns:
+        Statistiques sur les posts vérifiés et mis à jour
+    """
+    try:
+        import json
+        body = await request.json()
+        limit = body.get('limit')  # None = all unanswered posts
+        
+        logger.info(f"Starting re-check of answered status (limit: {limit or 'all unanswered'})...")
+        
+        # Use the async function from db.py
+        result = await db.recheck_posts_answered_status(limit=limit, delay_between_requests=0.5)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error re-checking answered status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to re-check answered status: {str(e)}")

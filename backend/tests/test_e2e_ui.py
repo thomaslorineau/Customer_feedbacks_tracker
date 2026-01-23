@@ -4,6 +4,9 @@ import asyncio
 from playwright.async_api import async_playwright, Page, expect
 import time
 
+# Configuration pytest-asyncio pour les fixtures async de session
+pytest_plugins = ('pytest_asyncio',)
+
 
 @pytest.fixture(scope="session")
 def event_loop():
@@ -92,6 +95,89 @@ async def test_database_stats_display(page: Page):
     
     negative_posts = await page.locator("#globalNegativePosts").text_content()
     assert negative_posts is not None
+
+
+@pytest.mark.asyncio
+async def test_update_product_labels_button(page: Page):
+    """Test que le bouton 'Check Product Labels' met à jour la base de données."""
+    await page.goto(f"{BASE_URL}/scraping")
+    
+    # Attendre que la page soit chargée
+    await page.wait_for_selector("button[onclick='checkProductLabels()']", timeout=5000)
+    
+    # Intercepter la requête de mise à jour
+    update_request_promise = page.wait_for_request("**/admin/update-product-labels")
+    stats_request_promise = page.wait_for_request("**/admin/product-labels-stats")
+    
+    # Mock les réponses
+    async def handle_route(route):
+        if "/admin/update-product-labels" in route.request.url:
+            await route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"success": true, "updated_count": 10, "error_count": 0, "total_posts": 10, "message": "Updated 10 posts"}'
+            )
+        elif "/admin/product-labels-stats" in route.request.url:
+            await route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"total_posts": 10, "posts_with_label": 8, "posts_without_label": 2, "coverage_percentage": 80.0, "label_distribution": {"VPS": 3, "Domain": 2}, "validation": {"valid_labels_count": 8, "invalid_labels_count": 0, "invalid_labels": {}, "official_products": ["VPS", "Domain"]}}'
+            )
+        else:
+            await route.continue_()
+    
+    await page.route("**/admin/update-product-labels*", handle_route)
+    await page.route("**/admin/product-labels-stats*", handle_route)
+    
+    # Cliquer sur le bouton (avec confirmation)
+    page.on("dialog", lambda dialog: dialog.accept())
+    await page.click("button[onclick='checkProductLabels()']")
+    
+    # Attendre que les requêtes soient faites
+    await update_request_promise
+    await stats_request_promise
+    
+    # Vérifier qu'un toast de succès apparaît
+    await page.wait_for_selector(".toast.success", timeout=5000, state="visible")
+    toast_text = await page.locator(".toast.success").text_content()
+    assert "updated" in toast_text.lower() or "success" in toast_text.lower()
+
+
+@pytest.mark.asyncio
+async def test_recheck_answered_status_button(page: Page):
+    """Test que le bouton 'Re-check Answered Status' fonctionne."""
+    await page.goto(f"{BASE_URL}/scraping")
+    
+    # Attendre que la page soit chargée
+    await page.wait_for_selector("button[onclick='recheckAnsweredStatus()']", timeout=5000)
+    
+    # Intercepter la requête
+    request_promise = page.wait_for_request("**/admin/recheck-answered-status")
+    
+    # Mock la réponse
+    async def handle_route(route):
+        if "/admin/recheck-answered-status" in route.request.url:
+            await route.fulfill(
+                status=200,
+                content_type="application/json",
+                body='{"success": true, "updated_count": 5, "error_count": 0, "skipped_count": 2, "total_posts": 7, "message": "Re-checked 7 posts. Updated 5 posts."}'
+            )
+        else:
+            await route.continue_()
+    
+    await page.route("**/admin/recheck-answered-status*", handle_route)
+    
+    # Cliquer sur le bouton (avec confirmation)
+    page.on("dialog", lambda dialog: dialog.accept())
+    await page.click("button[onclick='recheckAnsweredStatus()']")
+    
+    # Attendre que la requête soit faite
+    await request_promise
+    
+    # Vérifier qu'un toast de succès apparaît
+    await page.wait_for_selector(".toast.success", timeout=5000, state="visible")
+    toast_text = await page.locator(".toast.success").text_content()
+    assert "completed" in toast_text.lower() or "updated" in toast_text.lower() or "success" in toast_text.lower()
 
 
 @pytest.mark.asyncio

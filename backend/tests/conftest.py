@@ -21,8 +21,15 @@ def test_db(monkeypatch):
     db_path = Path(temp_file.name)
     
     try:
+        # Remove file if it exists (might be leftover from previous test)
+        if db_path.exists():
+            os.unlink(str(db_path))
+        
         # Temporarily override DB_FILE in db module
         monkeypatch.setattr(db, 'DB_FILE', db_path)
+        
+        # Reset shared connection to force new connection
+        monkeypatch.setattr(db, '_shared_connection', None)
         
         # Initialize database using db.init_db()
         db.init_db()
@@ -32,7 +39,10 @@ def test_db(monkeypatch):
     finally:
         # Clean up temporary database
         if db_path.exists():
-            os.unlink(str(db_path))
+            try:
+                os.unlink(str(db_path))
+            except Exception:
+                pass  # Ignore errors during cleanup
 
 
 @pytest.fixture

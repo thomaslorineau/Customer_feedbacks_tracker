@@ -1,6 +1,7 @@
 """Unit tests for db.py module."""
 import pytest
 from datetime import datetime
+from unittest.mock import patch
 from app import db
 
 
@@ -130,6 +131,93 @@ class TestGetPosts:
         posts_en = db.get_posts(language='en')
         assert len(posts_en) == 1
         assert posts_en[0]['language'] == 'en'
+
+
+class TestAnsweredStatus:
+    """Tests for answered status functions."""
+    
+    def test_detect_and_update_answered_status_reddit(self, test_db, sample_post):
+        """Test detecting answered status for Reddit post."""
+        post = sample_post.copy()
+        post['source'] = 'Reddit'
+        post_id = db.insert_post(post)
+        
+        # Simulate Reddit post with comments
+        metadata = {
+            'source': 'reddit',
+            'num_comments': 5,
+            'comments': 5
+        }
+        
+        success = db.detect_and_update_answered_status(post_id, metadata)
+        assert success is True
+        
+        # Verify update
+        posts = db.get_posts(limit=1, offset=0)
+        updated_post = next((p for p in posts if p['id'] == post_id), None)
+        assert updated_post is not None
+        assert updated_post.get('is_answered') == 1
+    
+    def test_detect_and_update_answered_status_github(self, test_db, sample_post):
+        """Test detecting answered status for GitHub issue."""
+        post = sample_post.copy()
+        post['source'] = 'GitHub'
+        post_id = db.insert_post(post)
+        
+        # Simulate GitHub issue with comments
+        metadata = {
+            'source': 'github',
+            'comments': 3,
+            'comments_count': 3
+        }
+        
+        success = db.detect_and_update_answered_status(post_id, metadata)
+        assert success is True
+        
+        # Verify update
+        posts = db.get_posts(limit=1, offset=0)
+        updated_post = next((p for p in posts if p['id'] == post_id), None)
+        assert updated_post is not None
+        assert updated_post.get('is_answered') == 1
+    
+    def test_detect_and_update_answered_status_no_comments(self, test_db, sample_post):
+        """Test that posts without comments are not marked as answered."""
+        post = sample_post.copy()
+        post['source'] = 'Reddit'
+        post_id = db.insert_post(post)
+        
+        # Simulate Reddit post without comments
+        metadata = {
+            'source': 'reddit',
+            'num_comments': 0,
+            'comments': 0
+        }
+        
+        success = db.detect_and_update_answered_status(post_id, metadata)
+        assert success is False  # Should not update if no comments
+    
+    @pytest.mark.asyncio
+    async def test_recheck_posts_answered_status(self, test_db, sample_post):
+        """Test rechecking answered status for posts."""
+        # Insert a post
+        post = sample_post.copy()
+        post['url'] = 'https://www.reddit.com/r/ovh/comments/abc123/test/'
+        post['source'] = 'Reddit'
+        post_id = db.insert_post(post)
+        
+        # Mock the metadata fetcher
+        with patch('app.utils.post_metadata_fetcher.fetch_post_metadata_from_url') as mock_fetch:
+            mock_fetch.return_value = {
+                'source': 'reddit',
+                'num_comments': 5,
+                'comments': 5
+            }
+            
+            result = await db.recheck_posts_answered_status(limit=10)
+            
+            assert result['success'] is True
+            assert result['updated_count'] >= 1
+            mock_fetch.assert_called()
 
 
 class TestDuplicateDetection:

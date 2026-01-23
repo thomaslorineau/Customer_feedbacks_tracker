@@ -261,6 +261,23 @@ def init_db() -> None:
     except Exception:
         pass  # Column already exists
     
+    # Add product column for storing detected product labels
+    try:
+        c.execute("ALTER TABLE posts ADD COLUMN product TEXT")
+        conn.commit()
+    except Exception:
+        pass  # Column already exists
+    
+    # Add index for product
+    try:
+        c.execute('''
+            CREATE INDEX IF NOT EXISTS idx_posts_product 
+            ON posts(product)
+        ''')
+        conn.commit()
+    except Exception:
+        pass  # Index already exists
+    
     # Add index for answered status
     try:
         c.execute('''
@@ -578,23 +595,52 @@ def insert_post(post: Dict[str, Any]) -> Optional[int]:
                                     logger.debug(f"Duplicate detected by normalized content hash: {normalized_key[:100]}")
                                     return None  # Duplicate detected
             
+            # Detect product label if not provided
+            product_label = post.get('product')
+            if not product_label:
+                product_label = detect_product_label(str(post.get('content', '')), str(post.get('language', 'unknown')))
+            
+            # Check if product column exists
+            c.execute("DESCRIBE posts")
+            columns_info = c.fetchall()
+            available_columns = [col[0] for col in columns_info]
+            has_product_column = 'product' in available_columns
+            
             # SECURITY: Use parameterized query to prevent SQL injection
             # DuckDB: use nextval for auto-increment and RETURNING clause to get the ID
-            c.execute('''
-                INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score)
-                VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                RETURNING id
-            ''', (
-                str(post.get('source'))[:100],  # Limit length
-                str(post.get('author', 'unknown'))[:100],
-                str(post.get('content', ''))[:10000],  # Limit content length
-                url,
-                post.get('created_at'),
-                float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
-                str(post.get('sentiment_label', 'neutral'))[:20],
-                str(post.get('language', 'unknown'))[:20],
-                float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
-            ))
+            if has_product_column:
+                c.execute('''
+                    INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score, product)
+                    VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+                ''', (
+                    str(post.get('source'))[:100],  # Limit length
+                    str(post.get('author', 'unknown'))[:100],
+                    str(post.get('content', ''))[:10000],  # Limit content length
+                    url,
+                    post.get('created_at'),
+                    float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+                    str(post.get('sentiment_label', 'neutral'))[:20],
+                    str(post.get('language', 'unknown'))[:20],
+                    float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
+                    product_label,
+                ))
+            else:
+                c.execute('''
+                    INSERT INTO posts (id, source, author, content, url, created_at, sentiment_score, sentiment_label, language, relevance_score)
+                    VALUES (nextval('posts_id_seq'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+                ''', (
+                    str(post.get('source'))[:100],  # Limit length
+                    str(post.get('author', 'unknown'))[:100],
+                    str(post.get('content', ''))[:10000],  # Limit content length
+                    url,
+                    post.get('created_at'),
+                    float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+                    str(post.get('sentiment_label', 'neutral'))[:20],
+                    str(post.get('language', 'unknown'))[:20],
+                    float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
+                ))
             result = c.fetchone()
             post_id = result[0] if result else None
             
@@ -997,7 +1043,12 @@ def get_posts(limit: int = 100, offset: int = 0, language: Optional[str] = None)
         if 'answer_detection_method' in available_columns:
             answered_columns.append('answer_detection_method')
         
-        all_columns = base_columns + answered_columns
+        # Add product column if it exists
+        product_columns = []
+        if 'product' in available_columns:
+            product_columns.append('product')
+        
+        all_columns = base_columns + answered_columns + product_columns
         columns_str = ', '.join(all_columns)
         
         # SECURITY: Always use parameterized queries
@@ -1113,6 +1164,291 @@ def detect_and_update_answered_status(post_id: Optional[int], post_data: Dict[st
     if is_answered and post_id:
         return update_post_answered_status(post_id, True, answered_by, method)
     return False
+
+
+def detect_product_label(content: str, language: str = 'unknown') -> Optional[str]:
+    """
+    Détecte le produit OVH mentionné dans le contenu d'un post.
+    Basé sur la logique de détection du frontend.
+    
+    Args:
+        content: Contenu du post
+        language: Langue du post (pour filtrage)
+    
+    Returns:
+        Nom du produit détecté ou None
+    """
+    if not content:
+        return None
+    
+    import re
+    content_lower = content.lower()
+    
+    # Product patterns with priority order (more specific first)
+    product_patterns = [
+        # Web & Hosting
+        {'key': 'domain', 'pattern': re.compile(r'\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b', re.I), 'label': 'Domain'},
+        {'key': 'wordpress', 'pattern': re.compile(r'\b(wordpress|wp\s*host|wp\s*config)\b', re.I), 'label': 'WordPress'},
+        {'key': 'email', 'pattern': re.compile(r'\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b', re.I), 'label': 'Email'},
+        {'key': 'web-hosting', 'pattern': re.compile(r'\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b', re.I), 'label': 'Hosting'},
+        
+        # Cloud & Servers
+        {'key': 'vps', 'pattern': re.compile(r'\b(vps|virtual\s*private\s*server|kimsufi)\b', re.I), 'label': 'VPS'},
+        {'key': 'dedicated', 'pattern': re.compile(r'\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b', re.I), 'label': 'Dedicated Server'},
+        {'key': 'public-cloud', 'pattern': re.compile(r'\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b', re.I), 'label': 'Public Cloud'},
+        {'key': 'private-cloud', 'pattern': re.compile(r'\b(private\s*cloud|vmware|vsphere)\b', re.I), 'label': 'Private Cloud'},
+        {'key': 'kubernetes', 'pattern': re.compile(r'\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b', re.I), 'label': 'Managed Kubernetes'},
+        
+        # Storage & Backup
+        {'key': 'object-storage', 'pattern': re.compile(r'\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b', re.I), 'label': 'Storage'},
+        {'key': 'backup', 'pattern': re.compile(r'\b(backup|veeam|archive|snapshot|restore)\b', re.I), 'label': 'Backup'},
+        
+        # Network & CDN
+        {'key': 'cdn', 'pattern': re.compile(r'\b(cdn|content\s*delivery|cache)\b', re.I), 'label': 'CDN'},
+        {'key': 'load-balancer', 'pattern': re.compile(r'\b(load\s*balancer|iplb|lb|balancing)\b', re.I), 'label': 'Load Balancer'},
+        {'key': 'ddos', 'pattern': re.compile(r'\b(ddos|anti-ddos|protection|mitigation)\b', re.I), 'label': 'DDoS Protection'},
+        {'key': 'network', 'pattern': re.compile(r'\b(network|vrack|vlan|ip\s*address|subnet)\b', re.I), 'label': 'Network'},
+        
+        # Support & Billing (lower priority)
+        {'key': 'billing', 'pattern': re.compile(r'\b(billing|facture|invoice|payment|paiement|refund|rembours|subscription)\b', re.I), 'label': 'Billing'},
+        {'key': 'manager', 'pattern': re.compile(r'\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b', re.I), 'label': 'Manager'},
+        {'key': 'api', 'pattern': re.compile(r'\b(api|sdk|integration|rest\s*api|webhook)\b', re.I), 'label': 'API'},
+        {'key': 'support', 'pattern': re.compile(r'\b(support|ticket|assistance|help|service\s*client|customer\s*service)\b', re.I), 'label': 'Support'},
+    ]
+    
+    # Check patterns in order (first match wins)
+    for product in product_patterns:
+        if product['pattern'].search(content_lower):
+            return product['label']
+    
+    return None
+
+
+def update_post_product_label(post_id: int, product_label: Optional[str]) -> bool:
+    """
+    Met à jour le product label d'un post.
+    
+    Args:
+        post_id: ID du post
+        product_label: Label du produit (None pour supprimer)
+    
+    Returns:
+        True si la mise à jour a réussi, False sinon
+    """
+    conn, _ = get_db_connection()
+    try:
+        c = conn.cursor()
+        
+        # Check if product column exists
+        c.execute("DESCRIBE posts")
+        columns_info = c.fetchall()
+        available_columns = [col[0] for col in columns_info]
+        
+        if 'product' not in available_columns:
+            logger.warning("Product column does not exist in posts table")
+            return False
+        
+        # Update product label
+        c.execute('''
+            UPDATE posts 
+            SET product = ?
+            WHERE id = ?
+        ''', (product_label, post_id))
+        
+        conn.commit()
+        
+        # Verify update
+        c.execute('SELECT product FROM posts WHERE id = ?', (post_id,))
+        result = c.fetchone()
+        updated_value = result[0] if result else None
+        
+        if updated_value == product_label:
+            logger.debug(f"Successfully updated product label for post {post_id} to {product_label}")
+            return True
+        else:
+            logger.warning(f"Update may have failed: post {post_id} product={updated_value}, expected={product_label}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error updating product label for post {post_id}: {e}")
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
+def update_all_posts_product_labels(limit: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Met à jour les product labels de tous les posts en détectant automatiquement le produit.
+    
+    Args:
+        limit: Nombre maximum de posts à traiter (None pour tous)
+    
+    Returns:
+        Statistiques sur les mises à jour
+    """
+    conn, _ = get_db_connection()
+    try:
+        c = conn.cursor()
+        
+        # Check if product column exists
+        c.execute("DESCRIBE posts")
+        columns_info = c.fetchall()
+        available_columns = [col[0] for col in columns_info]
+        
+        if 'product' not in available_columns:
+            logger.warning("Product column does not exist in posts table")
+            return {
+                "success": False,
+                "message": "Product column does not exist. Please run database migration first.",
+                "updated_count": 0,
+                "total_posts": 0
+            }
+        
+        # Get all posts (or limited)
+        if limit:
+            c.execute('SELECT id, content, language FROM posts LIMIT ?', (limit,))
+        else:
+            c.execute('SELECT id, content, language FROM posts')
+        
+        posts = c.fetchall()
+        total_posts = len(posts)
+        updated_count = 0
+        error_count = 0
+        
+        logger.info(f"Updating product labels for {total_posts} posts...")
+        
+        for post_id, content, language in posts:
+            try:
+                # Detect product label
+                product_label = detect_product_label(content or '', language or 'unknown')
+                
+                # Update post
+                c.execute('''
+                    UPDATE posts 
+                    SET product = ?
+                    WHERE id = ?
+                ''', (product_label, post_id))
+                
+                updated_count += 1
+                
+                if updated_count % 100 == 0:
+                    conn.commit()
+                    logger.info(f"Updated {updated_count}/{total_posts} posts...")
+                    
+            except Exception as e:
+                error_count += 1
+                logger.warning(f"Error updating product label for post {post_id}: {e}")
+                continue
+        
+        conn.commit()
+        logger.info(f"Product label update completed: {updated_count} updated, {error_count} errors")
+        
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "error_count": error_count,
+            "total_posts": total_posts,
+            "message": f"Updated product labels for {updated_count} out of {total_posts} posts"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating product labels: {e}", exc_info=True)
+        conn.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating product labels: {str(e)}",
+            "updated_count": 0,
+            "total_posts": 0
+        }
+    finally:
+        conn.close()
+
+
+async def recheck_posts_answered_status(limit: Optional[int] = None, delay_between_requests: float = 0.5) -> Dict[str, Any]:
+    """
+    Re-vérifie le statut answered des posts existants en re-scrapant leurs métadonnées depuis leurs URLs.
+    
+    Args:
+        limit: Nombre maximum de posts à vérifier (None = tous)
+        delay_between_requests: Délai en secondes entre les requêtes pour éviter les rate limits
+    
+    Returns:
+        Statistiques sur les mises à jour
+    """
+    import asyncio
+    
+    try:
+        conn, _ = get_db_connection()
+        c = conn.cursor()
+        
+        # Get posts to check
+        if limit:
+            c.execute('SELECT id, url, source FROM posts WHERE is_answered = 0 OR is_answered IS NULL ORDER BY id DESC LIMIT ?', (limit,))
+        else:
+            c.execute('SELECT id, url, source FROM posts WHERE is_answered = 0 OR is_answered IS NULL ORDER BY id DESC')
+        
+        posts = c.fetchall()
+        conn.close()
+        
+        total_posts = len(posts)
+        updated_count = 0
+        error_count = 0
+        skipped_count = 0
+        
+        logger.info(f"Re-checking answered status for {total_posts} posts...")
+        
+        # Import metadata fetcher
+        from .utils.post_metadata_fetcher import fetch_post_metadata_from_url
+        
+        # Process posts with delay to avoid rate limiting
+        for post_id, url, source in posts:
+            try:
+                if not url:
+                    skipped_count += 1
+                    continue
+                
+                # Fetch metadata from URL
+                metadata = await fetch_post_metadata_from_url(url, source or '')
+                
+                if metadata:
+                    # Update answered status using existing detection logic
+                    success = detect_and_update_answered_status(post_id, metadata)
+                    if success:
+                        updated_count += 1
+                        logger.debug(f"Updated answered status for post {post_id}")
+                else:
+                    skipped_count += 1
+                
+                # Delay to avoid rate limiting
+                if delay_between_requests > 0:
+                    await asyncio.sleep(delay_between_requests)
+                    
+            except Exception as e:
+                error_count += 1
+                logger.warning(f"Error re-checking post {post_id}: {e}")
+                continue
+        
+        logger.info(f"Re-check completed: {updated_count} updated, {error_count} errors, {skipped_count} skipped")
+        
+        return {
+            "success": True,
+            "updated_count": updated_count,
+            "error_count": error_count,
+            "skipped_count": skipped_count,
+            "total_posts": total_posts,
+            "message": f"Re-checked {total_posts} posts. Updated {updated_count} posts, {error_count} errors, {skipped_count} skipped."
+        }
+        
+    except Exception as e:
+        logger.error(f"Error re-checking answered status: {e}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"Error re-checking answered status: {str(e)}",
+            "updated_count": 0,
+            "error_count": 1,
+            "total_posts": 0
+        }
 
 
 def get_answered_stats() -> Dict[str, Any]:
