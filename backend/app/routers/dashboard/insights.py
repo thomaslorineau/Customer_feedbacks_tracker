@@ -611,6 +611,8 @@ async def generate_whats_happening_insights_with_llm(
     
     prompt = f"""You are an OVHcloud customer feedback analyst. Your task is to analyze customer feedback and generate ACTIONABLE, PRIORITY-FOCUSED insights that directly identify what needs immediate attention.
 
+IMPORTANT: Generate ALL insights, titles, descriptions, and content in ENGLISH only.
+
 CONTEXT:
 - Active filters: {active_filters if active_filters else "All posts (no filters)"}
 - Total posts analyzed: {total} (Positive: {positive}, Negative: {negative}, Neutral: {neutral})
@@ -623,66 +625,49 @@ DETAILED POSTS TO ANALYZE (READ EACH ONE CAREFULLY TO EXTRACT CONCRETE PROBLEMS)
 
 CRITICAL ANALYSIS REQUIREMENTS - ORIENTED "ACTION":
 1. **READ AND PARSE EACH POST**: Understand the ACTUAL problems customers are experiencing. Extract concrete issues, not generic complaints.
-2. **IDENTIFY ACTIONABLE PROBLEMS**: Find specific, fixable issues:
-   - GOOD: "Les clients ont des difficultés à transférer leurs domaines" (customers have difficulties transferring their domains)
-   - GOOD: "Les zones DNS génèrent beaucoup d'insatisfaction, il faut prioriser" (DNS zones generate a lot of dissatisfaction, need to prioritize)
-   - BAD: "Support issues" or "Product problems" (too generic)
+2. **IDENTIFY ACTIONABLE PROBLEMS**: Find specific, fixable issues based on what customers are ACTUALLY saying in the posts. Avoid generic categories like "Support issues" or "Product problems" - be specific about what the problem is.
 3. **PRIORITIZE BY IMPACT**: Which problems affect the most customers? Which need immediate attention?
-4. **BE PRODUCT-SPECIFIC**: Identify the exact product/service causing issues (e.g., "Domain", "DNS", "VPS", "Hosting", "Public Cloud", "API", "Email", "Storage").
+4. **BE PRODUCT-SPECIFIC**: Identify the exact product/service causing issues based on what's mentioned in the posts.
 5. **BE TIMELINE-SPECIFIC**: Reference the filtered period. Are these recent issues? Is there a trend?
 
-Generate 2-4 key insights focusing on:
+DYNAMIC INSIGHT GENERATION:
+Analyze the posts and generate 2-4 insights that reflect what you ACTUALLY find. The insights should be:
+- Based on REAL problems mentioned in the posts (not generic categories)
+- Actionable and specific (what exactly is the problem?)
+- Prioritized by impact and frequency
+- Relevant to the filtered context (product, time period, etc.)
 
-1. **Top Product Impacted**: Which OVH product/service is most frequently mentioned in negative feedback? Be SPECIFIC (e.g., "Domain", "DNS", "VPS", "Hosting", "Public Cloud", "API", "Email", "Storage"). Count how many posts actually mention this product. Calculate the percentage accurately.
+Generate insights dynamically based on what you find. Common insight types include:
+- Product-specific issues (if a product is frequently mentioned)
+- Specific problems or pain points (extracted from actual post content)
+- Spike alerts (if spike_detected is true)
+- Emerging patterns or trends
+- Priority action items
 
-2. **Priority Action Item**: What is the MAIN ACTIONABLE PROBLEM that needs immediate attention? Extract from actual post content. Be SPECIFIC and ACTIONABLE:
-   - GOOD: "Les clients ont des difficultés à transférer leurs domaines" (customers have difficulties transferring their domains)
-   - GOOD: "Les zones DNS génèrent beaucoup d'insatisfaction, il faut prioriser" (DNS zones generate a lot of dissatisfaction, need to prioritize)
-   - BAD: "Support issues" or "Product problems" (too generic)
-   Count how many posts mention this specific issue. Quote or paraphrase what customers are saying.
-
-3. **Spike Alert** (if spike_detected is true): Highlight the spike with accurate percentage and count. Mention what customers are complaining about in these recent posts.
-
-4. **Emerging Pattern** (optional): Any notable trend or recurring theme that indicates a systemic issue requiring action.
-
-Format your response as a JSON array with this structure:
+Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
 [
   {{
-    "type": "top_product",
-    "title": "[Specific Product Name] - Priorité",
-    "description": "[X]% des posts négatifs ([count] posts) concernent [Product Name]. [Explain the SPECIFIC problems mentioned in posts - e.g., 'Les clients ont des difficultés à transférer leurs domaines' or 'Les zones DNS génèrent beaucoup d'insatisfaction']. [Why this is a priority]",
-    "icon": "🎁",
-    "metric": "[X]%",
-    "count": [actual_number]
-  }},
-  {{
-    "type": "top_issue",
-    "title": "[ACTIONABLE PROBLEM - e.g., 'Difficultés de transfert de domaines']",
-    "description": "[Count] posts mentionnent [specific issue]. [Explain the issue based on ACTUAL post content - quote or paraphrase what customers are saying]. [Why this needs to be prioritized]",
-    "icon": "💬",
-    "metric": "",
-    "count": [actual_number]
-  }},
-  {{
-    "type": "spike",
-    "title": "Pic d'insatisfaction détecté",
-    "description": "[Percentage]% d'augmentation des retours négatifs. [Count] posts négatifs dans les 48h. [Mention what customers are complaining about in these recent posts - be specific and actionable]",
-    "icon": "⚠️",
-    "metric": "+[percentage]%",
-    "count": [actual_number]
+    "type": "top_product|top_issue|spike|trend|priority",
+    "title": "[ACTIONABLE PROBLEM STATEMENT - be specific about what the problem is, based on actual posts]",
+    "description": "[Explain the problem based on ACTUAL post content. Quote or paraphrase what customers are saying. Include counts/percentages if relevant. Explain why this is a priority and what should be done.]",
+    "icon": "🎁|💬|⚠️|📊|🎯",
+    "metric": "[percentage or count if relevant, empty string otherwise]",
+    "count": [actual_number if relevant, 0 otherwise]
   }}
 ]
 
 CRITICAL INSTRUCTIONS:
-- READ EACH POST CAREFULLY and extract REAL, ACTIONABLE problems
+- Generate ALL content in ENGLISH only
+- READ EACH POST CAREFULLY and extract REAL, ACTIONABLE problems from the actual content
 - Base ALL insights on ACTUAL content from the posts provided - quote or reference specific issues mentioned
-- Be SPECIFIC and ACTIONABLE: Use exact product names, specific problems, concrete examples
-- Format titles as ACTIONABLE statements (e.g., "Difficultés de transfert de domaines", "Zones DNS génèrent de l'insatisfaction")
+- Be SPECIFIC and ACTIONABLE: Use exact product names, specific problems, concrete examples from the posts
+- Generate insights DYNAMICALLY based on what you find - don't force insights that aren't present in the data
 - Calculate percentages and counts ACCURATELY based on the data provided
 - If a filter is active, acknowledge it in the insights and ensure insights are specific to the filtered context
 - If analysis_focus is provided, prioritize insights related to that focus area
-- Use appropriate icons (🎁 for products, 💬 for issues, ⚠️ for alerts, 📊 for trends)
+- Use appropriate icons: 🎁 for products, 💬 for issues, ⚠️ for alerts, 📊 for trends, 🎯 for priorities
 - DO NOT make generic statements - every insight must reference actual problems from posts
+- DO NOT use placeholder examples - generate insights based on what you actually find in the posts
 - Prioritize insights that can lead to immediate action"""
 
     openai_key = os.getenv('OPENAI_API_KEY')
@@ -1134,6 +1119,8 @@ async def generate_improvements_analysis_with_llm(
     
     prompt = f"""You are an OVHcloud product improvement analyst. Your task is to analyze customer feedback and generate ACTIONABLE, PRIORITY-FOCUSED insights that directly guide product improvement decisions.
 
+IMPORTANT: Generate ALL insights, titles, descriptions, and content in ENGLISH only.
+
 CONTEXT:
 - {', '.join(context_parts)}
 - Pain points identified: {len(pain_points)}
@@ -1152,64 +1139,57 @@ PRODUCT OPPORTUNITIES:
 
 CRITICAL ANALYSIS REQUIREMENTS - ORIENTED "ACTION":
 1. **READ AND PARSE EACH POST**: Understand the ACTUAL problems customers are experiencing. Extract concrete issues, not generic complaints.
-2. **IDENTIFY ACTIONABLE PROBLEMS**: Find specific, fixable issues:
-   - GOOD: "Les clients ont des difficultés à transférer leurs domaines" (customers have difficulties transferring their domains)
-   - GOOD: "Les zones DNS génèrent beaucoup d'insatisfaction, il faut prioriser" (DNS zones generate a lot of dissatisfaction, need to prioritize)
-   - BAD: "Support issues" or "Product problems" (too generic)
+2. **IDENTIFY ACTIONABLE PROBLEMS**: Find specific, fixable issues based on what customers are ACTUALLY saying in the posts. Avoid generic categories - be specific about what the problem is.
 3. **PRIORITIZE BY IMPACT**: Which problems affect the most customers? Which have the highest business impact?
 4. **BE PRODUCT-SPECIFIC**: If a product filter is active, ALL insights must reference that specific product and problems related to it.
 5. **BE TIMELINE-SPECIFIC**: Reference the filtered period. Are these recent issues? Is there a trend?
 
-Generate insights in this format (2-4 insights total):
-- **Priority Action Items**: What should be fixed FIRST? Why? Reference specific problems from posts.
-- **ROI & Impact**: What's the potential impact? Be specific about customer satisfaction, retention, revenue.
-- **Product-Specific Issues**: If filtering by product, what are the main problems for that product?
+DYNAMIC INSIGHT GENERATION:
+Analyze the posts, pain points, and products data and generate 2-4 insights that reflect what you ACTUALLY find. The insights should be:
+- Based on REAL problems mentioned in the posts (not generic categories)
+- Actionable and specific (what exactly is the problem?)
+- Prioritized by impact and frequency
+- Relevant to the filtered context (product, time period, etc.)
 
-Format your response as JSON with this structure:
+Generate insights dynamically based on what you find. Common insight types include:
+- Priority action items (what should be fixed first)
+- Product-specific issues (if filtering by product or if a product stands out)
+- Specific problems or pain points (extracted from actual post content)
+- ROI & impact estimates (based on the problems identified)
+- Key findings (root causes or patterns)
+
+Format your response as JSON with this structure (ALL TEXT IN ENGLISH):
 {{
   "key_findings": [
-    "Finding 1: [ACTIONABLE problem - e.g., 'Les clients ont des difficultés à transférer leurs domaines']",
-    "Finding 2: [CONCRETE issue with product context - e.g., 'Les zones DNS génèrent beaucoup d'insatisfaction']",
-    "Finding 3: [SPECIFIC problem that needs prioritization]"
+    "Finding 1: [ACTIONABLE problem extracted from actual posts]",
+    "Finding 2: [CONCRETE issue with specific context from posts]",
+    "Finding 3: [SPECIFIC problem that needs prioritization, based on post analysis]"
   ],
-  "roi_summary": "[2-3 sentences about ROI and customer impact. Reference SPECIFIC problems and products. Be concrete about potential benefits based on the data.]",
+  "roi_summary": "[2-3 sentences about ROI and customer impact. Reference SPECIFIC problems and products found in the posts. Be concrete about potential benefits based on the actual data.]",
   "insights": [
     {{
-      "type": "priority",
-      "title": "[ACTIONABLE PROBLEM - e.g., 'Difficultés de transfert de domaines']",
+      "type": "priority|key_finding|roi|product_issue",
+      "title": "[ACTIONABLE PROBLEM STATEMENT - be specific about what the problem is, based on actual posts]",
       "description": "[Explain the problem based on ACTUAL post content. Quote or paraphrase what customers are saying. Explain why this is a priority and what should be done.]",
-      "icon": "🎯",
-      "metric": "",
-      "roi_impact": "[Potential impact: e.g., 'Réduction de 15-20% de l'insatisfaction, priorité élevée']"
-    }},
-    {{
-      "type": "key_finding",
-      "title": "[CONCRETE ISSUE - e.g., 'Zones DNS génèrent de l'insatisfaction']",
-      "description": "[Detailed description based on ACTUAL posts. What are customers saying? Why is this happening? What needs to be fixed?]",
-      "icon": "💡",
-      "metric": "",
-      "roi_impact": "[Impact estimate if relevant]"
-    }},
-    {{
-      "type": "roi",
-      "title": "ROI & Customer Impact",
-      "description": "[Specific ROI estimate based on the problems identified. Reference actual issues and products. Be concrete about potential benefits.]",
-      "icon": "💰",
-      "metric": "",
-      "roi_impact": "[ROI estimate with specific numbers if possible]"
+      "icon": "🎯|💡|💰|🎁",
+      "metric": "[percentage or count if relevant, empty string otherwise]",
+      "roi_impact": "[Potential impact estimate if relevant, empty string otherwise]"
     }}
   ]
 }}
 
 CRITICAL INSTRUCTIONS:
-- READ EACH POST CAREFULLY and extract REAL, ACTIONABLE problems
+- Generate ALL content in ENGLISH only
+- READ EACH POST CAREFULLY and extract REAL, ACTIONABLE problems from the actual content
 - Base ALL insights on ACTUAL post content - quote or reference specific issues mentioned
-- Be SPECIFIC and ACTIONABLE: Use exact product names, specific problems, concrete examples
+- Be SPECIFIC and ACTIONABLE: Use exact product names, specific problems, concrete examples from the posts
+- Generate insights DYNAMICALLY based on what you find - don't force insights that aren't present in the data
 - If product_filter is provided, ALL insights must be about that product
 - If date filters are provided, acknowledge the time period in insights
-- Format titles as ACTIONABLE statements (e.g., "Difficultés de transfert de domaines", "Zones DNS génèrent de l'insatisfaction")
 - DO NOT make generic statements - every insight must reference actual problems from posts
-- Prioritize insights that can lead to immediate action"""
+- DO NOT use placeholder examples - generate insights based on what you actually find in the posts
+- Prioritize insights that can lead to immediate action
+- Include ROI insights only if you can provide meaningful estimates based on the data"""
 
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
