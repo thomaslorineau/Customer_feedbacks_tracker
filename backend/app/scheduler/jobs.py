@@ -142,3 +142,65 @@ def daily_backup_job():
         logger.error(f"❌ Error during daily backup: {e}", exc_info=True)
 
 
+def recheck_answered_status_job():
+    """Scheduled job to re-check answered status of all posts.
+    
+    Runs every 3 hours to update the answered status of posts by re-scraping
+    their metadata from their URLs. This ensures that posts that have been
+    answered since the last scrape are correctly marked as answered.
+    
+    Vérifie progressivement tous les posts non answered (par batch de 50 pour éviter les timeouts).
+    Note: This is a synchronous wrapper that runs the async function.
+    """
+    import asyncio
+    logger.info("🔄 Running scheduled re-check of answered status...")
+    
+    try:
+        # Créer un event loop si nécessaire
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Si un loop est déjà en cours, créer une tâche dans un thread séparé
+                import threading
+                import concurrent.futures
+                
+                def run_in_thread():
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    try:
+                        # Vérifier par batch de 50 posts pour éviter les timeouts
+                        # Le job planifié vérifie progressivement tous les posts sur plusieurs exécutions
+                        return new_loop.run_until_complete(
+                            db.recheck_posts_answered_status(limit=50, delay_between_requests=0.5)
+                        )
+                    finally:
+                        new_loop.close()
+                
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(run_in_thread)
+                    result = future.result(timeout=600)  # 10 minutes max
+            else:
+                # Vérifier par batch de 50 posts
+                result = loop.run_until_complete(
+                    db.recheck_posts_answered_status(limit=50, delay_between_requests=0.5)
+                )
+        except RuntimeError:
+            # Pas de loop existant, créer un nouveau
+            # Vérifier par batch de 50 posts
+            result = asyncio.run(
+                db.recheck_posts_answered_status(limit=50, delay_between_requests=0.5)
+            )
+        
+        if result.get('success'):
+            updated = result.get('updated_count', 0)
+            errors = result.get('error_count', 0)
+            total = result.get('total_posts', 0)
+            skipped = result.get('skipped_count', 0)
+            logger.info(f"✅ Re-check completed: {updated} posts updated, {errors} errors, {skipped} skipped, {total} total checked")
+        else:
+            logger.error(f"❌ Re-check failed: {result.get('message', 'Unknown error')}")
+            
+    except Exception as e:
+        logger.error(f"❌ Error during re-check answered status: {e}", exc_info=True)
+
+
