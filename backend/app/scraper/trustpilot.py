@@ -111,6 +111,9 @@ class TrustpilotScraper(BaseScraper):
                 
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
+                # Yield control to event loop to allow heartbeat to progress
+                await asyncio.sleep(0)
+                
                 # Find ALL review cards - Trustpilot uses article tags with data-service-review-card-paper
                 all_cards = soup.find_all('article', {'data-service-review-card-paper': True})
                 
@@ -165,6 +168,9 @@ class TrustpilotScraper(BaseScraper):
                     if len(reviews) >= limit:
                         break
                     try:
+                        # Yield control to event loop every card to allow heartbeat to progress
+                        await asyncio.sleep(0)
+                        
                         # Extract rating (stars)
                         rating_elem = card.find('div', {'data-service-review-rating': True})
                         rating = 3  # default neutral
@@ -301,6 +307,8 @@ class TrustpilotScraper(BaseScraper):
                                 review_response = await self._fetch_get(review_url, headers=DEFAULT_HEADERS)
                                 if review_response.status_code == 200:
                                     review_soup = BeautifulSoup(review_response.text, 'html.parser')
+                                    # Yield control to event loop to allow heartbeat to progress
+                                    await asyncio.sleep(0)
                                     page_text = review_soup.get_text()
                                     
                                     # Method 1: Look for reply HTML elements

@@ -734,131 +734,44 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     
     heartbeat_running = True
     heartbeat_step = scraping_start
-    scraping_start_time = None
     
     async def progress_heartbeat():
-        nonlocal heartbeat_step, scraping_start_time
-        import time as time_module
-        try:
-            scraping_start_time = time_module.time()
-            logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
-        except Exception as log_err:
-            scraping_start_time = time_module.time()
-            try:
-                print(f"[{source}] ERROR logging heartbeat start: {log_err}")
-            except Exception:
-                pass
-        
-        target_duration = 60.0  # Increased to 60 seconds for longer scrapings (Trustpilot can take time)
-        steps_to_progress = scraping_end - scraping_start
-        last_update_time = scraping_start_time
-        iteration_count = 0
+        """Simplified heartbeat: just increment progress every second."""
+        nonlocal heartbeat_step, heartbeat_running
+        logger.info(f"[{source}] Heartbeat started for job {job_id[:8]} (from {heartbeat_step} to {scraping_end})")
         
         while heartbeat_running and heartbeat_step < scraping_end:
-            iteration_count += 1
-            # Check if job was cancelled - stop immediately
+            # Check cancellation
             if job.get('cancelled'):
-                logger.info(f"[{source}] Job {job_id[:8]} was cancelled, stopping heartbeat")
+                logger.info(f"[{source}] Job cancelled, stopping heartbeat")
                 heartbeat_running = False
                 break
             
+            # Wait 1 second
             try:
-                await asyncio.sleep(0.5)  # Update every 0.5 seconds
-            except Exception as sleep_err:
-                try:
-                    logger.warning(f"[{source}] Error in heartbeat sleep: {sleep_err}")
-                except Exception:
-                    pass
+                await asyncio.sleep(1.0)
+            except asyncio.CancelledError:
+                break
+            except Exception:
                 break
             
-            # Continue updating even if scraping finished, until we reach scraping_end
-            # This ensures progress bar always moves forward
-            if not heartbeat_running and heartbeat_step >= scraping_end - 5:
-                # Scraping finished, but we're close to end, so finish the heartbeat naturally
-                break
-            elif not heartbeat_running:
-                # Scraping finished early, but continue updating progress to show completion
-                try:
-                    logger.info(f"[{source}] Scraping finished, but continuing heartbeat to show progress (current: {heartbeat_step}/{scraping_end})")
-                except Exception:
-                    pass
-            
-            # CRITICAL: ALWAYS increment heartbeat_step FIRST, no matter what
-            # This ensures progress always moves forward
-            old_step = heartbeat_step
+            # Increment progress
             if heartbeat_step < scraping_end - 1:
                 heartbeat_step += 1
-                # Log EVERY increment for first 10 iterations to debug
-                if iteration_count <= 10:
-                    try:
-                        logger.info(f"[{source}] Heartbeat iteration {iteration_count}: FORCED increment {old_step} -> {heartbeat_step}")
-                    except Exception:
-                        pass
             
-            # Also try time-based calculation for smoother progress (but don't override the forced increment)
-            try:
-                current_time = time_module.time()
-                if scraping_start_time and scraping_start_time > 0:
-                    elapsed = current_time - scraping_start_time
-                    if elapsed > 0 and target_duration > 0:
-                        time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
-                        time_based_step = min(time_based_step, scraping_end - 1)
-                        # Use time-based if it's ahead of current step
-                        if time_based_step > heartbeat_step:
-                            logger.info(f"[{source}] Heartbeat: time-based ahead, updating {heartbeat_step} -> {time_based_step}")
-                            heartbeat_step = time_based_step
-            except Exception as progress_err:
-                try:
-                    logger.error(f"[{source}] Error in time-based calculation: {progress_err}", exc_info=True)
-                except Exception:
-                    pass
-                # Progress already incremented above, so continue
-            
-            # Always update progress in memory and DB every iteration
-            # Force update even if value hasn't changed (ensures frontend sees progress)
+            # Update progress in memory and DB
             job['progress']['completed'] = heartbeat_step
             job['progress']['total'] = total_steps
             
-            # Check if job was cancelled before updating progress
-            if job.get('cancelled'):
-                logger.info(f"[{source}] Job {job_id[:8]} was cancelled, stopping heartbeat")
-                heartbeat_running = False
-                break
-            
-            # Update DB more frequently to ensure frontend sees progress
             try:
                 db.update_job_progress(job_id, total_steps, heartbeat_step)
-                # Log every 5% to avoid spam but show progress
-                if heartbeat_step % 5 == 0 or heartbeat_step == scraping_start + 1:
-                    logger.info(f"[{source}] Heartbeat progress: {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
+                # Log every 10%
+                if heartbeat_step % 10 == 0:
+                    logger.info(f"[{source}] Progress: {heartbeat_step}%")
             except Exception as e:
-                logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
-                # If DB update fails due to cancellation, stop heartbeat
-                if job.get('cancelled'):
-                    heartbeat_running = False
-                    break
-            
-            # Ensure we always show some progress, even if minimal
-            if heartbeat_step == scraping_start and current_time - last_update_time > 1.0:
-                # Force a small increment if we've been stuck at start for more than 1 second
-                heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
-                last_update_time = current_time
+                logger.debug(f"[{source}] DB update failed: {e}")
         
-        try:
-            logger.info(f"[{source}] Heartbeat finished at step {heartbeat_step} after {iteration_count} iterations")
-        except Exception as heartbeat_err:
-            try:
-                logger.error(f"[{source}] Heartbeat crashed: {heartbeat_err}", exc_info=True)
-            except Exception:
-                pass
-            # Try to update progress one last time before crashing
-            try:
-                job['progress']['completed'] = heartbeat_step
-                job['progress']['total'] = total_steps
-                db.update_job_progress(job_id, total_steps, heartbeat_step)
-            except Exception:
-                pass
-            raise  # Re-raise to see the error
+        logger.info(f"[{source}] Heartbeat finished at {heartbeat_step}%")
     
     try:
         if job.get('cancelled'):
@@ -1277,10 +1190,18 @@ async def get_job_status(job_id: str):
         try:
             db_job = db.get_job_record(job_id)
             if db_job:
-                # Always sync progress from DB for running jobs (DB is source of truth for progress)
-                if db_job.get('progress'):
+                # For running jobs, use whichever progress is higher (memory or DB)
+                # This handles cases where DB updates fail but memory is still updated
+                if db_job.get('progress') and job.get('progress'):
+                    db_completed = db_job['progress'].get('completed', 0) or 0
+                    mem_completed = job['progress'].get('completed', 0) or 0
+                    # Use the higher value (memory may be ahead if DB update failed)
+                    if db_completed > mem_completed:
+                        job['progress'] = db_job['progress']
+                        logger.debug(f"Synced progress from DB for job {job_id[:8]}: {db_job['progress']}")
+                    # else keep memory progress (it's more up to date)
+                elif db_job.get('progress') and not job.get('progress'):
                     job['progress'] = db_job['progress']
-                    logger.debug(f"Synced progress from DB for job {job_id[:8]}: {db_job['progress']}")
                 
                 # Sync status for final states
                 if db_job.get('status') in ('completed', 'failed', 'cancelled'):

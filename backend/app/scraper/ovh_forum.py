@@ -110,18 +110,9 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
                 except requests.exceptions.HTTPError as e:
                     if e.response.status_code in [403, 503]:
                         logger.warning(f"[OVH Forum] Server returned {e.response.status_code}")
-                        # Don't try browser automation on first attempt to avoid long waits
-                        if attempt == MAX_RETRIES - 1:  # Only on last attempt
-                            logger.info("[OVH Forum] Trying browser automation as last resort...")
-                            html = _try_browser_automation(main_url)
-                            if html:
-                                soup = BeautifulSoup(html, 'html.parser')
-                            else:
-                                logger.warning("[OVH Forum] Browser automation also failed")
-                                return []
-                        else:
-                            # Return empty on early attempts to avoid long waits
-                            return []
+                        # Browser automation is DISABLED - it blocks the asyncio event loop
+                        logger.warning("[OVH Forum] Cannot scrape - server blocked request and browser automation is disabled")
+                        return []
                     else:
                         raise
                 except requests.exceptions.Timeout:
@@ -145,29 +136,33 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
                 
                 posts = []
                 
-                # Try to find topic links or post elements
-                # The structure may vary, so we'll try multiple selectors
-                topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/'))
+                # OVH Forum uses ServiceNow platform with URLs like:
+                # ?id=community_question&sys_id=...
+                # First try the ServiceNow pattern (current forum structure)
+                topic_links = soup.find_all('a', href=re.compile(r'community_question.*sys_id=|id=community_question'))
                 
                 if not topic_links:
-                    # Try alternative selectors on the same page
-                    logger.info("[OVH Forum] No topic links found, trying alternative selectors...")
-                    # Try different patterns
+                    # Try broader sys_id pattern
+                    topic_links = soup.find_all('a', href=re.compile(r'sys_id='))
+                    # Filter to only question-like links
+                    topic_links = [link for link in topic_links if 'question' in link.get('href', '').lower() or 'topic' in link.get('href', '').lower()]
+                
+                if not topic_links:
+                    # Legacy patterns (old forum structure)
+                    logger.info("[OVH Forum] No ServiceNow links found, trying legacy patterns...")
                     topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/|/discussion/'))
-                    if not topic_links:
-                        # Try any links that might be posts
-                        topic_links = soup.find_all('a', href=True)
-                        # Filter to likely post links
-                        topic_links = [link for link in topic_links if any(pattern in link.get('href', '') for pattern in ['/t/', '/topic/', '/post/', '/discussion/'])]
-                    
-                    if not topic_links:
-                        logger.warning("[OVH Forum] No posts found - forum structure may have changed")
-                        return []
+                
+                if not topic_links:
+                    # NOTE: Browser automation (Playwright) is DISABLED because it blocks the asyncio event loop
+                    # and prevents the heartbeat from running, causing the progress bar to freeze.
+                    # The OVH Forum uses JavaScript to load content, so we can't scrape it without a browser.
+                    logger.warning("[OVH Forum] No posts found - forum requires JavaScript (browser automation disabled)")
+                    return []
                 
                 seen_urls = set()
                 
                 # Limit the number of links to process to avoid infinite loops
-                max_links_to_process = min(limit * 2, 20)  # Cap at 20 links max
+                max_links_to_process = min(limit * 2, 30)  # Cap at 30 links max
                 
                 for link in topic_links[:max_links_to_process]:
                     try:
@@ -175,38 +170,37 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
                         if not href:
                             continue
                         
-                        # Make absolute URL
+                        # Make absolute URL - handle ServiceNow format
                         if href.startswith('http'):
-                            # URL absolue complète
                             full_url = href
+                        elif href.startswith('?'):
+                            # ServiceNow query string format: ?id=community_question&sys_id=...
+                            full_url = f"{OVH_FORUM_BASE}{href}"
                         elif href.startswith('/'):
-                            # URL relative - peut être /community/... ou /en/... ou /fr/...
-                            if href.startswith('/community/'):
-                                # URL déjà complète avec /community/
+                            # URL relative
+                            if href.startswith('/community'):
                                 full_url = f"https://community.ovhcloud.com{href}"
-                            elif href.startswith(f'/{language}/'):
-                                # URL commence par /en/ ou /fr/ - déjà correcte
-                                full_url = f"{OVH_FORUM_BASE}{href}"
                             else:
-                                # URL relative sans préfixe de langue - ajouter la langue
-                                full_url = f"{OVH_FORUM_BASE}/{language}{href}"
+                                full_url = f"https://community.ovhcloud.com{href}"
                         else:
                             # URL relative sans slash initial
-                            full_url = f"{OVH_FORUM_BASE}/{language}/{href}"
+                            full_url = f"{OVH_FORUM_BASE}/{href}"
                         
-                        # Skip if already seen
-                        if full_url in seen_urls:
+                        # Skip if already seen (normalize URL for comparison)
+                        url_key = full_url.split('sys_id=')[-1] if 'sys_id=' in full_url else full_url
+                        if url_key in seen_urls:
                             continue
-                        seen_urls.add(full_url)
+                        seen_urls.add(url_key)
                         
                         # Extract title
                         title = link.get_text(strip=True)
-                        if not title or len(title) < 10:
+                        # Clean up title (remove "Question :" prefix)
+                        title = re.sub(r'^(Question\s*:\s*)', '', title)
+                        if not title or len(title) < 5:
                             continue
                         
-                        # Check if query is relevant (basic check)
-                        if query.lower() not in title.lower() and query.lower() not in full_url.lower():
-                            continue
+                        # For OVH forum, most posts are OVH-related by nature
+                        # So we're less strict on query matching
                         
                         # Try to get post details (but skip if we already have enough posts)
                         if len(posts) >= limit:
@@ -217,51 +211,45 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
                             logger.warning("[OVH Forum] Timeout reached, stopping")
                             break
                         
-                        try:
-                            # Small delay between requests (minimal to avoid blocking)
-                            time.sleep(0.1)  # Very small delay
+                        # First, try to extract metadata from the parent element (faster, no extra request)
+                        author = 'OVH Community User'
+                        created_at = datetime.now().isoformat()
+                        content = title
+                        
+                        parent = link.find_parent(['div', 'li', 'article', 'tr'])
+                        if parent:
+                            # Look for author in ServiceNow format
+                            author_elem = parent.find('a', href=re.compile(r'community_user_profile'))
+                            if author_elem:
+                                author = author_elem.get_text(strip=True)
+                                author = re.sub(r'^Profil de\s*', '', author)
                             
-                            post_response = session.get(full_url, headers=headers, timeout=5)  # Reduced timeout
-                            post_response.raise_for_status()
-                            post_soup = BeautifulSoup(post_response.content, 'html.parser')
-                            
-                            # Extract content
-                            content_elem = post_soup.find('div', class_=re.compile(r'post|content|body|message'))
-                            if not content_elem:
-                                content_elem = post_soup.find('article')
-                            if not content_elem:
-                                content_elem = post_soup.find('main')
-                            
-                            content = content_elem.get_text(strip=True)[:500] if content_elem else title
-                            
-                            # Extract author
-                            author_elem = post_soup.find('a', class_=re.compile(r'author|user|username'))
-                            if not author_elem:
-                                author_elem = post_soup.find('span', class_=re.compile(r'author|user'))
-                            author = author_elem.get_text(strip=True) if author_elem else 'Unknown'
-                            
-                            # Extract date
-                            date_elem = post_soup.find('time')
-                            if date_elem:
-                                date_str = date_elem.get('datetime') or date_elem.get_text(strip=True)
-                                try:
-                                    created_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')).isoformat()
-                                except:
-                                    created_at = datetime.now().isoformat()
-                            else:
-                                created_at = datetime.now().isoformat()
-                            
-                        except Exception as e:
-                            logger.debug(f"Could not fetch post details for {full_url}: {e}")
-                            # Use basic info from link
-                            content = title
-                            author = 'Unknown'
-                            created_at = datetime.now().isoformat()
+                            # Look for date/time info
+                            parent_text = parent.get_text()
+                            date_match = re.search(r'(\d+)\s*(hour|heure|jour|day|week|semaine|month|mois|minute)', parent_text, re.I)
+                            if date_match:
+                                from datetime import timedelta
+                                num = int(date_match.group(1))
+                                unit = date_match.group(2).lower()
+                                now = datetime.now()
+                                if 'hour' in unit or 'heure' in unit:
+                                    created_at = (now - timedelta(hours=num)).isoformat()
+                                elif 'day' in unit or 'jour' in unit:
+                                    created_at = (now - timedelta(days=num)).isoformat()
+                                elif 'week' in unit or 'semaine' in unit:
+                                    created_at = (now - timedelta(weeks=num)).isoformat()
+                                elif 'month' in unit or 'mois' in unit:
+                                    created_at = (now - timedelta(days=num*30)).isoformat()
+                                elif 'minute' in unit:
+                                    created_at = (now - timedelta(minutes=num)).isoformat()
+                        
+                        # Skip fetching individual pages to save time
+                        # Just use the title as content for fast scraping
                         
                         post = {
                             'source': 'OVH Forum',
                             'author': author,
-                            'content': f"{title}\n{content}",
+                            'content': title,
                             'url': full_url,
                             'created_at': created_at,
                             'sentiment_score': 0.0,
@@ -325,9 +313,9 @@ def _try_browser_automation(url: str) -> str:
         logger.info(f"[OVH Forum] Trying {method} for browser automation...")
         
         if method == 'playwright':
-            return scrape_with_playwright(url, wait_selector='body', timeout=15000)
+            return scrape_with_playwright(url, wait_selector='body', timeout=8000)
         elif method == 'selenium':
-            return scrape_with_selenium(url, wait_selector='body', timeout=15)
+            return scrape_with_selenium(url, wait_selector='body', timeout=8)
         else:
             logger.warning("[OVH Forum] No browser automation available. Install: pip install playwright")
             return None

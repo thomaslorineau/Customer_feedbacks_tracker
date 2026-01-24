@@ -132,13 +132,13 @@ def scrape_with_selenium(url: str, wait_selector: str = None, timeout: int = 10)
             driver.quit()
 
 
-def scrape_with_playwright(url: str, wait_selector: str = None, timeout: int = 10000):
+def scrape_with_playwright(url: str, wait_selector: str = None, timeout: int = 8000):
     """Scrape a URL using Playwright (more modern, better stealth).
     
     Args:
         url: URL to scrape
         wait_selector: CSS selector to wait for (optional)
-        timeout: Timeout in milliseconds
+        timeout: Timeout in milliseconds (default: 8 seconds)
     
     Returns:
         HTML content as string, or None if failed
