@@ -1,0 +1,137 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database - replaces DuckDB for better concurrency
+  postgres:
+    image: postgres:15-alpine
+    container_name: vibe_postgres
+    environment:
+      POSTGRES_DB: vibe_tracker
+      POSTGRES_USER: vibe_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibe_secure_password_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vibe_user -d vibe_tracker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - vibe_network
+
+  # Redis - Job queue for async scraping
+  redis:
+    image: redis:7-alpine
+    container_name: vibe_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - vibe_network
+
+  # API Server - FastAPI with Gunicorn + Uvicorn workers
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: vibe_api
+    environment:
+      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+      - USE_POSTGRES=true
+      - LOG_LEVEL=info
+      - WORKERS=4
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app/frontend:ro
+      - ./backend/backups:/app/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - vibe_network
+
+  # Worker - Isolated scraping processes (does NOT affect API stability)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: vibe_worker
+    environment:
+      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - REDIS_URL=redis://redis:6379/0
+      - USE_POSTGRES=true
+      - LOG_LEVEL=info
+      - WORKER_CONCURRENCY=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/backups:/app/backups
+    restart: unless-stopped
+    networks:
+      - vibe_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+
+  # Scheduler - Handles cron jobs (backup, auto-scrape triggers)
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.scheduler
+    container_name: vibe_scheduler
+    environment:
+      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - REDIS_URL=redis://redis:6379/0
+      - USE_POSTGRES=true
+      - LOG_LEVEL=info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/backups:/app/backups
+    restart: unless-stopped
+    networks:
+      - vibe_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  vibe_network:
+    driver: bridge
