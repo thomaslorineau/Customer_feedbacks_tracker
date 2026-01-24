@@ -1,0 +1,57 @@
+# ============================================
+# VibeCoding Worker Dockerfile
+# Isolated process for scraping jobs
+# ============================================
+FROM python:3.11-slim as builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /build
+
+# Install build dependencies including chromium for selenium
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-docker.txt ./
+RUN pip install --user -r requirements-docker.txt
+
+# ============================================
+# Production Stage
+# ============================================
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/root/.local/bin:$PATH"
+
+WORKDIR /app
+
+# Install runtime dependencies including headless browser support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    curl \
+    chromium \
+    chromium-driver \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Set chromium path for selenium
+ENV CHROME_BIN=/usr/bin/chromium \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver
+
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
+COPY app/ /app/app/
+COPY scripts/ /app/scripts/
+COPY worker.py /app/worker.py
+
+RUN mkdir -p /app/backups /app/logs
+
+# Run the worker process
+CMD ["python", "-m", "worker"]

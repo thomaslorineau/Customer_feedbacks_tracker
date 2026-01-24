@@ -203,6 +203,14 @@ app.include_router(admin.router)
 app.include_router(email.router)
 app.include_router(pages.router)
 
+# Include async jobs router (for Docker/Redis mode)
+try:
+    from .routers import jobs as jobs_router
+    app.include_router(jobs_router.router)
+    logger.info("[ROUTER] Async jobs router enabled")
+except ImportError as e:
+    logger.warning(f"[ROUTER] Async jobs router not available: {e}")
+
 # Set limiter for scraping router
 scraping.set_limiter(limiter)
 
