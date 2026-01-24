@@ -1788,7 +1788,14 @@ async function pollJobStatus(jobId) {
                 );
                 
                 if (isNetworkError) {
-                    console.warn(`⚠️ Network error polling job status (server might be restarting): ${error.message}`);
+                    // Only log network errors occasionally to avoid spam (every 10th error)
+                    if (!window._networkErrorCount) window._networkErrorCount = 0;
+                    window._networkErrorCount++;
+                    
+                    if (window._networkErrorCount % 10 === 1) {
+                        console.warn(`[Progress] ⚠️ Network error polling job status (server might be restarting): ${error.message}`);
+                    }
+                    
                     // Update progress text to show connection issue but keep polling
                     if (progressText) {
                         const currentText = progressText.textContent;
@@ -2090,27 +2097,52 @@ function showCancelButton(show) {
 }
 
 async function cancelScraping() {
-    if (currentJobId) {
-        try {
-            await api.cancelJob(currentJobId);
-            showToast('Job cancellation requested', 'info');
-        } catch (error) {
-            console.error(`Error cancelling job: ${error.message}`);
+    if (!currentJobId) {
+        console.warn('[Cancel] No active job to cancel');
+        return;
+    }
+    
+    const jobIdToCancel = currentJobId;
+    console.log(`[Cancel] Cancelling job ${jobIdToCancel.substring(0, 8)}...`);
+    
+    // Stop polling IMMEDIATELY to prevent network errors during cancellation
+    if (jobStatusInterval) {
+        clearInterval(jobStatusInterval);
+        jobStatusInterval = null;
+        console.log('[Cancel] ✅ Polling stopped');
+    }
+    
+    // Clear job ID immediately to prevent resume
+    currentJobId = null;
+    persistLastJob(null); // Clear persisted job
+    
+    // Hide UI immediately
+    showCancelButton(false);
+    const progressContainer = document.getElementById('scrapingProgressContainer');
+    if (progressContainer) {
+        progressContainer.style.display = 'none';
+    }
+    
+    // Try to cancel on server (but don't wait if it fails)
+    try {
+        await api.cancelJob(jobIdToCancel);
+        console.log(`[Cancel] ✅ Job ${jobIdToCancel.substring(0, 8)}... cancellation requested on server`);
+        showToast('Job cancellation requested', 'info');
+    } catch (error) {
+        // Network errors are expected if server is restarting or unreachable
+        // Don't show error to user since we've already stopped the job locally
+        const isNetworkError = error.message && (
+            error.message.includes('NetworkError') || 
+            error.message.includes('Failed to fetch') ||
+            error.message.includes('fetch')
+        );
+        
+        if (isNetworkError) {
+            console.warn(`[Cancel] ⚠️ Network error during cancellation (server may be restarting): ${error.message}`);
+            showToast('Job stopped locally. Server may be restarting.', 'info');
+        } else {
+            console.error(`[Cancel] ❌ Error cancelling job: ${error.message}`);
             showToast(`Error cancelling job: ${error.message}`, 'error');
-        }
-        
-        // Stop polling
-        if (jobStatusInterval) {
-            clearInterval(jobStatusInterval);
-            jobStatusInterval = null;
-        }
-        currentJobId = null;
-        persistLastJob(null); // Clear persisted job
-        showCancelButton(false);
-        
-        const progressContainer = document.getElementById('scrapingProgressContainer');
-        if (progressContainer) {
-            progressContainer.style.display = 'none';
         }
     }
 }

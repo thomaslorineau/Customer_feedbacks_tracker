@@ -35,19 +35,27 @@ def scrape_ovh_forum(query: str = "OVH", limit: int = 50, languages: list = None
     
     Returns list of dicts: source, author, content, url, created_at
     """
-    if languages is None:
-        languages = ['en', 'fr']  # Par défaut, scraper les deux langues
-    
-    all_posts = []
-    posts_per_language = max(limit // len(languages), 10) if languages else limit
-    
-    for language in languages:
-        if len(all_posts) >= limit:
-            break
-        posts = _scrape_ovh_forum_single_language(query, posts_per_language, language)
-        all_posts.extend(posts)
-    
-    return all_posts[:limit]
+    try:
+        if languages is None:
+            languages = ['en', 'fr']  # Par défaut, scraper les deux langues
+        
+        all_posts = []
+        posts_per_language = max(limit // len(languages), 10) if languages else limit
+        
+        for language in languages:
+            if len(all_posts) >= limit:
+                break
+            try:
+                posts = _scrape_ovh_forum_single_language(query, posts_per_language, language)
+                all_posts.extend(posts)
+            except Exception as lang_error:
+                logger.warning(f"[OVH Forum] Error scraping language {language}: {lang_error}")
+                continue
+        
+        return all_posts[:limit]
+    except Exception as e:
+        logger.error(f"[OVH Forum] Error in scrape_ovh_forum: {e}", exc_info=True)
+        return []  # Return empty list instead of crashing
 
 
 def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, language: str = "en"):
@@ -60,11 +68,12 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
     
     Returns list of dicts: source, author, content, url, created_at
     """
-    import signal
-    
-    # Set a global timeout to prevent infinite loops (60 seconds max)
-    start_time = time.time()
-    MAX_TOTAL_TIME = 60
+    try:
+        import signal
+        
+        # Set a global timeout to prevent infinite loops (60 seconds max)
+        start_time = time.time()
+        MAX_TOTAL_TIME = 60
     
     for attempt in range(MAX_RETRIES):
         # Check if we've exceeded total time limit
@@ -293,8 +302,11 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
                 continue
             return []
     
-    # Should not reach here, but return empty if it does
-    return []
+        # Should not reach here, but return empty if it does
+        return []
+    except Exception as e:
+        logger.error(f"[OVH Forum] Critical error in _scrape_ovh_forum_single_language: {e}", exc_info=True)
+        return []  # Return empty list instead of crashing
 
 
 def _try_browser_automation(url: str) -> str:

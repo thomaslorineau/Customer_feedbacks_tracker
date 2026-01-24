@@ -78,6 +78,7 @@ class GitHubScraper(BaseScraper):
         except Exception as e:
             duration = time.time() - start_time
             self.logger.log_scraping_error(e, duration)
+            # Don't re-raise - return empty list to prevent server crash
             return []
     
     async def _search_issues(self, query: str, limit: int) -> List[Dict[str, Any]]:

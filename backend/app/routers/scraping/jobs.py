@@ -1,12 +1,13 @@
 """Job processing functions and endpoints for async scraping jobs."""
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional
+from typing import List, Optional, Callable, Any
 import uuid
 import threading
 import asyncio
 import logging
 import os
+import functools
 
 from ... import db
 from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin, discord
@@ -17,6 +18,102 @@ from .base import should_insert_post, log_scraping, RELEVANCE_THRESHOLD
 from .endpoints import KeywordsPayload
 
 logger = logging.getLogger(__name__)
+
+# Global timeout for scraper calls (in seconds)
+SCRAPER_TIMEOUT = 120  # 2 minutes max per scraper call
+
+
+def safe_scraper_wrapper(scraper_func: Callable, source_name: str, is_async: bool = False):
+    """Wrapper to make scraper calls robust and prevent server crashes.
+    
+    Features:
+    - Timeout protection (prevents infinite hangs)
+    - Exception handling (prevents crashes)
+    - Result validation (ensures correct format)
+    - Error logging (for debugging)
+    
+    Args:
+        scraper_func: The scraper function to wrap
+        source_name: Name of the source (for logging)
+        is_async: Whether the scraper is async
+    
+    Returns:
+        Wrapped function that always returns a list (empty on error)
+    """
+    if is_async:
+        @functools.wraps(scraper_func)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                # Add timeout to async scraper
+                try:
+                    result = await asyncio.wait_for(
+                        scraper_func(*args, **kwargs),
+                        timeout=SCRAPER_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"[{source_name}] Scraper timeout after {SCRAPER_TIMEOUT}s")
+                    return []
+                
+                # Validate result is a list
+                if not isinstance(result, list):
+                    logger.warning(f"[{source_name}] Scraper returned non-list: {type(result)}")
+                    return []
+                
+                # Validate items in list
+                validated_result = []
+                for item in result:
+                    if isinstance(item, dict):
+                        # Ensure required fields exist
+                        if 'source' not in item:
+                            item['source'] = source_name
+                        validated_result.append(item)
+                    else:
+                        logger.warning(f"[{source_name}] Invalid item type in result: {type(item)}")
+                
+                return validated_result
+                
+            except Exception as e:
+                logger.error(f"[{source_name}] Scraper error: {e}", exc_info=True)
+                return []  # Always return empty list on error
+        
+        return async_wrapper
+    else:
+        @functools.wraps(scraper_func)
+        def sync_wrapper(*args, **kwargs):
+            try:
+                # For sync scrapers, run in thread with timeout
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(scraper_func, *args, **kwargs)
+                    try:
+                        result = future.result(timeout=SCRAPER_TIMEOUT)
+                    except concurrent.futures.TimeoutError:
+                        logger.error(f"[{source_name}] Scraper timeout after {SCRAPER_TIMEOUT}s")
+                        return []
+                
+                # Validate result is a list
+                if not isinstance(result, list):
+                    logger.warning(f"[{source_name}] Scraper returned non-list: {type(result)}")
+                    return []
+                
+                # Validate items in list
+                validated_result = []
+                for item in result:
+                    if isinstance(item, dict):
+                        # Ensure required fields exist
+                        if 'source' not in item:
+                            item['source'] = source_name
+                        validated_result.append(item)
+                    else:
+                        logger.warning(f"[{source_name}] Invalid item type in result: {type(item)}")
+                
+                return validated_result
+                
+            except Exception as e:
+                logger.error(f"[{source_name}] Scraper error: {e}", exc_info=True)
+                return []  # Always return empty list on error
+        
+        return sync_wrapper
 
 router = APIRouter()
 
@@ -30,23 +127,30 @@ BLOCKED_JOB_IDS = {
 BLOCKED_JOB_REQUEST_COUNT = {}  # Track request count per blocked job
 
 
-async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_keyword_expansion: bool = True):
+async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_keyword_expansion: bool = True, job_id: Optional[str] = None):
     """Async version: Call the appropriate scraper and insert results into DB; return count added."""
     try:
+        # Check if job was cancelled before starting
+        if job_id:
+            job = JOBS.get(job_id)
+            if job and job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled, aborting scraping")
+                return 0
+        # Wrap all scrapers with safety wrapper
         async_mapper = {
-            'github': lambda q, l: github.scrape_github_issues_async(q, limit=l),
-            'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews_async(q, limit=l),
-            'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow_async(q, limit=l),
-            'reddit': lambda q, l: reddit.scrape_reddit_async(q, limit=l),
-            'news': lambda q, l: news.scrape_google_news_async(q, limit=l),
-            'mastodon': lambda q, l: mastodon.scrape_mastodon_async(q, limit=l),
-            'linkedin': lambda q, l: linkedin.scrape_linkedin_async(q, limit=l),
-            'discord': lambda q, l: discord.scrape_discord_async(q, limit=l),
+            'github': safe_scraper_wrapper(github.scrape_github_issues_async, 'GitHub', is_async=True),
+            'trustpilot': safe_scraper_wrapper(trustpilot.scrape_trustpilot_reviews_async, 'Trustpilot', is_async=True),
+            'stackoverflow': safe_scraper_wrapper(stackoverflow.scrape_stackoverflow_async, 'StackOverflow', is_async=True),
+            'reddit': safe_scraper_wrapper(reddit.scrape_reddit_async, 'Reddit', is_async=True),
+            'news': safe_scraper_wrapper(news.scrape_google_news_async, 'Google News', is_async=True),
+            'mastodon': safe_scraper_wrapper(mastodon.scrape_mastodon_async, 'Mastodon', is_async=True),
+            'linkedin': safe_scraper_wrapper(linkedin.scrape_linkedin_async, 'LinkedIn', is_async=True),
+            'discord': safe_scraper_wrapper(discord.scrape_discord_async, 'Discord', is_async=True),
         }
         sync_mapper = {
-            'x': lambda q, l: x_scraper.scrape_x(q, limit=l),
-            'ovh-forum': lambda q, l: ovh_forum.scrape_ovh_forum(q, limit=l),
-            'g2-crowd': lambda q, l: g2_crowd.scrape_g2_crowd(q, limit=l),
+            'x': safe_scraper_wrapper(x_scraper.scrape_x, 'X/Twitter', is_async=False),
+            'ovh-forum': safe_scraper_wrapper(ovh_forum.scrape_ovh_forum, 'OVH Forum', is_async=False),
+            'g2-crowd': safe_scraper_wrapper(g2_crowd.scrape_g2_crowd, 'G2 Crowd', is_async=False),
         }
         
         async_func = async_mapper.get(source)
@@ -73,6 +177,13 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
         seen_urls = set()
         
         for query_variant in queries_to_try:
+            # Check if job was cancelled before processing each query variant
+            if job_id:
+                job = JOBS.get(job_id)
+                if job and job.get('cancelled'):
+                    logger.info(f"[{source}] Job {job_id[:8]} was cancelled during scraping, stopping")
+                    break
+            
             try:
                 per_query_limit = max(limit // len(queries_to_try), 20)  # Minimum 20 par query pour meilleure couverture
                 
@@ -81,32 +192,71 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
                 else:
                     items = await asyncio.to_thread(func, query_variant, per_query_limit)
                 
+                # Validate items is a list (safety wrapper should ensure this, but double-check)
+                if not isinstance(items, list):
+                    logger.warning(f"[{source}] Scraper returned non-list: {type(items)}, converting to empty list")
+                    items = []
+                
+                # Check again after scraping this variant
+                if job_id:
+                    job = JOBS.get(job_id)
+                    if job and job.get('cancelled'):
+                        logger.info(f"[{source}] Job {job_id[:8]} was cancelled after scraping variant, stopping")
+                        break
+                
+                # Process items safely
                 for item in items:
-                    url = item.get('url', '')
-                    if url and url not in seen_urls:
-                        all_items.append(item)
-                        seen_urls.add(url)
-                    elif not url:
-                        all_items.append(item)
+                    try:
+                        # Validate item is a dict
+                        if not isinstance(item, dict):
+                            logger.warning(f"[{source}] Skipping invalid item (not a dict): {type(item)}")
+                            continue
+                        
+                        url = item.get('url', '')
+                        if url and url not in seen_urls:
+                            all_items.append(item)
+                            seen_urls.add(url)
+                        elif not url:
+                            all_items.append(item)
+                    except Exception as item_error:
+                        logger.warning(f"[{source}] Error processing item: {item_error}")
+                        continue
                 
                 if len(all_items) >= limit:
                     break
                     
             except Exception as e:
+                logger.error(f"[{source}] Error in query variant processing: {e}", exc_info=True)
                 try:
-                    for job_id, info in JOBS.items():
-                        if info.get('status') == 'running':
+                    if job_id:
+                        job = JOBS.get(job_id)
+                        if job:
                             db.append_job_error(job_id, f"{source} (query: {query_variant}): {str(e)}")
                 except Exception:
                     pass
-                continue
+                continue  # Continue with next query variant
         
         all_items = all_items[:limit]
         
         added = 0
         duplicates = 0
         filtered_by_relevance = 0
+        
+        # Check if job was cancelled before processing items
+        if job_id:
+            job = JOBS.get(job_id)
+            if job and job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled before processing items")
+                return 0
+        
         for it in all_items:
+            # Check if job was cancelled during item processing
+            if job_id:
+                job = JOBS.get(job_id)
+                if job and job.get('cancelled'):
+                    logger.info(f"[{source}] Job {job_id[:8]} was cancelled during item processing")
+                    break
+            
             try:
                 is_relevant, relevance_score = should_insert_post(it)
                 if not is_relevant:
@@ -119,31 +269,48 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
                     from ...analysis import language_detection
                     detected_language = language_detection.detect_language_from_post(it)
                     it['language'] = detected_language
-                except Exception:
+                except Exception as e:
+                    logger.debug(f"[{source}] Language detection failed: {e}")
                     it['language'] = it.get('language', 'unknown')
                 
                 # Analyze sentiment with language awareness
                 content = it.get('content') or ''
                 language = it.get('language', 'unknown')
-                an = sentiment.analyze(content, language=language)
+                try:
+                    an = sentiment.analyze(content, language=language)
+                except Exception as e:
+                    logger.warning(f"[{source}] Sentiment analysis failed: {e}, using neutral")
+                    an = {'label': 'neutral', 'score': 0.0}
                 
-                country = country_detection.detect_country_from_post(it)
-                if db.insert_post({
-                    'source': it.get('source'),
-                    'author': it.get('author'),
-                    'content': it.get('content'),
-                    'url': it.get('url'),
-                    'created_at': it.get('created_at'),
-                    'sentiment_score': an['score'],
-                    'sentiment_label': an['label'],
-                    'language': it.get('language', 'unknown'),
-                    'country': country,
-                    'relevance_score': relevance_score,
-                }):
-                    added += 1
-                else:
-                    duplicates += 1
-            except Exception:
+                try:
+                    country = country_detection.detect_country_from_post(it)
+                except Exception as e:
+                    logger.debug(f"[{source}] Country detection failed: {e}")
+                    country = None
+                
+                try:
+                    if db.insert_post({
+                        'source': it.get('source'),
+                        'author': it.get('author'),
+                        'content': it.get('content'),
+                        'url': it.get('url'),
+                        'created_at': it.get('created_at'),
+                        'sentiment_score': an['score'],
+                        'sentiment_label': an['label'],
+                        'language': it.get('language', 'unknown'),
+                        'country': country,
+                        'relevance_score': relevance_score,
+                    }):
+                        added += 1
+                    else:
+                        duplicates += 1
+                except Exception as db_error:
+                    logger.warning(f"[{source}] Failed to insert post to DB: {db_error}")
+                    # Continue processing other items even if one fails
+                    continue
+            except Exception as item_error:
+                logger.warning(f"[{source}] Error processing item: {item_error}")
+                # Continue processing other items even if one fails
                 continue
         
         if filtered_by_relevance > 0:
@@ -511,11 +678,45 @@ def _process_keyword_job(job_id: str, keywords: List[str], limit: int, concurren
 
 async def _process_single_source_job_async(job_id: str, source: str, query: str, limit: int):
     """Process a single source scraping job with granular progress updates."""
+    try:
+        logger.info(f"[{source}] Async function started for job {job_id[:8]}")
+    except Exception:
+        pass
+    
     job = JOBS.get(job_id)
     if job is None:
+        try:
+            logger.error(f"[{source}] Job {job_id[:8]} not found in JOBS dict!")
+        except Exception:
+            pass
         return
     
+    try:
+        logger.info(f"[{source}] Setting job {job_id[:8]} status to 'running' (was: {job.get('status')})")
+    except Exception:
+        pass
+    
+    # CRITICAL: Set status to running IMMEDIATELY, before anything else
+    # This must happen before any await or DB operations
     job['status'] = 'running'
+    
+    # Also update in DB immediately to ensure consistency
+    try:
+        import datetime
+        with db.get_db() as conn:
+            c = conn.cursor()
+            now = datetime.datetime.utcnow().isoformat()
+            c.execute('UPDATE jobs SET status = ?, updated_at = ? WHERE job_id = ?', ('running', now, job_id))
+    except Exception as db_err:
+        try:
+            logger.warning(f"[{source}] Failed to update job status in DB: {db_err}")
+        except Exception:
+            pass
+    
+    try:
+        logger.info(f"[{source}] Job {job_id[:8]} status is now: {job.get('status')}")
+    except Exception:
+        pass
     
     total_steps = 100
     init_steps = 5
@@ -538,15 +739,38 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     async def progress_heartbeat():
         nonlocal heartbeat_step, scraping_start_time
         import time as time_module
-        scraping_start_time = time_module.time()
-        logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
+        try:
+            scraping_start_time = time_module.time()
+            logger.info(f"[{source}] Starting heartbeat for job {job_id[:8]}... (step {heartbeat_step} -> {scraping_end})")
+        except Exception as log_err:
+            scraping_start_time = time_module.time()
+            try:
+                print(f"[{source}] ERROR logging heartbeat start: {log_err}")
+            except Exception:
+                pass
         
         target_duration = 60.0  # Increased to 60 seconds for longer scrapings (Trustpilot can take time)
         steps_to_progress = scraping_end - scraping_start
         last_update_time = scraping_start_time
+        iteration_count = 0
         
         while heartbeat_running and heartbeat_step < scraping_end:
-            await asyncio.sleep(0.5)  # Update every 0.5 seconds
+            iteration_count += 1
+            # Check if job was cancelled - stop immediately
+            if job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled, stopping heartbeat")
+                heartbeat_running = False
+                break
+            
+            try:
+                await asyncio.sleep(0.5)  # Update every 0.5 seconds
+            except Exception as sleep_err:
+                try:
+                    logger.warning(f"[{source}] Error in heartbeat sleep: {sleep_err}")
+                except Exception:
+                    pass
+                break
+            
             # Continue updating even if scraping finished, until we reach scraping_end
             # This ensures progress bar always moves forward
             if not heartbeat_running and heartbeat_step >= scraping_end - 5:
@@ -554,34 +778,52 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 break
             elif not heartbeat_running:
                 # Scraping finished early, but continue updating progress to show completion
-                logger.info(f"[{source}] Scraping finished, but continuing heartbeat to show progress (current: {heartbeat_step}/{scraping_end})")
+                try:
+                    logger.info(f"[{source}] Scraping finished, but continuing heartbeat to show progress (current: {heartbeat_step}/{scraping_end})")
+                except Exception:
+                    pass
             
-            current_time = time_module.time()
-            if scraping_start_time:
-                elapsed = current_time - scraping_start_time
-                # Calculate progress based on elapsed time, but cap at scraping_end - 1
-                if elapsed > 0 and target_duration > 0:
-                    time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
-                    time_based_step = min(time_based_step, scraping_end - 1)
-                    
-                    # Always move forward, but use time-based if it's ahead
-                    if time_based_step > heartbeat_step:
-                        heartbeat_step = time_based_step
-                    elif heartbeat_step < scraping_end - 1:
-                        # Increment by at least 1 every 0.5 seconds to show progress
-                        heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
-                else:
-                    # Fallback: increment slowly
-                    if heartbeat_step < scraping_end - 1:
-                        heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
-            else:
-                if heartbeat_step < scraping_end - 1:
-                    heartbeat_step += 1
+            # CRITICAL: ALWAYS increment heartbeat_step FIRST, no matter what
+            # This ensures progress always moves forward
+            old_step = heartbeat_step
+            if heartbeat_step < scraping_end - 1:
+                heartbeat_step += 1
+                # Log EVERY increment for first 10 iterations to debug
+                if iteration_count <= 10:
+                    try:
+                        logger.info(f"[{source}] Heartbeat iteration {iteration_count}: FORCED increment {old_step} -> {heartbeat_step}")
+                    except Exception:
+                        pass
+            
+            # Also try time-based calculation for smoother progress (but don't override the forced increment)
+            try:
+                current_time = time_module.time()
+                if scraping_start_time and scraping_start_time > 0:
+                    elapsed = current_time - scraping_start_time
+                    if elapsed > 0 and target_duration > 0:
+                        time_based_step = scraping_start + int((elapsed / target_duration) * steps_to_progress)
+                        time_based_step = min(time_based_step, scraping_end - 1)
+                        # Use time-based if it's ahead of current step
+                        if time_based_step > heartbeat_step:
+                            logger.info(f"[{source}] Heartbeat: time-based ahead, updating {heartbeat_step} -> {time_based_step}")
+                            heartbeat_step = time_based_step
+            except Exception as progress_err:
+                try:
+                    logger.error(f"[{source}] Error in time-based calculation: {progress_err}", exc_info=True)
+                except Exception:
+                    pass
+                # Progress already incremented above, so continue
             
             # Always update progress in memory and DB every iteration
             # Force update even if value hasn't changed (ensures frontend sees progress)
             job['progress']['completed'] = heartbeat_step
             job['progress']['total'] = total_steps
+            
+            # Check if job was cancelled before updating progress
+            if job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled, stopping heartbeat")
+                heartbeat_running = False
+                break
             
             # Update DB more frequently to ensure frontend sees progress
             try:
@@ -591,6 +833,10 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                     logger.info(f"[{source}] Heartbeat progress: {heartbeat_step}/{total_steps} ({heartbeat_step*100//total_steps}%)")
             except Exception as e:
                 logger.warning(f"[{source}] Failed to update job progress in DB: {e}")
+                # If DB update fails due to cancellation, stop heartbeat
+                if job.get('cancelled'):
+                    heartbeat_running = False
+                    break
             
             # Ensure we always show some progress, even if minimal
             if heartbeat_step == scraping_start and current_time - last_update_time > 1.0:
@@ -598,7 +844,21 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 heartbeat_step = min(heartbeat_step + 1, scraping_end - 1)
                 last_update_time = current_time
         
-        logger.info(f"[{source}] Heartbeat finished at step {heartbeat_step}")
+        try:
+            logger.info(f"[{source}] Heartbeat finished at step {heartbeat_step} after {iteration_count} iterations")
+        except Exception as heartbeat_err:
+            try:
+                logger.error(f"[{source}] Heartbeat crashed: {heartbeat_err}", exc_info=True)
+            except Exception:
+                pass
+            # Try to update progress one last time before crashing
+            try:
+                job['progress']['completed'] = heartbeat_step
+                job['progress']['total'] = total_steps
+                db.update_job_progress(job_id, total_steps, heartbeat_step)
+            except Exception:
+                pass
+            raise  # Re-raise to see the error
     
     try:
         if job.get('cancelled'):
@@ -628,30 +888,87 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
         except Exception as e:
             logger.warning(f"[{source}] Failed to set initial progress: {e}")
         
-        logger.info(f"[{source}] Starting heartbeat task for job {job_id[:8]}...")
-        heartbeat_task = asyncio.create_task(progress_heartbeat())
+        # Start heartbeat BEFORE scraping to ensure progress updates
+        heartbeat_task = None
+        try:
+            logger.info(f"[{source}] Starting heartbeat task for job {job_id[:8]}...")
+            heartbeat_task = asyncio.create_task(progress_heartbeat())
+            logger.info(f"[{source}] Heartbeat task created for job {job_id[:8]}, task={heartbeat_task}")
+        except Exception as heartbeat_error:
+            logger.error(f"[{source}] Failed to create heartbeat task: {heartbeat_error}", exc_info=True)
+            # Don't fail the job, but log the error
+            heartbeat_task = None
         
         # Give heartbeat a moment to start and update progress
-        await asyncio.sleep(0.1)
+        if heartbeat_task:
+            try:
+                await asyncio.sleep(0.5)  # Increased delay to ensure heartbeat starts
+                logger.info(f"[{source}] Heartbeat task status: done={heartbeat_task.done()}, cancelled={heartbeat_task.cancelled()}, exception={heartbeat_task.exception() if heartbeat_task.done() else None}")
+                # Check if heartbeat crashed immediately
+                if heartbeat_task.done() and heartbeat_task.exception():
+                    logger.error(f"[{source}] Heartbeat task crashed immediately: {heartbeat_task.exception()}", exc_info=True)
+                    # Try to restart heartbeat
+                    try:
+                        heartbeat_running = True
+                        heartbeat_task = asyncio.create_task(progress_heartbeat())
+                        logger.info(f"[{source}] Restarted heartbeat task")
+                    except Exception as restart_err:
+                        logger.error(f"[{source}] Failed to restart heartbeat: {restart_err}", exc_info=True)
+            except Exception as check_err:
+                logger.error(f"[{source}] Error checking heartbeat status: {check_err}", exc_info=True)
+        else:
+            logger.error(f"[{source}] Heartbeat task is None - heartbeat will not run!")
         
         try:
+            # Check if job was cancelled before starting scraping
+            if job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled before scraping started")
+                return
+            
             logger.info(f"[{source}] Starting scraping for job {job_id[:8]}...")
-            added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False)
+            
+            # Wrap scraping in try/except to prevent server crash
+            try:
+                added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False, job_id=job_id)
+            except Exception as scrape_error:
+                logger.error(f"[{source}] Error during scraping for job {job_id[:8]}: {scrape_error}", exc_info=True)
+                # Don't crash - just log the error and continue
+                added = 0
+                # Add error to job
+                try:
+                    db.append_job_error(job_id, f"Scraping error: {str(scrape_error)}")
+                except Exception:
+                    pass
+            
+            # Check again after scraping (job might have been cancelled during scraping)
+            if job.get('cancelled'):
+                logger.info(f"[{source}] Job {job_id[:8]} was cancelled during scraping")
+                return
+            
             logger.info(f"[{source}] Scraping completed for job {job_id[:8]}, added {added} posts")
         finally:
             # Don't stop heartbeat immediately - let it finish naturally to show progress
             # Set flag but let heartbeat continue until it reaches scraping_end
             heartbeat_running = False
-            logger.info(f"[{source}] Scraping finished, stopping heartbeat. Current progress: {job['progress']['completed']}/{total_steps}")
+            try:
+                logger.info(f"[{source}] Scraping finished, stopping heartbeat. Current progress: {job['progress']['completed']}/{total_steps}")
+            except Exception:
+                pass
             # Wait a bit for heartbeat to catch up if scraping finished quickly
             await asyncio.sleep(1.0)
             # Now cancel heartbeat if it's still running
-            if not heartbeat_task.done():
-                heartbeat_task.cancel()
+            if heartbeat_task and not heartbeat_task.done():
                 try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
+                    heartbeat_task.cancel()
+                    try:
+                        await heartbeat_task
+                    except asyncio.CancelledError:
+                        pass
+                except Exception as cancel_err:
+                    try:
+                        logger.warning(f"[{source}] Error cancelling heartbeat: {cancel_err}")
+                    except Exception:
+                        pass
             # Ensure we're at scraping_end
             current_progress = job['progress']['completed']
             if current_progress < scraping_end:
@@ -722,37 +1039,90 @@ def _process_single_source_job(job_id: str, source: str, query: str, limit: int)
     """Wrapper to run async job processing in a thread."""
     def run_in_new_loop():
         """Run async job in a completely isolated event loop."""
-        new_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(new_loop)
+        new_loop = None
         try:
+            try:
+                logger.info(f"[{source}] Thread function started for job {job_id[:8]}")
+            except Exception:
+                pass  # Don't crash if logging fails
+            
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            
+            try:
+                logger.info(f"[{source}] Calling async function for job {job_id[:8]}...")
+            except Exception:
+                pass
+            
             new_loop.run_until_complete(_process_single_source_job_async(job_id, source, query, limit))
+            
+            try:
+                logger.info(f"[{source}] Async function completed for job {job_id[:8]}")
+            except Exception:
+                pass
+        except KeyboardInterrupt:
+            # Don't catch keyboard interrupts
+            raise
+        except SystemExit:
+            # Don't catch system exits
+            raise
         except Exception as e:
-            logger.error(f"Error in single source job thread {job_id[:8]}: {e}", exc_info=True)
+            try:
+                logger.error(f"Error in single source job thread {job_id[:8]}: {e}", exc_info=True)
+            except Exception:
+                # If logging fails, at least print to stderr
+                import sys
+                print(f"ERROR: Failed to log error for job {job_id[:8]}: {e}", file=sys.stderr)
+            
             # Update job status to failed
             try:
                 job = JOBS.get(job_id)
                 if job:
                     job['status'] = 'failed'
                     job['error'] = str(e)
-                    db.append_job_error(job_id, str(e))
-                    db.finalize_job(job_id, 'failed', str(e))
+                    try:
+                        db.append_job_error(job_id, str(e))
+                        db.finalize_job(job_id, 'failed', str(e))
+                    except Exception:
+                        pass  # DB operations might fail, but don't crash
             except Exception:
-                pass
+                pass  # Don't crash if updating job status fails
         finally:
-            try:
-                # Cancel all pending tasks
-                pending = asyncio.all_tasks(new_loop)
-                for task in pending:
-                    task.cancel()
-                # Wait for cancellation
-                if pending:
-                    new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-            except Exception:
-                pass
-            new_loop.close()
+            if new_loop:
+                try:
+                    # Cancel all pending tasks
+                    pending = asyncio.all_tasks(new_loop)
+                    for task in pending:
+                        try:
+                            task.cancel()
+                        except Exception:
+                            pass
+                    # Wait for cancellation
+                    if pending:
+                        try:
+                            new_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                try:
+                    new_loop.close()
+                except Exception:
+                    pass
     
-    t = threading.Thread(target=run_in_new_loop, daemon=True)
-    t.start()
+    try:
+        t = threading.Thread(target=run_in_new_loop, daemon=True)
+        t.start()
+    except Exception as e:
+        # If thread creation fails, mark job as failed
+        try:
+            logger.error(f"Failed to start thread for job {job_id[:8]}: {e}", exc_info=True)
+            job = JOBS.get(job_id)
+            if job:
+                job['status'] = 'failed'
+                job['error'] = f"Failed to start thread: {str(e)}"
+        except Exception:
+            pass
 
 
 @router.post('/scrape/{source}/job')
@@ -762,37 +1132,74 @@ async def start_single_source_job(
     limit: int = 100
 ):
     """Start a background job for a single scraper source."""
-    valid_sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
-    if source not in valid_sources:
-        raise HTTPException(status_code=400, detail=f"Invalid source. Must be one of: {', '.join(valid_sources)}")
-    
-    job_id = str(uuid.uuid4())
-    JOBS[job_id] = {
-        'id': job_id,
-        'status': 'pending',
-        'progress': {'total': 1, 'completed': 0},
-        'results': [],
-        'errors': [],
-        'cancelled': False,
-        'error': None,
-    }
-    
     try:
-        db.create_job_record(job_id)
-        db.update_job_progress(job_id, 1, 0)
-    except Exception:
-        pass
-    
-    t = threading.Thread(target=_process_single_source_job, args=(job_id, source, query, limit), daemon=True)
-    t.start()
-    
-    return {
-        'job_id': job_id,
-        'source': source,
-        'query': query,
-        'limit': limit,
-        'total_tasks': 1
-    }
+        valid_sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+        if source not in valid_sources:
+            raise HTTPException(status_code=400, detail=f"Invalid source. Must be one of: {', '.join(valid_sources)}")
+        
+        job_id = str(uuid.uuid4())
+        JOBS[job_id] = {
+            'id': job_id,
+            'status': 'pending',
+            'progress': {'total': 100, 'completed': 0},  # Initialize with correct total
+            'results': [],
+            'errors': [],
+            'cancelled': False,
+            'error': None,
+        }
+        
+        try:
+            db.create_job_record(job_id)
+            db.update_job_progress(job_id, 100, 0)
+        except Exception as db_error:
+            # Log but don't fail - job can still proceed
+            try:
+                logger.warning(f"Failed to create DB record for job {job_id[:8]}: {db_error}")
+            except Exception:
+                pass
+        
+        try:
+            logger.info(f"[{source}] Starting job {job_id[:8]} in background thread...")
+        except Exception:
+            pass
+        
+        # Start thread BEFORE setting status to running (thread will set it)
+        try:
+            t = threading.Thread(target=_process_single_source_job, args=(job_id, source, query, limit), daemon=True)
+            t.start()
+            try:
+                logger.info(f"[{source}] Thread started for job {job_id[:8]}, thread alive: {t.is_alive()}")
+            except Exception:
+                pass
+        except Exception as thread_error:
+            # If thread creation fails, mark job as failed and return error
+            try:
+                logger.error(f"Failed to create thread for job {job_id[:8]}: {thread_error}", exc_info=True)
+                job = JOBS.get(job_id)
+                if job:
+                    job['status'] = 'failed'
+                    job['error'] = f"Failed to start thread: {str(thread_error)}"
+            except Exception:
+                pass
+            raise HTTPException(status_code=500, detail=f"Failed to start scraping job: {str(thread_error)}")
+        
+        return {
+            'job_id': job_id,
+            'source': source,
+            'query': query,
+            'limit': limit,
+            'total_tasks': 1
+        }
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        # Catch any other unexpected errors
+        try:
+            logger.error(f"Unexpected error in start_single_source_job: {e}", exc_info=True)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 @router.post('/scrape/keywords')
@@ -950,21 +1357,51 @@ async def get_job_status(job_id: str):
 @router.post('/scrape/jobs/{job_id}/cancel')
 async def cancel_job(job_id: str):
     """Cancel a specific scraping job."""
-    job = JOBS.get(job_id)
-    if not job:
+    try:
+        job = JOBS.get(job_id)
+        if not job:
+            # Job not in memory, try to cancel in DB only
+            try:
+                db.append_job_error(job_id, 'cancelled by user')
+                db.finalize_job(job_id, 'cancelled', 'cancelled by user')
+                logger.info(f"Job {job_id[:8]} cancelled (was not in memory)")
+                return {'cancelled': True}
+            except Exception as e:
+                logger.warning(f"Failed to cancel job {job_id[:8]} in DB: {e}")
+                raise HTTPException(status_code=404, detail='Job not found')
+        
+        # Mark job as cancelled FIRST (before DB operations)
+        # This ensures heartbeat and scraping loops will see the cancellation flag immediately
+        job['cancelled'] = True
+        job['status'] = 'cancelled'
+        
+        # Stop heartbeat by setting the flag (heartbeat checks cancelled flag in its loop)
+        # The heartbeat will check job.get('cancelled') and stop itself
+        
+        # Update DB (wrap in try/except to prevent crashes)
+        # Even if DB update fails, the job is already cancelled in memory
         try:
             db.append_job_error(job_id, 'cancelled by user')
+        except Exception as e:
+            logger.warning(f"Failed to append error when cancelling job {job_id[:8]}: {e}")
+            # Continue anyway - job is already cancelled in memory
+        
+        try:
             db.finalize_job(job_id, 'cancelled', 'cancelled by user')
-            return {'cancelled': True}
-        except Exception:
-            raise HTTPException(status_code=404, detail='Job not found')
-    job['cancelled'] = True
-    try:
-        db.append_job_error(job_id, 'cancelled by user')
-        db.finalize_job(job_id, 'cancelled', 'cancelled by user')
-    except Exception:
-        pass
-    return {'cancelled': True}
+            logger.info(f"Job {job_id[:8]} cancelled successfully")
+        except Exception as e:
+            logger.warning(f"Failed to finalize job {job_id[:8]} in DB: {e}")
+            # Don't fail the cancellation request even if DB update fails
+            # The job is already marked as cancelled in memory
+        
+        return {'cancelled': True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error cancelling job {job_id[:8]}: {e}", exc_info=True)
+        # Return success even on error to prevent server crash
+        # The job might still be cancelled in memory
+        return {'cancelled': True, 'warning': f'Job cancellation requested but error occurred: {str(e)}'}
 
 
 @router.post('/scrape/jobs/cancel-all')
