@@ -196,11 +196,11 @@ def recheck_answered_status_job():
             errors = result.get('error_count', 0)
             total = result.get('total_posts', 0)
             skipped = result.get('skipped_count', 0)
-            logger.info(f"✅ Re-check completed: {updated} posts updated, {errors} errors, {skipped} skipped, {total} total checked")
+            logger.info(f"[OK] Re-check completed: {updated} posts updated, {errors} errors, {skipped} skipped, {total} total checked")
         else:
-            logger.error(f"❌ Re-check failed: {result.get('message', 'Unknown error')}")
+            logger.error(f"[ERROR] Re-check failed: {result.get('message', 'Unknown error')}")
             
     except Exception as e:
-        logger.error(f"❌ Error during re-check answered status: {e}", exc_info=True)
+        logger.error(f"[ERROR] Error during re-check answered status: {e}", exc_info=True)
 
 

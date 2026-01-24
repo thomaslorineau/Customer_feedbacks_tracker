@@ -1718,9 +1718,26 @@ async function pollJobStatus(jobId) {
     if (!progressText) console.error('[Progress] progressText element not found!');
     if (!progressContainer) console.error('[Progress] progressContainer element not found!');
     
+    console.log(`[Progress] 🚀 Starting polling for job ${jobId.substring(0, 8)}...`);
+    
     // Track last progress to detect stuck jobs
     let lastProgress = { completed: 0, total: 0, timestamp: Date.now() };
     const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+    
+    // Poll immediately first time
+    (async () => {
+        try {
+            const job = await api.getJobStatus(jobId);
+            console.log(`[Progress] 🔄 First poll result:`, job);
+            if (job && job.progress) {
+                const completed = Number(job.progress.completed) || 0;
+                const total = Number(job.progress.total) || 0;
+                console.log(`[Progress] 📊 First poll progress: ${completed}/${total}`);
+            }
+        } catch (error) {
+            console.error(`[Progress] ❌ First poll error:`, error);
+        }
+    })();
     
     jobStatusInterval = setInterval(async () => {
         try {
@@ -1889,6 +1906,9 @@ async function pollJobStatus(jobId) {
                     const percentage = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
                     console.log(`[Progress] ✅ Updating progress bar: ${completed}/${total} = ${percentage}%`);
                     
+                    // Store old width to detect changes
+                    const oldWidth = progressBar.style.width || '0%';
+                    
                     // Update progress bar width - use !important to override any CSS
                     progressBar.style.setProperty('width', `${percentage}%`, 'important');
                     progressBar.setAttribute('aria-valuenow', percentage);
@@ -1906,14 +1926,20 @@ async function pollJobStatus(jobId) {
                     const actualWidth = progressBar.style.width;
                     const computedWidth = window.getComputedStyle(progressBar).width;
                     const computedDisplay = window.getComputedStyle(progressBar).display;
-                    console.log(`[Progress] Progress bar - style: ${actualWidth}, computed: ${computedWidth}, display: ${computedDisplay}`);
+                    
+                    // Log if width actually changed
+                    if (oldWidth !== `${percentage}%`) {
+                        console.log(`[Progress] 📈 Progress bar updated: ${oldWidth} → ${percentage}% (computed: ${computedWidth})`);
+                    }
                     
                     // Also check parent container
                     const parent = progressBar.parentElement;
                     if (parent) {
                         const parentWidth = window.getComputedStyle(parent).width;
                         const parentDisplay = window.getComputedStyle(parent).display;
-                        console.log(`[Progress] Parent container - width: ${parentWidth}, display: ${parentDisplay}`);
+                        if (parentWidth === '0px' || parentWidth === '0') {
+                            console.warn(`[Progress] ⚠️ Parent container width is 0! This will hide the progress bar.`);
+                        }
                     }
                     
                     // Update container attributes

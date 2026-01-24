@@ -635,11 +635,14 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
         await asyncio.sleep(0.1)
         
         try:
+            logger.info(f"[{source}] Starting scraping for job {job_id[:8]}...")
             added = await _run_scrape_for_source_async(source, query, limit, use_keyword_expansion=False)
+            logger.info(f"[{source}] Scraping completed for job {job_id[:8]}, added {added} posts")
         finally:
             # Don't stop heartbeat immediately - let it finish naturally to show progress
             # Set flag but let heartbeat continue until it reaches scraping_end
             heartbeat_running = False
+            logger.info(f"[{source}] Scraping finished, stopping heartbeat. Current progress: {job['progress']['completed']}/{total_steps}")
             # Wait a bit for heartbeat to catch up if scraping finished quickly
             await asyncio.sleep(1.0)
             # Now cancel heartbeat if it's still running
@@ -650,12 +653,14 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
                 except asyncio.CancelledError:
                     pass
             # Ensure we're at scraping_end
-            if job['progress']['completed'] < scraping_end:
+            current_progress = job['progress']['completed']
+            if current_progress < scraping_end:
+                logger.info(f"[{source}] Updating progress from {current_progress} to {scraping_end}")
                 job['progress']['completed'] = scraping_end
                 try:
                     db.update_job_progress(job_id, total_steps, scraping_end)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"[{source}] Failed to update progress to scraping_end: {e}")
         
         for step in range(processing_start, processing_start + 5):
             job['progress']['completed'] = step

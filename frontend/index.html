@@ -4107,7 +4107,17 @@
                 showCancelBtn(true);
                 
                 // Start polling job status
-                pollJobStatus(currentJobId, sourceDisplayName);
+                console.log(`[${sourceDisplayName}] 🚀 Starting polling for job ${currentJobId.substring(0, 8)}...`);
+                try {
+                    if (typeof pollJobStatus === 'function') {
+                        console.log(`[${sourceDisplayName}] ✅ pollJobStatus function exists, calling it...`);
+                        pollJobStatus(currentJobId, sourceDisplayName);
+                    } else {
+                        console.error(`[${sourceDisplayName}] ❌ pollJobStatus is not a function! Type: ${typeof pollJobStatus}`);
+                    }
+                } catch (error) {
+                    console.error(`[${sourceDisplayName}] ❌ Error calling pollJobStatus:`, error);
+                }
                 
                 // Re-enable button immediately (job is running in background)
                 setButtonLoading(buttonId, false);
@@ -4235,23 +4245,33 @@
         }
         
         async function pollJobStatus(jobId, sourceName = '') {
+            console.log(`[Progress] 🚀 Starting polling for job ${jobId.substring(0, 8)}... (source: ${sourceName})`);
+            
             if (jobStatusInterval) {
                 clearInterval(jobStatusInterval);
+                console.log(`[Progress] 🧹 Cleared previous polling interval`);
             }
             
             const progressBar = document.getElementById('scrapingProgressBar');
             const progressText = document.getElementById('scrapingProgressText');
             const progressContainer = document.getElementById('scrapingProgressContainer');
             
+            // Verify elements exist
+            if (!progressBar) console.error('[Progress] ❌ progressBar element not found!');
+            if (!progressText) console.error('[Progress] ❌ progressText element not found!');
+            if (!progressContainer) console.error('[Progress] ❌ progressContainer element not found!');
+            
             // Show progress bar
             if (progressContainer) {
                 progressContainer.style.display = 'block';
                 progressContainer.setAttribute('data-status', 'running');
                 progressContainer.setAttribute('data-percentage', '0%');
+                console.log('[Progress] ✅ Progress container displayed');
             }
             if (progressBar) {
                 progressBar.style.width = '0%';
                 progressBar.setAttribute('aria-valuenow', 0);
+                console.log('[Progress] ✅ Progress bar initialized to 0%');
             }
             if (progressText && sourceName) {
                 progressText.textContent = `Initializing ${sourceName} scraper...`;
@@ -4260,6 +4280,7 @@
             // Poll immediately first time
             (async () => {
                 try {
+                    console.log(`[Progress] 🔄 First poll: fetching job ${jobId.substring(0, 8)}...`);
                     const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
                     if (response.ok) {
                         const job = await response.json();
@@ -4268,14 +4289,19 @@
                         const completed = progress.completed || 0;
                         const total = progress.total || 0;
                         
+                        console.log(`[Progress] 🔄 First poll result: status=${status}, progress=${completed}/${total}`);
+                        
                         if (total > 0 && progressBar) {
                             const percentage = Math.round((completed / total) * 100);
                             progressBar.style.width = `${percentage}%`;
                             progressBar.setAttribute('aria-valuenow', percentage);
+                            console.log(`[Progress] 📊 First poll: Updated progress bar to ${percentage}%`);
                             if (progressContainer) {
                                 progressContainer.setAttribute('data-percentage', `${percentage}%`);
                                 progressContainer.setAttribute('data-status', status === 'running' ? 'running' : status);
                             }
+                        } else {
+                            console.log(`[Progress] ⏳ First poll: No progress yet (total=${total}, completed=${completed})`);
                         }
                     } else if (response.status === 404) {
                         // Job doesn't exist (server restarted or job expired)
@@ -4303,6 +4329,7 @@
             })();
             
             // Poll every 1 second for more responsive progress updates
+            console.log(`[Progress] ⏰ Setting up polling interval (every 1 second)`);
             jobStatusInterval = setInterval(async () => {
                 try {
                     const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
@@ -4331,8 +4358,8 @@
                     const job = await response.json();
                     const status = job.status || 'unknown';
                     const progress = job.progress || { total: 0, completed: 0 };
-                    const completed = progress.completed || 0;
-                    const total = progress.total || 0;
+                    const completed = Number(progress.completed) || 0;
+                    const total = Number(progress.total) || 0;
                     
                     // Re-fetch elements in case DOM changed (more robust)
                     const currentProgressBar = document.getElementById('scrapingProgressBar');
@@ -4342,25 +4369,59 @@
                     // Debug logs - more detailed
                     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
                     const oldWidth = currentProgressBar ? currentProgressBar.style.width : '0%';
-                    console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${percentage}%)`, {
-                        job: job,
-                        progress: progress,
-                        progressBarExists: !!currentProgressBar,
-                        currentWidth: oldWidth
-                    });
+                    
+                    // Log every poll to track progress
+                    console.log(`[Progress] 📊 Poll: job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${percentage}%), bar exists=${!!currentProgressBar}, current width=${oldWidth}`);
                     
                     // Always update progress bar if we have progress data (even if total is 0 initially)
                     if (currentProgressBar) {
-                        if (total > 0) {
-                            const percentage = Math.round((completed / total) * 100);
+                        if (total > 0 && completed >= 0) {
+                            const percentage = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
                             const newWidth = `${percentage}%`;
+                            
                             // Force update even if value is the same (ensures visual update)
-                            currentProgressBar.style.width = newWidth;
+                            currentProgressBar.style.setProperty('width', newWidth, 'important');
                             currentProgressBar.setAttribute('aria-valuenow', percentage);
                             
-                            // Log if progress actually changed
+                            // Ensure visibility
+                            currentProgressBar.style.setProperty('display', 'block', 'important');
+                            currentProgressBar.style.setProperty('visibility', 'visible', 'important');
+                            currentProgressBar.style.setProperty('opacity', '1', 'important');
+                            currentProgressBar.style.setProperty('height', '100%', 'important');
+                            
+                            // Ensure parent container is visible and has width
+                            if (currentProgressContainer) {
+                                currentProgressContainer.style.setProperty('display', 'block', 'important');
+                                const containerWidth = window.getComputedStyle(currentProgressContainer).width;
+                                if (containerWidth === '0px' || containerWidth === '0') {
+                                    console.warn(`[Progress] ⚠️ Container width is 0! This will hide the progress bar.`);
+                                }
+                            }
+                            
+                            // Check parent of progress bar
+                            const parent = currentProgressBar.parentElement;
+                            if (parent) {
+                                const parentWidth = window.getComputedStyle(parent).width;
+                                const parentDisplay = window.getComputedStyle(parent).display;
+                                if (parentWidth === '0px' || parentWidth === '0') {
+                                    console.warn(`[Progress] ⚠️ Parent container width is 0! Parent: ${parentWidth}, display: ${parentDisplay}`);
+                                }
+                            }
+                            
+                            // Force repaint
+                            void currentProgressBar.offsetWidth;
+                            
+                            // Verify the update worked
+                            const actualStyleWidth = currentProgressBar.style.width;
+                            const computedWidth = window.getComputedStyle(currentProgressBar).width;
+                            const computedDisplay = window.getComputedStyle(currentProgressBar).display;
+                            
+                            // Log every update to track visual changes
                             if (oldWidth !== newWidth) {
-                                console.log(`[Progress Bar] ✅ Updated from ${oldWidth} to ${newWidth} (${completed}/${total})`);
+                                console.log(`[Progress Bar] ✅ Updated: ${oldWidth} → ${newWidth} (style: ${actualStyleWidth}, computed: ${computedWidth}, display: ${computedDisplay}) (${completed}/${total})`);
+                            } else {
+                                // Log even if width didn't change to verify it's still correct
+                                console.log(`[Progress Bar] 📊 No change: ${newWidth} (style: ${actualStyleWidth}, computed: ${computedWidth}) (${completed}/${total})`);
                             }
                             
                             // Update container attributes
@@ -5641,18 +5702,21 @@
                 addLog(`✅ Background job started: ${jobId}`, 'success');
                 document.getElementById('jobPanel').style.display = 'block';
                 updateJobPanel({ id: jobId, status: 'pending', progress: { total: 0, completed: 0 } });
-                // start polling
+                // start polling - use new function with 2 parameters
                 if (jobPollInterval) clearInterval(jobPollInterval);
-                jobPollInterval = setInterval(() => pollJobStatus(jobId), 500);
-                // immediate poll
-                pollJobStatus(jobId);
+                if (jobStatusInterval) clearInterval(jobStatusInterval);
+                // Use the new pollJobStatus function (line 4247) which handles progress bar
+                pollJobStatus(jobId, 'All Sources');
             } catch (e) {
                 addLog(`❌ Error starting background job: ${e.message}`, 'error');
                 showToast('Network error starting job', 'error');
             }
         }
 
-        async function pollJobStatus(jobId) {
+        // OLD pollJobStatus function - DEPRECATED, use the one at line 4247 instead
+        // This function is kept for backward compatibility but should not be used
+        async function pollJobStatusOld(jobId) {
+            console.warn('[Progress] ⚠️ Using deprecated pollJobStatusOld function. Use pollJobStatus(jobId, sourceName) instead.');
             try {
                 const resp = await fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(jobId)}`);
                 if (!resp.ok) {
@@ -5821,13 +5885,8 @@
                                         jobPanel.style.display = 'block';
                                     }
                                     
-                                    if (jobPanel) {
-                                        jobPollInterval = setInterval(() => pollJobStatus(jobId), 2000);
-                                        pollJobStatus(jobId);
-                                    } else {
-                                        // Use the main polling function
-                                        pollJobStatus(jobId, lastJob.sourceName);
-                                    }
+                                    // Use the main polling function (line 4247) which handles progress bar
+                                    pollJobStatus(jobId, lastJob.sourceName || 'Resumed Job');
                                 } else {
                                     // Job finished, show notification and clean up
                                     const results = job.results || [];
