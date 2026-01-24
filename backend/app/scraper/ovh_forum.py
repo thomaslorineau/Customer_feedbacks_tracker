@@ -74,233 +74,233 @@ def _scrape_ovh_forum_single_language(query: str = "OVH", limit: int = 50, langu
         # Set a global timeout to prevent infinite loops (60 seconds max)
         start_time = time.time()
         MAX_TOTAL_TIME = 60
-    
-    for attempt in range(MAX_RETRIES):
-        # Check if we've exceeded total time limit
-        if time.time() - start_time > MAX_TOTAL_TIME:
-            logger.warning(f"[OVH Forum] Exceeded maximum time limit ({MAX_TOTAL_TIME}s)")
-            return []
-        try:
-            # OVH Forum - Try multiple strategies
-            # Strategy 1: Try main forum page with language (more reliable than search)
-            main_url = f"{OVH_FORUM_BASE}/{language}/"
-            
-            logger.info(f"[OVH Forum] Attempt {attempt + 1}/{MAX_RETRIES} - Searching for: {query} (language: {language})")
-            
-            # Create stealth session with realistic headers
-            session = create_stealth_session()
-            
-            # Get realistic headers with referer
-            headers = get_realistic_headers(referer=OVH_FORUM_BASE)
-            
-            # Simulate human behavior: visit main page first (but skip if same URL)
-            # This is optional and can be disabled if causing issues
-            # simulate_human_behavior(session, main_url)
-            
-            # Try main forum page first (more stable)
-            soup = None
-            response = None
+        
+        for attempt in range(MAX_RETRIES):
+            # Check if we've exceeded total time limit
+            if time.time() - start_time > MAX_TOTAL_TIME:
+                logger.warning(f"[OVH Forum] Exceeded maximum time limit ({MAX_TOTAL_TIME}s)")
+                return []
             try:
-                response = session.get(main_url, headers=headers, timeout=10)  # Reduced timeout
-                response.raise_for_status()
-                # Small delay after first request
-                time.sleep(0.3)  # Reduced delay
-                # Parse HTML
-                soup = BeautifulSoup(response.content, 'html.parser')
-            except requests.exceptions.HTTPError as e:
-                if e.response.status_code in [403, 503]:
-                    logger.warning(f"[OVH Forum] Server returned {e.response.status_code}")
-                    # Don't try browser automation on first attempt to avoid long waits
-                    if attempt == MAX_RETRIES - 1:  # Only on last attempt
-                        logger.info("[OVH Forum] Trying browser automation as last resort...")
-                        html = _try_browser_automation(main_url)
-                        if html:
-                            soup = BeautifulSoup(html, 'html.parser')
+                # OVH Forum - Try multiple strategies
+                # Strategy 1: Try main forum page with language (more reliable than search)
+                main_url = f"{OVH_FORUM_BASE}/{language}/"
+                
+                logger.info(f"[OVH Forum] Attempt {attempt + 1}/{MAX_RETRIES} - Searching for: {query} (language: {language})")
+                
+                # Create stealth session with realistic headers
+                session = create_stealth_session()
+                
+                # Get realistic headers with referer
+                headers = get_realistic_headers(referer=OVH_FORUM_BASE)
+                
+                # Simulate human behavior: visit main page first (but skip if same URL)
+                # This is optional and can be disabled if causing issues
+                # simulate_human_behavior(session, main_url)
+                
+                # Try main forum page first (more stable)
+                soup = None
+                response = None
+                try:
+                    response = session.get(main_url, headers=headers, timeout=10)  # Reduced timeout
+                    response.raise_for_status()
+                    # Small delay after first request
+                    time.sleep(0.3)  # Reduced delay
+                    # Parse HTML
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                except requests.exceptions.HTTPError as e:
+                    if e.response.status_code in [403, 503]:
+                        logger.warning(f"[OVH Forum] Server returned {e.response.status_code}")
+                        # Don't try browser automation on first attempt to avoid long waits
+                        if attempt == MAX_RETRIES - 1:  # Only on last attempt
+                            logger.info("[OVH Forum] Trying browser automation as last resort...")
+                            html = _try_browser_automation(main_url)
+                            if html:
+                                soup = BeautifulSoup(html, 'html.parser')
+                            else:
+                                logger.warning("[OVH Forum] Browser automation also failed")
+                                return []
                         else:
-                            logger.warning("[OVH Forum] Browser automation also failed")
+                            # Return empty on early attempts to avoid long waits
                             return []
                     else:
-                        # Return empty on early attempts to avoid long waits
-                        return []
-                else:
-                    raise
-            except requests.exceptions.Timeout:
-                logger.warning(f"[OVH Forum] Timeout on attempt {attempt + 1}")
-                if attempt < MAX_RETRIES - 1:
-                    continue
-                return []
-            except Exception as e:
-                logger.error(f"[OVH Forum] Error fetching page: {e}")
-                if attempt < MAX_RETRIES - 1:
-                    wait_time = RETRY_DELAY * (2 ** attempt)
-                    time.sleep(wait_time)
-                    continue
-                return []
-            
-            if not soup:
-                logger.warning("[OVH Forum] Failed to parse HTML")
-                if attempt < MAX_RETRIES - 1:
-                    continue
-                return []
-            
-            posts = []
-            
-            # Try to find topic links or post elements
-            # The structure may vary, so we'll try multiple selectors
-            topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/'))
-            
-            if not topic_links:
-                # Try alternative selectors on the same page
-                logger.info("[OVH Forum] No topic links found, trying alternative selectors...")
-                # Try different patterns
-                topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/|/discussion/'))
-                if not topic_links:
-                    # Try any links that might be posts
-                    topic_links = soup.find_all('a', href=True)
-                    # Filter to likely post links
-                    topic_links = [link for link in topic_links if any(pattern in link.get('href', '') for pattern in ['/t/', '/topic/', '/post/', '/discussion/'])]
+                        raise
+                except requests.exceptions.Timeout:
+                    logger.warning(f"[OVH Forum] Timeout on attempt {attempt + 1}")
+                    if attempt < MAX_RETRIES - 1:
+                        continue
+                    return []
+                except Exception as e:
+                    logger.error(f"[OVH Forum] Error fetching page: {e}")
+                    if attempt < MAX_RETRIES - 1:
+                        wait_time = RETRY_DELAY * (2 ** attempt)
+                        time.sleep(wait_time)
+                        continue
+                    return []
+                
+                if not soup:
+                    logger.warning("[OVH Forum] Failed to parse HTML")
+                    if attempt < MAX_RETRIES - 1:
+                        continue
+                    return []
+                
+                posts = []
+                
+                # Try to find topic links or post elements
+                # The structure may vary, so we'll try multiple selectors
+                topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/'))
                 
                 if not topic_links:
-                    logger.warning("[OVH Forum] No posts found - forum structure may have changed")
-                    return []
-            
-            seen_urls = set()
-            
-            # Limit the number of links to process to avoid infinite loops
-            max_links_to_process = min(limit * 2, 20)  # Cap at 20 links max
-            
-            for link in topic_links[:max_links_to_process]:
-                try:
-                    href = link.get('href', '')
-                    if not href:
-                        continue
+                    # Try alternative selectors on the same page
+                    logger.info("[OVH Forum] No topic links found, trying alternative selectors...")
+                    # Try different patterns
+                    topic_links = soup.find_all('a', href=re.compile(r'/t/|/topic/|/post/|/discussion/'))
+                    if not topic_links:
+                        # Try any links that might be posts
+                        topic_links = soup.find_all('a', href=True)
+                        # Filter to likely post links
+                        topic_links = [link for link in topic_links if any(pattern in link.get('href', '') for pattern in ['/t/', '/topic/', '/post/', '/discussion/'])]
                     
-                    # Make absolute URL
-                    if href.startswith('http'):
-                        # URL absolue complète
-                        full_url = href
-                    elif href.startswith('/'):
-                        # URL relative - peut être /community/... ou /en/... ou /fr/...
-                        if href.startswith('/community/'):
-                            # URL déjà complète avec /community/
-                            full_url = f"https://community.ovhcloud.com{href}"
-                        elif href.startswith(f'/{language}/'):
-                            # URL commence par /en/ ou /fr/ - déjà correcte
-                            full_url = f"{OVH_FORUM_BASE}{href}"
-                        else:
-                            # URL relative sans préfixe de langue - ajouter la langue
-                            full_url = f"{OVH_FORUM_BASE}/{language}{href}"
-                    else:
-                        # URL relative sans slash initial
-                        full_url = f"{OVH_FORUM_BASE}/{language}/{href}"
-                    
-                    # Skip if already seen
-                    if full_url in seen_urls:
-                        continue
-                    seen_urls.add(full_url)
-                    
-                    # Extract title
-                    title = link.get_text(strip=True)
-                    if not title or len(title) < 10:
-                        continue
-                    
-                    # Check if query is relevant (basic check)
-                    if query.lower() not in title.lower() and query.lower() not in full_url.lower():
-                        continue
-                    
-                    # Try to get post details (but skip if we already have enough posts)
-                    if len(posts) >= limit:
-                        break
-                    
-                    # Check timeout before making request
-                    if time.time() - start_time > MAX_TOTAL_TIME:
-                        logger.warning("[OVH Forum] Timeout reached, stopping")
-                        break
-                    
+                    if not topic_links:
+                        logger.warning("[OVH Forum] No posts found - forum structure may have changed")
+                        return []
+                
+                seen_urls = set()
+                
+                # Limit the number of links to process to avoid infinite loops
+                max_links_to_process = min(limit * 2, 20)  # Cap at 20 links max
+                
+                for link in topic_links[:max_links_to_process]:
                     try:
-                        # Small delay between requests (minimal to avoid blocking)
-                        time.sleep(0.1)  # Very small delay
+                        href = link.get('href', '')
+                        if not href:
+                            continue
                         
-                        post_response = session.get(full_url, headers=headers, timeout=5)  # Reduced timeout
-                        post_response.raise_for_status()
-                        post_soup = BeautifulSoup(post_response.content, 'html.parser')
-                        
-                        # Extract content
-                        content_elem = post_soup.find('div', class_=re.compile(r'post|content|body|message'))
-                        if not content_elem:
-                            content_elem = post_soup.find('article')
-                        if not content_elem:
-                            content_elem = post_soup.find('main')
-                        
-                        content = content_elem.get_text(strip=True)[:500] if content_elem else title
-                        
-                        # Extract author
-                        author_elem = post_soup.find('a', class_=re.compile(r'author|user|username'))
-                        if not author_elem:
-                            author_elem = post_soup.find('span', class_=re.compile(r'author|user'))
-                        author = author_elem.get_text(strip=True) if author_elem else 'Unknown'
-                        
-                        # Extract date
-                        date_elem = post_soup.find('time')
-                        if date_elem:
-                            date_str = date_elem.get('datetime') or date_elem.get_text(strip=True)
-                            try:
-                                created_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')).isoformat()
-                            except:
-                                created_at = datetime.now().isoformat()
+                        # Make absolute URL
+                        if href.startswith('http'):
+                            # URL absolue complète
+                            full_url = href
+                        elif href.startswith('/'):
+                            # URL relative - peut être /community/... ou /en/... ou /fr/...
+                            if href.startswith('/community/'):
+                                # URL déjà complète avec /community/
+                                full_url = f"https://community.ovhcloud.com{href}"
+                            elif href.startswith(f'/{language}/'):
+                                # URL commence par /en/ ou /fr/ - déjà correcte
+                                full_url = f"{OVH_FORUM_BASE}{href}"
+                            else:
+                                # URL relative sans préfixe de langue - ajouter la langue
+                                full_url = f"{OVH_FORUM_BASE}/{language}{href}"
                         else:
+                            # URL relative sans slash initial
+                            full_url = f"{OVH_FORUM_BASE}/{language}/{href}"
+                        
+                        # Skip if already seen
+                        if full_url in seen_urls:
+                            continue
+                        seen_urls.add(full_url)
+                        
+                        # Extract title
+                        title = link.get_text(strip=True)
+                        if not title or len(title) < 10:
+                            continue
+                        
+                        # Check if query is relevant (basic check)
+                        if query.lower() not in title.lower() and query.lower() not in full_url.lower():
+                            continue
+                        
+                        # Try to get post details (but skip if we already have enough posts)
+                        if len(posts) >= limit:
+                            break
+                        
+                        # Check timeout before making request
+                        if time.time() - start_time > MAX_TOTAL_TIME:
+                            logger.warning("[OVH Forum] Timeout reached, stopping")
+                            break
+                        
+                        try:
+                            # Small delay between requests (minimal to avoid blocking)
+                            time.sleep(0.1)  # Very small delay
+                            
+                            post_response = session.get(full_url, headers=headers, timeout=5)  # Reduced timeout
+                            post_response.raise_for_status()
+                            post_soup = BeautifulSoup(post_response.content, 'html.parser')
+                            
+                            # Extract content
+                            content_elem = post_soup.find('div', class_=re.compile(r'post|content|body|message'))
+                            if not content_elem:
+                                content_elem = post_soup.find('article')
+                            if not content_elem:
+                                content_elem = post_soup.find('main')
+                            
+                            content = content_elem.get_text(strip=True)[:500] if content_elem else title
+                            
+                            # Extract author
+                            author_elem = post_soup.find('a', class_=re.compile(r'author|user|username'))
+                            if not author_elem:
+                                author_elem = post_soup.find('span', class_=re.compile(r'author|user'))
+                            author = author_elem.get_text(strip=True) if author_elem else 'Unknown'
+                            
+                            # Extract date
+                            date_elem = post_soup.find('time')
+                            if date_elem:
+                                date_str = date_elem.get('datetime') or date_elem.get_text(strip=True)
+                                try:
+                                    created_at = datetime.fromisoformat(date_str.replace('Z', '+00:00')).isoformat()
+                                except:
+                                    created_at = datetime.now().isoformat()
+                            else:
+                                created_at = datetime.now().isoformat()
+                            
+                        except Exception as e:
+                            logger.debug(f"Could not fetch post details for {full_url}: {e}")
+                            # Use basic info from link
+                            content = title
+                            author = 'Unknown'
                             created_at = datetime.now().isoformat()
                         
+                        post = {
+                            'source': 'OVH Forum',
+                            'author': author,
+                            'content': f"{title}\n{content}",
+                            'url': full_url,
+                            'created_at': created_at,
+                            'sentiment_score': 0.0,
+                            'sentiment_label': 'neutral',
+                        }
+                        posts.append(post)
+                        logger.info(f"✓ OVH Forum: {author} - {title[:50]}")
+                        
+                        # Break early if we have enough posts
+                        if len(posts) >= limit:
+                            break
+                        
                     except Exception as e:
-                        logger.debug(f"Could not fetch post details for {full_url}: {e}")
-                        # Use basic info from link
-                        content = title
-                        author = 'Unknown'
-                        created_at = datetime.now().isoformat()
-                    
-                    post = {
-                        'source': 'OVH Forum',
-                        'author': author,
-                        'content': f"{title}\n{content}",
-                        'url': full_url,
-                        'created_at': created_at,
-                        'sentiment_score': 0.0,
-                        'sentiment_label': 'neutral',
-                    }
-                    posts.append(post)
-                    logger.info(f"✓ OVH Forum: {author} - {title[:50]}")
-                    
-                    # Break early if we have enough posts
-                    if len(posts) >= limit:
-                        break
-                    
-                except Exception as e:
-                    logger.debug(f"Error processing forum link: {e}")
+                        logger.debug(f"Error processing forum link: {e}")
+                        continue
+                
+                if not posts:
+                    logger.warning(f"[OVH Forum] No posts found for query: {query}")
+                    return []
+                
+                logger.info(f"[OVH Forum] Successfully scraped {len(posts)} posts")
+                return posts[:limit]
+            
+            except requests.exceptions.RequestException as e:
+                last_error = e
+                if attempt < MAX_RETRIES - 1:
+                    wait_time = min(RETRY_DELAY * (2 ** attempt), 10)  # Cap at 10 seconds
+                    logger.warning(f"[Attempt {attempt + 1}/{MAX_RETRIES}] OVH Forum network error: {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"OVH Forum scraper failed after {MAX_RETRIES} attempts: {e}")
+                    return []
+            
+            except Exception as e:
+                logger.error(f"Error scraping OVH Forum: {str(e)}")
+                if attempt < MAX_RETRIES - 1:
+                    time.sleep(1)  # Small delay before retry
                     continue
-            
-            if not posts:
-                logger.warning(f"[OVH Forum] No posts found for query: {query}")
                 return []
-            
-            logger.info(f"[OVH Forum] Successfully scraped {len(posts)} posts")
-            return posts[:limit]
-        
-        except requests.exceptions.RequestException as e:
-            last_error = e
-            if attempt < MAX_RETRIES - 1:
-                wait_time = min(RETRY_DELAY * (2 ** attempt), 10)  # Cap at 10 seconds
-                logger.warning(f"[Attempt {attempt + 1}/{MAX_RETRIES}] OVH Forum network error: {e}. Retrying in {wait_time}s...")
-                time.sleep(wait_time)
-            else:
-                logger.error(f"OVH Forum scraper failed after {MAX_RETRIES} attempts: {e}")
-                return []
-        
-        except Exception as e:
-            logger.error(f"Error scraping OVH Forum: {str(e)}")
-            if attempt < MAX_RETRIES - 1:
-                time.sleep(1)  # Small delay before retry
-                continue
-            return []
     
         # Should not reach here, but return empty if it does
         return []
