@@ -1,5 +1,0 @@
-[33m2e4355d[m[33m ([m[1;36mHEAD -> [m[1;32mdevelop[m[33m)[m docs: Remove example Discord token from documentation to fix GitHub push protection
-[33m715f5b4[m fix(answered-status): Improve answered status detection and display
-[33ma561535[m feat(tests): Add comprehensive test suite for scrapers and progress bar
-[33m9be725e[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/develop[m[33m, [m[1;32mmaster[m[33m)[m Fix: Amélioration de la gestion des connexions DuckDB et de la barre de progression
-[33ma9deb3f[m[33m ([m[1;31mgithub/develop[m[33m)[m Amélioration de la configuration LLM: sélecteur de provider actif et renommage Analysis Focus en LLM Prompts
