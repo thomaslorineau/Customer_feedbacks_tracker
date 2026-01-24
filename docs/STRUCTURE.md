@@ -61,6 +61,11 @@ backend/
 │   ├── main.py            # Point d'entrée FastAPI (routes, scheduler)
 │   ├── config.py          # Configuration (clés API, variables d'env)
 │   ├── db.py              # Gestion base de données DuckDB
+│   ├── db_postgres.py     # Adaptateur PostgreSQL (Docker) ⭐ NOUVEAU
+│   ├── job_queue.py       # File d'attente Redis + fallback ⭐ NOUVEAU
+│   │
+│   ├── routers/           # Routers API modulaires ⭐ NOUVEAU
+│   │   └── jobs.py        # Endpoints /jobs/* pour la queue
 │   │
 │   ├── scraper/           # Modules de scraping
 │   │   ├── x_scraper.py   # X/Twitter (via Nitter)
@@ -80,13 +85,20 @@ backend/
 │   │   ├── country_detection.py # Détection de pays
 │   │   └── relevance_scorer.py  # Score de pertinence
 │   │
-│   ├── notifications/     # Système de notifications email ⭐ NOUVEAU
+│   ├── notifications/     # Système de notifications email
 │   │   ├── email_sender.py      # Envoi d'emails SMTP
 │   │   ├── trigger_checker.py   # Vérification des conditions
 │   │   └── notification_manager.py  # Orchestration
 │   │
 │   └── utils/             # Utilitaires
 │       └── helpers.py
+│
+├── worker.py              # Service worker isolé ⭐ NOUVEAU
+├── scheduler_service.py   # Service scheduler ⭐ NOUVEAU
+├── Dockerfile             # Image API Gunicorn ⭐ NOUVEAU
+├── Dockerfile.worker      # Image Worker + Chromium ⭐ NOUVEAU
+├── Dockerfile.scheduler   # Image Scheduler ⭐ NOUVEAU
+├── requirements-docker.txt # Dépendances Docker ⭐ NOUVEAU
 │
 ├── requirements.txt        # Dépendances Python
 ├── scripts/               # Scripts backend (tests E2E, maintenance)
@@ -249,7 +261,9 @@ ovh-complaints-tracker/
 
 ## 📝 Notes
 
-- **Base de données** : DuckDB (`data.duckdb`) - migration complète depuis SQLite (janvier 2026)
+- **Base de données** : DuckDB (`data.duckdb`) en développement, PostgreSQL en production Docker
+- **Architecture Docker** : Voir `docs/guides/DOCKER_ARCHITECTURE.md` pour l'architecture multi-processus ⭐ NOUVEAU
+- **File d'attente** : Redis pour les jobs de scraping, fallback in-memory si indisponible ⭐ NOUVEAU
 - **Notifications email** : Système complet avec triggers configurables et templates HTML
 - **Page Improvements** : Filtrage par produit interactif, modale de prévisualisation des posts, opportunity scores (0-100), détection automatique des pain points
 - **Backups** : Les 5 derniers backups sont conservés dans `backend/backups/`
@@ -257,6 +271,32 @@ ovh-complaints-tracker/
 - **Configuration** : Fichiers `.env` dans `backend/` (non commités, voir `.gitignore`)
 - **Caches** : `__pycache__/` et fichiers temporaires ignorés par Git
 - **Documentation** : Documents obsolètes archivés dans `docs/archive/`
+
+## 🐳 Architecture Docker (Production) ⭐ NOUVEAU
+
+```
+Racine/
+├── docker-compose.yml      # Stack production (5 services)
+├── docker-compose.dev.yml  # Mode développement (DB+Redis)
+├── scripts/
+│   ├── start-docker.sh     # Démarrage Linux
+│   ├── start-docker.ps1    # Démarrage Windows
+│   └── dev-docker.ps1      # Mode hybride développement
+└── backend/
+    ├── Dockerfile          # Image API (Gunicorn + Uvicorn)
+    ├── Dockerfile.worker   # Image Worker (Selenium + Chromium)
+    ├── Dockerfile.scheduler # Image Scheduler (APScheduler)
+    └── scripts/
+        ├── init_postgres.sql    # Schéma PostgreSQL
+        └── migrate_to_postgres.py # Migration DuckDB → PostgreSQL
+```
+
+**Services Docker :**
+- `postgres` : Base de données PostgreSQL 15
+- `redis` : File d'attente Redis 7
+- `api` : API FastAPI avec Gunicorn (4 workers)
+- `worker` : Worker scraping isolé avec Chromium
+- `scheduler` : Scheduler APScheduler pour jobs planifiés
 
 ## 🗂️ Organisation des scripts
 
