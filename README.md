@@ -73,7 +73,48 @@ bash scripts/app/stop.sh
 
 ---
 
-## 📁 Structure du projet
+## � Déploiement Docker (Production)
+
+Pour un déploiement robuste en production avec isolation des processus :
+
+### Installation Docker
+
+**Linux :**
+```bash
+./scripts/install-docker.sh --migrate
+```
+
+**Windows :**
+```powershell
+.\scripts\install-docker.ps1 -Migrate
+```
+
+### Architecture Docker
+
+- **PostgreSQL** : Base de données robuste (remplace DuckDB)
+- **Redis** : File d'attente pour les jobs de scraping
+- **API** : Gunicorn avec 4 workers Uvicorn
+- **Worker** : Processus isolé pour le scraping (Selenium/Chrome)
+- **Scheduler** : Jobs planifiés (APScheduler)
+
+### Commandes utiles
+
+```bash
+# Voir les logs
+docker compose logs -f
+
+# Mettre à jour
+./scripts/update-docker.sh
+
+# Redémarrer
+docker compose restart
+```
+
+📖 **Documentation complète :** [docs/guides/DOCKER_ARCHITECTURE.md](docs/guides/DOCKER_ARCHITECTURE.md)
+
+---
+
+## �📁 Structure du projet
 
 ```
 ovh-complaints-tracker/
