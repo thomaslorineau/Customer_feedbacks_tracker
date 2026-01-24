@@ -1667,6 +1667,9 @@ async function scrapeAll() {
         const jobData = await api.startScrapingJob(keywords, 50, 2, 0.5);
         currentJobId = jobData.job_id;
         
+        // Track job start time to detect stuck jobs
+        window._jobStartTime = Date.now();
+        
         // Persist job ID so it can be resumed after page navigation
         persistLastJob(currentJobId, 'All Sources');
         
@@ -1724,10 +1727,10 @@ async function pollJobStatus(jobId) {
             let job;
             try {
                 job = await api.getJobStatus(jobId);
-            } catch (error) {
+                } catch (error) {
                 // If job doesn't exist (404) or is gone (410), stop polling
                 if (error.status === 404 || error.status === 410 || 
-                    (error.message && (error.message.includes('404') || error.message.includes('410')))) {
+                    (error.message && (error.message.includes('404') || error.message.includes('410') || error.message.includes('not found')))) {
                     const statusCode = error.status || (error.message.includes('410') ? 410 : 404);
                     console.warn(`Job ${jobId.substring(0, 8)}... not found (${statusCode}), stopping polling`);
                     clearInterval(jobStatusInterval);
@@ -1746,12 +1749,48 @@ async function pollJobStatus(jobId) {
                                 }
                             }, 5000);
                         } else {
-                            progressContainer.style.display = 'none';
+                            if (progressText) {
+                                progressText.textContent = '⚠️ Job not found (server may have restarted). Please start a new scraping job.';
+                            }
+                            setTimeout(() => {
+                                if (progressContainer) {
+                                    progressContainer.style.display = 'none';
+                                }
+                            }, 5000);
                         }
                     }
                     showCancelButton(false);
                     return;
                 }
+                
+                // Network errors - server might be restarting, don't stop polling
+                const isNetworkError = error.message && (
+                    error.message.includes('NetworkError') || 
+                    error.message.includes('Failed to fetch') ||
+                    error.message.includes('fetch')
+                );
+                
+                if (isNetworkError) {
+                    console.warn(`⚠️ Network error polling job status (server might be restarting): ${error.message}`);
+                    // Update progress text to show connection issue but keep polling
+                    if (progressText) {
+                        const currentText = progressText.textContent;
+                        // Only update if not already showing connection error
+                        if (!currentText.includes('Connection')) {
+                            // Use last known progress or show generic message
+                            const lastCompleted = lastProgress.completed || 0;
+                            const lastTotal = lastProgress.total || 0;
+                            if (lastTotal > 0) {
+                                progressText.textContent = `⚠️ Connection issue - retrying... (${lastCompleted}/${lastTotal})`;
+                            } else {
+                                progressText.textContent = `⚠️ Connection issue - retrying...`;
+                            }
+                        }
+                    }
+                    // Don't stop polling - server might come back
+                    return;
+                }
+                
                 console.error(`Error polling job status: ${error.message}`);
                 // Don't stop polling for other errors, just log them and return early
                 return;
@@ -1761,6 +1800,11 @@ async function pollJobStatus(jobId) {
             if (!job) {
                 console.warn('[Progress] Job data is undefined');
                 return;
+            }
+            
+            // Reset connection error message if we successfully got job data
+            if (progressText && progressText.textContent.includes('Connection')) {
+                // Connection restored, will update with real progress below
             }
             
             // Log raw job data for debugging (only first time or when status changes)
@@ -1805,8 +1849,31 @@ async function pollJobStatus(jobId) {
             // Debug logs - always log to help diagnose issues
             console.log(`[Progress] Job ${jobId.substring(0, 8)}: status=${status}, progress=${completed}/${total} (${total > 0 ? Math.round((completed/total)*100) : 0}%)`);
             
+            // Detect stuck jobs: if status is "pending" for too long, it might be stuck
+            if (status === 'pending' && total > 0) {
+                const jobStartTime = window._jobStartTime || Date.now();
+                const timeSinceStart = Date.now() - jobStartTime;
+                
+                // If job has been pending for more than 2 minutes, it's likely stuck
+                if (timeSinceStart > 120000) { // 2 minutes
+                    console.warn(`[Progress] Job ${jobId.substring(0, 8)} has been pending for ${Math.round(timeSinceStart/1000)}s - likely stuck`);
+                    if (progressText) {
+                        const progressInfo = completed > 0 ? ` (${completed}/${total} tasks)` : '';
+                        progressText.textContent = `⚠️ Job appears stuck (pending for ${Math.round(timeSinceStart/1000)}s${progressInfo}). Server may have restarted. Please cancel and start a new job.`;
+                    }
+                    // Show cancel button to allow user to stop
+                    showCancelButton(true);
+                } else if (completed > 0 && completed < total && timeSinceStart > 30000) {
+                    // If job has some progress but is stuck in pending for more than 30 seconds
+                    console.warn(`[Progress] Job ${jobId.substring(0, 8)} is pending with ${completed}/${total} tasks completed - might be stuck`);
+                    if (progressText) {
+                        progressText.textContent = `⏳ Job starting... (${completed}/${total} tasks completed) - If this persists, the server may have restarted.`;
+                    }
+                }
+            }
+            
             // Force update if we have valid progress data
-            if (status === 'running' && total > 0 && completed >= 0) {
+            if ((status === 'running' || status === 'pending') && total > 0 && completed >= 0) {
                 console.log(`[Progress] Updating UI: ${completed}/${total} = ${Math.round((completed/total)*100)}%`);
             }
             

@@ -136,11 +136,22 @@ def validate_query(query: str, max_length: int = 100) -> bool:
         'DELETE FROM',
         'INSERT INTO',
         'UPDATE SET',
+        'UPDATE ',
     ]
     
     query_lower = query.lower()
     for pattern in dangerous_patterns:
-        if pattern.lower() in query_lower:
+        # Pour "UPDATE ", vérifier qu'il n'est pas suivi d'un mot-clé SQL valide dans un contexte de requête de recherche
+        if pattern.lower() == 'update ':
+            # Bloquer si "UPDATE " est suivi d'un nom de table (comme "posts", "users", etc.)
+            if 'update ' in query_lower:
+                # Vérifier qu'il n'est pas dans un contexte de recherche valide
+                # Par exemple, "update" seul dans une recherche pourrait être valide, mais "UPDATE posts" ne l'est pas
+                import re
+                if re.search(r'\bupdate\s+(posts|users|table|database|schema)\b', query_lower):
+                    logger.warning(f"Blocked dangerous pattern in query: UPDATE with table name")
+                    return False
+        elif pattern.lower() in query_lower:
             logger.warning(f"Blocked dangerous pattern in query: {pattern}")
             return False
     

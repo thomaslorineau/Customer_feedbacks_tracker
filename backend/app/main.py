@@ -135,6 +135,7 @@ async def add_security_headers(request, call_next):
 async def global_exception_handler(request: Request, exc: Exception):
     """Ensure all exceptions return JSON responses, especially for scraper endpoints."""
     import traceback
+    import sys
     error_type = type(exc).__name__
     error_msg = str(exc)
     
@@ -145,11 +146,14 @@ async def global_exception_handler(request: Request, exc: Exception):
     # Log the full traceback
     try:
         logger.error(f"Unhandled exception: {error_type}: {error_msg}", exc_info=True)
-        traceback.print_exc()
-    except Exception:
+        # Also print to stderr to ensure we see it even if logging fails
+        print(f"CRITICAL ERROR: {error_type}: {error_msg}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+    except Exception as log_error:
         # If logging fails, at least log to console
-        logger.error(f"ERROR: {error_type}: {error_msg}")
-        traceback.print_exc()
+        print(f"ERROR: {error_type}: {error_msg}", file=sys.stderr)
+        print(f"Also failed to log error: {log_error}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
     
     # Check if this is a scraper endpoint
     if request.url.path.startswith("/scrape/"):

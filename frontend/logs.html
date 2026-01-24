@@ -449,8 +449,9 @@
         </div>
 
         <div class="actions">
-            <button class="btn-primary" onclick="loadLogs()">🔄 Refresh</button>
+            <button id="refreshBtn" class="btn-primary" onclick="loadLogs()">🔄 Refresh</button>
             <button class="btn-danger" onclick="clearLogs()">🗑️ Clear</button>
+            <button class="btn-primary" onclick="testProgressBar()" style="background: #10b981; margin-left: 10px;" title="Test progress bar display">🧪 Test Progress Bar</button>
             <div class="auto-refresh">
                 <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" checked>
                 <label for="autoRefresh">Auto refresh (2s)</label>
@@ -609,6 +610,7 @@
             // Poll immediately first time
             (async () => {
                 try {
+                    console.log(`Polling job status for ${jobId.substring(0, 8)}...`);
                     const response = await fetch(`${API_BASE}/scrape/jobs/${jobId}`);
                     if (response.ok) {
                         const job = await response.json();
@@ -758,51 +760,174 @@
                 const lastJob = loadLastJob();
                 const lastJobId = lastJob?.jobId;
                 
-                if (!lastJobId || typeof lastJobId !== 'string' || lastJobId.trim() === '') {
-                    return;
-                }
-                
-                console.log('ResumeLastJob: Found valid job ID:', lastJobId.substring(0, 8) + '...');
-                
-                // Try to fetch job status first
-                fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(lastJobId)}`)
-                    .then(resp => {
-                        if (resp.status === 404) {
-                            console.warn(`Job ${lastJobId.substring(0, 8)}... not found (404), clearing persisted job`);
-                            persistLastJob(null);
-                            return;
-                        }
-                        if (resp.ok) {
-                            return resp.json().then(job => {
-                                if (job.status === 'running' || job.status === 'pending') {
-                                    console.log(`Resuming job ${lastJobId.substring(0, 8)}... on logs page`);
-                                    currentJobId = lastJobId;
-                                    pollJobStatus(lastJobId, lastJob.sourceName);
-                                } else {
-                                    // Job finished, clean up
-                                    console.log(`Job ${lastJobId.substring(0, 8)}... is ${job.status}, cleaning up`);
-                                    persistLastJob(null);
-                                    const progressContainer = document.getElementById('scrapingProgressContainer');
-                                    if (progressContainer) {
-                                        progressContainer.style.display = 'none';
+                // First, check if there's a job in localStorage
+                if (lastJobId && typeof lastJobId === 'string' && lastJobId.trim() !== '') {
+                    console.log('ResumeLastJob: Found valid job ID in localStorage:', lastJobId.substring(0, 8) + '...');
+                    
+                    // Try to fetch job status first
+                    fetch(`${API_BASE}/scrape/jobs/${encodeURIComponent(lastJobId)}`)
+                        .then(resp => {
+                            if (resp.status === 404) {
+                                console.warn(`Job ${lastJobId.substring(0, 8)}... not found (404), clearing persisted job`);
+                                persistLastJob(null);
+                                // Continue to check for running jobs from API
+                                checkRunningJobsFromAPI();
+                                return;
+                            }
+                            if (resp.ok) {
+                                return resp.json().then(job => {
+                                    if (job.status === 'running' || job.status === 'pending') {
+                                        console.log(`Resuming job ${lastJobId.substring(0, 8)}... on logs page`);
+                                        currentJobId = lastJobId;
+                                        pollJobStatus(lastJobId, lastJob.sourceName);
+                                    } else {
+                                        // Job finished, clean up
+                                        console.log(`Job ${lastJobId.substring(0, 8)}... is ${job.status}, cleaning up`);
+                                        persistLastJob(null);
+                                        const progressContainer = document.getElementById('scrapingProgressContainer');
+                                        if (progressContainer) {
+                                            progressContainer.style.display = 'none';
+                                        }
+                                        showCancelBtn(false);
+                                        // Check for other running jobs
+                                        checkRunningJobsFromAPI();
                                     }
-                                    showCancelBtn(false);
-                                }
-                            });
-                        }
-                    })
-                    .catch(error => {
-                        console.warn('Could not check job status on page load:', error);
-                        persistLastJob(null);
-                    });
+                                });
+                            }
+                        })
+                        .catch(error => {
+                            console.warn('Could not check job status on page load:', error);
+                            persistLastJob(null);
+                            // Check for running jobs from API as fallback
+                            checkRunningJobsFromAPI();
+                        });
+                } else {
+                    // No job in localStorage, check API for running jobs
+                    checkRunningJobsFromAPI();
+                }
             } catch (error) {
                 console.error('Error in resume job function:', error);
                 localStorage.removeItem('ovh_last_job');
                 localStorage.removeItem('ovh_last_job_source');
+                // Try to check API as fallback
+                checkRunningJobsFromAPI();
             }
         })();
+        
+        // Check for running jobs from API (useful after server restart)
+        async function checkRunningJobsFromAPI() {
+            try {
+                // Don't check if we already have a job being tracked and polling is active
+                if (currentJobId && jobStatusInterval) {
+                    console.log(`Skipping job check - already tracking job ${currentJobId.substring(0, 8)}...`);
+                    return true;
+                }
+                
+                console.log('Checking for running jobs from API...');
+                
+                // Add timeout to prevent hanging
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+                
+                const response = await fetch(`${API_BASE}/scrape/jobs?status=running&limit=5`, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                console.log('API response status:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('API response data:', data);
+                    const jobs = data.jobs || [];
+                    
+                    if (jobs.length > 0) {
+                        const runningJob = jobs[0];
+                        const jobId = runningJob.id;
+                        console.log(`✅ Found running job from API: ${jobId.substring(0, 8)}...`);
+                        
+                        // Update localStorage
+                        persistLastJob(jobId);
+                        currentJobId = jobId;
+                        
+                        // Show progress bar immediately
+                        const progressContainer = document.getElementById('scrapingProgressContainer');
+                        if (progressContainer) {
+                            progressContainer.style.display = 'block';
+                            console.log('Progress bar displayed');
+                        }
+                        
+                        // Show cancel button
+                        showCancelBtn(true);
+                        
+                        // Start polling
+                        pollJobStatus(jobId, '');
+                        return true; // Job found
+                    } else {
+                        console.log('No running jobs found');
+                        // Only hide progress bar if we don't already have a job being tracked
+                        // AND if there's no active polling interval
+                        if (!currentJobId && !jobStatusInterval) {
+                            const progressContainer = document.getElementById('scrapingProgressContainer');
+                            if (progressContainer) {
+                                progressContainer.style.display = 'none';
+                            }
+                            showCancelBtn(false);
+                        } else if (currentJobId) {
+                            console.log(`Keeping progress bar visible - job ${currentJobId.substring(0, 8)}... is being tracked`);
+                        }
+                        return false; // No job found
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.warn('API returned error:', response.status, errorText);
+                    // Don't hide bar on API error if we have a job being tracked
+                    if (!currentJobId && !jobStatusInterval) {
+                        const progressContainer = document.getElementById('scrapingProgressContainer');
+                        if (progressContainer) {
+                            progressContainer.style.display = 'none';
+                        }
+                    }
+                    return false;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.warn('Job check timed out');
+                } else {
+                    console.error('Could not check running jobs from API:', error);
+                }
+                // Don't hide bar on error if we have a job being tracked
+                if (!currentJobId && !jobStatusInterval) {
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer) {
+                        progressContainer.style.display = 'none';
+                    }
+                }
+                return false;
+            }
+        }
 
+        let isLoadingLogs = false; // Prevent concurrent requests
+        let consecutiveErrors = 0; // Track consecutive errors
+        const MAX_CONSECUTIVE_ERRORS = 3; // Stop auto-refresh after 3 consecutive errors
+        
         async function loadLogs() {
+            // Prevent concurrent requests
+            if (isLoadingLogs) {
+                console.log('Logs already loading, skipping...');
+                return;
+            }
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            
+            // Disable button and show loading state
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '⏳ Loading...';
+            }
+            
+            isLoadingLogs = true;
+            
             const source = document.getElementById('filterSource').value;
             const level = document.getElementById('filterLevel').value;
             const limit = parseInt(document.getElementById('filterLimit').value) || 100;
@@ -813,7 +938,18 @@
                 if (level) params.append('level', level);
                 params.append('limit', limit);
 
-                const response = await fetch(`${API_BASE}/api/logs?${params}`);
+                console.log(`Loading logs from ${API_BASE}/api/logs?${params}`);
+                
+                // Add timeout to prevent hanging requests
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const response = await fetch(`${API_BASE}/api/logs?${params}`, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('Error response:', errorText);
@@ -833,11 +969,82 @@
                 displayLogs(logs);
                 updateStats(logs);
                 document.getElementById('lastUpdate').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+                
+                // Reset error counter on success
+                consecutiveErrors = 0;
+                
+                // Show success feedback
+                if (refreshBtn) {
+                    refreshBtn.textContent = '✅ Refreshed';
+                    setTimeout(() => {
+                        refreshBtn.textContent = '🔄 Refresh';
+                        refreshBtn.disabled = false;
+                    }, 1000);
+                }
             } catch (error) {
                 console.error('Error loading logs:', error);
+                
+                // Don't show error if it's just an abort (timeout or cancelled)
+                if (error.name === 'AbortError') {
+                    console.log('Request was aborted (timeout or cancelled)');
+                    if (refreshBtn) {
+                        refreshBtn.textContent = '🔄 Refresh';
+                        refreshBtn.disabled = false;
+                    }
+                    isLoadingLogs = false;
+                    return;
+                }
+                
+                consecutiveErrors++;
                 const errorMsg = error.message || 'Error loading logs';
-                document.getElementById('logsList').innerHTML = `<div class="empty">❌ ${errorMsg}</div>`;
-                showToast(`Error: ${errorMsg}`, 'error');
+                const isNetworkError = errorMsg.includes('NetworkError') || errorMsg.includes('Failed to fetch');
+                
+                // If too many consecutive errors, stop auto-refresh
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    console.warn(`Too many consecutive errors (${consecutiveErrors}), stopping auto-refresh`);
+                    const autoRefreshCheckbox = document.getElementById('autoRefresh');
+                    if (autoRefreshCheckbox && autoRefreshCheckbox.checked) {
+                        autoRefreshCheckbox.checked = false;
+                        toggleAutoRefresh();
+                        showToast('Server unavailable - Auto-refresh disabled', 'error');
+                    }
+                }
+                
+                // Only show error message if we don't have any logs displayed
+                const logsList = document.getElementById('logsList');
+                if (logsList) {
+                    if (logsList.children.length === 0) {
+                        logsList.innerHTML = `<div class="empty">
+                            ❌ ${isNetworkError ? 'Server unavailable' : errorMsg}
+                            <br><small>Please check if the server is running on port 8000</small>
+                        </div>`;
+                    } else if (isNetworkError && consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                        // Show warning banner at top of logs
+                        const warningBanner = document.createElement('div');
+                        warningBanner.id = 'serverWarningBanner';
+                        warningBanner.style.cssText = 'background: #fee; border: 1px solid #fcc; padding: 10px; margin-bottom: 10px; border-radius: 4px; color: #c33;';
+                        warningBanner.innerHTML = '⚠️ Server unavailable - Auto-refresh disabled. Please restart the server.';
+                        const firstLog = logsList.firstElementChild;
+                        if (firstLog && !document.getElementById('serverWarningBanner')) {
+                            logsList.insertBefore(warningBanner, firstLog);
+                        }
+                    }
+                }
+                
+                // Show toast only for network errors (but not too frequently)
+                if (isNetworkError && consecutiveErrors <= MAX_CONSECUTIVE_ERRORS) {
+                    showToast(`Connection error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS})`, 'warning');
+                } else if (!isNetworkError) {
+                    showToast(`Error: ${errorMsg}`, 'error');
+                }
+                
+                // Restore button state on error
+                if (refreshBtn) {
+                    refreshBtn.textContent = '🔄 Refresh';
+                    refreshBtn.disabled = false;
+                }
+            } finally {
+                isLoadingLogs = false;
             }
         }
 
@@ -1067,14 +1274,29 @@
         function toggleAutoRefresh() {
             const enabled = document.getElementById('autoRefresh').checked;
             
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            
+            // Remove warning banner when re-enabling auto-refresh
             if (enabled) {
-                // Reduced interval to 2 seconds for better real-time updates
-                autoRefreshInterval = setInterval(loadLogs, 2000);
-            } else {
-                if (autoRefreshInterval) {
-                    clearInterval(autoRefreshInterval);
-                    autoRefreshInterval = null;
+                const warningBanner = document.getElementById('serverWarningBanner');
+                if (warningBanner) {
+                    warningBanner.remove();
                 }
+                // Reset error counter when manually re-enabling
+                consecutiveErrors = 0;
+            }
+            
+            if (enabled) {
+                // Increased interval to 3 seconds to avoid too many concurrent requests
+                autoRefreshInterval = setInterval(() => {
+                    // Only load if not already loading
+                    if (!isLoadingLogs) {
+                        loadLogs();
+                    }
+                }, 3000);
             }
         }
         
@@ -1155,6 +1377,97 @@
             }
         })();
 
+        // Make loadLogs available globally
+        window.loadLogs = loadLogs;
+        window.clearLogs = clearLogs;
+        window.toggleAutoRefresh = toggleAutoRefresh;
+        
+        // Debug function to test progress bar display
+        window.testProgressBar = function() {
+            const progressContainer = document.getElementById('scrapingProgressContainer');
+            const progressBar = document.getElementById('scrapingProgressBar');
+            const progressText = document.getElementById('scrapingProgressText');
+            const cancelBtn = document.getElementById('cancelProgressBtn');
+            
+            console.log('🧪 Testing progress bar display...');
+            console.log('Container found:', !!progressContainer);
+            console.log('Bar found:', !!progressBar);
+            console.log('Text found:', !!progressText);
+            
+            if (!progressContainer) {
+                console.error('❌ Progress container not found!');
+                alert('Progress container not found! Check console for details.');
+                return;
+            }
+            
+            // Show progress bar
+            progressContainer.style.display = 'block';
+            progressContainer.setAttribute('data-status', 'running');
+            progressContainer.setAttribute('data-percentage', '50%');
+            console.log('✅ Progress bar displayed');
+            
+            // Update progress bar
+            if (progressBar) {
+                progressBar.style.width = '50%';
+                progressBar.setAttribute('aria-valuenow', 50);
+                console.log('✅ Progress bar set to 50%');
+            }
+            
+            // Update text
+            if (progressText) {
+                progressText.textContent = '🧪 Test: 5/10 tasks completed (50%)';
+                console.log('✅ Progress text updated');
+            }
+            
+            // Show cancel button
+            if (cancelBtn) {
+                cancelBtn.style.display = 'inline-block';
+                console.log('✅ Cancel button shown');
+            }
+            
+            showToast('Progress bar test - should be visible now!', 'info');
+            
+            // Also check for running jobs
+            console.log('Checking for real running jobs...');
+            checkRunningJobsFromAPI().then(hasJob => {
+                if (hasJob) {
+                    console.log('✅ Real job found, will update progress bar');
+                } else {
+                    console.log('ℹ️ No real job found, keeping test display');
+                }
+            });
+        };
+
+        // Periodic check for running jobs (every 5 seconds)
+        let jobCheckInterval = null;
+        function startJobCheckInterval() {
+            if (jobCheckInterval) {
+                clearInterval(jobCheckInterval);
+            }
+            // Check every 5 seconds for running jobs
+            jobCheckInterval = setInterval(() => {
+                // Only check if we don't already have a job being tracked
+                // AND if the progress bar is not visible (to avoid hiding it if it's already showing)
+                if (!currentJobId) {
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    const isVisible = progressContainer && progressContainer.style.display !== 'none';
+                    // Only check if bar is not visible to avoid hiding it unnecessarily
+                    if (!isVisible) {
+                        checkRunningJobsFromAPI();
+                    }
+                } else {
+                    // If we have a currentJobId, verify it's still valid
+                    // But don't hide the bar if polling is active
+                    const progressContainer = document.getElementById('scrapingProgressContainer');
+                    if (progressContainer && progressContainer.style.display === 'none') {
+                        // Bar was hidden but we have a job ID - restore it
+                        progressContainer.style.display = 'block';
+                        pollJobStatus(currentJobId, '');
+                    }
+                }
+            }, 5000);
+        }
+        
         // Load logs on page load
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -1162,12 +1475,20 @@
                 loadLogs();
                 // Démarrer l'actualisation automatique par défaut
                 startAutoRefresh();
+                // Check for running jobs after a short delay to ensure API is ready
+                setTimeout(checkRunningJobsFromAPI, 500);
+                // Start periodic check for running jobs
+                startJobCheckInterval();
             });
         } else {
             initializeTheme();
             loadLogs();
             // Démarrer l'actualisation automatique par défaut
             startAutoRefresh();
+            // Check for running jobs after a short delay to ensure API is ready
+            setTimeout(checkRunningJobsFromAPI, 500);
+            // Start periodic check for running jobs
+            startJobCheckInterval();
         }
 
         // Update filters trigger reload

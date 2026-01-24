@@ -1167,7 +1167,10 @@ def update_post_answered_status(post_id: int, is_answered: bool, answered_by: Op
         return False
     except Exception as e:
         logger.error(f"Error updating answered status for post {post_id}: {e}", exc_info=True)
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if no transaction is active
         return False
     finally:
         conn.close()
@@ -1334,7 +1337,10 @@ def update_post_product_label(post_id: int, product_label: Optional[str]) -> boo
             
     except Exception as e:
         logger.error(f"Error updating product label for post {post_id}: {e}")
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if no transaction is active
         return False
     finally:
         conn.close()
@@ -1417,7 +1423,10 @@ def update_all_posts_product_labels(limit: Optional[int] = None) -> Dict[str, An
         
     except Exception as e:
         logger.error(f"Error updating product labels: {e}", exc_info=True)
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass  # Ignore rollback errors if no transaction is active
         return {
             "success": False,
             "message": f"Error updating product labels: {str(e)}",
