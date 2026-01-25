@@ -527,6 +527,37 @@ def pg_get_timeline_stats(days: int = 30) -> List[Dict]:
                 for row in cur.fetchall()]
 
 
+def pg_get_answered_stats() -> Dict[str, Any]:
+    """Get statistics about answered vs unanswered posts."""
+    with get_pg_cursor() as cur:
+        # Total posts
+        cur.execute("SELECT COUNT(*) as total FROM posts")
+        total = cur.fetchone()['total']
+        
+        # Answered posts (is_answered = 1, stored as INTEGER)
+        cur.execute("""
+            SELECT COUNT(*) as answered 
+            FROM posts 
+            WHERE is_answered = 1
+        """)
+        answered = cur.fetchone()['answered']
+        
+        # Unanswered posts
+        unanswered = total - answered
+        
+        # Calculate percentage
+        answered_percentage = round((answered / total * 100) if total > 0 else 0, 1)
+        unanswered_percentage = round((unanswered / total * 100) if total > 0 else 0, 1)
+        
+        return {
+            'total': total,
+            'answered': answered,
+            'unanswered': unanswered,
+            'answered_percentage': answered_percentage,
+            'unanswered_percentage': unanswered_percentage
+        }
+
+
 # ============================================
 # Saved Queries / Keywords
 # ============================================
@@ -929,6 +960,7 @@ get_sentiment_stats = pg_get_sentiment_stats
 get_source_stats = pg_get_source_stats
 get_language_stats = pg_get_language_stats
 get_timeline_stats = pg_get_timeline_stats
+get_answered_stats = pg_get_answered_stats
 
 # Saved queries
 get_saved_queries = pg_get_saved_queries
