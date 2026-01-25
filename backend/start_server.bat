@@ -19,7 +19,7 @@ if exist "..\.venv\Scripts\python.exe" (
 )
 
 echo.
-echo Serveur avec DuckDB
+echo Serveur avec PostgreSQL
 echo URL: http://127.0.0.1:8000
 echo Documentation: http://127.0.0.1:8000/docs
 echo.
