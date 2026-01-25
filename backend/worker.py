@@ -158,33 +158,80 @@ def process_auto_scrape_job(job: Job) -> dict:
 
 
 def process_backup_job(job: Job) -> dict:
-    """Process database backup job."""
+    """Process PostgreSQL database backup job."""
     from pathlib import Path
+    import subprocess
+    from datetime import datetime
+    from urllib.parse import urlparse
     
     try:
-        # Import backup function
-        sys.path.insert(0, str(Path(__file__).resolve().parents[0] / "scripts"))
-        from scripts.backup_db import backup_database
-        
         backup_type = job.payload.get('backup_type', 'hourly')
-        db_path = Path(__file__).resolve().parent / "data.duckdb"
-        
-        if os.getenv('USE_POSTGRES', 'false').lower() == 'true':
-            # PostgreSQL backup
-            logger.info("PostgreSQL backup not yet implemented")
-            return {'status': 'skipped', 'reason': 'PostgreSQL backup not implemented'}
-        
-        # DuckDB backup
         keep_backups = 24 if backup_type == 'hourly' else 30
-        success = backup_database(db_path, "production", keep_backups, backup_type)
+        
+        # PostgreSQL backup using pg_dump
+        database_url = os.getenv('DATABASE_URL', '')
+        if not database_url:
+            logger.error("DATABASE_URL not set, cannot perform backup")
+            return {'status': 'failed', 'reason': 'DATABASE_URL not set'}
+        
+        # Parse DATABASE_URL: postgresql://user:password@host:port/database
+        parsed = urlparse(database_url)
+        db_user = parsed.username
+        db_password = parsed.password
+        db_host = parsed.hostname
+        db_port = parsed.port or 5432
+        db_name = parsed.path.lstrip('/')
+        
+        # Create backup directory
+        backup_dir = Path(__file__).resolve().parent / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        
+        # Generate backup filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"postgres_backup_{backup_type}_{timestamp}.sql"
+        backup_path = backup_dir / backup_filename
+        
+        # Set PGPASSWORD environment variable for pg_dump
+        env = os.environ.copy()
+        env['PGPASSWORD'] = db_password
+        
+        # Run pg_dump
+        cmd = [
+            'pg_dump',
+            '-h', db_host,
+            '-p', str(db_port),
+            '-U', db_user,
+            '-d', db_name,
+            '-F', 'c',  # Custom format (compressed)
+            '-f', str(backup_path)
+        ]
+        
+        logger.info(f"Starting PostgreSQL backup: {backup_filename}")
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"Backup failed: {result.stderr}")
+            return {'status': 'failed', 'reason': result.stderr}
+        
+        # Clean up old backups
+        backups = sorted(backup_dir.glob(f"postgres_backup_{backup_type}_*.sql"), reverse=True)
+        if len(backups) > keep_backups:
+            for old_backup in backups[keep_backups:]:
+                old_backup.unlink()
+                logger.info(f"Removed old backup: {old_backup.name}")
+        
+        backup_size_mb = backup_path.stat().st_size / (1024 * 1024)
+        logger.info(f"Backup completed: {backup_filename} ({backup_size_mb:.2f} MB)")
         
         return {
-            'status': 'success' if success else 'failed',
-            'backup_type': backup_type
+            'status': 'success',
+            'backup_type': backup_type,
+            'backup_file': backup_filename,
+            'size_mb': round(backup_size_mb, 2)
         }
     except Exception as e:
-        logger.error(f"Backup failed: {e}")
-        raise
+        logger.error(f"Backup failed: {e}", exc_info=True)
+        return {'status': 'failed', 'reason': str(e)}
 
 
 def process_cleanup_job(job: Job) -> dict:

@@ -31,6 +31,20 @@ Les fichiers suivants ont été supprimés car obsolètes :
 - `backend/scripts/test_duckdb_*.py` - Tests spécifiques DuckDB
 - `backend/scripts/fix_duckdb_sequences.py` - Fix séquences DuckDB
 
+## Scripts archivés (dans `backend/archives/scripts/`)
+
+Les scripts suivants ont été archivés car spécifiques à DuckDB :
+
+- `backend/scripts/backup_db.py` - Script de backup DuckDB (remplacé par backup PostgreSQL dans `worker.py`)
+- `backend/scripts/check_db_integrity.py` - Vérification d'intégrité DuckDB
+- `backend/scripts/check_db_status.py` - Vérification du statut DuckDB
+- `backend/scripts/restore_from_backup.py` - Restauration depuis backup DuckDB
+
+## Scripts utilitaires archivés (dans `scripts/archives/`)
+
+- `scripts/utils/install-duckdb.sh` - Script d'installation DuckDB
+- `scripts/utils/check-duckdb.sh` - Script de vérification DuckDB
+
 ## Note
 
 Les fichiers DuckDB peuvent être supprimés après vérification que :
