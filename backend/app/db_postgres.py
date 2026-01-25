@@ -26,8 +26,8 @@ if USE_POSTGRES:
         POSTGRES_AVAILABLE = True
     except ImportError:
         POSTGRES_AVAILABLE = False
-        logger.warning("psycopg2 not installed, falling back to DuckDB")
-        USE_POSTGRES = False
+        logger.error("psycopg2 not installed. PostgreSQL is required.")
+        raise ImportError("psycopg2-binary is required. Install with: pip install psycopg2-binary")
 else:
     POSTGRES_AVAILABLE = False
 
