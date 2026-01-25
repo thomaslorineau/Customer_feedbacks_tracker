@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS posts (
     source VARCHAR(50),
     author VARCHAR(255),
     content TEXT,
-    url TEXT,
+    url TEXT UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE,
     sentiment_score REAL,
     sentiment_label VARCHAR(20),

@@ -96,19 +96,217 @@ def pg_insert_post(source: str, author: str, content: str, url: str,
                    created_at: str, sentiment_score: float, sentiment_label: str,
                    language: str = 'unknown', country: str = None,
                    relevance_score: float = 0.0, product: str = None) -> Optional[int]:
-    """Insert a new post into PostgreSQL."""
+    """Insert a new post into PostgreSQL (low-level function)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             INSERT INTO posts (source, author, content, url, created_at, 
                              sentiment_score, sentiment_label, language, country, 
                              relevance_score, product)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT DO NOTHING
+            ON CONFLICT (url) DO NOTHING
             RETURNING id
         """, (source, author, content, url, created_at, sentiment_score,
               sentiment_label, language, country, relevance_score, product))
         result = cur.fetchone()
         return result['id'] if result else None
+
+
+def _normalize_content_for_comparison(content: str) -> str:
+    """
+    Normalize content for duplicate comparison.
+    Removes HTML tags, extra whitespace, and normalizes case.
+    """
+    if not content:
+        return ""
+    
+    import re
+    # Remove HTML tags
+    content = re.sub(r'<[^>]+>', '', content)
+    # Normalize whitespace
+    content = ' '.join(content.split())
+    # Lowercase
+    content = content.lower()
+    # Remove punctuation for better matching
+    content = re.sub(r'[^\w\s]', '', content)
+    # Limit length for comparison
+    return content[:500]
+
+
+def detect_product_label(content: str, language: str = 'unknown') -> Optional[str]:
+    """
+    Détecte le produit OVH mentionné dans le contenu d'un post.
+    Basé sur la logique de détection du frontend.
+    
+    Args:
+        content: Contenu du post
+        language: Langue du post (pour filtrage)
+    
+    Returns:
+        Nom du produit détecté ou None
+    """
+    if not content:
+        return None
+    
+    import re
+    content_lower = content.lower()
+    
+    # Product patterns with priority order (more specific first)
+    product_patterns = [
+        # Web & Hosting
+        {'key': 'domain', 'pattern': re.compile(r'\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b', re.I), 'label': 'Domain'},
+        {'key': 'wordpress', 'pattern': re.compile(r'\b(wordpress|wp\s*host|wp\s*config)\b', re.I), 'label': 'WordPress'},
+        {'key': 'email', 'pattern': re.compile(r'\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b', re.I), 'label': 'Email'},
+        {'key': 'web-hosting', 'pattern': re.compile(r'\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b', re.I), 'label': 'Hosting'},
+        
+        # Cloud & Servers
+        {'key': 'vps', 'pattern': re.compile(r'\b(vps|virtual\s*private\s*server|kimsufi)\b', re.I), 'label': 'VPS'},
+        {'key': 'dedicated', 'pattern': re.compile(r'\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b', re.I), 'label': 'Dedicated Server'},
+        {'key': 'public-cloud', 'pattern': re.compile(r'\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b', re.I), 'label': 'Public Cloud'},
+        {'key': 'private-cloud', 'pattern': re.compile(r'\b(private\s*cloud|vmware|vsphere)\b', re.I), 'label': 'Private Cloud'},
+        {'key': 'kubernetes', 'pattern': re.compile(r'\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b', re.I), 'label': 'Managed Kubernetes'},
+        
+        # Storage & Backup
+        {'key': 'object-storage', 'pattern': re.compile(r'\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b', re.I), 'label': 'Storage'},
+        {'key': 'backup', 'pattern': re.compile(r'\b(backup|veeam|archive|snapshot|restore)\b', re.I), 'label': 'Backup'},
+        
+        # Network & CDN
+        {'key': 'cdn', 'pattern': re.compile(r'\b(cdn|content\s*delivery|cache)\b', re.I), 'label': 'CDN'},
+        {'key': 'load-balancer', 'pattern': re.compile(r'\b(load\s*balancer|iplb|lb|balancing)\b', re.I), 'label': 'Load Balancer'},
+        {'key': 'ddos', 'pattern': re.compile(r'\b(ddos|anti-ddos|protection|mitigation)\b', re.I), 'label': 'DDoS Protection'},
+        {'key': 'network', 'pattern': re.compile(r'\b(network|vrack|vlan|ip\s*address|subnet)\b', re.I), 'label': 'Network'},
+        
+        # Support & Billing (lower priority)
+        {'key': 'billing', 'pattern': re.compile(r'\b(billing|facture|invoice|payment|paiement|refund|rembours|subscription)\b', re.I), 'label': 'Billing'},
+        {'key': 'manager', 'pattern': re.compile(r'\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b', re.I), 'label': 'Manager'},
+        {'key': 'api', 'pattern': re.compile(r'\b(api|sdk|integration|rest\s*api|webhook)\b', re.I), 'label': 'API'},
+        {'key': 'support', 'pattern': re.compile(r'\b(support|ticket|assistance|help|service\s*client|customer\s*service)\b', re.I), 'label': 'Support'},
+    ]
+    
+    # Check patterns in priority order
+    for pattern_info in product_patterns:
+        if pattern_info['pattern'].search(content_lower):
+            return pattern_info['label']
+    
+    return None
+
+
+def insert_post(post: Dict[str, Any]) -> Optional[int]:
+    """
+    Insert post with validation and proper error handling.
+    Compatible with DuckDB interface (takes dict).
+    
+    Returns:
+        int: ID of the inserted post, or None if insertion failed (duplicate)
+    """
+    
+    # SECURITY: Validate post data before insertion
+    if not isinstance(post, dict):
+        raise ValueError("post must be a dictionary")
+    
+    # SECURITY: Validate required fields exist
+    required_fields = ['source', 'content']
+    for field in required_fields:
+        if field not in post:
+            raise ValueError(f"Missing required field: {field}")
+    
+    try:
+        # Check for duplicate URL first (most reliable)
+        url = str(post.get('url', ''))[:500]
+        if url:
+            with get_pg_cursor() as cur:
+                cur.execute("SELECT id FROM posts WHERE url = %s LIMIT 1", (url,))
+                existing = cur.fetchone()
+                if existing:
+                    logger.debug(f"Duplicate detected by URL: {url[:100]}")
+                    return None  # Duplicate detected
+        
+        # Check for duplicate by normalized content + author + source
+        content = str(post.get('content', ''))[:10000]
+        author = str(post.get('author', 'unknown'))[:100]
+        source = str(post.get('source'))[:100]
+        
+        # Normalize content for comparison
+        normalized_content = _normalize_content_for_comparison(content)
+        
+        # Improved duplicate detection: check normalized content more thoroughly
+        if normalized_content and len(normalized_content) > 30:
+            normalized_key = normalized_content[:300]
+            
+            with get_pg_cursor() as cur:
+                # First check: same normalized content + same author + same source (strictest)
+                cur.execute("""
+                    SELECT id, content FROM posts 
+                    WHERE source = %s 
+                    AND author = %s
+                    AND LENGTH(content) > 30
+                    LIMIT 50
+                """, (source, author))
+                existing_posts = cur.fetchall()
+                
+                for existing_id, existing_content in existing_posts:
+                    existing_normalized = _normalize_content_for_comparison(str(existing_content))
+                    if len(existing_normalized) > 30 and existing_normalized[:300] == normalized_key:
+                        logger.debug(f"Duplicate detected by normalized content+author+source: {normalized_key[:50]}")
+                        return None  # Duplicate detected
+                
+                # Second check: same normalized content + same source (catches author variations)
+                if len(normalized_content) > 100:
+                    normalized_key_long = normalized_content[:300]
+                    cur.execute("""
+                        SELECT id, content FROM posts 
+                        WHERE source = %s
+                        AND LENGTH(content) > 100
+                        LIMIT 100
+                    """, (source,))
+                    existing_posts = cur.fetchall()
+                    
+                    for existing_id, existing_content in existing_posts:
+                        existing_normalized = _normalize_content_for_comparison(str(existing_content))
+                        if len(existing_normalized) > 100:
+                            if existing_normalized[:300] == normalized_key_long:
+                                # Additional check: if content is very similar (90% match on first 500 chars)
+                                if len(existing_normalized) >= 500 and len(normalized_content) >= 500:
+                                    similarity = sum(1 for a, b in zip(existing_normalized[:500], normalized_content[:500]) if a == b) / 500.0
+                                    if similarity > 0.90:
+                                        logger.debug(f"Duplicate detected by normalized content similarity ({similarity:.2%}): {normalized_key[:50]}")
+                                        return None
+                                elif existing_normalized[:300] == normalized_key_long:
+                                    logger.debug(f"Duplicate detected by normalized content hash: {normalized_key[:100]}")
+                                    return None  # Duplicate detected
+        
+        # Detect product label if not provided
+        product_label = post.get('product')
+        if not product_label:
+            product_label = detect_product_label(str(post.get('content', '')), str(post.get('language', 'unknown')))
+        
+        # Insert the post
+        post_id = pg_insert_post(
+            source=str(post.get('source'))[:100],
+            author=str(post.get('author', 'unknown'))[:100],
+            content=str(post.get('content', ''))[:10000],
+            url=url,
+            created_at=post.get('created_at'),
+            sentiment_score=float(post.get('sentiment_score', 0.0)) if post.get('sentiment_score') else 0.0,
+            sentiment_label=str(post.get('sentiment_label', 'neutral'))[:20],
+            language=str(post.get('language', 'unknown'))[:20],
+            country=post.get('country'),
+            relevance_score=float(post.get('relevance_score', 0.0)) if post.get('relevance_score') is not None else 0.0,
+            product=product_label
+        )
+        
+        # Trigger notification check in background (non-blocking)
+        if post_id:
+            try:
+                from ..notifications import notification_manager
+                notification_manager.check_and_send_notifications(post_id)
+            except Exception as e:
+                logger.warning(f"Failed to trigger notification check for post {post_id}: {e}")
+        
+        return post_id
+        
+    except Exception as e:
+        logger.error(f"Error inserting post: {e}", exc_info=True)
+        raise
 
 
 def pg_get_all_posts(limit: int = 1000, offset: int = 0,
@@ -642,7 +840,7 @@ def get_db_connection():
     return conn, False  # False = not DuckDB
 
 # Posts
-insert_post = pg_insert_post
+# insert_post is already defined above with full duplicate detection logic
 get_posts = pg_get_all_posts
 get_post_by_id = pg_get_post_by_id
 delete_post = pg_delete_post
@@ -666,8 +864,14 @@ get_scraping_logs = pg_get_scraping_logs
 
 # Jobs
 create_job_record = pg_enqueue_job
-get_job_record = pg_get_job
-update_job_progress = pg_update_job
+def get_job_record(job_id: str) -> Optional[Dict]:
+    """Get a job by ID."""
+    with get_pg_cursor() as cur:
+        cur.execute("SELECT * FROM job_queue WHERE id = %s", (job_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+update_job_progress = pg_update_job_status
 get_all_jobs = pg_get_pending_jobs
 
 # Base keywords  

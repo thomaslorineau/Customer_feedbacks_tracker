@@ -1,0 +1,214 @@
+# ============================================
+# Installer et Tester PostgreSQL Portable
+# ============================================
+
+$ErrorActionPreference = "Stop"
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Installation PostgreSQL Portable" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+$PostgresPath = "$env:USERPROFILE\postgresql-portable"
+$DataDir = "$env:USERPROFILE\postgresql-data"
+$BinPath = Join-Path $PostgresPath "bin"
+
+# Vérifier si PostgreSQL portable existe déjà
+if (-not (Test-Path $BinPath)) {
+    Write-Host ""
+    Write-Host "PostgreSQL portable non trouvé dans: $PostgresPath" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Téléchargez PostgreSQL portable depuis:" -ForegroundColor Cyan
+    Write-Host "  https://github.com/garethflowers/postgresql-portable/releases" -ForegroundColor White
+    Write-Host ""
+    Write-Host "Ou utilisez BigSQL PostgreSQL portable:" -ForegroundColor Cyan
+    Write-Host "  https://www.enterprisedb.com/download-postgresql-binaries" -ForegroundColor White
+    Write-Host ""
+    
+    $download = Read-Host "Voulez-vous que je tente de télécharger automatiquement? (O/N)"
+    if ($download -eq "O" -or $download -eq "o") {
+        Write-Host "Téléchargement de PostgreSQL portable..." -ForegroundColor Green
+        
+        # Créer le dossier de destination
+        New-Item -ItemType Directory -Path $PostgresPath -Force | Out-Null
+        
+        # URL de téléchargement (dernière version connue)
+        $downloadUrl = "https://github.com/garethflowers/postgresql-portable/releases/download/v15.5.0/postgresql-portable-15.5.0-win-x64.zip"
+        $zipPath = "$env:TEMP\postgresql-portable.zip"
+        
+        try {
+            Write-Host "Téléchargement depuis GitHub..." -ForegroundColor Yellow
+            Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -UseBasicParsing
+            
+            Write-Host "Extraction..." -ForegroundColor Yellow
+            Expand-Archive -Path $zipPath -DestinationPath $PostgresPath -Force
+            
+            Write-Host "✅ PostgreSQL portable installé!" -ForegroundColor Green
+        } catch {
+            Write-Host "❌ Erreur lors du téléchargement: $_" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Veuillez télécharger manuellement et extraire dans: $PostgresPath" -ForegroundColor Yellow
+            exit 1
+        }
+    } else {
+        Write-Host "Veuillez télécharger et extraire PostgreSQL portable dans: $PostgresPath" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# Vérifier que les binaires existent
+$InitDb = Join-Path $BinPath "initdb.exe"
+$PgCtl = Join-Path $BinPath "pg_ctl.exe"
+$Psql = Join-Path $BinPath "psql.exe"
+
+if (-not (Test-Path $InitDb)) {
+    Write-Host "❌ initdb.exe non trouvé dans $BinPath" -ForegroundColor Red
+    Write-Host "Vérifiez que PostgreSQL portable est correctement installé" -ForegroundColor Yellow
+    exit 1
+}
+
+Write-Host "✅ PostgreSQL portable trouvé" -ForegroundColor Green
+
+# Setup initial si nécessaire
+if (-not (Test-Path $DataDir)) {
+    Write-Host ""
+    Write-Host "Initialisation de la base de données..." -ForegroundColor Green
+    New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
+    
+    & $InitDb -D $DataDir -U postgres -E UTF8 --locale=C
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Erreur lors de l'initialisation" -ForegroundColor Red
+        exit 1
+    }
+    
+    # Configurer postgresql.conf
+    $ConfigFile = Join-Path $DataDir "postgresql.conf"
+    if (Test-Path $ConfigFile) {
+        $content = Get-Content $ConfigFile -Raw
+        $content = $content -replace "#port = 5432", "port = 5432"
+        Set-Content $ConfigFile $content
+    }
+    
+    # Configurer pg_hba.conf
+    $PgHbaFile = Join-Path $DataDir "pg_hba.conf"
+    if (Test-Path $PgHbaFile) {
+        $hbaContent = @"
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   all             all                                     trust
+host    all             all             127.0.0.1/32            trust
+host    all             all             ::1/128                  trust
+"@
+        Set-Content $PgHbaFile $hbaContent
+    }
+    
+    Write-Host "✅ Base de données initialisée" -ForegroundColor Green
+}
+
+# Démarrer PostgreSQL
+Write-Host ""
+Write-Host "Démarrage de PostgreSQL..." -ForegroundColor Green
+$LogFile = Join-Path $DataDir "postgres.log"
+
+$Status = & $PgCtl -D $DataDir status 2>&1
+if ($Status -match "server is running") {
+    Write-Host "✅ PostgreSQL est déjà démarré" -ForegroundColor Green
+} else {
+    & $PgCtl -D $DataDir -l $LogFile start
+    Start-Sleep -Seconds 3
+    
+    $Status = & $PgCtl -D $DataDir status 2>&1
+    if ($Status -match "server is running") {
+        Write-Host "✅ PostgreSQL démarré" -ForegroundColor Green
+    } else {
+        Write-Host "❌ Erreur au démarrage" -ForegroundColor Red
+        Write-Host "Logs: $LogFile" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# Créer la base de données et l'utilisateur
+Write-Host ""
+Write-Host "Configuration de la base de données..." -ForegroundColor Green
+$env:PGPASSWORD = "postgres"
+
+& $Psql -U postgres -h localhost -c "CREATE DATABASE vibe_tracker;" 2>&1 | Out-Null
+& $Psql -U postgres -h localhost -c "CREATE USER vibe_user WITH PASSWORD 'dev_password_123';" 2>&1 | Out-Null
+& $Psql -U postgres -h localhost -c "ALTER DATABASE vibe_tracker OWNER TO vibe_user;" 2>&1 | Out-Null
+& $Psql -U postgres -h localhost -c "GRANT ALL PRIVILEGES ON DATABASE vibe_tracker TO vibe_user;" 2>&1 | Out-Null
+
+# Initialiser le schéma
+Write-Host ""
+Write-Host "Initialisation du schéma..." -ForegroundColor Green
+$InitScript = Join-Path $ProjectRoot "backend\scripts\init_postgres.sql"
+$env:PGPASSWORD = "dev_password_123"
+
+& $Psql -U vibe_user -h localhost -d vibe_tracker -f $InitScript
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ Schéma initialisé" -ForegroundColor Green
+} else {
+    Write-Host "⚠️ Erreurs lors de l'initialisation (peut être normal si déjà initialisé)" -ForegroundColor Yellow
+}
+
+# Test de connexion avec Python
+Write-Host ""
+Write-Host "Test de connexion avec Python..." -ForegroundColor Green
+Set-Location "$ProjectRoot\backend"
+
+$env:DATABASE_URL = "postgresql://vibe_user:dev_password_123@localhost:5432/vibe_tracker"
+$env:USE_POSTGRES = "true"
+
+try {
+    $testResult = python -c @"
+import os
+import sys
+sys.path.insert(0, '.')
+
+os.environ['DATABASE_URL'] = '$env:DATABASE_URL'
+os.environ['USE_POSTGRES'] = 'true'
+
+try:
+    from app.database import get_db_connection, init_db
+    conn, is_duckdb = get_db_connection()
+    print('✅ Connexion PostgreSQL réussie!')
+    print(f'   Type: PostgreSQL (is_duckdb={is_duckdb})')
+    
+    # Test simple query
+    cursor = conn.cursor()
+    cursor.execute('SELECT version()')
+    version = cursor.fetchone()[0]
+    print(f'   Version: {version.split(",")[0]}')
+    
+    cursor.close()
+    conn.close()
+    print('✅ Test réussi!')
+except Exception as e:
+    print(f'❌ Erreur: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"@
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Green
+        Write-Host "✅ Installation et Test Réussis!" -ForegroundColor Green
+        Write-Host "========================================" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "PostgreSQL est prêt à être utilisé!" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Pour lancer l'API:" -ForegroundColor Yellow
+        Write-Host "  cd backend" -ForegroundColor White
+        Write-Host "  `$env:DATABASE_URL = 'postgresql://vibe_user:dev_password_123@localhost:5432/vibe_tracker'" -ForegroundColor White
+        Write-Host "  uvicorn app.main:app --reload" -ForegroundColor White
+        Write-Host ""
+        Write-Host "Pour arrêter PostgreSQL:" -ForegroundColor Yellow
+        Write-Host "  .\scripts\stop-postgres-local.ps1" -ForegroundColor White
+    } else {
+        Write-Host "❌ Test échoué" -ForegroundColor Red
+        exit 1
+    }
+} catch {
+    Write-Host "❌ Erreur lors du test: $_" -ForegroundColor Red
+    exit 1
+}

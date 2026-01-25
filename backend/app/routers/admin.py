@@ -62,33 +62,21 @@ async def get_duplicates_stats():
     Returns counts of duplicates by URL and by content+author+source.
     """
     try:
-        conn, is_duckdb = db.get_db_connection()
-        c = conn.cursor()
-        
         # Count duplicates by URL
-        if is_duckdb:
-            url_duplicates_query = """
-                SELECT url, COUNT(*) as count
-                FROM posts
-                WHERE url IS NOT NULL AND url != ''
-                GROUP BY url
-                HAVING COUNT(*) > 1
-            """
-        else:
-            url_duplicates_query = """
-                SELECT url, COUNT(*) as count
-                FROM posts
-                WHERE url IS NOT NULL AND url != ''
-                GROUP BY url
-                HAVING COUNT(*) > 1
-            """
+        url_duplicates_query = """
+            SELECT url, COUNT(*) as count
+            FROM posts
+            WHERE url IS NOT NULL AND url != ''
+            GROUP BY url
+            HAVING COUNT(*) > 1
+        """
         
-        c.execute(url_duplicates_query)
-        url_duplicates = c.fetchall()
-        url_duplicates_count = sum(count - 1 for _, count in url_duplicates)  # -1 to keep one
-        
-        # Count duplicates by content+author+source
-        if is_duckdb:
+        with db.get_pg_cursor() as cur:
+            cur.execute(url_duplicates_query)
+            url_duplicates = cur.fetchall()
+            url_duplicates_count = sum(count - 1 for _, count in url_duplicates)  # -1 to keep one
+            
+            # Count duplicates by content+author+source
             content_duplicates_query = """
                 SELECT content, author, source, COUNT(*) as count
                 FROM posts
@@ -96,26 +84,16 @@ async def get_duplicates_stats():
                 GROUP BY content, author, source
                 HAVING COUNT(*) > 1
             """
-        else:
-            content_duplicates_query = """
-                SELECT content, author, source, COUNT(*) as count
-                FROM posts
-                WHERE content IS NOT NULL AND content != ''
-                GROUP BY content, author, source
-                HAVING COUNT(*) > 1
-            """
-        
-        c.execute(content_duplicates_query)
-        content_duplicates = c.fetchall()
-        content_duplicates_count = sum(count - 1 for _, _, _, count in content_duplicates)  # -1 to keep one
-        
-        # Total unique duplicate groups
-        total_duplicate_groups = len(url_duplicates) + len(content_duplicates)
-        
-        # Total posts that would be deleted
-        total_to_delete = url_duplicates_count + content_duplicates_count
-        
-        conn.close()
+            
+            cur.execute(content_duplicates_query)
+            content_duplicates = cur.fetchall()
+            content_duplicates_count = sum(count - 1 for _, _, _, count in content_duplicates)  # -1 to keep one
+            
+            # Total unique duplicate groups
+            total_duplicate_groups = len(url_duplicates) + len(content_duplicates)
+            
+            # Total posts that would be deleted
+            total_to_delete = url_duplicates_count + content_duplicates_count
         
         return {
             'duplicates_by_url': {
@@ -143,18 +121,48 @@ async def trigger_backup(
     """Trigger a manual database backup. Admin only."""
     logger.info(f"Admin {current_user.username} triggered manual backup")
     try:
-        db_path = backend_dir / "data.duckdb"
-        success = backup_database(db_path, "production", keep_backups=30, backup_type="manual")
+        # PostgreSQL backup using pg_dump
+        import subprocess
+        import os
+        from datetime import datetime
         
-        if success:
+        database_url = os.getenv('DATABASE_URL', '')
+        if not database_url:
+            raise HTTPException(status_code=500, detail='DATABASE_URL not configured')
+        
+        # Parse DATABASE_URL: postgresql://user:password@host:port/database
+        from urllib.parse import urlparse
+        parsed = urlparse(database_url)
+        
+        backup_dir = backend_dir / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        backup_file = backup_dir / f"postgres_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
+        
+        # Use pg_dump to create backup
+        env = os.environ.copy()
+        env['PGPASSWORD'] = parsed.password
+        
+        cmd = [
+            'pg_dump',
+            '-h', parsed.hostname or 'localhost',
+            '-p', str(parsed.port or 5432),
+            '-U', parsed.username,
+            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
+            '-f', str(backup_file)
+        ]
+        
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode == 0:
             return {
                 'success': True,
-                'message': 'Backup created successfully'
+                'message': 'Backup created successfully',
+                'backup_file': str(backup_file)
             }
         else:
-            raise HTTPException(status_code=500, detail='Backup failed - database may be corrupted')
+            raise HTTPException(status_code=500, detail=f'Backup failed: {result.stderr}')
     except Exception as e:
-        logger.error(f"Error during manual backup: {e}")
+        logger.error(f"Error during manual backup: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

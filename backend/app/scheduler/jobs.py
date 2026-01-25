@@ -10,9 +10,7 @@ from ..routers.scraping import _run_scrape_for_source
 
 logger = logging.getLogger(__name__)
 
-# Import backup function
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from scripts.backup_db import backup_database
+# Backup functions are now implemented directly using pg_dump
 
 
 def auto_scrape_job():
@@ -88,55 +86,103 @@ def auto_scrape_job():
 
 
 def auto_backup_job():
-    """Scheduled job to backup the database automatically.
+    """Scheduled job to backup PostgreSQL database automatically.
     
-    Creates regular backups with integrity checks:
+    Creates regular backups using pg_dump:
     - Hourly backups: kept for 24 hours (24 backups)
     - Daily backups: kept for 30 days (30 backups)
-    - Weekly backups: kept for 12 weeks (12 backups)
     """
     logger.info("💾 Running scheduled database backup...")
     
     try:
-        backend_dir = Path(__file__).resolve().parents[2]
-        db_path = backend_dir / "data.duckdb"
+        import subprocess
+        import os
+        from datetime import datetime
+        from urllib.parse import urlparse
         
-        if not db_path.exists():
-            logger.warning("⚠️  Database file not found, skipping backup")
+        database_url = os.getenv('DATABASE_URL', '')
+        if not database_url:
+            logger.warning("⚠️  DATABASE_URL not configured, skipping backup")
             return
         
-        # Create backup with integrity check
-        # Keep 24 hourly backups (1 day)
-        success = backup_database(db_path, "production", keep_backups=24, backup_type="hourly")
+        parsed = urlparse(database_url)
+        backend_dir = Path(__file__).resolve().parents[2]
+        backup_dir = backend_dir / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        backup_file = backup_dir / f"postgres_backup_hourly_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
         
-        if success:
+        env = os.environ.copy()
+        env['PGPASSWORD'] = parsed.password
+        
+        cmd = [
+            'pg_dump',
+            '-h', parsed.hostname or 'localhost',
+            '-p', str(parsed.port or 5432),
+            '-U', parsed.username,
+            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
+            '-f', str(backup_file)
+        ]
+        
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode == 0:
             logger.info("✅ Scheduled backup completed successfully")
+            # Keep only last 24 hourly backups
+            backups = sorted(backup_dir.glob("postgres_backup_hourly_*.sql"), key=lambda p: p.stat().st_mtime)
+            if len(backups) > 24:
+                for old_backup in backups[:-24]:
+                    old_backup.unlink()
         else:
-            logger.error("❌ Scheduled backup failed - database may be corrupted")
+            logger.error(f"❌ Scheduled backup failed: {result.stderr}")
             
     except Exception as e:
         logger.error(f"❌ Error during scheduled backup: {e}", exc_info=True)
 
 
 def daily_backup_job():
-    """Daily backup job - creates a backup that will be kept longer."""
+    """Daily backup job - creates a PostgreSQL backup that will be kept longer."""
     logger.info("💾 Running daily database backup...")
     
     try:
-        backend_dir = Path(__file__).resolve().parents[2]
-        db_path = backend_dir / "data.duckdb"
+        import subprocess
+        import os
+        from datetime import datetime
+        from urllib.parse import urlparse
         
-        if not db_path.exists():
-            logger.warning("⚠️  Database file not found, skipping backup")
+        database_url = os.getenv('DATABASE_URL', '')
+        if not database_url:
+            logger.warning("⚠️  DATABASE_URL not configured, skipping backup")
             return
         
-        # Create daily backup - keep 30 days
-        success = backup_database(db_path, "production", keep_backups=30, backup_type="daily")
+        parsed = urlparse(database_url)
+        backend_dir = Path(__file__).resolve().parents[2]
+        backup_dir = backend_dir / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        backup_file = backup_dir / f"postgres_backup_daily_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
         
-        if success:
+        env = os.environ.copy()
+        env['PGPASSWORD'] = parsed.password
+        
+        cmd = [
+            'pg_dump',
+            '-h', parsed.hostname or 'localhost',
+            '-p', str(parsed.port or 5432),
+            '-U', parsed.username,
+            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
+            '-f', str(backup_file)
+        ]
+        
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        
+        if result.returncode == 0:
             logger.info("✅ Daily backup completed successfully")
+            # Keep only last 30 daily backups
+            backups = sorted(backup_dir.glob("postgres_backup_daily_*.sql"), key=lambda p: p.stat().st_mtime)
+            if len(backups) > 30:
+                for old_backup in backups[:-30]:
+                    old_backup.unlink()
         else:
-            logger.error("❌ Daily backup failed - database may be corrupted")
+            logger.error(f"❌ Daily backup failed: {result.stderr}")
             
     except Exception as e:
         logger.error(f"❌ Error during daily backup: {e}", exc_info=True)
