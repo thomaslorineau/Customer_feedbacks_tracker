@@ -370,6 +370,7 @@ ovh-complaints-tracker/
 | **Scrapers** | httpx, feedparser, BeautifulSoup | Real data from Trustpilot, X (Nitter), GitHub, etc. |
 | **Sentiment** | VADER (vaderSentiment) | Classify customer sentiment in complaints |
 | **Database** | PostgreSQL | Persistent storage of real posts only |
+| **Job Queue** | Redis | Asynchronous job processing for scraping operations (with in-memory fallback) |
 | **Charts** | Chart.js | Interactive timeline, histogram, and product distribution charts |
 | **LLM** | OpenAI GPT-4o-mini / Anthropic Claude 3 Haiku | AI-powered recommended actions and improvement ideas |
 
@@ -384,19 +385,20 @@ ovh-complaints-tracker/
 7. **ES6 Modules**: Frontend uses ES6 modules for better code organization and maintainability.
 8. **Modular Scrapers**: Each source (Trustpilot, X, GitHub, etc.) is isolated for independent development.
 9. **Complaint-Focused**: All scrapers search for customer complaints, not generic mentions.
-10. **APScheduler**: Background auto-scraping without external job queue.
-11. **Background Jobs**: Thread-based job system for long-running keyword searches with progress tracking.
-12. **Fallback Strategies**: Scrapers use multiple strategies (Primary → Google Search → RSS Detector → empty list) for maximum resilience.
-13. **Base Keywords System**: Configurable base keywords (brands, products, problems, leadership) combined with user-defined keywords.
-14. **Relevance Scoring**: Automatic relevance scoring (0-100%) filters out non-relevant posts (< 30% threshold).
-15. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters. Product analysis with AI-powered summaries and product-specific filtering.
-16. **Opportunity Score**: Additive algorithm (0-100): `relevance_score + sentiment_score + recency_score + engagement_score` for accurate prioritization. Replaces the old multiplicative priority score.
-17. **Product Filtering**: Interactive filtering on Improvements page - clicking a product filters LLM analysis and posts automatically.
-18. **Post Preview Modal**: Full-content preview modal with metadata and link to original post source.
-19. **Pain Points Detection**: Automatic detection of recurring issues based on keyword analysis in recent negative/neutral posts.
-17. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
-18. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
-19. **Dashboard Enhancements**: Posts Statistics with dynamic satisfaction metrics, Critical Posts drawer, All Posts section with comprehensive filters.
+10. **Redis Job Queue**: Asynchronous job processing system for scraping operations. Decouples API from heavy work to prevent crashes. Falls back to in-memory queue if Redis unavailable.
+11. **APScheduler**: Background auto-scraping every 3 hours, triggers jobs via Redis queue.
+12. **Background Jobs**: Redis-based job system for long-running keyword searches with progress tracking and status monitoring.
+13. **Fallback Strategies**: Scrapers use multiple strategies (Primary → Google Search → RSS Detector → empty list) for maximum resilience.
+14. **Base Keywords System**: Configurable base keywords (brands, products, problems, leadership) combined with user-defined keywords.
+15. **Relevance Scoring**: Automatic relevance scoring (0-100%) filters out non-relevant posts (< 30% threshold).
+16. **LLM Integration**: Dynamic, context-aware recommended actions based on filtered posts and active filters. Product analysis with AI-powered summaries and product-specific filtering.
+17. **Opportunity Score**: Additive algorithm (0-100): `relevance_score + sentiment_score + recency_score + engagement_score` for accurate prioritization. Replaces the old multiplicative priority score.
+18. **Product Filtering**: Interactive filtering on Improvements page - clicking a product filters LLM analysis and posts automatically.
+19. **Post Preview Modal**: Full-content preview modal with metadata and link to original post source.
+20. **Pain Points Detection**: Automatic detection of recurring issues based on keyword analysis in recent negative/neutral posts.
+21. **Interactive Charts**: Chart.js visualizations with click/double-click filtering capabilities.
+22. **Shared Theme System**: Consistent dark/light mode across all pages with localStorage synchronization.
+23. **Dashboard Enhancements**: Posts Statistics with dynamic satisfaction metrics, Critical Posts drawer, All Posts section with comprehensive filters.
 
 ## API Contract
 
@@ -683,7 +685,7 @@ SMTP settings via environment variables:
 ## Scaling Considerations
 
 - **More posts**: PostgreSQL handles large datasets efficiently with proper indexes. Current indexes on `(source, created_at, sentiment_label)`.
-- **More scrapers**: Add Redis queue for async jobs; use Celery for distributed task scheduling.
+- **More scrapers**: Redis queue already implemented for async jobs. Can scale workers horizontally with `docker compose up -d --scale worker=3`.
 - **Better Sentiment**: Replace VADER with Hugging Face transformer model (DistilBERT-multilingual).
 - **Real-time updates**: Add WebSocket endpoint to push new complaint alerts.
 - **Analytics**: Add dashboard for sentiment trends, source distribution, complaint categories.

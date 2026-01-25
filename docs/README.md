@@ -24,6 +24,7 @@
 ### 📚 Guides
 - **[GUIDE_TEST.md](guides/GUIDE_TEST.md)** - Guide des tests
 - **[GUIDE_API_KEYS.md](guides/GUIDE_API_KEYS.md)** - Configuration des clés API
+- **[REDIS_GUIDE.md](guides/REDIS_GUIDE.md)** - Guide Redis (file d'attente de jobs)
 - **[VERSIONING.md](guides/VERSIONING.md)** - Gestion des versions
 
 ### 📊 Spécifications
