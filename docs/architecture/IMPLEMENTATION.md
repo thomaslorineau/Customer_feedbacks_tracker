@@ -616,7 +616,7 @@ lsof -i :8000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 8000
 
 ```bash
 # Vérifier les processus utilisant la DB
-# Pour PostgreSQL, vérifier les connexions actives`npsql -U vibe_user -d vibe_tracker -c "SELECT pid, usename, application_name FROM pg_stat_activity WHERE datname='vibe_tracker';" 2>/dev/null
+# Pour PostgreSQL, vérifier les connexions actives`npsql -U ocft_user -d ocft_tracker -c "SELECT pid, usename, application_name FROM pg_stat_activity WHERE datname='ocft_tracker';" 2>/dev/null
 
 # Arrêter tous les processus Python de l'application
 pkill -f "uvicorn app.main:app"
@@ -1075,7 +1075,7 @@ ps aux | grep uvicorn
 netstat -tlnp 2>/dev/null | grep 8000 || ss -tlnp | grep 8000
 
 # Vérifier les permissions
-# Vérifier la connexion PostgreSQL`npsql -U vibe_user -d vibe_tracker -c "SELECT COUNT(*) FROM posts;"
+# Vérifier la connexion PostgreSQL`npsql -U ocft_user -d ocft_tracker -c "SELECT COUNT(*) FROM posts;"
 ls -la ~/apps/complaints_tracker/backend/server.log
 
 # Tester manuellement
