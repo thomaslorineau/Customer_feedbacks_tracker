@@ -431,6 +431,47 @@ def pg_delete_duplicate_posts() -> int:
         return cur.rowcount
 
 
+def pg_delete_sample_posts() -> int:
+    """Delete sample/test posts from the database."""
+    with get_pg_cursor() as cur:
+        cur.execute("""
+            DELETE FROM posts 
+            WHERE url LIKE '%/sample%'
+               OR url LIKE '%example.com%'
+               OR url LIKE '%/status/174%'
+               OR url = 'https://trustpilot.com/sample'
+        """)
+        return cur.rowcount
+
+
+def pg_delete_non_ovh_posts() -> int:
+    """
+    Delete posts that do NOT mention OVH or its brands.
+    Keeps posts containing: ovh, ovhcloud, ovh cloud, kimsufi, soyoustart
+    """
+    with get_pg_cursor() as cur:
+        cur.execute("""
+            DELETE FROM posts 
+            WHERE LOWER(content) NOT LIKE '%ovh%'
+              AND LOWER(content) NOT LIKE '%ovhcloud%'
+              AND LOWER(content) NOT LIKE '%ovh cloud%'
+              AND LOWER(content) NOT LIKE '%kimsufi%'
+              AND LOWER(content) NOT LIKE '%soyoustart%'
+              AND LOWER(url) NOT LIKE '%ovh%'
+              AND LOWER(url) NOT LIKE '%ovhcloud%'
+              AND LOWER(url) NOT LIKE '%kimsufi%'
+              AND LOWER(url) NOT LIKE '%soyoustart%'
+        """)
+        return cur.rowcount
+
+
+def pg_delete_hackernews_posts() -> int:
+    """Delete all posts from Hacker News (replaced by Reddit)."""
+    with get_pg_cursor() as cur:
+        cur.execute("DELETE FROM posts WHERE source = 'HackerNews' OR source = 'hackernews'")
+        return cur.rowcount
+
+
 # ============================================
 # Statistics and Analytics
 # ============================================
@@ -879,6 +920,9 @@ get_post_by_id = pg_get_post_by_id
 delete_post = pg_delete_post
 url_exists = pg_url_exists
 delete_duplicate_posts = pg_delete_duplicate_posts
+delete_sample_posts = pg_delete_sample_posts
+delete_non_ovh_posts = pg_delete_non_ovh_posts
+delete_hackernews_posts = pg_delete_hackernews_posts
 
 # Stats
 get_sentiment_stats = pg_get_sentiment_stats
