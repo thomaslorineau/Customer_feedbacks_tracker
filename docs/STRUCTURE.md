@@ -60,7 +60,7 @@ backend/
 ├── app/                    # Code source de l'application
 │   ├── main.py            # Point d'entrée FastAPI (routes, scheduler)
 │   ├── config.py          # Configuration (clés API, variables d'env)
-│   ├── db.py              # Gestion base de données DuckDB
+│   ├── db_postgres.py     # Gestion base de données PostgreSQL
 │   ├── db_postgres.py     # Adaptateur PostgreSQL (Docker) ⭐ NOUVEAU
 │   ├── job_queue.py       # File d'attente Redis + fallback ⭐ NOUVEAU
 │   │
@@ -116,9 +116,9 @@ backend/
 │   └── test_scrapers_async.py
 │
 ├── backups/              # Backups de la base de données (5 derniers conservés)
-│   └── production_data_*.duckdb
+│   └── postgres_backup_*.sql
 │
-└── data.duckdb           # Base de données DuckDB (générée automatiquement)
+└── (PostgreSQL database managed via Docker or external service)
 ```
 
 **Points d'entrée:**
@@ -178,7 +178,7 @@ docs/
 │   └── ...
 │
 ├── archive/              # Documents archivés (historique)
-│   ├── migration/        # Migrations terminées (SQLite → DuckDB)
+│   ├── migration/        # Migrations terminées (SQLite → DuckDB → PostgreSQL)
 │   ├── changelog/        # Changelogs historiques (PHASE*.md)
 │   ├── guides/           # Anciens guides consolidés
 │   └── audits/           # Anciens audits
@@ -261,7 +261,7 @@ ovh-complaints-tracker/
 
 ## 📝 Notes
 
-- **Base de données** : DuckDB (`data.duckdb`) en développement, PostgreSQL en production Docker
+- **Base de données** : PostgreSQL (unifié pour développement et production)
 - **Architecture Docker** : Voir `docs/guides/DOCKER_ARCHITECTURE.md` pour l'architecture multi-processus ⭐ NOUVEAU
 - **File d'attente** : Redis pour les jobs de scraping, fallback in-memory si indisponible ⭐ NOUVEAU
 - **Notifications email** : Système complet avec triggers configurables et templates HTML
@@ -302,7 +302,7 @@ Racine/
 
 Les scripts sont organisés par fonction dans `backend/scripts/` :
 - **Tests** : `e2e_*.py`, `ci_test_*.py`, `test_*.py`
-- **Maintenance** : `backup_db.py`, `check_db_integrity.py`, `fix_duckdb_sequences.py`
+- **Maintenance** : `backup_db.py`, `check_db_integrity.py` (PostgreSQL)`
 - **Migration** : `migrate_github_sources.py`
 - **Rapports** : `generate_final_report.py`, `test_scrapers_report.py`
 

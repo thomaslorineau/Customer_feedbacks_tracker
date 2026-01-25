@@ -261,7 +261,7 @@ class TestAnsweredStatus:
             result = await db.recheck_posts_answered_status(limit=10)
             
             assert result['success'] is True
-            # Le résultat peut être 0 si le post est déjà marqué comme answered ou si DuckDB a des problèmes de contraintes
+            # Le résultat peut être 0 si le post est déjà marqué comme answered ou si PostgreSQL a des problèmes de contraintes
             # On vérifie juste que la fonction s'exécute sans erreur
             assert 'updated_count' in result
             assert 'error_count' in result

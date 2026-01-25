@@ -136,7 +136,7 @@ class TestUpdateAllPostsProductLabels:
         
         assert result['success'] is True
         assert result['total_posts'] >= len(post_ids)
-        # Le résultat peut être 0 si les posts ont déjà des labels ou si DuckDB a des problèmes de contraintes
+        # Le résultat peut être 0 si les posts ont déjà des labels ou si PostgreSQL a des problèmes de contraintes
         # On vérifie juste que la fonction s'exécute sans erreur
         assert 'updated_count' in result
         assert 'error_count' in result

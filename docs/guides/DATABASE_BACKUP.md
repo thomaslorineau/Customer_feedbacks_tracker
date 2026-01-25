@@ -1,6 +1,6 @@
 # Guide de Sauvegarde et Maintenance des Bases de Données
 
-Ce guide explique comment utiliser le système de sauvegarde automatique et de vérification d'intégrité des bases de données DuckDB.
+Ce guide explique comment utiliser le système de sauvegarde automatique et de vérification d'intégrité des bases de données PostgreSQL (migration depuis DuckDB terminée le 25 janvier 2026).
 
 ## Vue d'ensemble
 
@@ -130,17 +130,14 @@ Vous n'avez rien à faire de spécial, ces vérifications sont automatiques lors
 
 Les sauvegardes sont stockées dans `backend/backups/` avec le format :
 ```
-production_data_YYYYMMDD_HHMMSS.duckdb
-staging_data_YYYYMMDD_HHMMSS.duckdb
+postgres_backup_YYYYMMDD_HHMMSS.sql
 ```
 
 Exemple :
 ```
 backend/backups/
-├── production_data_20240115_020000.duckdb
-├── production_data_20240116_020000.duckdb
-├── staging_data_20240115_020000.duckdb
-└── staging_data_20240116_020000.duckdb
+├── postgres_backup_20240115_020000.sql
+├── postgres_backup_20240116_020000.sql
 ```
 
 ## Restauration d'une sauvegarde
@@ -152,10 +149,12 @@ Pour restaurer une sauvegarde :
 ./stop.sh
 
 # 2. Sauvegarder la base actuelle (au cas où)
-cp backend/data.duckdb backend/data.duckdb.old
+# Pour PostgreSQL, créer un backup avant restauration
+pg_dump -U vibe_user -d vibe_tracker > backend/data_postgres_backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 3. Restaurer la sauvegarde souhaitée
-cp backend/backups/production_data_20240115_020000.duckdb backend/data.duckdb
+# Restaurer depuis un backup PostgreSQL
+psql -U vibe_user -d vibe_tracker < backend/backups/postgres_backup_20240115_020000.sql
 
 # 4. Vérifier l'intégrité
 python backend/scripts/check_db_integrity.py production

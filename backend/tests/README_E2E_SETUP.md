@@ -65,7 +65,7 @@ Si vous voyez l'erreur `httpx.ConnectError: All connection attempts failed`, cel
 - Vérifiez que l'URL de base est correcte dans les tests (par défaut : `http://127.0.0.1:8000`)
 - Vous pouvez changer l'URL avec la variable d'environnement : `API_BASE_URL=http://127.0.0.1:8001 python -m pytest backend/tests/test_e2e_jobs.py`
 
-### Erreurs de base de données DuckDB
+### Erreurs de base de données PostgreSQL
 - Si vous voyez "File is already open", arrêtez tous les processus Python et redémarrez le serveur
 - Les tests E2E utilisent la même base de données que le serveur, donc des conflits peuvent survenir
 
