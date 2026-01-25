@@ -52,7 +52,7 @@ services:
       - USE_POSTGRES=true
       - LOG_LEVEL=info
       - WORKERS=4
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080,http://gw.lab.core.ovh.net:11840
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080,http://tlorinea.sdev-docker.ha.ovh.net:11840,http://gw.lab.core.ovh.net:11840
     ports:
       - "0.0.0.0:11840:8000"
     depends_on:
