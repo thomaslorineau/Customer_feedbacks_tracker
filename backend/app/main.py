@@ -58,36 +58,52 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Mount static files for dashboard frontend
-frontend_dashboard_path = Path(__file__).resolve().parents[2] / "frontend" / "dashboard"
-frontend_path = Path(__file__).resolve().parents[2] / "frontend"
-if frontend_dashboard_path.exists():
-    # Mount CSS and JS directories separately
-    css_path = frontend_dashboard_path / "css"
-    js_path = frontend_dashboard_path / "js"
-    if css_path.exists():
-        app.mount("/dashboard/css", StaticFiles(directory=str(css_path), html=False), name="dashboard-css")
-    if js_path.exists():
-        app.mount("/dashboard/js", StaticFiles(directory=str(js_path), html=False), name="dashboard-js")
+# Try multiple paths for Docker and local dev compatibility
+def find_frontend_path():
+    """Find frontend directory using multiple fallback paths."""
+    possible_paths = [
+        Path("/app/frontend"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend",  # Local dev
+    ]
+    for path in possible_paths:
+        if path.exists():
+            return path
+    return None
 
-# Mount assets (logos, images)
-assets_path = frontend_path / "assets"
-if assets_path.exists():
-    app.mount("/assets", StaticFiles(directory=str(assets_path), html=False), name="assets")
+frontend_path = find_frontend_path()
+if frontend_path:
+    # Mount dashboard CSS and JS
+    dashboard_css_path = frontend_path / "dashboard" / "css"
+    dashboard_js_path = frontend_path / "dashboard" / "js"
+    if dashboard_css_path.exists():
+        app.mount("/dashboard/css", StaticFiles(directory=str(dashboard_css_path), html=False), name="dashboard-css")
+    if dashboard_js_path.exists():
+        app.mount("/dashboard/js", StaticFiles(directory=str(dashboard_js_path), html=False), name="dashboard-js")
 
-# Mount shared CSS files
-if (frontend_path / "css").exists():
-    app.mount("/css", StaticFiles(directory=str(frontend_path / "css"), html=False), name="shared-css")
+    # Mount assets (logos, images)
+    assets_path = frontend_path / "assets"
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path), html=False), name="assets")
 
-# Mount shared JS files
-if (frontend_path / "js").exists():
-    app.mount("/js", StaticFiles(directory=str(frontend_path / "js"), html=False), name="shared-js")
+    # Mount shared CSS files
+    shared_css_path = frontend_path / "css"
+    if shared_css_path.exists():
+        app.mount("/css", StaticFiles(directory=str(shared_css_path), html=False), name="shared-css")
 
-# Mount improvements static files (must be before /improvements route)
-improvements_path = frontend_path / "improvements"
-if improvements_path.exists():
-    improvements_js_path = improvements_path / "js"
-    if improvements_js_path.exists():
-        app.mount("/improvements/js", StaticFiles(directory=str(improvements_js_path), html=False), name="improvements-js")
+    # Mount shared JS files
+    shared_js_path = frontend_path / "js"
+    if shared_js_path.exists():
+        app.mount("/js", StaticFiles(directory=str(shared_js_path), html=False), name="shared-js")
+
+    # Mount improvements static files (must be before /improvements route)
+    improvements_path = frontend_path / "improvements"
+    if improvements_path.exists():
+        improvements_js_path = improvements_path / "js"
+        if improvements_js_path.exists():
+            app.mount("/improvements/js", StaticFiles(directory=str(improvements_js_path), html=False), name="improvements-js")
+else:
+    logger.warning("Frontend directory not found. Static files will not be served.")
 
 # Enable CORS for frontend - restrict to specific ports for security
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://localhost:8080,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8080,http://127.0.0.1:8000').split(',')
