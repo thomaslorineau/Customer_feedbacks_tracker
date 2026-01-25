@@ -2,6 +2,9 @@
 -- PostgreSQL Initialization Script
 -- VibeCoding Customer Feedbacks Tracker
 -- ============================================
+-- Note: This script runs AFTER PostgreSQL creates the user and database
+-- specified in POSTGRES_USER and POSTGRES_DB environment variables.
+-- It only runs on FIRST initialization (when data directory is empty).
 
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
