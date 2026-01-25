@@ -12,24 +12,21 @@ from typing import Optional, List, Dict, Any, Generator
 from contextlib import contextmanager
 from functools import wraps
 
-# Check if we should use PostgreSQL
-USE_POSTGRES = os.getenv('USE_POSTGRES', 'false').lower() == 'true'
+# PostgreSQL is now the only database (DuckDB removed)
 DATABASE_URL = os.getenv('DATABASE_URL', '')
 
 logger = logging.getLogger(__name__)
 
-if USE_POSTGRES:
-    try:
-        import psycopg2
-        from psycopg2 import pool
-        from psycopg2.extras import RealDictCursor, Json
-        POSTGRES_AVAILABLE = True
-    except ImportError:
-        POSTGRES_AVAILABLE = False
-        logger.error("psycopg2 not installed. PostgreSQL is required.")
-        raise ImportError("psycopg2-binary is required. Install with: pip install psycopg2-binary")
-else:
+# PostgreSQL is required - no fallback
+try:
+    import psycopg2
+    from psycopg2 import pool
+    from psycopg2.extras import RealDictCursor, Json
+    POSTGRES_AVAILABLE = True
+except ImportError:
     POSTGRES_AVAILABLE = False
+    logger.error("psycopg2 not installed. PostgreSQL is required.")
+    raise ImportError("psycopg2-binary is required. Install with: pip install psycopg2-binary")
 
 # Connection pool (initialized lazily)
 _connection_pool: Optional[Any] = None
@@ -52,13 +49,19 @@ def _get_pool():
 
 
 @contextmanager
-def get_pg_connection():
-    """Context manager for PostgreSQL connections with auto-return to pool."""
+def get_pg_connection(autocommit=True):
+    """
+    Context manager for PostgreSQL connections with auto-return to pool.
+    
+    Args:
+        autocommit: If True, automatically commit on success. If False, caller must commit/rollback.
+    """
     pool = _get_pool()
     conn = pool.getconn()
     try:
         yield conn
-        conn.commit()
+        if autocommit:
+            conn.commit()
     except Exception as e:
         conn.rollback()
         logger.error(f"PostgreSQL error: {e}")
@@ -68,9 +71,15 @@ def get_pg_connection():
 
 
 @contextmanager
-def get_pg_cursor(dict_cursor=True):
-    """Context manager for PostgreSQL cursor with auto-commit."""
-    with get_pg_connection() as conn:
+def get_pg_cursor(dict_cursor=True, autocommit=True):
+    """
+    Context manager for PostgreSQL cursor with optional auto-commit.
+    
+    Args:
+        dict_cursor: If True, use RealDictCursor (returns dict-like rows)
+        autocommit: If True, automatically commit on success. If False, caller must commit/rollback.
+    """
+    with get_pg_connection(autocommit=autocommit) as conn:
         cursor_factory = RealDictCursor if dict_cursor else None
         cursor = conn.cursor(cursor_factory=cursor_factory)
         try:
@@ -130,6 +139,21 @@ def _normalize_content_for_comparison(content: str) -> str:
     content = re.sub(r'[^\w\s]', '', content)
     # Limit length for comparison
     return content[:500]
+
+
+def _compute_content_hash(content: str) -> str:
+    """
+    Compute a hash of normalized content for fast duplicate detection.
+    
+    Args:
+        content: Raw content string
+    
+    Returns:
+        SHA256 hash of normalized content (hex string)
+    """
+    import hashlib
+    normalized = _normalize_content_for_comparison(content)
+    return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
 
 
 def detect_product_label(content: str, language: str = 'unknown') -> Optional[str]:
@@ -450,10 +474,11 @@ def pg_get_language_stats() -> Dict[str, int]:
 def pg_get_timeline_stats(days: int = 30) -> List[Dict]:
     """Get posts per day for timeline chart."""
     with get_pg_cursor() as cur:
+        # Use make_interval() for proper parameterized interval
         cur.execute("""
             SELECT DATE(created_at) as date, COUNT(*) as count
             FROM posts
-            WHERE created_at >= NOW() - INTERVAL '%s days'
+            WHERE created_at >= NOW() - make_interval(days => %s)
             GROUP BY DATE(created_at)
             ORDER BY date
         """, (days,))
@@ -682,29 +707,37 @@ def pg_health_check() -> Dict[str, Any]:
 # ============================================
 
 def init_db() -> None:
-    """Initialize PostgreSQL database schema."""
-    logger.info("Initializing PostgreSQL database schema...")
+    """
+    Initialize PostgreSQL database schema.
+    
+    NOTE: This function creates a basic schema. For production, use init_postgres.sql
+    which has proper types (BIGSERIAL, TIMESTAMP WITH TIME ZONE, etc.) and indexes.
+    This function is kept for backward compatibility but should not be used in production.
+    """
+    logger.warning("init_db() called - consider using init_postgres.sql for production schema")
+    logger.info("Initializing PostgreSQL database schema (basic version)...")
     
     with get_pg_cursor(dict_cursor=False) as cur:
-        # Posts table
+        # Posts table (basic schema - use init_postgres.sql for production)
         cur.execute('''
             CREATE TABLE IF NOT EXISTS posts (
-                id SERIAL PRIMARY KEY,
-                source TEXT,
-                author TEXT,
+                id BIGSERIAL PRIMARY KEY,
+                source VARCHAR(50),
+                author VARCHAR(255),
                 content TEXT,
                 url TEXT UNIQUE,
-                created_at TEXT,
+                created_at TIMESTAMP WITH TIME ZONE,
                 sentiment_score REAL,
-                sentiment_label TEXT,
-                language TEXT DEFAULT 'unknown',
-                country TEXT,
+                sentiment_label VARCHAR(20),
+                language VARCHAR(20) DEFAULT 'unknown',
+                country VARCHAR(100),
                 relevance_score REAL DEFAULT 0.0,
                 is_answered INTEGER DEFAULT 0,
-                answered_at TEXT,
-                answered_by TEXT,
-                answer_detection_method TEXT,
-                product TEXT
+                answered_at TIMESTAMP WITH TIME ZONE,
+                answered_by VARCHAR(255),
+                answer_detection_method VARCHAR(50),
+                product VARCHAR(100),
+                inserted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         

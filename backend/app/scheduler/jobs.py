@@ -90,51 +90,20 @@ def auto_backup_job():
     
     Creates regular backups using pg_dump:
     - Hourly backups: kept for 24 hours (24 backups)
-    - Daily backups: kept for 30 days (30 backups)
     """
     logger.info("💾 Running scheduled database backup...")
     
     try:
-        import subprocess
-        import os
-        from datetime import datetime
-        from urllib.parse import urlparse
+        from ..utils.backup import create_postgres_backup
         
-        database_url = os.getenv('DATABASE_URL', '')
-        if not database_url:
-            logger.warning("⚠️  DATABASE_URL not configured, skipping backup")
-            return
+        result = create_postgres_backup(
+            backup_type='hourly',
+            keep_backups=24
+        )
         
-        parsed = urlparse(database_url)
-        backend_dir = Path(__file__).resolve().parents[2]
-        backup_dir = backend_dir / "backups"
-        backup_dir.mkdir(exist_ok=True)
-        backup_file = backup_dir / f"postgres_backup_hourly_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
-        
-        env = os.environ.copy()
-        env['PGPASSWORD'] = parsed.password
-        
-        cmd = [
-            'pg_dump',
-            '-h', parsed.hostname or 'localhost',
-            '-p', str(parsed.port or 5432),
-            '-U', parsed.username,
-            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
-            '-f', str(backup_file)
-        ]
-        
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            logger.info("✅ Scheduled backup completed successfully")
-            # Keep only last 24 hourly backups
-            backups = sorted(backup_dir.glob("postgres_backup_hourly_*.sql"), key=lambda p: p.stat().st_mtime)
-            if len(backups) > 24:
-                for old_backup in backups[:-24]:
-                    old_backup.unlink()
-        else:
-            logger.error(f"❌ Scheduled backup failed: {result.stderr}")
-            
+        logger.info(f"✅ Scheduled backup completed successfully: {result['backup_file']} ({result['size_mb']} MB)")
+    except ValueError as e:
+        logger.warning(f"⚠️  DATABASE_URL not configured, skipping backup: {e}")
     except Exception as e:
         logger.error(f"❌ Error during scheduled backup: {e}", exc_info=True)
 
@@ -144,46 +113,16 @@ def daily_backup_job():
     logger.info("💾 Running daily database backup...")
     
     try:
-        import subprocess
-        import os
-        from datetime import datetime
-        from urllib.parse import urlparse
+        from ..utils.backup import create_postgres_backup
         
-        database_url = os.getenv('DATABASE_URL', '')
-        if not database_url:
-            logger.warning("⚠️  DATABASE_URL not configured, skipping backup")
-            return
+        result = create_postgres_backup(
+            backup_type='daily',
+            keep_backups=30
+        )
         
-        parsed = urlparse(database_url)
-        backend_dir = Path(__file__).resolve().parents[2]
-        backup_dir = backend_dir / "backups"
-        backup_dir.mkdir(exist_ok=True)
-        backup_file = backup_dir / f"postgres_backup_daily_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
-        
-        env = os.environ.copy()
-        env['PGPASSWORD'] = parsed.password
-        
-        cmd = [
-            'pg_dump',
-            '-h', parsed.hostname or 'localhost',
-            '-p', str(parsed.port or 5432),
-            '-U', parsed.username,
-            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
-            '-f', str(backup_file)
-        ]
-        
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            logger.info("✅ Daily backup completed successfully")
-            # Keep only last 30 daily backups
-            backups = sorted(backup_dir.glob("postgres_backup_daily_*.sql"), key=lambda p: p.stat().st_mtime)
-            if len(backups) > 30:
-                for old_backup in backups[:-30]:
-                    old_backup.unlink()
-        else:
-            logger.error(f"❌ Daily backup failed: {result.stderr}")
-            
+        logger.info(f"✅ Daily backup completed successfully: {result['backup_file']} ({result['size_mb']} MB)")
+    except ValueError as e:
+        logger.warning(f"⚠️  DATABASE_URL not configured, skipping backup: {e}")
     except Exception as e:
         logger.error(f"❌ Error during daily backup: {e}", exc_info=True)
 
