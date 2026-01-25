@@ -10,7 +10,7 @@ from pathlib import Path
 # Ajouter le répertoire parent au path pour les imports
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app import db
+from app import database as db
 import logging
 
 logging.basicConfig(level=logging.INFO)

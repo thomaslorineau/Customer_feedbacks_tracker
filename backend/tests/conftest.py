@@ -1,7 +1,5 @@
 """Pytest configuration and fixtures."""
 import pytest
-import duckdb
-import tempfile
 import os
 from pathlib import Path
 import sys
@@ -9,40 +7,26 @@ import sys
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app import db
+from app import database as db
 
 
 @pytest.fixture
 def test_db(monkeypatch):
-    """Create a temporary DuckDB database for testing."""
-    # Create temporary database file
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.duckdb')
-    temp_file.close()
-    db_path = Path(temp_file.name)
+    """Create a test PostgreSQL database connection for testing."""
+    # Use test database URL from environment or default
+    test_db_url = os.getenv('TEST_DATABASE_URL', 'postgresql://vibe_user:test_password@localhost:5432/vibe_tracker_test')
     
-    try:
-        # Remove file if it exists (might be leftover from previous test)
-        if db_path.exists():
-            os.unlink(str(db_path))
-        
-        # Temporarily override DB_FILE in db module
-        monkeypatch.setattr(db, 'DB_FILE', db_path)
-        
-        # Reset shared connection to force new connection
-        monkeypatch.setattr(db, '_shared_connection', None)
-        
-        # Initialize database using db.init_db()
-        db.init_db()
-        
-        yield db_path
-        
-    finally:
-        # Clean up temporary database
-        if db_path.exists():
-            try:
-                os.unlink(str(db_path))
-            except Exception:
-                pass  # Ignore errors during cleanup
+    # Override DATABASE_URL for tests
+    monkeypatch.setenv('DATABASE_URL', test_db_url)
+    monkeypatch.setenv('USE_POSTGRES', 'true')
+    
+    # Initialize database
+    db.init_db()
+    
+    yield test_db_url
+    
+    # Cleanup: drop test data (optional, depends on test strategy)
+    # For now, we'll let tests handle their own cleanup
 
 
 @pytest.fixture

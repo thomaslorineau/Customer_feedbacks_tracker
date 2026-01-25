@@ -18,12 +18,13 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
-# Vérifier si on doit migrer depuis DuckDB
-DUCKDB_FILE="/tmp/data.duckdb"
-MIGRATE_FLAG="/app/.migration_done"
-
-# Si le fichier DuckDB existe et que la migration n'a pas été faite
-if [ -f "$DUCKDB_FILE" ] && [ ! -f "$MIGRATE_FLAG" ]; then
+# Migration DuckDB -> PostgreSQL (désactivée - migration terminée)
+# Pour réactiver la migration, décommentez le code ci-dessous et remontez le volume DuckDB
+# DUCKDB_FILE="/tmp/data.duckdb"
+# MIGRATE_FLAG="/app/.migration_done"
+# 
+# if [ -f "$DUCKDB_FILE" ] && [ ! -f "$MIGRATE_FLAG" ]; then
+if false; then
     echo "=========================================="
     echo "Migration automatique DuckDB -> PostgreSQL"
     echo "=========================================="

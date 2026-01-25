@@ -14,7 +14,7 @@ import duckdb
 # Ajouter le répertoire parent au path pour importer db
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.db import get_db_connection
+from app.database import get_db_connection
 
 def migrate_github_sources():
     """Migre les sources GitHub Issues et GitHub Discussions vers GitHub."""
