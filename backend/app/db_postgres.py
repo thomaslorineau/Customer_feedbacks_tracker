@@ -477,3 +477,203 @@ def pg_health_check() -> Dict[str, Any]:
             'database': 'postgresql',
             'error': str(e)
         }
+
+
+# ============================================
+# init_db - Create PostgreSQL schema
+# ============================================
+
+def init_db() -> None:
+    """Initialize PostgreSQL database schema."""
+    logger.info("Initializing PostgreSQL database schema...")
+    
+    with get_pg_cursor(dict_cursor=False) as cur:
+        # Posts table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS posts (
+                id SERIAL PRIMARY KEY,
+                source TEXT,
+                author TEXT,
+                content TEXT,
+                url TEXT UNIQUE,
+                created_at TEXT,
+                sentiment_score REAL,
+                sentiment_label TEXT,
+                language TEXT DEFAULT 'unknown',
+                country TEXT,
+                relevance_score REAL DEFAULT 0.0,
+                is_answered INTEGER DEFAULT 0,
+                answered_at TEXT,
+                answered_by TEXT,
+                answer_detection_method TEXT,
+                product TEXT
+            )
+        ''')
+        
+        # Indexes for posts
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_source ON posts(source)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_sentiment ON posts(sentiment_label)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_language ON posts(language)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_product ON posts(product)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_posts_is_answered ON posts(is_answered)')
+        
+        # Saved queries table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS saved_queries (
+                id SERIAL PRIMARY KEY,
+                keyword TEXT UNIQUE NOT NULL
+            )
+        ''')
+        
+        # Scraping logs table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS scraping_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                source TEXT,
+                level TEXT,
+                message TEXT,
+                posts_scraped INTEGER DEFAULT 0,
+                posts_inserted INTEGER DEFAULT 0,
+                error TEXT
+            )
+        ''')
+        
+        # Jobs table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                job_type TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                payload JSONB,
+                priority INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                started_at TIMESTAMP,
+                completed_at TIMESTAMP,
+                progress INTEGER DEFAULT 0,
+                result JSONB,
+                error TEXT,
+                worker_id TEXT
+            )
+        ''')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)')
+        
+        # Job results table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS job_results (
+                id SERIAL PRIMARY KEY,
+                job_id TEXT,
+                job_type TEXT,
+                status TEXT,
+                result JSONB,
+                duration_seconds REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Base keywords table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS base_keywords (
+                id SERIAL PRIMARY KEY,
+                category TEXT NOT NULL,
+                keyword TEXT NOT NULL,
+                UNIQUE(category, keyword)
+            )
+        ''')
+        
+        # Email notifications table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS email_notifications (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                name TEXT,
+                trigger_conditions JSONB,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Improvements table
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS improvements (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'proposed',
+                priority TEXT DEFAULT 'medium',
+                source TEXT,
+                source_post_ids TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                jira_key TEXT,
+                jira_url TEXT,
+                votes INTEGER DEFAULT 0
+            )
+        ''')
+        
+        # Users table for auth
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE,
+                password_hash TEXT NOT NULL,
+                role TEXT DEFAULT 'user',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_login TIMESTAMP,
+                is_active INTEGER DEFAULT 1
+            )
+        ''')
+        
+    logger.info("PostgreSQL database schema initialized successfully")
+
+
+# ============================================
+# Compatibility Aliases (match db.py interface)
+# ============================================
+
+# Connection
+def get_db_connection():
+    """Compatibility: returns (connection, True) for PostgreSQL."""
+    pool = _get_pool()
+    conn = pool.getconn()
+    return conn, False  # False = not DuckDB
+
+# Posts
+insert_post = pg_insert_post
+get_posts = pg_get_all_posts
+get_post_by_id = pg_get_post_by_id
+delete_post = pg_delete_post
+url_exists = pg_url_exists
+delete_duplicate_posts = pg_delete_duplicate_posts
+
+# Stats
+get_sentiment_stats = pg_get_sentiment_stats
+get_source_stats = pg_get_source_stats
+get_language_stats = pg_get_language_stats
+get_timeline_stats = pg_get_timeline_stats
+
+# Saved queries
+get_saved_queries = pg_get_saved_queries
+save_queries = pg_add_saved_query
+delete_saved_query = pg_delete_saved_query
+
+# Scraping logs
+add_scraping_log = pg_add_scraping_log
+get_scraping_logs = pg_get_scraping_logs
+
+# Jobs
+create_job_record = pg_enqueue_job
+get_job_record = pg_get_job
+update_job_progress = pg_update_job
+get_all_jobs = pg_get_pending_jobs
+
+# Base keywords  
+get_base_keywords = pg_get_base_keywords
+add_base_keyword = pg_add_base_keyword
+delete_base_keyword = pg_delete_base_keyword
+
+# Health
+health_check = pg_health_check
