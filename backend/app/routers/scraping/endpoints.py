@@ -7,7 +7,7 @@ import logging
 from .base import log_scraping, process_and_save_items, get_query_with_base_keywords
 from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin
 from ...analysis import sentiment, country_detection
-from ... import db
+from ... import database as db
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 # Import db de manière optionnelle pour éviter les dépendances circulaires
 try:
-    from .. import db
+    from .. import database as db
     DB_AVAILABLE = True
 except ImportError:
     DB_AVAILABLE = False

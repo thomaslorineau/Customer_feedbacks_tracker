@@ -16,7 +16,7 @@ from ..job_queue import (
     enqueue_scrape_job, enqueue_scrape_all_job, 
     enqueue_auto_scrape_job, enqueue_backup_job
 )
-from .. import db
+from .. import database as db
 
 logger = logging.getLogger(__name__)
 

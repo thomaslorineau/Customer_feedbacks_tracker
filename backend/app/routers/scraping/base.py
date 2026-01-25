@@ -4,7 +4,7 @@ import re
 import logging
 from typing import List, Dict, Tuple
 
-from ... import db
+from ... import database as db
 from ...analysis import sentiment, country_detection, relevance_scorer
 from ...config import keywords_base
 

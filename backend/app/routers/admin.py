@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Request, Depends
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from .. import db
+from .. import database as db
 from ..auth.dependencies import require_auth, require_admin
 from ..auth.models import TokenData
 

@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-from .. import db
+from .. import database as db
 from ..auth.dependencies import require_auth
 from ..auth.models import TokenData
 from ..utils.jira_client import (

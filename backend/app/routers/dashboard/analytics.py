@@ -5,7 +5,7 @@ from collections import Counter
 import re
 import logging
 from .models import PainPoint, PainPointsResponse
-from ... import db
+from ... import database as db
 
 logger = logging.getLogger(__name__)
 

@@ -76,7 +76,7 @@ def get_base_keywords_from_db() -> Dict[str, List[str]]:
     Si la table n'existe pas ou est vide, retourne les valeurs par défaut.
     """
     try:
-        from .. import db
+        from .. import database as db
         
         conn, _ = db.get_db_connection()
         c = conn.cursor()
@@ -159,7 +159,7 @@ def save_base_keywords(keywords_by_category: Dict[str, List[str]]) -> bool:
         True si succès, False sinon
     """
     try:
-        from .. import db
+        from .. import database as db
         
         conn, _ = db.get_db_connection()
         c = conn.cursor()

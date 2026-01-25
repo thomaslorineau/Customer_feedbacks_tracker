@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from app.job_queue import (
     get_job_queue, close_job_queue, Job, JobStatus, JobType
 )
-from app import db
+from app import database as db
 from app.config import keywords_base
 
 # Configure logging
