@@ -58,8 +58,7 @@ class Config(BaseSettings):
     rate_limit_requests: int = Field(default=100, description="Rate limit requests per window")
     rate_limit_window: int = Field(default=60, description="Rate limit window in seconds")
     
-    # Database - DuckDB is now the default and only database
-    use_duckdb: bool = Field(default=True, description="Use DuckDB database")
+    # Database - PostgreSQL is now the only database (DuckDB removed)
     
     @field_validator('debug', mode='before')
     @classmethod
@@ -78,14 +77,6 @@ class Config(BaseSettings):
             debug = info.data.get('debug', True)
             return "DEBUG" if debug else "INFO"
         return v
-    
-    @property
-    def db_path(self) -> Path:
-        """Get database path based on environment."""
-        if self.environment == "staging":
-            return Path(__file__).resolve().parents[1] / "data_staging.duckdb"
-        else:
-            return Path(__file__).resolve().parents[1] / "data.duckdb"
     
     # Backward compatibility properties
     @property
@@ -111,14 +102,6 @@ class Config(BaseSettings):
     @property
     def RATE_LIMIT_WINDOW(self) -> int:
         return self.rate_limit_window
-    
-    @property
-    def USE_DUCKDB(self) -> bool:
-        return self.use_duckdb
-    
-    @property
-    def DB_PATH(self) -> Path:
-        return self.db_path
     
     # Private API key properties for backward compatibility
     @property
@@ -361,7 +344,7 @@ class Config(BaseSettings):
         
         summary.append("")
         summary.append(f"🛡️ Rate Limiting: {self.RATE_LIMIT_REQUESTS} req/{self.RATE_LIMIT_WINDOW}s")
-        summary.append(f"💾 Database: {self.DB_PATH}")
+        summary.append(f"💾 Database: PostgreSQL")
         summary.append("=" * 50)
         
         return "\n".join(summary)

@@ -51,6 +51,10 @@ COPY --from=builder /root/.local /root/.local
 COPY app/ /app/app/
 COPY scripts/ /app/scripts/
 
+# Copy and set up entrypoint script
+COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 # Create directories
 RUN mkdir -p /app/backups /app/logs
 
@@ -60,6 +64,9 @@ EXPOSE 8000
 # Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/ || exit 1
+
+# Use entrypoint script that handles migration, then run the command
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 # Run with Gunicorn + Uvicorn workers for production
 # This provides process isolation and auto-restart on crash

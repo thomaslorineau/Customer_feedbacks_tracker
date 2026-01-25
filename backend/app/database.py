@@ -1,9 +1,9 @@
 """
-Database Selector Module
-========================
-Automatically selects PostgreSQL (Docker) or DuckDB (local dev) based on environment.
+Database Module
+===============
+PostgreSQL database adapter - DuckDB has been removed.
+Always uses PostgreSQL.
 
-This module should be imported instead of db.py directly.
 Usage: from app.database import *
 """
 import os
@@ -12,17 +12,19 @@ import logging
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-USE_POSTGRES = DATABASE_URL.startswith("postgresql://")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is required. "
+        "Set it to: postgresql://user:password@host:port/database"
+    )
 
-if USE_POSTGRES:
-    # Production mode: Use PostgreSQL (Docker)
-    logger.info("✅ [DB] Using PostgreSQL (Docker mode)")
-    print("✅ [DB] Using PostgreSQL (Docker mode)")
-    from app.db_postgres import *
-    DB_TYPE = "postgresql"
-else:
-    # Development mode: Use DuckDB
-    logger.info("✅ [DB] Using DuckDB (local dev mode)")
-    print("✅ [DB] Using DuckDB (local dev mode)")
-    from app.db import *
-    DB_TYPE = "duckdb"
+if not DATABASE_URL.startswith("postgresql://"):
+    raise RuntimeError(
+        f"DATABASE_URL must start with 'postgresql://'. Got: {DATABASE_URL[:20]}..."
+    )
+
+logger.info("[DB] Using PostgreSQL")
+print("[DB] Using PostgreSQL")
+
+from app.db_postgres import *
+DB_TYPE = "postgresql"
