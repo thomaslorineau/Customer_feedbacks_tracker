@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Import centralized backup utility
-from ...utils.backup import create_postgres_backup
+from ..utils.backup import create_postgres_backup
 
 
 # ============================================================================
