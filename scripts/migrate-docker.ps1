@@ -30,7 +30,7 @@ Write-Host "Verification de PostgreSQL..." -ForegroundColor Yellow
 $maxAttempts = 30
 $attempt = 0
 while ($attempt -lt $maxAttempts) {
-    $result = docker-compose exec -T postgres pg_isready -U vibe_user -d vibe_tracker 2>&1
+    $result = docker-compose exec -T postgres pg_isready -U ocft_user -d ocft_tracker 2>&1
     if ($LASTEXITCODE -eq 0) {
         break
     }
@@ -75,7 +75,7 @@ Write-Host ""
 Write-Host "Copie du fichier DuckDB dans le conteneur..." -ForegroundColor Yellow
 
 # Vérifier si le conteneur API existe
-$apiContainer = docker ps --format "{{.Names}}" | Select-String "vibe_api"
+$apiContainer = docker ps --format "{{.Names}}" | Select-String "ocft_api"
 $tempContainer = $false
 
 if (-not $apiContainer) {
@@ -88,11 +88,11 @@ Write-Host ""
 Write-Host "Recuperation de la configuration..." -ForegroundColor Yellow
 $postgresPassword = docker-compose exec -T postgres printenv POSTGRES_PASSWORD 2>&1
 if ($LASTEXITCODE -ne 0 -or -not $postgresPassword) {
-    $postgresPassword = "vibe_secure_password_2026"
+    $postgresPassword = "ocft_secure_password_2026"
 }
-$databaseUrl = "postgresql://vibe_user:${postgresPassword}@postgres:5432/vibe_tracker"
+$databaseUrl = "postgresql://ocft_user:${postgresPassword}@postgres:5432/ocft_tracker"
 
-Write-Host "  DATABASE_URL: postgresql://vibe_user:***@postgres:5432/vibe_tracker" -ForegroundColor Cyan
+Write-Host "  DATABASE_URL: postgresql://ocft_user:***@postgres:5432/ocft_tracker" -ForegroundColor Cyan
 
 # Exécuter la migration
 Write-Host ""
@@ -113,7 +113,7 @@ if ($tempContainer) {
         --postgres $databaseUrl
 } else {
     # Copier le fichier dans le conteneur existant
-    docker cp $DuckDbFile "vibe_api:/tmp/data.duckdb"
+    docker cp $DuckDbFile "ocft_api:/tmp/data.duckdb"
     
     # Exécuter la migration
     docker-compose exec -e "DATABASE_URL=$databaseUrl" api `
@@ -131,7 +131,7 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "Verification des donnees migrees..." -ForegroundColor Yellow
     
     # Vérifier le nombre de posts
-    docker-compose exec -T postgres psql -U vibe_user -d vibe_tracker -c "SELECT COUNT(*) as total_posts FROM posts;" 2>&1 | Select-String -Pattern "total_posts|^\s*\d+" | Select-Object -First 2
+    docker-compose exec -T postgres psql -U ocft_user -d ocft_tracker -c "SELECT COUNT(*) as total_posts FROM posts;" 2>&1 | Select-String -Pattern "total_posts|^\s*\d+" | Select-Object -First 2
     
     Write-Host ""
     Write-Host "Prochaines etapes:" -ForegroundColor Cyan

@@ -25,7 +25,7 @@ fi
 
 # Vérifier que les conteneurs sont démarrés
 echo -e "${YELLOW}Vérification des conteneurs Docker...${NC}"
-if ! docker-compose ps | grep -q "vibe_postgres.*Up"; then
+if ! docker-compose ps | grep -q "ocft_postgres.*Up"; then
     echo -e "${YELLOW}Démarrage des conteneurs...${NC}"
     docker-compose up -d postgres
     echo "Attente du démarrage de PostgreSQL..."
@@ -34,7 +34,7 @@ fi
 
 # Vérifier que PostgreSQL est prêt
 echo -e "${YELLOW}Vérification de PostgreSQL...${NC}"
-until docker-compose exec -T postgres pg_isready -U vibe_user -d vibe_tracker > /dev/null 2>&1; do
+until docker-compose exec -T postgres pg_isready -U ocft_user -d ocft_tracker > /dev/null 2>&1; do
     echo "Attente de PostgreSQL..."
     sleep 2
 done
@@ -70,13 +70,13 @@ echo ""
 echo -e "${YELLOW}Copie du fichier DuckDB dans le conteneur API...${NC}"
 
 # S'assurer que le conteneur API existe (ou créer un conteneur temporaire)
-if ! docker-compose ps | grep -q "vibe_api.*Up"; then
+if ! docker-compose ps | grep -q "ocft_api.*Up"; then
     echo -e "${YELLOW}Le conteneur API n'est pas démarré, création d'un conteneur temporaire...${NC}"
     docker-compose build api
 fi
 
 # Copier le fichier DuckDB dans le conteneur
-CONTAINER_NAME="vibe_api"
+CONTAINER_NAME="ocft_api"
 if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     docker cp "$DUCKDB_FILE" "${CONTAINER_NAME}:/tmp/data.duckdb"
 else
@@ -94,10 +94,10 @@ echo -e "${GREEN}✓ Fichier copié${NC}"
 # Obtenir DATABASE_URL depuis docker-compose
 echo ""
 echo -e "${YELLOW}Récupération de la configuration...${NC}"
-POSTGRES_PASSWORD=$(docker-compose exec -T postgres printenv POSTGRES_PASSWORD 2>/dev/null || echo "vibe_secure_password_2026")
-DATABASE_URL="postgresql://vibe_user:${POSTGRES_PASSWORD}@postgres:5432/vibe_tracker"
+POSTGRES_PASSWORD=$(docker-compose exec -T postgres printenv POSTGRES_PASSWORD 2>/dev/null || echo "ocft_secure_password_2026")
+DATABASE_URL="postgresql://ocft_user:${POSTGRES_PASSWORD}@postgres:5432/ocft_tracker"
 
-echo -e "${BLUE}  DATABASE_URL: postgresql://vibe_user:***@postgres:5432/vibe_tracker${NC}"
+echo -e "${BLUE}  DATABASE_URL: postgresql://ocft_user:***@postgres:5432/ocft_tracker${NC}"
 
 # Exécuter la migration dans le conteneur
 echo ""
@@ -120,7 +120,7 @@ if [ $MIGRATION_EXIT_CODE -eq 0 ]; then
     echo -e "${YELLOW}Vérification des données migrées...${NC}"
     
     # Vérifier le nombre de posts dans PostgreSQL
-    docker-compose exec -T postgres psql -U vibe_user -d vibe_tracker -c "SELECT COUNT(*) as total_posts FROM posts;" | grep -E "total_posts|[0-9]+" | head -2
+    docker-compose exec -T postgres psql -U ocft_user -d ocft_tracker -c "SELECT COUNT(*) as total_posts FROM posts;" | grep -E "total_posts|[0-9]+" | head -2
     
     echo ""
     echo -e "${BLUE}Prochaines étapes:${NC}"

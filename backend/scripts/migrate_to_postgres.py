@@ -384,7 +384,7 @@ def main():
     )
     parser.add_argument(
         '--postgres', '-p',
-        default=os.getenv('DATABASE_URL', 'postgresql://vibe_user:vibe_secure_password_2026@localhost:5432/vibe_tracker'),
+        default=os.getenv('DATABASE_URL', 'postgresql://ocft_user:ocft_secure_password_2026@localhost:5432/ocft_tracker'),
         help='PostgreSQL connection URL'
     )
     parser.add_argument(
