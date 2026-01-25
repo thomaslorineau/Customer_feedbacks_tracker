@@ -56,14 +56,41 @@ def migrate_posts(duck_conn, pg_conn):
     
     # Get posts from DuckDB
     duck_cur = duck_conn.cursor()
-    duck_cur.execute("""
-        SELECT id, source, author, content, url, created_at,
-               sentiment_score, sentiment_label, language, country,
-               relevance_score, is_answered, answered_at, answered_by,
-               answer_detection_method, product
-        FROM posts
-        ORDER BY id
-    """)
+    
+    # First, check which columns exist in DuckDB
+    try:
+        duck_cur.execute("DESCRIBE posts")
+        columns_info = duck_cur.fetchall()
+        available_columns = [col[0].lower() for col in columns_info]
+    except Exception:
+        # Fallback: try to get column names from PRAGMA
+        try:
+            duck_cur.execute("PRAGMA table_info(posts)")
+            columns_info = duck_cur.fetchall()
+            available_columns = [col[1].lower() for col in columns_info]
+        except Exception:
+            # Last resort: assume all columns exist
+            available_columns = ['id', 'source', 'author', 'content', 'url', 'created_at',
+                                'sentiment_score', 'sentiment_label', 'language', 'country',
+                                'relevance_score', 'is_answered', 'answered_at', 'answered_by',
+                                'answer_detection_method', 'product']
+    
+    logger.info(f"Available columns in DuckDB: {', '.join(available_columns)}")
+    
+    # Build SELECT query with only existing columns
+    base_columns = ['id', 'source', 'author', 'content', 'url', 'created_at',
+                    'sentiment_score', 'sentiment_label', 'language', 'country', 'relevance_score']
+    optional_columns = ['is_answered', 'answered_at', 'answered_by', 'answer_detection_method', 'product']
+    
+    select_columns = [col for col in base_columns if col in available_columns]
+    for col in optional_columns:
+        if col in available_columns:
+            select_columns.append(col)
+    
+    select_query = f"SELECT {', '.join(select_columns)} FROM posts ORDER BY id"
+    logger.info(f"SELECT query: {select_query}")
+    
+    duck_cur.execute(select_query)
     posts = duck_cur.fetchall()
     
     if not posts:
@@ -75,14 +102,41 @@ def migrate_posts(duck_conn, pg_conn):
     # Insert into PostgreSQL
     pg_cur = pg_conn.cursor()
     
-    insert_query = """
-        INSERT INTO posts (id, source, author, content, url, created_at,
-                          sentiment_score, sentiment_label, language, country,
-                          relevance_score, is_answered, answered_at, answered_by,
-                          answer_detection_method, product)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    # Build INSERT query with placeholders for all columns (PostgreSQL has all columns)
+    # Map DuckDB columns to PostgreSQL columns with defaults for missing ones
+    insert_columns = ['id', 'source', 'author', 'content', 'url', 'created_at',
+                     'sentiment_score', 'sentiment_label', 'language', 'country',
+                     'relevance_score', 'is_answered', 'answered_at', 'answered_by',
+                     'answer_detection_method', 'product']
+    
+    placeholders = ', '.join(['%s'] * len(insert_columns))
+    insert_query = f"""
+        INSERT INTO posts ({', '.join(insert_columns)})
+        VALUES ({placeholders})
         ON CONFLICT (id) DO NOTHING
     """
+    
+    # Map DuckDB rows to PostgreSQL format (fill missing columns with defaults)
+    def map_row_to_postgres(row):
+        """Map a DuckDB row to PostgreSQL format, filling missing columns."""
+        row_dict = dict(zip(select_columns, row))
+        
+        # Build PostgreSQL row with all columns
+        pg_row = []
+        for col in insert_columns:
+            if col in row_dict:
+                pg_row.append(row_dict[col])
+            else:
+                # Default values for missing columns
+                if col == 'is_answered':
+                    pg_row.append(0)
+                elif col in ['answered_at', 'answered_by', 'answer_detection_method', 'product', 'country']:
+                    pg_row.append(None)
+                elif col == 'relevance_score':
+                    pg_row.append(0.0)
+                else:
+                    pg_row.append(None)
+        return tuple(pg_row)
     
     # Batch insert for performance
     batch_size = 500
@@ -90,7 +144,9 @@ def migrate_posts(duck_conn, pg_conn):
     
     for i in range(0, len(posts), batch_size):
         batch = posts[i:i + batch_size]
-        execute_batch(pg_cur, insert_query, batch, page_size=batch_size)
+        # Map each row to PostgreSQL format
+        mapped_batch = [map_row_to_postgres(row) for row in batch]
+        execute_batch(pg_cur, insert_query, mapped_batch, page_size=batch_size)
         pg_conn.commit()
         migrated += len(batch)
         logger.info(f"  Migrated {migrated}/{len(posts)} posts...")
