@@ -31,8 +31,8 @@ if [ -f "$DUCKDB_FILE" ] && [ ! -f "$MIGRATE_FLAG" ]; then
     echo "Fichier DuckDB détecté: $DUCKDB_FILE"
     echo "Vérification de PostgreSQL..."
     
-    # Attendre que PostgreSQL soit prêt
-    MAX_ATTEMPTS=30
+    # Attendre que PostgreSQL soit prêt (augmenter le délai car depends_on peut ne pas suffire)
+    MAX_ATTEMPTS=60
     ATTEMPT=0
     
     # Extraire les infos de connexion depuis DATABASE_URL
@@ -51,31 +51,61 @@ if [ -f "$DUCKDB_FILE" ] && [ ! -f "$MIGRATE_FLAG" ]; then
     
     echo "Attente de PostgreSQL sur $DB_HOST:$DB_PORT..."
     
+    # Utiliser pg_isready si disponible, sinon psycopg2
     while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-        if python -c "
+        # Essayer d'abord avec pg_isready (plus rapide)
+        if command -v pg_isready >/dev/null 2>&1; then
+            if pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1; then
+                # Vérifier aussi la connexion réelle avec psycopg2
+                if python -c "
 import psycopg2
 import os
 import sys
 try:
-    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    conn = psycopg2.connect(os.environ['DATABASE_URL'], connect_timeout=2)
     conn.close()
     sys.exit(0)
-except:
+except Exception as e:
     sys.exit(1)
 " 2>/dev/null; then
-            echo "✓ PostgreSQL est prêt"
-            break
+                    echo "✓ PostgreSQL est prêt"
+                    break
+                fi
+            fi
+        else
+            # Fallback sur psycopg2 uniquement
+            if python -c "
+import psycopg2
+import os
+import sys
+try:
+    conn = psycopg2.connect(os.environ['DATABASE_URL'], connect_timeout=2)
+    conn.close()
+    sys.exit(0)
+except Exception as e:
+    sys.exit(1)
+" 2>/dev/null; then
+                echo "✓ PostgreSQL est prêt"
+                break
+            fi
         fi
         ATTEMPT=$((ATTEMPT + 1))
-        echo "  Tentative $ATTEMPT/$MAX_ATTEMPTS..."
+        if [ $((ATTEMPT % 5)) -eq 0 ]; then
+            echo "  Tentative $ATTEMPT/$MAX_ATTEMPTS... (attente de PostgreSQL)"
+        fi
         sleep 2
     done
     
     if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
-        echo "⚠️  PostgreSQL n'est pas prêt après $MAX_ATTEMPTS tentatives, migration reportée"
+        echo ""
+        echo "⚠️  PostgreSQL n'est pas prêt après $MAX_ATTEMPTS tentatives (2 minutes), migration reportée"
         echo "   La migration sera ignorée pour ce démarrage"
-        echo "   Vous pouvez lancer manuellement: python scripts/migrate_to_postgres.py --duckdb $DUCKDB_FILE --postgres \$DATABASE_URL"
+        echo "   L'API va démarrer quand même, mais sans migration automatique"
+        echo "   Pour migrer manuellement plus tard:"
+        echo "     docker-compose exec api python scripts/migrate_to_postgres.py --duckdb /tmp/data.duckdb --postgres \$DATABASE_URL"
+        echo ""
         # Ne pas créer le flag pour permettre une nouvelle tentative au prochain démarrage
+        # Mais continuer quand même le démarrage de l'API
     else
         # Vérifier si des données existent déjà dans PostgreSQL
         echo "Vérification des données existantes..."

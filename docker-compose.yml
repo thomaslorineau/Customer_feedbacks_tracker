@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # PostgreSQL Database - replaces DuckDB for better concurrency
   postgres:
