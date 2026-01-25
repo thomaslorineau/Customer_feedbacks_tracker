@@ -20,11 +20,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Import backup function
-import sys
-backend_dir = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(backend_dir))
-from scripts.backup_db import backup_database
+# Import centralized backup utility
+from ...utils.backup import create_postgres_backup
 
 
 # ============================================================================
@@ -121,49 +118,25 @@ async def trigger_backup(
     """Trigger a manual database backup. Admin only."""
     logger.info(f"Admin {current_user.username} triggered manual backup")
     try:
-        # PostgreSQL backup using pg_dump
-        import subprocess
-        import os
-        from datetime import datetime
-        
-        database_url = os.getenv('DATABASE_URL', '')
-        if not database_url:
-            raise HTTPException(status_code=500, detail='DATABASE_URL not configured')
-        
-        # Parse DATABASE_URL: postgresql://user:password@host:port/database
-        from urllib.parse import urlparse
-        parsed = urlparse(database_url)
-        
-        backup_dir = backend_dir / "backups"
-        backup_dir.mkdir(exist_ok=True)
-        backup_file = backup_dir / f"postgres_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
-        
-        # Use pg_dump to create backup
-        env = os.environ.copy()
-        env['PGPASSWORD'] = parsed.password
-        
-        cmd = [
-            'pg_dump',
-            '-h', parsed.hostname or 'localhost',
-            '-p', str(parsed.port or 5432),
-            '-U', parsed.username,
-            '-d', parsed.path[1:] if parsed.path else 'vibe_tracker',
-            '-f', str(backup_file)
-        ]
-        
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
-        
-        if result.returncode == 0:
-            return {
-                'success': True,
-                'message': 'Backup created successfully',
-                'backup_file': str(backup_file)
-            }
-        else:
-            raise HTTPException(status_code=500, detail=f'Backup failed: {result.stderr}')
-    except Exception as e:
+        result = create_postgres_backup(
+            backup_type='manual',
+            keep_backups=None  # No rotation for manual backups
+        )
+        return {
+            'success': True,
+            'message': 'Backup created successfully',
+            'backup_file': result['backup_file'],
+            'backup_path': result['backup_path'],
+            'size_mb': result['size_mb']
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError as e:
         logger.error(f"Error during manual backup: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error during manual backup: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
 
 
 @router.post('/admin/cleanup-duplicates')
