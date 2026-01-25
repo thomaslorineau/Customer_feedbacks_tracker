@@ -174,7 +174,7 @@
 │       ▼                                                                      │
 └─────────────────────────────────────────────────────────────────────────────┘
         │
-        │ PostgreSQL database: vibe_tracker (via DATABASE_URL)
+        │ PostgreSQL database: ocft_tracker (via DATABASE_URL)
         │
         ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
