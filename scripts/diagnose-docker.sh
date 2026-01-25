@@ -3,7 +3,8 @@
 # Script de diagnostic Docker pour OCFT
 # ============================================
 
-set -e
+# Ne pas arrêter sur erreur pour continuer le diagnostic
+set +e
 
 echo "=========================================="
 echo "Diagnostic Docker - OCFT"
@@ -87,17 +88,30 @@ echo ""
 
 # 9. Vérifier les ports en écoute
 echo -e "${BLUE}9. Ports en écoute sur le système:${NC}"
-netstat -tlnp 2>/dev/null | grep ":11840\|:5432\|:6379" || ss -tlnp 2>/dev/null | grep ":11840\|:5432\|:6379" || echo "Impossible de vérifier les ports (nécessite les droits root)"
+if command -v ss > /dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -E ":11840|:5432|:6379" || echo "Aucun des ports 11840, 5432, 6379 n'est en écoute"
+elif command -v netstat > /dev/null 2>&1; then
+    netstat -tlnp 2>/dev/null | grep -E ":11840|:5432|:6379" || echo "Aucun des ports 11840, 5432, 6379 n'est en écoute"
+else
+    echo "Impossible de vérifier les ports (ss et netstat non disponibles)"
+fi
 echo ""
 
 # 10. Tester la connexion HTTP locale
 echo -e "${BLUE}10. Test de connexion HTTP locale:${NC}"
-if curl -s -o /dev/null -w "%{http_code}" http://localhost:11840/health 2>/dev/null | grep -q "200\|404\|401"; then
-    echo -e "${GREEN}✓ Le serveur répond sur localhost:11840${NC}"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:11840/health 2>/dev/null || echo "000")
+if echo "$HTTP_CODE" | grep -qE "200|404|401|403"; then
+    echo -e "${GREEN}✓ Le serveur répond sur localhost:11840 (Code: $HTTP_CODE)${NC}"
 else
     echo -e "${RED}✗ Le serveur ne répond pas sur localhost:11840${NC}"
     echo "  Tentative de connexion..."
     curl -v http://localhost:11840/ 2>&1 | head -20 || echo "Erreur de connexion"
+    echo ""
+    echo "  Vérification alternative sur le port 8000..."
+    HTTP_CODE_8000=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
+    if echo "$HTTP_CODE_8000" | grep -qE "200|404|401|403"; then
+        echo -e "${YELLOW}⚠️  Le serveur répond sur localhost:8000 (peut-être un problème de mapping de port)${NC}"
+    fi
 fi
 echo ""
 
