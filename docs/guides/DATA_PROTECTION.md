@@ -116,7 +116,7 @@ python backend/repair_db.py staging
    ```
 3. **Restaurer depuis un backup** :
    ```bash
-   cp backend/backups/production_YYYYMMDD_HHMMSS.duckdb backend/data.duckdb
+   psql -U vibe_user -d vibe_tracker < backend/backups/postgres_backup_YYYYMMDD_HHMMSS.sql
    ```
 4. **Vérifier l'intégrité** :
    ```bash

@@ -616,7 +616,7 @@ lsof -i :8000 2>/dev/null || netstat -tlnp 2>/dev/null | grep 8000
 
 ```bash
 # Vérifier les processus utilisant la DB
-lsof ~/apps/complaints_tracker/backend/data.duckdb 2>/dev/null
+# Pour PostgreSQL, vérifier les connexions actives`npsql -U vibe_user -d vibe_tracker -c "SELECT pid, usename, application_name FROM pg_stat_activity WHERE datname='vibe_tracker';" 2>/dev/null
 
 # Arrêter tous les processus Python de l'application
 pkill -f "uvicorn app.main:app"
@@ -808,7 +808,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/data.duckdb:/app/backend/data.duckdb
+      # PostgreSQL géré via service séparé dans docker-compose.yml
       - ./backend/.env:/app/backend/.env
     environment:
       - CORS_ORIGINS=https://votre-domaine.com
@@ -882,11 +882,11 @@ LOG_LEVEL=INFO
 1. **Firewall** : Limiter l'accès au port 8000 (backend) uniquement depuis Nginx
 2. **SSL/TLS** : Toujours utiliser HTTPS en production
 3. **Secrets** : Ne jamais commiter les fichiers `.env` ou clés API
-4. **Backup** : Configurer des sauvegardes régulières de `data.duckdb` (production) et `data_staging.duckdb` (staging)
+4. **Backup** : Configurer des sauvegardes régulières de PostgreSQL (voir `docs/guides/DATABASE_BACKUP.md`)
 
 ### Performance
 
-1. **Base de données** : DuckDB offre d'excellentes performances analytiques. Pour très grande échelle (millions+ de posts), considérer PostgreSQL
+1. **Base de données** : PostgreSQL offre d'excellentes performances avec accès concurrent et index optimisés
 2. **Cache** : Considérer Redis pour le cache des requêtes fréquentes
 3. **Rate Limiting** : Configurer des limites de taux pour les endpoints API
 4. **Monitoring** : Utiliser des outils comme Prometheus + Grafana
@@ -1075,7 +1075,7 @@ ps aux | grep uvicorn
 netstat -tlnp 2>/dev/null | grep 8000 || ss -tlnp | grep 8000
 
 # Vérifier les permissions
-ls -la ~/apps/complaints_tracker/backend/data.duckdb
+# Vérifier la connexion PostgreSQL`npsql -U vibe_user -d vibe_tracker -c "SELECT COUNT(*) FROM posts;"
 ls -la ~/apps/complaints_tracker/backend/server.log
 
 # Tester manuellement
