@@ -194,7 +194,9 @@ echo ""
 info "Test de l'API..."
 sleep 3
 
-API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/ 2>/dev/null || echo "000")
+# Détecter le port depuis docker-compose.yml ou utiliser 11840 par défaut pour OVH
+API_PORT=$(grep -A 1 "ports:" docker-compose.yml 2>/dev/null | grep -oE "[0-9]+:8000" | cut -d: -f1 | head -1 || echo "11840")
+API_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${API_PORT}/ 2>/dev/null || echo "000")
 
 if [ "$API_RESPONSE" = "200" ]; then
     success "API accessible (HTTP 200)"
@@ -204,7 +206,7 @@ else
 fi
 
 # Test des jobs
-JOBS_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/jobs/status 2>/dev/null || echo "000")
+JOBS_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${API_PORT}/jobs/status 2>/dev/null || echo "000")
 
 if [ "$JOBS_RESPONSE" = "200" ]; then
     success "Endpoint /jobs/status accessible"
