@@ -45,7 +45,7 @@ def create_postgres_backup(
     db_password = parsed.password
     db_host = parsed.hostname or 'localhost'
     db_port = parsed.port or 5432
-    db_name = parsed.path.lstrip('/') or 'vibe_tracker'
+    db_name = parsed.path.lstrip('/') or 'ocft_tracker'
     
     # Determine backup directory
     if backup_dir is None:

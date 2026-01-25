@@ -110,7 +110,7 @@ docker compose up -d
 echo -e "${YELLOW}Waiting for PostgreSQL to be ready...${NC}"
 max_attempts=30
 attempt=0
-until docker compose exec -T postgres pg_isready -U vibe_user -d vibe_tracker 2>/dev/null; do
+until docker compose exec -T postgres pg_isready -U ocft_user -d ocft_tracker 2>/dev/null; do
     attempt=$((attempt + 1))
     if [ $attempt -ge $max_attempts ]; then
         echo -e "${RED}ERROR: PostgreSQL failed to start${NC}"

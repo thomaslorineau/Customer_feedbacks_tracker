@@ -80,7 +80,7 @@ $attempt = 0
 do {
     Start-Sleep -Seconds 2
     $attempt++
-    $result = docker compose exec -T postgres pg_isready -U vibe_user -d vibe_tracker 2>$null
+    $result = docker compose exec -T postgres pg_isready -U ocft_user -d ocft_tracker 2>$null
     if ($LASTEXITCODE -eq 0) {
         Write-Host "PostgreSQL is ready!" -ForegroundColor Green
         break

@@ -2,29 +2,29 @@ services:
   # PostgreSQL Database - replaces DuckDB for better concurrency
   postgres:
     image: postgres:15-alpine
-    container_name: vibe_postgres
+    container_name: ocft_postgres
     environment:
-      POSTGRES_DB: vibe_tracker
-      POSTGRES_USER: vibe_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vibe_secure_password_2026}
+      POSTGRES_DB: ocft_tracker
+      POSTGRES_USER: ocft_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ocft_secure_password_2026}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vibe_user -d vibe_tracker"]
+      test: ["CMD-SHELL", "pg_isready -U ocft_user -d ocft_tracker"]
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - vibe_network
+      - ocft_network
 
   # Redis - Job queue for async scraping
   redis:
     image: redis:7-alpine
-    container_name: vibe_redis
+    container_name: ocft_redis
     ports:
       - "6379:6379"
     volumes:
@@ -37,16 +37,16 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      - vibe_network
+      - ocft_network
 
   # API Server - FastAPI with Gunicorn + Uvicorn workers
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: vibe_api
+    container_name: ocft_api
     environment:
-      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - DATABASE_URL=postgresql://ocft_user:${POSTGRES_PASSWORD:-ocft_secure_password_2026}@postgres:5432/ocft_tracker
       - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=production
       - USE_POSTGRES=true
@@ -71,16 +71,16 @@ services:
       start_period: 40s
     restart: unless-stopped
     networks:
-      - vibe_network
+      - ocft_network
 
   # Worker - Isolated scraping processes (does NOT affect API stability)
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker
-    container_name: vibe_worker
+    container_name: ocft_worker
     environment:
-      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - DATABASE_URL=postgresql://ocft_user:${POSTGRES_PASSWORD:-ocft_secure_password_2026}@postgres:5432/ocft_tracker
       - REDIS_URL=redis://redis:6379/0
       - USE_POSTGRES=true
       - LOG_LEVEL=info
@@ -94,7 +94,7 @@ services:
       - ./backend/backups:/app/backups
     restart: unless-stopped
     networks:
-      - vibe_network
+      - ocft_network
     deploy:
       resources:
         limits:
@@ -107,9 +107,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.scheduler
-    container_name: vibe_scheduler
+    container_name: ocft_scheduler
     environment:
-      - DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD:-vibe_secure_password_2026}@postgres:5432/vibe_tracker
+      - DATABASE_URL=postgresql://ocft_user:${POSTGRES_PASSWORD:-ocft_secure_password_2026}@postgres:5432/ocft_tracker
       - REDIS_URL=redis://redis:6379/0
       - USE_POSTGRES=true
       - LOG_LEVEL=info
@@ -122,7 +122,7 @@ services:
       - ./backend/backups:/app/backups
     restart: unless-stopped
     networks:
-      - vibe_network
+      - ocft_network
 
 volumes:
   postgres_data:
@@ -131,5 +131,5 @@ volumes:
     driver: local
 
 networks:
-  vibe_network:
+  ocft_network:
     driver: bridge

@@ -67,7 +67,7 @@ Redis est configuré dans `docker-compose.yml` :
 ```yaml
 redis:
   image: redis:7-alpine
-  container_name: vibe_redis
+  container_name: ocft_redis
   ports:
     - "6379:6379"
   volumes:
@@ -241,19 +241,19 @@ GET /api/jobs/status
 docker compose exec redis redis-cli
 
 # Voir la taille de la queue
-ZCARD vibe:jobs:queue
+ZCARD ocft:jobs:queue
 
 # Voir les jobs en attente
-ZRANGE vibe:jobs:queue 0 -1 WITHSCORES
+ZRANGE ocft:jobs:queue 0 -1 WITHSCORES
 
 # Voir les jobs en traitement
-SMEMBERS vibe:jobs:processing
+SMEMBERS ocft:jobs:processing
 
 # Voir l'historique
-LRANGE vibe:jobs:results 0 10
+LRANGE ocft:jobs:results 0 10
 
 # Voir les détails d'un job
-GET vibe:job:{job_id}
+GET ocft:job:{job_id}
 
 # Statistiques mémoire
 INFO memory
@@ -306,7 +306,7 @@ docker compose exec redis redis-cli ping
 **Solution :**
 ```bash
 # Voir les jobs bloqués
-docker compose exec redis redis-cli SMEMBERS vibe:jobs:processing
+docker compose exec redis redis-cli SMEMBERS ocft:jobs:processing
 
 # Redémarrer le worker
 docker compose restart worker
@@ -324,7 +324,7 @@ docker compose restart worker
 docker compose exec redis redis-cli INFO memory
 
 # Nettoyer les anciens jobs (garder 100 derniers)
-docker compose exec redis redis-cli LTRIM vibe:jobs:results 0 99
+docker compose exec redis redis-cli LTRIM ocft:jobs:results 0 99
 
 # Ou augmenter la limite dans docker-compose.yml
 command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru

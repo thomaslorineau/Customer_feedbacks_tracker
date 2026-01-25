@@ -9,10 +9,10 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: vibe_postgres_dev
+    container_name: ocft_postgres_dev
     environment:
-      POSTGRES_DB: vibe_tracker
-      POSTGRES_USER: vibe_user
+      POSTGRES_DB: ocft_tracker
+      POSTGRES_USER: ocft_user
       POSTGRES_PASSWORD: dev_password_123
     ports:
       - "5432:5432"
@@ -20,14 +20,14 @@ services:
       - postgres_dev_data:/var/lib/postgresql/data
       - ./backend/scripts/init_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vibe_user -d vibe_tracker"]
+      test: ["CMD-SHELL", "pg_isready -U ocft_user -d ocft_tracker"]
       interval: 5s
       timeout: 3s
       retries: 5
 
   redis:
     image: redis:7-alpine
-    container_name: vibe_redis_dev
+    container_name: ocft_redis_dev
     ports:
       - "6379:6379"
     volumes:

@@ -128,7 +128,7 @@ Créer un fichier `.env` à la racine :
 ```bash
 # Base de données
 POSTGRES_PASSWORD=votre_mot_de_passe_securise
-DATABASE_URL=postgresql://vibe_user:${POSTGRES_PASSWORD}@postgres:5432/vibe_tracker
+DATABASE_URL=postgresql://ocft_user:${POSTGRES_PASSWORD}@postgres:5432/ocft_tracker
 
 # Redis
 REDIS_URL=redis://redis:6379/0
@@ -169,10 +169,10 @@ Le script de migration est conservé pour référence dans `backend/scripts/migr
 
 ```bash
 # Backup manuel PostgreSQL
-docker compose exec postgres pg_dump -U vibe_user vibe_tracker > backup.sql
+docker compose exec postgres pg_dump -U ocft_user ocft_tracker > backup.sql
 
 # Restore
-docker compose exec -T postgres psql -U vibe_user vibe_tracker < backup.sql
+docker compose exec -T postgres psql -U ocft_user ocft_tracker < backup.sql
 ```
 
 ### Logs

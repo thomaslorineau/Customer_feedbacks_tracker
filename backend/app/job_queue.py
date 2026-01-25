@@ -80,10 +80,10 @@ class Job:
 class RedisJobQueue:
     """Redis-based job queue with priority support."""
     
-    QUEUE_KEY = "vibe:jobs:queue"
-    PROCESSING_KEY = "vibe:jobs:processing"
-    RESULTS_KEY = "vibe:jobs:results"
-    JOB_PREFIX = "vibe:job:"
+    QUEUE_KEY = "ocft:jobs:queue"
+    PROCESSING_KEY = "ocft:jobs:processing"
+    RESULTS_KEY = "ocft:jobs:results"
+    JOB_PREFIX = "ocft:job:"
     
     def __init__(self, redis_url: str = None):
         self.redis_url = redis_url or REDIS_URL

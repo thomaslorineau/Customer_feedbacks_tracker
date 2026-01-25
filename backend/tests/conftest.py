@@ -14,7 +14,7 @@ from app import database as db
 def test_db(monkeypatch):
     """Create a test PostgreSQL database connection for testing."""
     # Use test database URL from environment or default
-    test_db_url = os.getenv('TEST_DATABASE_URL', 'postgresql://vibe_user:test_password@localhost:5432/vibe_tracker_test')
+    test_db_url = os.getenv('TEST_DATABASE_URL', 'postgresql://ocft_user:test_password@localhost:5432/ocft_tracker_test')
     
     # Override DATABASE_URL for tests
     monkeypatch.setenv('DATABASE_URL', test_db_url)
