@@ -8,7 +8,7 @@
 set +e
 
 echo "=========================================="
-echo "Docker Entrypoint - VibeCoding API"
+echo "Docker Entrypoint - OCFT API"
 echo "=========================================="
 echo ""
 
