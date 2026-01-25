@@ -40,7 +40,7 @@ VibeCoding utilise une architecture Docker robuste pour la production :
 ### Problème initial
 - **Server crashes** : Le serveur uvicorn crashait pendant le scraping
 - **Blocage** : Les scrapers bloquaient l'event loop async
-- **DuckDB** : Ne supporte pas bien les accès concurrents
+- **DuckDB** : Ne supportait pas bien les accès concurrents (remplacé par PostgreSQL)
 
 ### Solution
 1. **Workers isolés** : Le scraping tourne dans des processus séparés
@@ -157,15 +157,11 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 python worker.py
 ```
 
-## Migration DuckDB → PostgreSQL
+## Migration DuckDB → PostgreSQL (TERMINÉE)
 
-```powershell
-# Via Docker
-docker compose exec api python -m scripts.migrate_to_postgres --duckdb /app/data.duckdb
+> **Note:** La migration complète vers PostgreSQL a été effectuée le 25 janvier 2026. Toutes les données (591 posts) ont été migrées avec succès.
 
-# Localement
-python backend/scripts/migrate_to_postgres.py --duckdb backend/data.duckdb --postgres "postgresql://..."
-```
+Le script de migration est conservé pour référence dans `backend/scripts/migrate_to_postgres.py`.
 
 ## Maintenance
 
@@ -235,7 +231,7 @@ docker compose exec redis redis-cli LRANGE vibe:jobs:processing 0 -1
 
 ## Comparaison Modes
 
-| Aspect | Local (DuckDB) | Docker (PostgreSQL) |
+| Aspect | Local (PostgreSQL) | Docker (PostgreSQL) |
 |--------|----------------|---------------------|
 | Setup | Simple | Docker requis |
 | Concurrence | Limitée | Excellente |

@@ -1,6 +1,6 @@
 # Protection contre la perte de données par Git
 
-Ce document décrit toutes les mesures mises en place pour empêcher Git de causer des pertes de données dans les bases de données DuckDB.
+Ce document décrit toutes les mesures mises en place pour empêcher Git de causer des pertes de données dans les bases de données PostgreSQL (anciennement DuckDB).
 
 ## 🛡️ Protections mises en place
 
@@ -13,12 +13,10 @@ Tous les fichiers de base de données sont explicitement exclus de Git :
 *.duckdb
 *.duckdb.wal
 *.duckdb.backup
-backend/data.db
-backend/data.duckdb
-backend/data_staging.duckdb
-backend/data_staging.duckdb.wal
-backend/data.duckdb.backup
-backend/data_staging.duckdb.backup
+# (Fichiers DuckDB archivés - migration terminée)
+
+# PostgreSQL backups (optionnel selon configuration)
+*.sql.backup
 backend/backups/
 ```
 

@@ -2,7 +2,7 @@
 
 Ce guide décrit comment installer l'application et la déployer sur un serveur de production.
 
-> **📌 Note importante :** L'application utilise **DuckDB** comme base de données (migration complète depuis SQLite effectuée en janvier 2026). Voir [Migration DuckDB](migration/MIGRATION_FINALE_DUCKDB.md) pour plus de détails.
+> **📌 Note importante :** L'application utilise **PostgreSQL** comme base de données (migration complète depuis DuckDB effectuée le 25 janvier 2026). Voir [Migration PostgreSQL](MIGRATION_POSTGRESQL.md) pour plus de détails.
 
 > **💡 Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant la puissance de l'assistance IA pour créer des applications complètes et professionnelles.
 
@@ -19,7 +19,7 @@ Ce guide décrit comment installer l'application et la déployer sur un serveur 
 ### Prérequis
 
 - **Python 3.11 ou supérieur** (Python 3.13+ supporté)
-- **DuckDB** (installé automatiquement via requirements.txt)
+- **PostgreSQL** (via Docker ou installation locale)
 - **Git** pour cloner le dépôt
 - **Navigateur web moderne**
 - **Connexion Internet** (pour le scraping)

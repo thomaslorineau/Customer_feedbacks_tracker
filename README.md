@@ -91,7 +91,7 @@ Pour un déploiement robuste en production avec isolation des processus :
 
 ### Architecture Docker
 
-- **PostgreSQL** : Base de données robuste (remplace DuckDB)
+- **PostgreSQL** : Base de données robuste (migration complète depuis DuckDB terminée)
 - **Redis** : File d'attente pour les jobs de scraping
 - **API** : Gunicorn avec 4 workers Uvicorn
 - **Worker** : Processus isolé pour le scraping (Selenium/Chrome)
@@ -160,7 +160,7 @@ ovh-complaints-tracker/
 └──────┬──────┘
        │ HTTP
 ┌──────▼──────┐
-│   Backend   │  →  FastAPI + Scrapers + DuckDB
+│   Backend   │  →  FastAPI + Scrapers + PostgreSQL
 │  (FastAPI)  │
 └──────┬──────┘
        │
@@ -170,7 +170,7 @@ ovh-complaints-tracker/
 └──────┬──────┘
        │
 ┌──────▼──────┐
-│  Database   │  →  DuckDB (posts, logs, queries)
+│  Database   │  →  PostgreSQL (posts, logs, queries)
 └─────────────┘
 ```
 
@@ -236,7 +236,7 @@ ovh-complaints-tracker/
 |-----------|------------|
 | **Frontend** | HTML5, CSS3, Vanilla JS (ES6 Modules) |
 | **Backend** | FastAPI (Python 3.11+) |
-| **Base de données** | DuckDB |
+| **Base de données** | PostgreSQL |
 | **Scraping** | httpx, BeautifulSoup, feedparser |
 | **Analyse** | VADER Sentiment |
 | **Visualisation** | Chart.js |
@@ -305,13 +305,13 @@ python scripts/e2e_test_real_server.py
 
 Ce projet a été développé **100% avec VibeCoding** (Cursor AI), démontrant comment l'assistance IA peut accélérer le développement d'applications complètes :
 
-- **Architecture complète** : Backend FastAPI, Frontend vanilla JS, base de données DuckDB
+- **Architecture complète** : Backend FastAPI, Frontend vanilla JS, base de données PostgreSQL
 - **10 sources de scraping** : Implémentation de scrapers avec fallbacks intelligents
 - **Système de notifications** : Email notifications avec triggers configurables
 - **Analyse IA** : Intégration OpenAI/Anthropic pour recommandations et insights
 - **Interface moderne** : Dashboard interactif avec visualisations Chart.js
 
-**Technologies utilisées :** Python, FastAPI, DuckDB, HTML/CSS/JS, SMTP, VADER Sentiment, Chart.js
+**Technologies utilisées :** Python, FastAPI, PostgreSQL, HTML/CSS/JS, SMTP, VADER Sentiment, Chart.js
 
 ---
 

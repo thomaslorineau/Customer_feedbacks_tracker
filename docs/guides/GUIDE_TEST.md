@@ -237,9 +237,9 @@ python run_scrape_x.py
 
 ### Base de données
 
-La base de données DuckDB est créée automatiquement dans `backend/data.duckdb` (ou `backend/data_staging.duckdb` pour staging) lors du premier démarrage de l'API.
+La base de données PostgreSQL est initialisée automatiquement lors du premier démarrage de l'API via `app.database.init_db()`.
 
-> **Note :** L'application utilise DuckDB depuis janvier 2026 (migration complète depuis SQLite). Voir [Migration DuckDB](../migration/MIGRATION_FINALE_DUCKDB.md) pour plus de détails.
+> **Note :** L'application utilise PostgreSQL depuis janvier 2026 (migration complète depuis DuckDB). Voir [Migration PostgreSQL](../MIGRATION_POSTGRESQL.md) pour plus de détails.
 
 ### Fonctionnalités
 
@@ -384,7 +384,7 @@ from app.db import get_db_connection
 
 conn, is_duckdb = get_db_connection()
 c = conn.cursor()
-c.execute(\"SELECT index_name FROM duckdb_indexes() WHERE table_name='posts'\")
+c.execute(\"SELECT indexname FROM pg_indexes WHERE tablename='posts'\")
 indexes = c.fetchall()
 print('Indexes on posts table:')
 for idx in indexes:
@@ -393,7 +393,7 @@ conn.close()
 "
 ```
 
-> **Note :** L'application utilise DuckDB. La syntaxe pour vérifier les index est différente de SQLite.
+> **Note :** L'application utilise PostgreSQL. La syntaxe pour vérifier les index utilise `pg_indexes`.
 
 **Résultat attendu :**
 ```
