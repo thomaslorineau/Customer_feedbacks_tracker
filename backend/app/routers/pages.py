@@ -21,15 +21,26 @@ async def serve_frontend():
 @router.get("/scraping-configuration", response_class=HTMLResponse)
 async def serve_frontend_scraping():
     """Serve the scraping & configuration page."""
-    # Use parents[2] to match main.py logic (consistent with Docker and local)
-    base_path = Path(__file__).resolve().parents[2]
-    frontend_path = base_path / "frontend" / "index.html"
-    if frontend_path.exists():
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app/frontend/index.html"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend" / "index.html",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend" / "index.html",  # Local dev
+    ]
+    
+    frontend_path = None
+    for path in possible_paths:
+        if path.exists():
+            frontend_path = path
+            break
+    
+    if frontend_path and frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
         from fastapi import HTTPException
-        logger.error(f"Scraping page not found at: {frontend_path} (base_path: {base_path})")
-        raise HTTPException(status_code=404, detail=f"Scraping page not found at {frontend_path}")
+        tried_paths = ", ".join(str(p) for p in possible_paths)
+        logger.error(f"Scraping page not found. Tried: {tried_paths}")
+        raise HTTPException(status_code=404, detail=f"Scraping page not found. Tried: {tried_paths}")
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
@@ -63,10 +74,20 @@ async def serve_frontend_dashboard():
 @router.get("/logs", response_class=HTMLResponse)
 async def serve_logs_page():
     """Serve the scraping logs page."""
-    # Use parents[2] to match main.py logic (consistent with Docker and local)
-    base_path = Path(__file__).resolve().parents[2]
-    frontend_path = base_path / "frontend" / "logs.html"
-    if frontend_path.exists():
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app/frontend/logs.html"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend" / "logs.html",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend" / "logs.html",  # Local dev
+    ]
+    
+    frontend_path = None
+    for path in possible_paths:
+        if path.exists():
+            frontend_path = path
+            break
+    
+    if frontend_path and frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
         # Create a simple logs page if it doesn't exist
@@ -89,10 +110,20 @@ async def serve_logs_page():
 @router.get("/improvements", response_class=HTMLResponse)
 async def serve_improvements():
     """Serve the improvements opportunities HTML file."""
-    # Use parents[2] to match main.py logic (consistent with Docker and local)
-    base_path = Path(__file__).resolve().parents[2]
-    frontend_path = base_path / "frontend" / "improvements" / "index.html"
-    if frontend_path.exists():
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app/frontend/improvements/index.html"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend" / "improvements" / "index.html",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend" / "improvements" / "index.html",  # Local dev
+    ]
+    
+    frontend_path = None
+    for path in possible_paths:
+        if path.exists():
+            frontend_path = path
+            break
+    
+    if frontend_path and frontend_path.exists():
         content = open(frontend_path, "r", encoding="utf-8").read()
         # Replace relative paths with absolute paths for static files
         content = content.replace('href="/dashboard/css/', 'href="/dashboard/css/')
@@ -100,34 +131,57 @@ async def serve_improvements():
         return content
     else:
         from fastapi import HTTPException
-        logger.error(f"Improvements page not found at: {frontend_path} (base_path: {base_path})")
-        raise HTTPException(status_code=404, detail=f"Improvements page not found at {frontend_path}")
+        tried_paths = ", ".join(str(p) for p in possible_paths)
+        logger.error(f"Improvements page not found. Tried: {tried_paths}")
+        raise HTTPException(status_code=404, detail=f"Improvements page not found. Tried: {tried_paths}")
 
 
 @router.get("/settings", response_class=HTMLResponse)
 async def serve_settings():
     """Serve the settings page."""
-    # Use parents[2] to match main.py logic (consistent with Docker and local)
-    base_path = Path(__file__).resolve().parents[2]
-    frontend_path = base_path / "frontend" / "dashboard" / "settings.html"
-    if frontend_path.exists():
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app/frontend/dashboard/settings.html"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend" / "dashboard" / "settings.html",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "settings.html",  # Local dev
+    ]
+    
+    frontend_path = None
+    for path in possible_paths:
+        if path.exists():
+            frontend_path = path
+            break
+    
+    if frontend_path and frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
         from fastapi import HTTPException
-        logger.error(f"Settings page not found at: {frontend_path} (base_path: {base_path})")
-        raise HTTPException(status_code=404, detail=f"Settings page not found at {frontend_path}")
+        tried_paths = ", ".join(str(p) for p in possible_paths)
+        logger.error(f"Settings page not found. Tried: {tried_paths}")
+        raise HTTPException(status_code=404, detail=f"Settings page not found. Tried: {tried_paths}")
 
 
 @router.get("/cleanup-stale-job", response_class=HTMLResponse)
 async def serve_cleanup_page():
     """Serve the cleanup page for stale jobs."""
-    # Use parents[2] to match main.py logic (consistent with Docker and local)
-    base_path = Path(__file__).resolve().parents[2]
-    frontend_path = base_path / "frontend" / "cleanup-stale-job.html"
-    if frontend_path.exists():
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app/frontend/cleanup-stale-job.html"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend" / "cleanup-stale-job.html",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend" / "cleanup-stale-job.html",  # Local dev
+    ]
+    
+    frontend_path = None
+    for path in possible_paths:
+        if path.exists():
+            frontend_path = path
+            break
+    
+    if frontend_path and frontend_path.exists():
         return open(frontend_path, "r", encoding="utf-8").read()
     else:
         from fastapi import HTTPException
-        logger.error(f"Cleanup page not found at: {frontend_path} (base_path: {base_path})")
-        raise HTTPException(status_code=404, detail=f"Cleanup page not found at {frontend_path}")
+        tried_paths = ", ".join(str(p) for p in possible_paths)
+        logger.error(f"Cleanup page not found. Tried: {tried_paths}")
+        raise HTTPException(status_code=404, detail=f"Cleanup page not found. Tried: {tried_paths}")
 
