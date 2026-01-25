@@ -20,7 +20,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.job_queue import (
     enqueue_auto_scrape_job, enqueue_backup_job, get_job_queue
 )
-from app import db
+from app import database as db
 
 # Configure logging
 logging.basicConfig(

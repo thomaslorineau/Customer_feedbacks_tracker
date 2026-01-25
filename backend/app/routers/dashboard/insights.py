@@ -17,7 +17,7 @@ from .models import (
     ImprovementInsight, ImprovementsAnalysisRequest, ImprovementsAnalysisResponse
 )
 from .analytics import get_pain_points
-from ... import db
+from ... import database as db
 from fastapi import Query
 
 logger = logging.getLogger(__name__)

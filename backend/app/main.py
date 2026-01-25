@@ -29,7 +29,7 @@ from slowapi.errors import RateLimitExceeded
 
 logger = logging.getLogger(__name__)
 
-from . import db
+from . import database as db
 from .config import keywords_base
 
 

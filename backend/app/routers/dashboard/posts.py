@@ -3,7 +3,7 @@ from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 import logging
 
-from ... import db
+from ... import database as db
 
 logger = logging.getLogger(__name__)
 

@@ -20,7 +20,7 @@ from ..auth import (
     TokenData
 )
 from ..auth.jwt_handler import JWT_REFRESH_TOKEN_EXPIRE_DAYS
-from .. import db
+from .. import database as db
 from passlib.context import CryptContext
 
 logger = logging.getLogger(__name__)

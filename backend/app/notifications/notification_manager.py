@@ -9,7 +9,7 @@ from datetime import datetime
 
 from . import email_sender
 from . import trigger_checker
-from .. import db
+from .. import database as db
 
 logger = logging.getLogger(__name__)
 

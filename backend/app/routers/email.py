@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import db
+from .. import database as db
 from ..auth.dependencies import require_auth
 
 logger = logging.getLogger(__name__)

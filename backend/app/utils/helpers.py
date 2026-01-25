@@ -1,7 +1,7 @@
 """Helper functions to reduce code duplication and improve maintainability."""
 import logging
 from typing import List, Dict, Any, Optional, Callable
-from .. import db
+from .. import database as db
 from ..analysis import sentiment
 
 logger = logging.getLogger(__name__)

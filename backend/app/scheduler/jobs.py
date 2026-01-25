@@ -4,7 +4,7 @@ import logging
 import sys
 from pathlib import Path
 
-from .. import db
+from .. import database as db
 from ..config import keywords_base
 from ..routers.scraping import _run_scrape_for_source
 
