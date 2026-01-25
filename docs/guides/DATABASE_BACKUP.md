@@ -150,11 +150,11 @@ Pour restaurer une sauvegarde :
 
 # 2. Sauvegarder la base actuelle (au cas où)
 # Pour PostgreSQL, créer un backup avant restauration
-pg_dump -U vibe_user -d vibe_tracker > backend/data_postgres_backup_$(date +%Y%m%d_%H%M%S).sql
+pg_dump -U ocft_user -d ocft_tracker > backend/data_postgres_backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 3. Restaurer la sauvegarde souhaitée
 # Restaurer depuis un backup PostgreSQL
-psql -U vibe_user -d vibe_tracker < backend/backups/postgres_backup_20240115_020000.sql
+psql -U ocft_user -d ocft_tracker < backend/backups/postgres_backup_20240115_020000.sql
 
 # 4. Vérifier l'intégrité
 python backend/scripts/check_db_integrity.py production
