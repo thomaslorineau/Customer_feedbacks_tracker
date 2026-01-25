@@ -49,7 +49,6 @@ services:
       - DATABASE_URL=postgresql://ocft_user:${POSTGRES_PASSWORD:-ocft_secure_password_2026}@postgres:5432/ocft_tracker
       - REDIS_URL=redis://redis:6379/0
       - ENVIRONMENT=production
-      - USE_POSTGRES=true
       - LOG_LEVEL=info
       - WORKERS=4
       - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080,http://tlorinea.sdev-docker.ha.ovh.net:11840,http://gw.lab.core.ovh.net:11840
