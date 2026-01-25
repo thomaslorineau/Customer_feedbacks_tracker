@@ -14,7 +14,7 @@ from pathlib import Path
 backend_path = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_path))
 
-from app import db
+from app import database as db
 from app.analysis import sentiment, language_detection
 import logging
 

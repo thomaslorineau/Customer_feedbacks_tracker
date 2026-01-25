@@ -63,9 +63,6 @@ services:
     volumes:
       - ./frontend:/app/frontend:ro
       - ./backend/backups:/app/backups
-      # Mount DuckDB file for automatic migration (optional - only if file exists)
-      # If backend/data.duckdb doesn't exist, create it as empty file or remove this line
-      - ./backend/data.duckdb:/tmp/data.duckdb:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s

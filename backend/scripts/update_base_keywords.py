@@ -15,7 +15,7 @@ if 'ENVIRONMENT' not in os.environ:
 if 'USE_DUCKDB' not in os.environ:
     os.environ['USE_DUCKDB'] = 'true'
 
-from app import db
+from app import database as db
 from app.config.keywords_base import (
     DEFAULT_BRAND_KEYWORDS,
     DEFAULT_PRODUCT_KEYWORDS,

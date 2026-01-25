@@ -1,8 +1,8 @@
-"""Unit tests for db.py module."""
+"""Unit tests for database module."""
 import pytest
 from datetime import datetime
 from unittest.mock import patch
-from app import db
+from app import database as db
 
 
 class TestInsertPost:
