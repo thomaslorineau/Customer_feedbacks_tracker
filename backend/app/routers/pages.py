@@ -25,7 +25,8 @@ async def serve_frontend_scraping():
     possible_paths = [
         Path("/app/frontend/index.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "index.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "index.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "index.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "index.html",  # Fallback
     ]
     
     frontend_path = None
@@ -53,7 +54,8 @@ async def serve_frontend_dashboard():
     possible_paths = [
         Path("/app/frontend/dashboard/index.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "dashboard" / "index.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "index.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "dashboard" / "index.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "index.html",  # Fallback
     ]
     
     frontend_path = None
@@ -78,7 +80,8 @@ async def serve_logs_page():
     possible_paths = [
         Path("/app/frontend/logs.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "logs.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "logs.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "logs.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "logs.html",  # Fallback
     ]
     
     frontend_path = None
@@ -114,7 +117,8 @@ async def serve_improvements():
     possible_paths = [
         Path("/app/frontend/improvements/index.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "improvements" / "index.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "improvements" / "index.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "improvements" / "index.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "improvements" / "index.html",  # Fallback
     ]
     
     frontend_path = None
@@ -143,7 +147,8 @@ async def serve_settings():
     possible_paths = [
         Path("/app/frontend/dashboard/settings.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "dashboard" / "settings.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "settings.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "dashboard" / "settings.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "dashboard" / "settings.html",  # Fallback
     ]
     
     frontend_path = None
@@ -168,7 +173,8 @@ async def serve_cleanup_page():
     possible_paths = [
         Path("/app/frontend/cleanup-stale-job.html"),  # Docker absolute path
         Path(__file__).resolve().parents[1] / "frontend" / "cleanup-stale-job.html",  # Docker relative
-        Path(__file__).resolve().parents[2] / "frontend" / "cleanup-stale-job.html",  # Local dev
+        Path(__file__).resolve().parents[3] / "frontend" / "cleanup-stale-job.html",  # Local dev (root)
+        Path(__file__).resolve().parents[2] / "frontend" / "cleanup-stale-job.html",  # Fallback
     ]
     
     frontend_path = None
