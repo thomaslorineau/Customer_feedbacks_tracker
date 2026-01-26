@@ -966,19 +966,26 @@ async def get_product_opportunities(
                     created_at = post.get('created_at', '')
                     if created_at:
                         try:
-                            # Parse post date (handle various formats)
-                            post_date_str = created_at.replace('Z', '+00:00')
-                            try:
-                                post_date = datetime.fromisoformat(post_date_str)
-                            except ValueError:
-                                # Try parsing without timezone
-                                post_date = datetime.fromisoformat(created_at.split('T')[0])
+                            # Ensure created_at is a string (handle datetime objects from DB)
+                            if isinstance(created_at, datetime):
+                                post_date = created_at
+                            elif isinstance(created_at, str):
+                                # Parse post date (handle various formats)
+                                post_date_str = created_at.replace('Z', '+00:00')
+                                try:
+                                    post_date = datetime.fromisoformat(post_date_str)
+                                except ValueError:
+                                    # Try parsing without timezone
+                                    post_date = datetime.fromisoformat(created_at.split('T')[0])
+                            else:
+                                # Skip if created_at is not a string or datetime
+                                continue
                             
                             # Compare dates (remove timezone for comparison)
                             post_date_naive = post_date.replace(tzinfo=None) if post_date.tzinfo else post_date
                             if post_date_naive.date() >= cutoff_date.date():
                                 filtered_posts.append(post)
-                        except (ValueError, AttributeError) as e:
+                        except (ValueError, AttributeError, TypeError) as e:
                             logger.debug(f"Error parsing post date {created_at}: {e}")
                             continue
                 posts = filtered_posts
