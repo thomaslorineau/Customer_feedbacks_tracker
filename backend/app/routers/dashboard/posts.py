@@ -23,6 +23,18 @@ async def get_posts(
     Supports filtering by language and pagination via limit/offset.
     """
     try:
+        # Ensure limit and offset are integers (handle string conversion from query params)
+        try:
+            limit = int(limit) if limit is not None else 100
+            offset = int(offset) if offset is not None else 0
+        except (ValueError, TypeError):
+            limit = 100
+            offset = 0
+        
+        # Ensure positive values
+        limit = max(1, min(limit, 10000))
+        offset = max(0, offset)
+        
         posts = db.get_posts(limit=limit, offset=offset, language=language)
         return posts
     except Exception as e:
