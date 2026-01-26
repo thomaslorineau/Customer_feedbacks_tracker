@@ -371,8 +371,8 @@ export async function updateWhatsHappening(state) {
             <div class="stat-card-value" style="font-size: 1.8em; font-weight: 700; color: var(--accent-primary);">${globalAnsweredStats ? globalAnsweredStats.answered_percentage : answeredPercentage}%</div>
             <div class="stat-card-label">Answered</div>
             <div style="display: flex; gap: 8px; margin-top: 6px; font-size: 0.75em; justify-content: center;">
-                <span style="color: #10b981; font-weight: 600;">✓ ${globalAnsweredStats ? globalAnsweredStats.answered : answered}</span>
-                <span style="color: #ef4444; font-weight: 600;">✗ ${globalAnsweredStats ? globalAnsweredStats.not_answered : notAnswered}</span>
+                <span style="color: #10b981; font-weight: 600;">✓ ${globalAnsweredStats ? (globalAnsweredStats.answered || 0) : (answered || 0)}</span>
+                <span style="color: #ef4444; font-weight: 600;">✗ ${globalAnsweredStats ? (globalAnsweredStats.unanswered || globalAnsweredStats.not_answered || 0) : (notAnswered || 0)}</span>
             </div>
             ${globalAnsweredStats && totalForAnswered < globalAnsweredStats.total ? `
             <div style="font-size: 0.7em; color: var(--text-muted); margin-top: 4px; text-align: center;">
