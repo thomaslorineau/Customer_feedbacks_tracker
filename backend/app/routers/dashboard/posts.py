@@ -123,11 +123,18 @@ async def get_posts_for_improvement(
                 if created_at:
                     try:
                         from datetime import datetime
-                        post_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                        # Ensure created_at is a string
+                        if isinstance(created_at, str):
+                            post_date_str = created_at.replace('Z', '+00:00')
+                            post_date = datetime.fromisoformat(post_date_str)
+                        else:
+                            # If it's already a datetime object, use it directly
+                            post_date = created_at if isinstance(created_at, datetime) else datetime.fromisoformat(str(created_at))
                         cutoff_date = datetime.fromisoformat(date_from)
                         if post_date.replace(tzinfo=None) < cutoff_date:
                             continue
-                    except (ValueError, AttributeError):
+                    except (ValueError, AttributeError, TypeError) as e:
+                        logger.debug(f"Error parsing post date {created_at}: {e}")
                         continue
             
             # Apply filters
