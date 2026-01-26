@@ -144,10 +144,17 @@ async def fetch_github_issue_metadata(url: str) -> Optional[Dict[str, Any]]:
             response.raise_for_status()
             data = response.json()
             
+            # GitHub issues can be 'open' or 'closed'
+            # Only closed issues should be considered as potentially "answered"
+            # But even closed issues might not be answered (could be closed as "not planned", etc.)
+            state = data.get('state', 'open')
+            
             return {
                 'source': 'github',
                 'comments': data.get('comments', 0),
                 'comments_count': data.get('comments', 0),
+                'state': state,  # 'open' or 'closed'
+                'closed_at': data.get('closed_at'),  # When issue was closed, if applicable
                 'url': url
             }
         
