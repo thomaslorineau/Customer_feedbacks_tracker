@@ -933,7 +933,7 @@ Generate a sentence in English that summarizes the top improvement ideas in a cl
         return {"summary": "Analyzing improvement opportunities..."}
 
 
-@router.get("/api/pain-points", response_model=PainPointsResponse, tags=["Dashboard", "Insights"])
+@router.get("/pain-points", response_model=PainPointsResponse, tags=["Dashboard", "Insights"])
 async def get_pain_points_endpoint(
     days: int = Query(30, description="Number of days to look back", ge=1, le=365),
     limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=50)
@@ -946,7 +946,7 @@ async def get_pain_points_endpoint(
         raise HTTPException(status_code=500, detail=f"Failed to get pain points: {str(e)}")
 
 
-@router.get("/api/product-opportunities", response_model=ProductDistributionResponse, tags=["Dashboard", "Insights"])
+@router.get("/product-opportunities", response_model=ProductDistributionResponse, tags=["Dashboard", "Insights"])
 async def get_product_opportunities(
     date_from: Optional[str] = Query(None, description="Filter posts from this date (YYYY-MM-DD)")
 ):
