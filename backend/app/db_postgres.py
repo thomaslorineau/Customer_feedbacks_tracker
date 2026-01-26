@@ -105,18 +105,19 @@ def close_pg_pool():
 def pg_insert_post(source: str, author: str, content: str, url: str,
                    created_at: str, sentiment_score: float, sentiment_label: str,
                    language: str = 'unknown', country: str = None,
-                   relevance_score: float = 0.0, product: str = None) -> Optional[int]:
+                   relevance_score: float = 0.0, product: str = None,
+                   is_answered: int = 0) -> Optional[int]:
     """Insert a new post into PostgreSQL (low-level function)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             INSERT INTO posts (source, author, content, url, created_at, 
                              sentiment_score, sentiment_label, language, country, 
-                             relevance_score, product)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             relevance_score, product, is_answered)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (url) DO NOTHING
             RETURNING id
         """, (source, author, content, url, created_at, sentiment_score,
-              sentiment_label, language, country, relevance_score, product))
+              sentiment_label, language, country, relevance_score, product, is_answered))
         result = cur.fetchone()
         return result['id'] if result else None
 
@@ -548,6 +549,15 @@ def pg_get_answered_stats() -> Dict[str, Any]:
         total = cur.fetchone()['total']
         
         # Answered posts (is_answered = 1, stored as INTEGER)
+        # Also check for NULL values which should be treated as unanswered
+        cur.execute("""
+            SELECT COUNT(*) as answered 
+            FROM posts 
+            WHERE is_answered = 1 OR is_answered IS NULL
+        """)
+        answered = cur.fetchone()['answered']
+        
+        # Actually, let's be more precise: only count posts where is_answered = 1 explicitly
         cur.execute("""
             SELECT COUNT(*) as answered 
             FROM posts 
@@ -555,8 +565,13 @@ def pg_get_answered_stats() -> Dict[str, Any]:
         """)
         answered = cur.fetchone()['answered']
         
-        # Unanswered posts
-        unanswered = total - answered
+        # Unanswered posts (is_answered = 0 OR NULL)
+        cur.execute("""
+            SELECT COUNT(*) as unanswered 
+            FROM posts 
+            WHERE is_answered = 0 OR is_answered IS NULL
+        """)
+        unanswered = cur.fetchone()['unanswered']
         
         # Calculate percentage
         answered_percentage = round((answered / total * 100) if total > 0 else 0, 1)
@@ -569,6 +584,22 @@ def pg_get_answered_stats() -> Dict[str, Any]:
             'answered_percentage': answered_percentage,
             'unanswered_percentage': unanswered_percentage
         }
+
+
+def pg_reset_all_answered_status() -> int:
+    """Reset all posts to unanswered (is_answered = 0) except those explicitly marked as answered."""
+    with get_pg_cursor() as cur:
+        # Set all posts to unanswered (0) where is_answered is NULL or not explicitly 1
+        # This will reset posts that were incorrectly marked
+        cur.execute("""
+            UPDATE posts 
+            SET is_answered = 0,
+                answered_at = NULL,
+                answered_by = NULL,
+                answer_detection_method = NULL
+            WHERE is_answered IS NULL OR is_answered != 1
+        """)
+        return cur.rowcount
 
 
 # ============================================
