@@ -317,29 +317,23 @@ class BaseKeywordsPayload(BaseModel):
     tags=["Configuration", "LLM"]
 )
 async def get_llm_config():
-    """Get current LLM configuration status (without exposing keys)."""
-    from pathlib import Path
-    from dotenv import load_dotenv
+    """Get LLM configuration from database (app_config table)."""
+    from ..database import pg_get_config
+    import os
     
-    # Reload .env to get latest values
-    backend_path = Path(__file__).resolve().parents[2]
-    env_path = backend_path / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
-    
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    mistral_key = os.getenv('MISTRAL_API_KEY')
-    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    # Try to get from database first, fallback to environment variables
+    openai_key = pg_get_config('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
+    anthropic_key = pg_get_config('ANTHROPIC_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+    mistral_key = pg_get_config('MISTRAL_API_KEY') or os.getenv('MISTRAL_API_KEY')
+    llm_provider = pg_get_config('LLM_PROVIDER') or os.getenv('LLM_PROVIDER', 'openai')
     
     return LLMConfigResponse(
-        provider=provider,
+        provider=llm_provider or 'openai',
         api_key_set=bool(openai_key or anthropic_key or mistral_key),
         available=bool(openai_key or anthropic_key or mistral_key),
-        # Legacy fields for backward compatibility
         openai_api_key_set=bool(openai_key),
         anthropic_api_key_set=bool(anthropic_key),
-        llm_provider=provider,
+        llm_provider=llm_provider or 'openai',
         status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
     )
 
@@ -380,81 +374,42 @@ async def get_llm_config():
 async def set_llm_config(
     payload: LLMConfigPayload
 ):
-    """Set LLM configuration (save to .env file)."""
-    from pathlib import Path
+    """Set LLM configuration (save to PostgreSQL app_config table for persistence)."""
+    from ..database import pg_set_config, pg_delete_config, pg_get_config
     import os
     
-    logger.info("LLM configuration updated")
+    logger.info("LLM configuration updated - saving to database")
     
-    # Get backend directory (where .env should be)
-    # __file__ is backend/app/routers/config.py
-    # parents[0] = backend/app/routers
-    # parents[1] = backend/app
-    # parents[2] = backend
-    backend_path = Path(__file__).resolve().parents[2]
-    env_path = backend_path / ".env"
-    
-    logger.info(f"Saving LLM config to: {env_path}")
-    
-    # Read existing .env if it exists
-    env_vars = {}
-    if env_path.exists():
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key, value = line.split("=", 1)
-                    env_vars[key.strip()] = value.strip()
-    
-    # Update with new values
+    # Store in PostgreSQL app_config table (persistent across restarts)
     if payload.openai_api_key is not None:
         if payload.openai_api_key and payload.openai_api_key.strip():
-            env_vars['OPENAI_API_KEY'] = payload.openai_api_key.strip()
-            logger.info("OpenAI API key updated")
-        elif 'OPENAI_API_KEY' in env_vars:
-            del env_vars['OPENAI_API_KEY']
-            logger.info("OpenAI API key removed")
+            pg_set_config('OPENAI_API_KEY', payload.openai_api_key.strip())
+            logger.info("OpenAI API key saved to database")
+        else:
+            pg_delete_config('OPENAI_API_KEY')
+            logger.info("OpenAI API key removed from database")
     
     if payload.anthropic_api_key is not None:
         if payload.anthropic_api_key and payload.anthropic_api_key.strip():
-            env_vars['ANTHROPIC_API_KEY'] = payload.anthropic_api_key.strip()
-            logger.info("Anthropic API key updated")
-        elif 'ANTHROPIC_API_KEY' in env_vars:
-            del env_vars['ANTHROPIC_API_KEY']
-            logger.info("Anthropic API key removed")
+            pg_set_config('ANTHROPIC_API_KEY', payload.anthropic_api_key.strip())
+            logger.info("Anthropic API key saved to database")
+        else:
+            pg_delete_config('ANTHROPIC_API_KEY')
+            logger.info("Anthropic API key removed from database")
     
     if payload.mistral_api_key is not None:
         if payload.mistral_api_key and payload.mistral_api_key.strip():
-            env_vars['MISTRAL_API_KEY'] = payload.mistral_api_key.strip()
-            logger.info("Mistral API key updated")
-        elif 'MISTRAL_API_KEY' in env_vars:
-            del env_vars['MISTRAL_API_KEY']
-            logger.info("Mistral API key removed")
+            pg_set_config('MISTRAL_API_KEY', payload.mistral_api_key.strip())
+            logger.info("Mistral API key saved to database")
+        else:
+            pg_delete_config('MISTRAL_API_KEY')
+            logger.info("Mistral API key removed from database")
     
     if payload.llm_provider:
-        env_vars['LLM_PROVIDER'] = payload.llm_provider
+        pg_set_config('LLM_PROVIDER', payload.llm_provider)
         logger.info(f"LLM provider set to: {payload.llm_provider}")
     
-    # Ensure backend directory exists
-    backend_path.mkdir(parents=True, exist_ok=True)
-    
-    # Write back to .env (create if doesn't exist)
-    try:
-        with open(env_path, "w", encoding="utf-8") as f:
-            # Write header comment
-            f.write("# LLM Configuration\n")
-            f.write("# This file is auto-generated. Do not edit manually.\n\n")
-            
-            # Write all environment variables
-            for key, value in sorted(env_vars.items()):
-                f.write(f"{key}={value}\n")
-        
-        logger.info(f"✅ LLM configuration saved to {env_path}")
-    except Exception as e:
-        logger.error(f"❌ Failed to save LLM config to {env_path}: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save configuration: {str(e)}")
-    
-    # Update environment variables for current session
+    # Update environment variables for current session (so it works immediately)
     if payload.openai_api_key is not None:
         if payload.openai_api_key:
             os.environ['OPENAI_API_KEY'] = payload.openai_api_key
@@ -474,7 +429,6 @@ async def set_llm_config(
         os.environ['LLM_PROVIDER'] = payload.llm_provider
     
     # Also update the config singleton if it exists
-    # Note: This updates the current session, but a restart is needed for full persistence
     try:
         from ..config import config
         if payload.openai_api_key is not None:
@@ -489,15 +443,20 @@ async def set_llm_config(
     except Exception as e:
         logger.warning(f"Could not update config singleton: {e}")
     
+    # Get updated values from database for response
+    openai_key = pg_get_config('OPENAI_API_KEY')
+    anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
+    mistral_key = pg_get_config('MISTRAL_API_KEY')
+    llm_provider = pg_get_config('LLM_PROVIDER') or 'openai'
+    
     return LLMConfigResponse(
-        provider=env_vars.get('LLM_PROVIDER', 'openai'),
-        api_key_set=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')),
-        available=bool(env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')),
-        # Legacy fields
-        openai_api_key_set=bool(env_vars.get('OPENAI_API_KEY')),
-        anthropic_api_key_set=bool(env_vars.get('ANTHROPIC_API_KEY')),
-        llm_provider=env_vars.get('LLM_PROVIDER', 'openai'),
-        status="configured" if (env_vars.get('OPENAI_API_KEY') or env_vars.get('ANTHROPIC_API_KEY') or env_vars.get('MISTRAL_API_KEY')) else "not_configured"
+        provider=llm_provider,
+        api_key_set=bool(openai_key or anthropic_key or mistral_key),
+        available=bool(openai_key or anthropic_key or mistral_key),
+        openai_api_key_set=bool(openai_key),
+        anthropic_api_key_set=bool(anthropic_key),
+        llm_provider=llm_provider,
+        status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
     )
 
 

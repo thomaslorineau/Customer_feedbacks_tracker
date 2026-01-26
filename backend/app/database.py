@@ -58,6 +58,14 @@ except AttributeError:
             """Finalize a job by updating its status."""
             return pg_module.pg_update_job_status(job_id, status, error_message)
 
+# Ensure reset_all_answered_status is available
+try:
+    reset_all_answered_status = pg_module.pg_reset_all_answered_status
+except AttributeError:
+    def reset_all_answered_status() -> int:
+        """Reset all posts to unanswered status."""
+        return pg_module.pg_reset_all_answered_status()
+
 # Define finalize_job directly in this module's namespace
 def finalize_job(job_id: str, status: str, error_message: str = None) -> bool:
     """Finalize a job by updating its status to completed, failed, or cancelled."""

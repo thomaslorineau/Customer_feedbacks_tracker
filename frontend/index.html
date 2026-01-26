@@ -2183,7 +2183,7 @@
 
         async function loadPostsFromDB() {
             try {
-                const response = await fetch(`${API_BASE}/posts?limit=1000`);
+                const response = await fetch(`${API_BASE}/api/posts?limit=1000`);
                 if (response.ok) {
                     const posts = await response.json();
                     // Filter out sample posts AND posts with relevance_score = 0 (same as dashboard)
@@ -2211,11 +2211,12 @@
                     // Note: updateDatabaseStats removed - stats are updated automatically via renderGallery()
                     return true;
                 } else {
-                    console.error('Failed to load posts');
+                    const errorText = await response.text().catch(() => '');
+                    console.error('Failed to load posts:', response.status, response.statusText, errorText);
                     return false;
                 }
             } catch (e) {
-                console.error(`Error loading posts: ${e.message}`);
+                console.error(`Error loading posts: ${e.message}`, e);
                 return false;
             }
         }
@@ -6128,6 +6129,13 @@
                 console.error('Error loading posts:', error);
             });
             });
+        </script>
+        <!-- Force HTTPS redirect for port 11840 -->
+        <script>
+            // Force HTTPS if accessing via HTTP on port 11840
+            if (window.location.protocol === 'http:' && (window.location.port === '11840' || window.location.hostname.includes('gw.lab.core.ovh.net'))) {
+                window.location.replace(window.location.href.replace('http:', 'https:'));
+            }
         </script>
         <script type="module" src="/dashboard/js/version-loader.js"></script>
         <script src="/js/logo-updater.js"></script>

@@ -77,6 +77,24 @@ async def update_all_posts_answered_status():
         raise HTTPException(status_code=500, detail=f"Failed to update answered status: {str(e)}")
 
 
+@router.post("/posts/reset-answered-status", tags=["Dashboard", "Posts"])
+async def reset_all_answered_status():
+    """
+    Réinitialise le statut answered de tous les posts (met is_answered = 0 pour tous).
+    Utile pour corriger les erreurs où tous les posts sont marqués comme answered.
+    """
+    try:
+        from ..database import pg_reset_all_answered_status
+        reset_count = pg_reset_all_answered_status()
+        return {
+            "success": True,
+            "message": f"Reset answered status for {reset_count} posts"
+        }
+    except Exception as e:
+        logger.error(f"Error resetting answered status: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to reset answered status: {str(e)}")
+
+
 @router.get("/posts-for-improvement", tags=["Dashboard", "Posts"])
 async def get_posts_for_improvement(
     limit: int = Query(20, description="Maximum number of posts to return", ge=1, le=1000),
