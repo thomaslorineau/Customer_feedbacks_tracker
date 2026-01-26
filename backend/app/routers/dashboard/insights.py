@@ -1043,7 +1043,11 @@ async def get_product_opportunities(
             negative_count_calc = 0
             
             for post_data in post_list:
-                relevance = post_data['relevance']
+                # Ensure relevance is a float (handle string conversion)
+                try:
+                    relevance = float(post_data.get('relevance', 0.3) or 0.3)
+                except (ValueError, TypeError):
+                    relevance = 0.3  # Default if conversion fails
                 sentiment = post_data['sentiment']
                 
                 # Seuls les posts négatifs comptent pour l'opportunité
