@@ -1059,6 +1059,12 @@ async def get_product_opportunities(
                     negative_weighted_sum += relevance
                     negative_count_calc += 1
             
+            # Ensure negative_count_calc is an integer
+            try:
+                negative_count_calc = int(negative_count_calc) if negative_count_calc is not None else 0
+            except (ValueError, TypeError):
+                negative_count_calc = 0
+            
             if negative_count_calc > 0:
                 # Pertinence moyenne des posts négatifs
                 avg_relevance = negative_weighted_sum / negative_count_calc
@@ -1067,7 +1073,7 @@ async def get_product_opportunities(
                 # Plus il y a de posts négatifs, plus le score augmente
                 # Facteur de volume : logarithme pour éviter que ça explose
                 # 1 post = ~10 points, 5 posts = ~30 points, 10 posts = ~50 points, 20+ posts = ~100 points
-                volume_factor = min(math.log(negative_count_calc + 1) * 10, 50)  # Max 50 points pour le volume
+                volume_factor = min(math.log(float(negative_count_calc) + 1) * 10, 50)  # Max 50 points pour le volume
                 
                 # Pertinence factor : moyenne pondérée (max 50 points)
                 relevance_factor = avg_relevance * 50
