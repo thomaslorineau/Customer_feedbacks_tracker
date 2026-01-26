@@ -301,7 +301,7 @@ export async function updateWhatsHappening(state) {
     // Fetch global answered stats from API (for accurate global statistics)
     let globalAnsweredStats = null;
     try {
-        const response = await fetch('/posts/stats/answered');
+        const response = await fetch('/api/posts/stats/answered');
         if (response.ok) {
             globalAnsweredStats = await response.json();
             console.log('Global answered stats from API:', globalAnsweredStats);
