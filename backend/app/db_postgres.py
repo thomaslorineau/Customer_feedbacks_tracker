@@ -983,6 +983,15 @@ def get_job_record(job_id: str) -> Optional[Dict]:
 update_job_progress = pg_update_job_status
 get_all_jobs = pg_get_pending_jobs
 
+def pg_finalize_job(job_id: str, status: str, error_message: str = None) -> bool:
+    """
+    Finalize a job by updating its status to completed, failed, or cancelled.
+    This is an alias/wrapper for pg_update_job_status for consistency.
+    """
+    return pg_update_job_status(job_id, status, error_message)
+
+finalize_job = pg_finalize_job
+
 # Answered status functions
 def pg_update_post_answered_status(post_id: int, answered: bool, method: str = 'manual') -> bool:
     """Update the answered status of a post."""
