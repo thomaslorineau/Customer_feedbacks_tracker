@@ -36,12 +36,18 @@ async function initAPI() {
     }
 }
 
-// Load and display version with cache-busting
-export async function loadVersion() {
+// Load and display version with cache-busting (but only if cache expired)
+export async function loadVersion(force = false) {
     try {
+        const now = Date.now();
+        // Check cache first (unless forced)
+        if (!force && now - lastVersionCheck < VERSION_CACHE_DURATION) {
+            return; // Use cached version
+        }
+        
         await initAPI();
-        // Add cache-busting timestamp to request
-        const timestamp = new Date().getTime();
+        // Add cache-busting timestamp to request only if forced or cache expired
+        const timestamp = force ? new Date().getTime() : null;
         const response = await api.getVersion(timestamp);
         if (response && response.version) {
             const versionBadge = document.getElementById('versionBadge');
@@ -53,6 +59,7 @@ export async function loadVersion() {
                     versionBadge.title = `Version ${response.version}`;
                 }
             }
+            lastVersionCheck = now;
         }
     } catch (error) {
         console.warn('Failed to load version:', error);
@@ -70,18 +77,25 @@ if (document.readyState === 'loading') {
     loadVersion();
 }
 
-// Auto-refresh version every 30 seconds
+// Auto-refresh version every 5 minutes (instead of 30 seconds to reduce log noise)
 let versionRefreshInterval = null;
+let lastVersionCheck = 0;
+const VERSION_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function startVersionAutoRefresh() {
     // Clear existing interval if any
     if (versionRefreshInterval) {
         clearInterval(versionRefreshInterval);
     }
-    // Refresh every 30 seconds (30000 ms)
+    // Refresh every 5 minutes (300000 ms) instead of 30 seconds
     versionRefreshInterval = setInterval(() => {
-        loadVersion();
-    }, 30000);
+        const now = Date.now();
+        // Only refresh if cache expired
+        if (now - lastVersionCheck > VERSION_CACHE_DURATION) {
+            loadVersion();
+            lastVersionCheck = now;
+        }
+    }, 300000); // 5 minutes
 }
 
 // Start auto-refresh when DOM is ready
