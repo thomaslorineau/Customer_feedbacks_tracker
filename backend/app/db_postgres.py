@@ -1255,3 +1255,123 @@ delete_base_keyword = pg_delete_base_keyword
 
 # Health
 health_check = pg_health_check
+
+# Pain Points (stub functions - tables don't exist yet)
+def pg_get_pain_points(enabled_only: bool = True) -> List[Dict]:
+    """Get pain points from database. Returns empty list if table doesn't exist."""
+    try:
+        with get_pg_cursor() as cur:
+            # Check if table exists
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'pain_points'
+                )
+            """)
+            table_exists = cur.fetchone()['exists']
+            
+            if not table_exists:
+                return []
+            
+            query = "SELECT * FROM pain_points"
+            if enabled_only:
+                query += " WHERE enabled = 1"
+            query += " ORDER BY id"
+            
+            cur.execute(query)
+            return [dict(row) for row in cur.fetchall()]
+    except Exception as e:
+        logger.warning(f"Error getting pain points (table may not exist): {e}")
+        return []
+
+get_pain_points = pg_get_pain_points
+
+# Email Notifications
+def pg_get_email_notifications(limit: int = 50, offset: int = 0) -> List[Dict]:
+    """Get email notifications with pagination."""
+    # Ensure limit and offset are integers
+    try:
+        limit = int(limit) if limit is not None else 50
+        offset = int(offset) if offset is not None else 0
+    except (ValueError, TypeError):
+        limit = 50
+        offset = 0
+    
+    limit = max(1, min(limit, 1000))
+    offset = max(0, offset)
+    
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute("""
+                SELECT * FROM email_notifications 
+                ORDER BY created_at DESC 
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
+            return [dict(row) for row in cur.fetchall()]
+    except Exception as e:
+        logger.error(f"Error getting email notifications: {e}", exc_info=True)
+        return []
+
+get_email_notifications = pg_get_email_notifications
+
+# Notification Triggers (stub functions - table doesn't exist yet)
+def pg_get_all_notification_triggers() -> List[Dict]:
+    """Get all notification triggers. Returns empty list if table doesn't exist."""
+    try:
+        with get_pg_cursor() as cur:
+            # Check if table exists
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'notification_triggers'
+                )
+            """)
+            table_exists = cur.fetchone()['exists']
+            
+            if not table_exists:
+                # Return triggers from email_notifications table as fallback
+                cur.execute("SELECT * FROM email_notifications WHERE enabled = 1")
+                return [dict(row) for row in cur.fetchall()]
+            
+            cur.execute("SELECT * FROM notification_triggers ORDER BY id")
+            return [dict(row) for row in cur.fetchall()]
+    except Exception as e:
+        logger.warning(f"Error getting notification triggers (table may not exist): {e}")
+        # Fallback to email_notifications
+        try:
+            with get_pg_cursor() as cur:
+                cur.execute("SELECT * FROM email_notifications WHERE enabled = 1")
+                return [dict(row) for row in cur.fetchall()]
+        except:
+            return []
+
+get_all_notification_triggers = pg_get_all_notification_triggers
+
+def pg_get_notification_trigger(trigger_id: int) -> Optional[Dict]:
+    """Get a specific notification trigger by ID."""
+    try:
+        with get_pg_cursor() as cur:
+            # Try notification_triggers table first
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'notification_triggers'
+                )
+            """)
+            table_exists = cur.fetchone()['exists']
+            
+            if table_exists:
+                cur.execute("SELECT * FROM notification_triggers WHERE id = %s", (trigger_id,))
+                row = cur.fetchone()
+                if row:
+                    return dict(row)
+            
+            # Fallback to email_notifications
+            cur.execute("SELECT * FROM email_notifications WHERE id = %s", (trigger_id,))
+            row = cur.fetchone()
+            return dict(row) if row else None
+    except Exception as e:
+        logger.warning(f"Error getting notification trigger {trigger_id}: {e}")
+        return None
+
+get_notification_trigger = pg_get_notification_trigger
