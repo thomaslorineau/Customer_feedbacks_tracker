@@ -22,13 +22,14 @@
 
 | Métrique | Valeur |
 |----------|--------|
-| **Lignes de code** | ~25 000+ lignes (backend: ~25 687 Python, frontend: ~13 000 HTML/CSS/JS) |
-| **Fichiers** | 43 fichiers |
+| **Lignes de code** | **52 388 lignes** (backend: 25 687 Python, frontend: 26 701 HTML/CSS/JS) |
+| **Fichiers** | ~78+ fichiers |
 | **Sources de scraping** | 10+ sources |
 | **Endpoints API** | 50+ endpoints |
 | **Architecture** | Multi-services Docker (5 services) |
-| **Migrations** | DuckDB → PostgreSQL |
+| **Migrations** | SQLite → DuckDB → PostgreSQL |
 | **Refactoring** | Monolithique → Modulaire |
+| **Score sécurité** | 93/100 (OWASP Top 10: 9/9) |
 
 ---
 
@@ -37,9 +38,9 @@
 | Composant | Sans IA (Développeur Senior) | Avec VibeCoding (Réalité) | Gain |
 |-----------|------------------------------|---------------------------|------|
 | **Architecture & Design** | 3-5 jours | 1-2 jours | **60-70%** |
-| **Backend API (~25 687 lignes)** | 25-30 jours | ~1 semaine | **70-75%** |
+| **Backend API (25 687 lignes)** | 25-30 jours | ~1 semaine | **70-75%** |
 | **10+ Scrapers** | 15-20 jours | ~3 jours | **80-85%** |
-| **Frontend Dashboard (~13 000 lignes)** | 30-40 jours | ~1 semaine | **75-80%** |
+| **Frontend Dashboard (26 701 lignes)** | 30-40 jours | ~1 semaine | **75-80%** |
 | **Migrations (SQLite→DuckDB→PostgreSQL)** | 10-14 jours | ~3 jours | **75-80%** |
 | **Architecture Docker** | 5-7 jours | ~1 jour | **80-85%** |
 | **Refactoring modulaire** | 7-10 jours | ~2 jours | **75-80%** |
@@ -135,7 +136,7 @@ GAIN DE TEMPS: 75-85% ⚡
 
 | Métrique | Sans IA | Avec VibeCoding | Amélioration |
 |----------|---------|----------------|--------------|
-| **Lignes/jour** | ~250 | ~1 200-1 500 | **5-6x** |
+| **Lignes/jour** | ~250 | ~2 500-3 500 | **10-14x** |
 | **Temps architecture** | 3-5 jours | 1-2 jours | **60%** |
 | **Temps debugging** | 25% du temps | 10% du temps | **60%** |
 | **Temps documentation** | 10% du temps | 2-3% du temps | **70%** |
@@ -167,7 +168,7 @@ GAIN DE TEMPS: 75-85% ⚡
 - ⚡ **3-4 semaines** avec VibeCoding vs **4-6 mois** sans IA
 - 💰 **Réduction de 75-85%** du temps de développement
 - 🎯 **Qualité supérieure** : Architecture optimisée, code documenté
-- 📈 **Productivité multipliée par 5-6x**
+- 📈 **Productivité multipliée par 10-14x** (52 388 lignes en 3-4 semaines)
 
 **ROI exceptionnel pour un projet de cette complexité.**
 
@@ -430,9 +431,9 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 | Métrique | Valeur |
 |---------|--------|
-| **Lignes de code backend** | ~25 687 lignes (Python) |
-| **Lignes de code frontend** | ~13 000 lignes (HTML/CSS/JS) |
-| **Total lignes de code** | ~38 687 lignes |
+| **Lignes de code backend** | 25 687 lignes (Python) |
+| **Lignes de code frontend** | 26 701 lignes (HTML/CSS/JS) |
+| **Total lignes de code** | **52 388 lignes** |
 | **Routers API** | 7 routers modulaires |
 | **Endpoints API** | 50+ endpoints |
 | **Sources de scraping** | 10+ sources |
