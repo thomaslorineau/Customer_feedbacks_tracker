@@ -636,37 +636,55 @@ def pg_get_scraping_logs(limit: int = 100, source: str = None,
 # Job Queue Operations
 # ============================================
 
+def pg_create_job_record(job_id: str, job_type: str = 'scrape_source', payload: Dict = None, status: str = 'pending') -> bool:
+    """Create a job record in the database with a specific job_id."""
+    with get_pg_cursor() as cur:
+        try:
+            cur.execute("""
+                INSERT INTO jobs (id, job_type, payload, status, priority)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+            """, (job_id, job_type, Json(payload or {}), status, 0))
+            return cur.rowcount > 0
+        except Exception as e:
+            logger.warning(f"Failed to create job record {job_id[:8]}: {e}")
+            return False
+
 def pg_enqueue_job(job_type: str, payload: Dict, priority: int = 0,
                    scheduled_for: datetime = None) -> str:
     """Add a job to the queue."""
+    job_id = str(uuid.uuid4())
     with get_pg_cursor() as cur:
         cur.execute("""
-            INSERT INTO job_queue (job_type, payload, priority, scheduled_for)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id
-        """, (job_type, Json(payload), priority, 
-              scheduled_for or datetime.now()))
-        return str(cur.fetchone()['id'])
+            INSERT INTO jobs (id, job_type, payload, priority, status)
+            VALUES (%s, %s, %s, %s, 'pending')
+        """, (job_id, job_type, Json(payload), priority))
+        return job_id
 
 
-def pg_get_pending_jobs(job_type: str = None, limit: int = 10) -> List[Dict]:
+def pg_get_pending_jobs(job_type: str = None, limit: int = 10, status: str = None) -> List[Dict]:
     """Get pending jobs from queue."""
-    conditions = ["status = 'pending'", "scheduled_for <= NOW()"]
+    conditions = []
     params = []
+    
+    if status:
+        conditions.append("status = %s")
+        params.append(status)
+    else:
+        conditions.append("status = 'pending'")
     
     if job_type:
         conditions.append("job_type = %s")
         params.append(job_type)
     
-    where_clause = " AND ".join(conditions)
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
     
     with get_pg_cursor() as cur:
         cur.execute(f"""
-            SELECT * FROM job_queue 
+            SELECT * FROM jobs 
             WHERE {where_clause}
             ORDER BY priority DESC, created_at ASC
             LIMIT %s
-            FOR UPDATE SKIP LOCKED
         """, params + [limit])
         return [dict(row) for row in cur.fetchall()]
 
@@ -677,19 +695,19 @@ def pg_update_job_status(job_id: str, status: str,
     with get_pg_cursor() as cur:
         if status == 'running':
             cur.execute("""
-                UPDATE job_queue 
-                SET status = %s, started_at = NOW(), attempts = attempts + 1
+                UPDATE jobs 
+                SET status = %s, started_at = NOW()
                 WHERE id = %s
             """, (status, job_id))
-        elif status in ('completed', 'failed'):
+        elif status in ('completed', 'failed', 'cancelled'):
             cur.execute("""
-                UPDATE job_queue 
-                SET status = %s, completed_at = NOW(), error_message = %s
+                UPDATE jobs 
+                SET status = %s, completed_at = NOW(), error = %s
                 WHERE id = %s
             """, (status, error_message, job_id))
         else:
             cur.execute("""
-                UPDATE job_queue SET status = %s WHERE id = %s
+                UPDATE jobs SET status = %s WHERE id = %s
             """, (status, job_id))
         return cur.rowcount > 0
 
@@ -976,7 +994,7 @@ create_job_record = pg_enqueue_job
 def get_job_record(job_id: str) -> Optional[Dict]:
     """Get a job by ID."""
     with get_pg_cursor() as cur:
-        cur.execute("SELECT * FROM job_queue WHERE id = %s", (job_id,))
+        cur.execute("SELECT * FROM jobs WHERE id = %s", (job_id,))
         row = cur.fetchone()
         return dict(row) if row else None
 
