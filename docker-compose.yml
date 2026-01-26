@@ -61,6 +61,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frontend:/app/frontend:ro
+      - ./backend/app:/app/app:ro  # Mount backend code for live updates without rebuild
       - ./backend/backups:/app/backups
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
