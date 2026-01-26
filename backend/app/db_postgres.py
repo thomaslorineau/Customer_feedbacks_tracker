@@ -991,7 +991,7 @@ add_scraping_log = pg_add_scraping_log
 get_scraping_logs = pg_get_scraping_logs
 
 # Jobs
-create_job_record = pg_enqueue_job
+create_job_record = pg_create_job_record
 def get_job_record(job_id: str) -> Optional[Dict]:
     """Get a job by ID."""
     with get_pg_cursor() as cur:
