@@ -785,6 +785,66 @@ def pg_delete_base_keyword(category: str, keyword: str) -> bool:
 # Health Check
 # ============================================
 
+# ============================================
+# App Config Functions (for storing API keys and settings)
+# ============================================
+
+def pg_get_config(key: str) -> Optional[str]:
+    """Get a configuration value from app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute(
+                "SELECT value FROM app_config WHERE key = %s",
+                (key,)
+            )
+            result = cur.fetchone()
+            if result:
+                # value is JSONB, extract the string value
+                value = result['value']
+                # JSONB values are stored as strings in the database
+                # If it's already a string, return it
+                if isinstance(value, str):
+                    return value
+                # If it's a dict or other type, convert to string
+                # But typically JSONB stores strings directly
+                return str(value) if value else None
+            return None
+    except Exception as e:
+        logger.error(f"Error getting config key {key}: {e}")
+        return None
+
+
+def pg_set_config(key: str, value: str) -> bool:
+    """Set a configuration value in app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            # Use JSONB to store the value
+            cur.execute(
+                """
+                INSERT INTO app_config (key, value, updated_at)
+                VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) 
+                DO UPDATE SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                """,
+                (key, value, value)
+            )
+            return True
+    except Exception as e:
+        logger.error(f"Error setting config key {key}: {e}")
+        return False
+
+
+def pg_delete_config(key: str) -> bool:
+    """Delete a configuration key from app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute("DELETE FROM app_config WHERE key = %s", (key,))
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting config key {key}: {e}")
+        return False
+
+
 def pg_health_check() -> Dict[str, Any]:
     """Check PostgreSQL connection health."""
     try:
