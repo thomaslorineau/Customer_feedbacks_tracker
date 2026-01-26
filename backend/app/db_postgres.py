@@ -7,6 +7,7 @@ Replaces DuckDB for better concurrent access in Docker environment.
 import os
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional, List, Dict, Any, Generator
 from contextlib import contextmanager
