@@ -241,6 +241,30 @@ scheduler = BackgroundScheduler()
 def startup_event():
     db.init_db()
     
+    # Load LLM API keys from database into environment variables
+    # This ensures keys persist across Docker container restarts
+    try:
+        from .database import pg_get_config
+        openai_key = pg_get_config('OPENAI_API_KEY')
+        anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
+        mistral_key = pg_get_config('MISTRAL_API_KEY')
+        llm_provider = pg_get_config('LLM_PROVIDER')
+        
+        if openai_key:
+            os.environ['OPENAI_API_KEY'] = openai_key
+            logger.info("✅ Loaded OpenAI API key from database")
+        if anthropic_key:
+            os.environ['ANTHROPIC_API_KEY'] = anthropic_key
+            logger.info("✅ Loaded Anthropic API key from database")
+        if mistral_key:
+            os.environ['MISTRAL_API_KEY'] = mistral_key
+            logger.info("✅ Loaded Mistral API key from database")
+        if llm_provider:
+            os.environ['LLM_PROVIDER'] = llm_provider
+            logger.info(f"✅ Loaded LLM provider from database: {llm_provider}")
+    except Exception as e:
+        logger.warning(f"Could not load API keys from database at startup: {e}")
+    
     # Automatically clean up sample/fake posts on startup
     try:
         deleted_count = db.delete_sample_posts()

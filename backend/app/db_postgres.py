@@ -105,18 +105,19 @@ def close_pg_pool():
 def pg_insert_post(source: str, author: str, content: str, url: str,
                    created_at: str, sentiment_score: float, sentiment_label: str,
                    language: str = 'unknown', country: str = None,
-                   relevance_score: float = 0.0, product: str = None) -> Optional[int]:
+                   relevance_score: float = 0.0, product: str = None,
+                   is_answered: int = 0) -> Optional[int]:
     """Insert a new post into PostgreSQL (low-level function)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             INSERT INTO posts (source, author, content, url, created_at, 
                              sentiment_score, sentiment_label, language, country, 
-                             relevance_score, product)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                             relevance_score, product, is_answered)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (url) DO NOTHING
             RETURNING id
         """, (source, author, content, url, created_at, sentiment_score,
-              sentiment_label, language, country, relevance_score, product))
+              sentiment_label, language, country, relevance_score, product, is_answered))
         result = cur.fetchone()
         return result['id'] if result else None
 
@@ -548,6 +549,15 @@ def pg_get_answered_stats() -> Dict[str, Any]:
         total = cur.fetchone()['total']
         
         # Answered posts (is_answered = 1, stored as INTEGER)
+        # Also check for NULL values which should be treated as unanswered
+        cur.execute("""
+            SELECT COUNT(*) as answered 
+            FROM posts 
+            WHERE is_answered = 1 OR is_answered IS NULL
+        """)
+        answered = cur.fetchone()['answered']
+        
+        # Actually, let's be more precise: only count posts where is_answered = 1 explicitly
         cur.execute("""
             SELECT COUNT(*) as answered 
             FROM posts 
@@ -555,8 +565,13 @@ def pg_get_answered_stats() -> Dict[str, Any]:
         """)
         answered = cur.fetchone()['answered']
         
-        # Unanswered posts
-        unanswered = total - answered
+        # Unanswered posts (is_answered = 0 OR NULL)
+        cur.execute("""
+            SELECT COUNT(*) as unanswered 
+            FROM posts 
+            WHERE is_answered = 0 OR is_answered IS NULL
+        """)
+        unanswered = cur.fetchone()['unanswered']
         
         # Calculate percentage
         answered_percentage = round((answered / total * 100) if total > 0 else 0, 1)
@@ -569,6 +584,22 @@ def pg_get_answered_stats() -> Dict[str, Any]:
             'answered_percentage': answered_percentage,
             'unanswered_percentage': unanswered_percentage
         }
+
+
+def pg_reset_all_answered_status() -> int:
+    """Reset all posts to unanswered (is_answered = 0) except those explicitly marked as answered."""
+    with get_pg_cursor() as cur:
+        # Set all posts to unanswered (0) where is_answered is NULL or not explicitly 1
+        # This will reset posts that were incorrectly marked
+        cur.execute("""
+            UPDATE posts 
+            SET is_answered = 0,
+                answered_at = NULL,
+                answered_by = NULL,
+                answer_detection_method = NULL
+            WHERE is_answered IS NULL OR is_answered != 1
+        """)
+        return cur.rowcount
 
 
 # ============================================
@@ -621,8 +652,20 @@ def pg_add_scraping_log(source: str, level: str, message: str,
 
 
 def pg_get_scraping_logs(limit: int = 100, source: str = None, 
-                         level: str = None) -> List[Dict]:
-    """Get scraping logs with filtering."""
+                         level: str = None, offset: int = 0) -> List[Dict]:
+    """Get scraping logs with filtering and pagination."""
+    # Ensure limit and offset are integers
+    try:
+        limit = int(limit) if limit is not None else 100
+        offset = int(offset) if offset is not None else 0
+    except (ValueError, TypeError):
+        limit = 100
+        offset = 0
+    
+    # Ensure positive values
+    limit = max(1, min(limit, 10000))
+    offset = max(0, offset)
+    
     conditions = []
     params = []
     
@@ -640,8 +683,8 @@ def pg_get_scraping_logs(limit: int = 100, source: str = None,
             SELECT * FROM scraping_logs 
             WHERE {where_clause}
             ORDER BY timestamp DESC 
-            LIMIT %s
-        """, params + [limit])
+            LIMIT %s OFFSET %s
+        """, params + [limit, offset])
         return [dict(row) for row in cur.fetchall()]
 
 
@@ -784,6 +827,66 @@ def pg_delete_base_keyword(category: str, keyword: str) -> bool:
 # ============================================
 # Health Check
 # ============================================
+
+# ============================================
+# App Config Functions (for storing API keys and settings)
+# ============================================
+
+def pg_get_config(key: str) -> Optional[str]:
+    """Get a configuration value from app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute(
+                "SELECT value FROM app_config WHERE key = %s",
+                (key,)
+            )
+            result = cur.fetchone()
+            if result:
+                # value is JSONB, extract the string value
+                value = result['value']
+                # JSONB values are stored as strings in the database
+                # If it's already a string, return it
+                if isinstance(value, str):
+                    return value
+                # If it's a dict or other type, convert to string
+                # But typically JSONB stores strings directly
+                return str(value) if value else None
+            return None
+    except Exception as e:
+        logger.error(f"Error getting config key {key}: {e}")
+        return None
+
+
+def pg_set_config(key: str, value: str) -> bool:
+    """Set a configuration value in app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            # Use JSONB to store the value
+            cur.execute(
+                """
+                INSERT INTO app_config (key, value, updated_at)
+                VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
+                ON CONFLICT (key) 
+                DO UPDATE SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                """,
+                (key, value, value)
+            )
+            return True
+    except Exception as e:
+        logger.error(f"Error setting config key {key}: {e}")
+        return False
+
+
+def pg_delete_config(key: str) -> bool:
+    """Delete a configuration key from app_config table."""
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute("DELETE FROM app_config WHERE key = %s", (key,))
+            return True
+    except Exception as e:
+        logger.error(f"Error deleting config key {key}: {e}")
+        return False
+
 
 def pg_health_check() -> Dict[str, Any]:
     """Check PostgreSQL connection health."""

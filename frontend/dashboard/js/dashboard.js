@@ -1393,6 +1393,9 @@ function resetFilters() {
     const globalSearch = document.getElementById('globalSearch');
     if (globalSearch) globalSearch.value = '';
     
+    const sourceFilter = document.getElementById('sourceFilter');
+    if (sourceFilter) sourceFilter.value = 'all';
+    
     const sentimentFilter = document.getElementById('sentimentFilter');
     if (sentimentFilter) sentimentFilter.value = 'all';
     
@@ -3300,26 +3303,60 @@ function handlePostsLanguageFilterChange() {
 }
 
 function clearPostsFilters() {
-    document.getElementById('postsSortBy').value = 'date-desc';
-    document.getElementById('postsSentimentFilter').value = 'all';
-    document.getElementById('postsSourceFilter').value = 'all';
-    document.getElementById('postsLanguageFilter').value = 'all';
-    document.getElementById('postsAnsweredFilter').value = 'all';
-    document.getElementById('postsDateFrom').value = '';
-    document.getElementById('postsDateTo').value = '';
-    // Clear global state filters
+    // Clear all DOM elements FIRST
+    const postsSourceFilterEl = document.getElementById('postsSourceFilter');
+    const postsSentimentFilterEl = document.getElementById('postsSentimentFilter');
+    const postsLanguageFilterEl = document.getElementById('postsLanguageFilter');
+    const postsAnsweredFilterEl = document.getElementById('postsAnsweredFilter');
+    const postsDateFromEl = document.getElementById('postsDateFrom');
+    const postsDateToEl = document.getElementById('postsDateTo');
+    const postsSortByEl = document.getElementById('postsSortBy');
+    
+    if (postsSortByEl) postsSortByEl.value = 'date-desc';
+    if (postsSentimentFilterEl) postsSentimentFilterEl.value = 'all';
+    if (postsSourceFilterEl) postsSourceFilterEl.value = 'all';
+    if (postsLanguageFilterEl) postsLanguageFilterEl.value = 'all';
+    if (postsAnsweredFilterEl) postsAnsweredFilterEl.value = 'all';
+    if (postsDateFromEl) postsDateFromEl.value = '';
+    if (postsDateToEl) postsDateToEl.value = '';
+    
+    // Clear global state filters (this will trigger applyFilters() automatically)
     if (state) {
+        state.setFilter('source', ''); // Clear source filter
+        state.setFilter('sentiment', 'all');
         state.setFilter('language', 'all');
+        state.setFilter('answered', 'all');
+        state.setFilter('dateFrom', '');
+        state.setFilter('dateTo', '');
     }
-    // Sync global filter
+    
+    // Sync global filters DOM elements
+    const sourceFilterEl = document.getElementById('sourceFilter');
+    if (sourceFilterEl) {
+        sourceFilterEl.value = 'all';
+    }
     const languageFilterEl = document.getElementById('languageFilter');
     if (languageFilterEl) {
         languageFilterEl.value = 'all';
     }
+    const sentimentFilterEl = document.getElementById('sentimentFilter');
+    if (sentimentFilterEl) {
+        sentimentFilterEl.value = 'all';
+    }
+    const answeredFilterEl = document.getElementById('answeredFilter');
+    if (answeredFilterEl) {
+        answeredFilterEl.value = 'all';
+    }
+    
+    // Reset pagination
     postsCurrentOffset = 0;
-    updatePostsDisplay();
-    updateDashboard();
-    updateResetFiltersButtonVisibility();
+    
+    // Use setTimeout to ensure DOM and state are fully synchronized before updating display
+    setTimeout(() => {
+        updatePostsDisplay();
+        updateDashboard();
+        updateResetFiltersButtonVisibility();
+    }, 0);
 }
 
 function updatePostsSourceFilter() {
