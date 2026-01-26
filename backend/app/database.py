@@ -30,31 +30,41 @@ from app.db_postgres import *
 DB_TYPE = "postgresql"
 
 # Explicitly ensure these functions are available
-# Import them directly to ensure they're in the module namespace
+# Import the module to access functions that might not be captured by import *
 import app.db_postgres as pg_module
 
 # Ensure recheck_posts_answered_status is available
-if hasattr(pg_module, 'recheck_posts_answered_status'):
+try:
     recheck_posts_answered_status = pg_module.recheck_posts_answered_status
-elif hasattr(pg_module, 'pg_recheck_posts_answered_status'):
-    recheck_posts_answered_status = pg_module.pg_recheck_posts_answered_status
+except AttributeError:
+    try:
+        recheck_posts_answered_status = pg_module.pg_recheck_posts_answered_status
+    except AttributeError:
+        # Fallback: define wrapper
+        def recheck_posts_answered_status(*args, **kwargs):
+            return pg_module.pg_recheck_posts_answered_status(*args, **kwargs)
 
-# Ensure finalize_job is available - CRITICAL: Must be explicitly in module namespace
-# Try multiple methods to ensure it's available
-if hasattr(pg_module, 'finalize_job'):
-    finalize_job = pg_module.finalize_job
-elif hasattr(pg_module, 'pg_finalize_job'):
-    finalize_job = pg_module.pg_finalize_job
-else:
-    # Last resort: define it as a wrapper using pg_update_job_status
-    def finalize_job(job_id: str, status: str, error_message: str = None) -> bool:
-        """Finalize a job by updating its status."""
-        return pg_module.pg_update_job_status(job_id, status, error_message)
+# CRITICAL: Ensure finalize_job is DEFINED DIRECTLY in this module
+# This ensures it's always available regardless of import * behavior
+try:
+    # Try to get it from pg_module
+    _finalize_func = pg_module.finalize_job
+except AttributeError:
+    try:
+        _finalize_func = pg_module.pg_finalize_job
+    except AttributeError:
+        # Last resort: define it as a wrapper
+        def _finalize_func(job_id: str, status: str, error_message: str = None) -> bool:
+            """Finalize a job by updating its status."""
+            return pg_module.pg_update_job_status(job_id, status, error_message)
 
-# CRITICAL: Explicitly add to module's __dict__ to ensure it's in the namespace
+# Define finalize_job directly in this module's namespace
+def finalize_job(job_id: str, status: str, error_message: str = None) -> bool:
+    """Finalize a job by updating its status to completed, failed, or cancelled."""
+    return _finalize_func(job_id, status, error_message)
+
+# Also ensure it's available via the module dict
 import sys
 current_module = sys.modules[__name__]
-if not hasattr(current_module, 'finalize_job'):
-    current_module.finalize_job = finalize_job
-if not hasattr(current_module, 'recheck_posts_answered_status'):
-    current_module.recheck_posts_answered_status = recheck_posts_answered_status
+current_module.finalize_job = finalize_job
+current_module.recheck_posts_answered_status = recheck_posts_answered_status
