@@ -553,7 +553,7 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate ideas: {str(e)}")
 
 
-@router.post("/api/recommended-actions", response_model=RecommendedActionsResponse)
+@router.post("/recommended-actions", response_model=RecommendedActionsResponse)
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback using LLM."""
     try:
@@ -808,7 +808,7 @@ def generate_whats_happening_fallback(
     return insights
 
 
-@router.post("/api/whats-happening", response_model=WhatsHappeningResponse)
+@router.post("/whats-happening", response_model=WhatsHappeningResponse)
 async def get_whats_happening(request: WhatsHappeningRequest):
     """Generate What's Happening insights based on filtered posts using LLM."""
     try:
@@ -838,7 +838,7 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
 
 
-@router.get("/api/improvements-summary")
+@router.get("/improvements-summary")
 async def get_improvements_summary():
     """Generate a concise LLM summary of top improvement opportunities."""
     try:
@@ -1420,7 +1420,7 @@ def generate_improvements_analysis_fallback(
     )
 
 
-@router.post("/api/improvements-analysis", response_model=ImprovementsAnalysisResponse, tags=["Dashboard", "Insights"])
+@router.post("/improvements-analysis", response_model=ImprovementsAnalysisResponse, tags=["Dashboard", "Insights"])
 async def get_improvements_analysis(request: ImprovementsAnalysisRequest):
     """Generate comprehensive improvements analysis with insights and ROI using LLM."""
     try:
