@@ -39,6 +39,22 @@ services:
     networks:
       - ocft_network
 
+  # Nginx Reverse Proxy with HTTPS
+  nginx:
+    image: nginx:alpine
+    container_name: ocft_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - ocft_network
+
   # API Server - FastAPI with Gunicorn + Uvicorn workers
   api:
     build:
@@ -51,9 +67,10 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=info
       - WORKERS=4
-      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080,http://tlorinea.sdev-docker.ha.ovh.net:11840,http://gw.lab.core.ovh.net:11840
-    ports:
-      - "0.0.0.0:11840:8000"
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:8080,https://tlorinea.sdev-docker.ha.ovh.net,https://gw.lab.core.ovh.net
+    # Remove direct port exposure - nginx will proxy
+    expose:
+      - "8000"
     depends_on:
       postgres:
         condition: service_healthy
