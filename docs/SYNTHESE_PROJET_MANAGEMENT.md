@@ -14,6 +14,10 @@
 
 **Innovation:** Projet développé **100% avec VibeCoding (Cursor AI)**, démontrant l'efficacité de l'assistance IA pour créer des applications professionnelles complètes.
 
+**🌐 Accès à l'application :**
+- **Production :** http://tlorinea.sdev-docker.ha.ovh.net:11840
+- **Local :** http://localhost:8000 (développement)
+
 ---
 
 ## ⚡ Comparatif Temps de Développement : Avec vs Sans IA
