@@ -1393,6 +1393,9 @@ function resetFilters() {
     const globalSearch = document.getElementById('globalSearch');
     if (globalSearch) globalSearch.value = '';
     
+    const sourceFilter = document.getElementById('sourceFilter');
+    if (sourceFilter) sourceFilter.value = 'all';
+    
     const sentimentFilter = document.getElementById('sentimentFilter');
     if (sentimentFilter) sentimentFilter.value = 'all';
     
@@ -3309,12 +3312,29 @@ function clearPostsFilters() {
     document.getElementById('postsDateTo').value = '';
     // Clear global state filters
     if (state) {
+        state.setFilter('source', ''); // Clear source filter
+        state.setFilter('sentiment', 'all');
         state.setFilter('language', 'all');
+        state.setFilter('answered', 'all');
+        state.setFilter('dateFrom', '');
+        state.setFilter('dateTo', '');
     }
-    // Sync global filter
+    // Sync global filters
+    const sourceFilterEl = document.getElementById('sourceFilter');
+    if (sourceFilterEl) {
+        sourceFilterEl.value = 'all';
+    }
     const languageFilterEl = document.getElementById('languageFilter');
     if (languageFilterEl) {
         languageFilterEl.value = 'all';
+    }
+    const sentimentFilterEl = document.getElementById('sentimentFilter');
+    if (sentimentFilterEl) {
+        sentimentFilterEl.value = 'all';
+    }
+    const answeredFilterEl = document.getElementById('answeredFilter');
+    if (answeredFilterEl) {
+        answeredFilterEl.value = 'all';
     }
     postsCurrentOffset = 0;
     updatePostsDisplay();
