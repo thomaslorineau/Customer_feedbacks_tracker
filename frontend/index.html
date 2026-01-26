@@ -2457,8 +2457,8 @@
             try {
                 const confirmed = confirm(
                     '✅ Re-check Answered Status\n\n' +
-                    'This will re-scrape metadata from post URLs to check if posts have been answered since they were scraped.\n\n' +
-                    '⚠️ Note: This may take some time depending on the number of posts.\n\n' +
+                    'This will re-scrape metadata from ALL post URLs to check if posts have been answered since they were scraped.\n\n' +
+                    '⚠️ Warning: This will check ALL posts in the database and may take a long time!\n\n' +
                     'Do you want to continue?'
                 );
                 
@@ -2474,7 +2474,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ limit: 100 }) // Check up to 100 most recent posts
+                    body: JSON.stringify({}) // No limit = check all posts
                 });
                 
                 if (!response.ok) {

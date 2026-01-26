@@ -983,6 +983,231 @@ def get_job_record(job_id: str) -> Optional[Dict]:
 update_job_progress = pg_update_job_status
 get_all_jobs = pg_get_pending_jobs
 
+# Answered status functions
+def pg_update_post_answered_status(post_id: int, answered: bool, method: str = 'manual') -> bool:
+    """Update the answered status of a post."""
+    with get_pg_cursor() as cur:
+        cur.execute("""
+            UPDATE posts 
+            SET is_answered = %s,
+                answered_at = CASE WHEN %s THEN CURRENT_TIMESTAMP ELSE NULL END,
+                answered_by = CASE WHEN %s THEN %s ELSE NULL END,
+                answer_detection_method = %s
+            WHERE id = %s
+        """, (1 if answered else 0, answered, answered, method, method, post_id))
+        return cur.rowcount > 0
+
+def pg_detect_and_update_answered_status(post_id: int, metadata: Dict[str, Any]) -> bool:
+    """
+    Automatically detect and update answered status based on metadata.
+    
+    For GitHub: Mark as answered if issue is closed AND has comments (likely resolved).
+    For Reddit: Mark as answered if there are comments (discussion happened).
+    For Stack Overflow: Use the is_answered field from API or answer_count > 0.
+    """
+    if not metadata:
+        return False
+    
+    source = metadata.get('source', '').lower()
+    post = pg_get_post_by_id(post_id)
+    if not post:
+        return False
+    
+    is_answered = False
+    method = 'auto'
+    
+    if source == 'github':
+        # GitHub: Mark as answered if issue is closed AND has comments
+        # This indicates the issue was likely resolved/discussed
+        state = metadata.get('state', 'open')
+        comments = metadata.get('comments', 0) or metadata.get('comments_count', 0)
+        
+        # Issue is closed and has comments = likely answered/resolved
+        if state == 'closed' and comments > 0:
+            is_answered = True
+            method = 'auto-github-closed'
+        # Issue is open but has many comments = active discussion, might be answered
+        elif state == 'open' and comments >= 3:
+            is_answered = True
+            method = 'auto-github-discussion'
+    
+    elif source == 'reddit':
+        # Reddit: Mark as answered if there are comments (discussion happened)
+        comments = metadata.get('num_comments', 0) or metadata.get('comments', 0) or metadata.get('comments_count', 0)
+        is_answered = comments > 0
+        method = 'auto-reddit-comments'
+    
+    elif source == 'stackoverflow':
+        # Stack Overflow: Use the is_answered field from API
+        is_answered = metadata.get('is_answered', False)
+        if not is_answered:
+            # Also check answer_count
+            answer_count = metadata.get('answer_count', 0) or metadata.get('answers', 0)
+            is_answered = answer_count > 0
+        method = 'auto-stackoverflow'
+    
+    if is_answered:
+        return pg_update_post_answered_status(post_id, True, method)
+    
+    return False
+
+async def pg_recheck_posts_answered_status(limit: Optional[int] = None, delay_between_requests: float = 0.5) -> Dict[str, Any]:
+    """
+    Re-check answered status for posts by fetching their metadata.
+    This is an async function that processes posts in batches.
+    
+    Args:
+        limit: Maximum number of posts to check (None = all unanswered posts)
+        delay_between_requests: Delay between API requests in seconds
+    
+    Returns:
+        Dict with statistics: total_posts, updated_count, error_count, skipped_count, success, message
+    """
+    import asyncio
+    from app.utils.post_metadata_fetcher import fetch_post_metadata_from_url
+    
+    updated_count = 0
+    error_count = 0
+    skipped_count = 0
+    
+    # Get posts to check
+    # If limit is None, check ALL posts (not just unanswered ones)
+    # This allows re-checking posts that might have been answered since last check
+    with get_pg_cursor() as cur:
+        if limit is None:
+            # Check all posts (except manually marked ones)
+            query = """
+                SELECT id, url, source, is_answered
+                FROM posts 
+                WHERE answer_detection_method != 'manual' OR answer_detection_method IS NULL
+                ORDER BY created_at DESC
+            """
+            cur.execute(query)
+        else:
+            # Check only unanswered posts (limited)
+            query = """
+                SELECT id, url, source, is_answered
+                FROM posts 
+                WHERE (is_answered = 0 OR is_answered IS NULL)
+                AND (answer_detection_method IS NULL OR answer_detection_method != 'manual')
+                ORDER BY created_at DESC
+                LIMIT %s
+            """
+            cur.execute(query, (limit,))
+        posts = cur.fetchall()
+    
+    total_posts = len(posts)
+    
+    if total_posts == 0:
+        return {
+            'success': True,
+            'total_posts': 0,
+            'updated_count': 0,
+            'error_count': 0,
+            'skipped_count': 0,
+            'message': 'No posts to check'
+        }
+    
+    logger.info(f"Re-checking answered status for {total_posts} posts...")
+    
+    # Process posts with delay between requests
+    for i, post in enumerate(posts):
+        post_id = post['id']
+        url = post['url']
+        source = post['source']
+        
+        try:
+            # Fetch metadata
+            metadata = await fetch_post_metadata_from_url(url, source)
+            
+            if metadata:
+                # Try to detect and update
+                if pg_detect_and_update_answered_status(post_id, metadata):
+                    updated_count += 1
+                    logger.debug(f"Updated post {post_id} ({source})")
+                else:
+                    skipped_count += 1
+            else:
+                skipped_count += 1
+                logger.debug(f"Could not fetch metadata for post {post_id}")
+            
+            # Delay between requests to respect rate limits
+            if i < len(posts) - 1 and delay_between_requests > 0:
+                await asyncio.sleep(delay_between_requests)
+                
+        except Exception as e:
+            error_count += 1
+            logger.warning(f"Error processing post {post_id}: {e}")
+    
+    message = f"Checked {total_posts} posts: {updated_count} updated, {error_count} errors, {skipped_count} skipped"
+    logger.info(message)
+    
+    return {
+        'success': True,
+        'total_posts': total_posts,
+        'updated_count': updated_count,
+        'error_count': error_count,
+        'skipped_count': skipped_count,
+        'message': message
+    }
+
+def pg_update_all_posts_answered_status_from_metadata() -> int:
+    """
+    Update answered status for all posts by fetching their metadata.
+    This is expensive and should be run periodically, not on every request.
+    """
+    import asyncio
+    from app.utils.post_metadata_fetcher import fetch_post_metadata_from_url
+    
+    updated_count = 0
+    
+    # Get all posts that are not manually marked as answered
+    with get_pg_cursor() as cur:
+        cur.execute("""
+            SELECT id, url, source 
+            FROM posts 
+            WHERE (is_answered = 0 OR is_answered IS NULL)
+            AND (answer_detection_method IS NULL OR answer_detection_method != 'manual')
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        posts = cur.fetchall()
+    
+    if not posts:
+        return 0
+    
+    # Process posts in batches
+    async def process_post(post_row):
+        post_id, url, source = post_row['id'], post_row['url'], post_row['source']
+        try:
+            metadata = await fetch_post_metadata_from_url(url, source)
+            if metadata:
+                if pg_detect_and_update_answered_status(post_id, metadata):
+                    return 1
+        except Exception as e:
+            logger.debug(f"Error processing post {post_id}: {e}")
+        return 0
+    
+    # Run async processing
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    tasks = [process_post(post) for post in posts]
+    results = loop.run_until_complete(asyncio.gather(*tasks, return_exceptions=True))
+    
+    updated_count = sum(r for r in results if isinstance(r, int))
+    
+    logger.info(f"Updated answered status for {updated_count} posts from metadata")
+    return updated_count
+
+update_post_answered_status = pg_update_post_answered_status
+detect_and_update_answered_status = pg_detect_and_update_answered_status
+update_all_posts_answered_status_from_metadata = pg_update_all_posts_answered_status_from_metadata
+recheck_posts_answered_status = pg_recheck_posts_answered_status
+
 # Base keywords  
 get_base_keywords = pg_get_base_keywords
 add_base_keyword = pg_add_base_keyword

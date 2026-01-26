@@ -205,8 +205,16 @@ def migrate_base_keywords(duck_conn, pg_conn):
     
     duck_cur = duck_conn.cursor()
     try:
-        duck_cur.execute("SELECT id, category, keyword, created_at FROM base_keywords ORDER BY id")
-        keywords = duck_cur.fetchall()
+        # Try to get created_at if it exists, otherwise skip it
+        try:
+            duck_cur.execute("SELECT id, category, keyword, created_at FROM base_keywords ORDER BY id")
+            keywords_with_date = duck_cur.fetchall()
+            # PostgreSQL doesn't have created_at, so we only use id, category, keyword
+            keywords = [(k[0], k[1], k[2]) for k in keywords_with_date]
+        except Exception:
+            # If created_at doesn't exist in DuckDB either, just get the three columns
+            duck_cur.execute("SELECT id, category, keyword FROM base_keywords ORDER BY id")
+            keywords = duck_cur.fetchall()
     except Exception:
         logger.warning("base_keywords table not found, skipping")
         return 0
@@ -218,8 +226,8 @@ def migrate_base_keywords(duck_conn, pg_conn):
     pg_cur = pg_conn.cursor()
     
     insert_query = """
-        INSERT INTO base_keywords (id, category, keyword, created_at)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO base_keywords (id, category, keyword)
+        VALUES (%s, %s, %s)
         ON CONFLICT (category, keyword) DO NOTHING
     """
     
@@ -243,44 +251,45 @@ def migrate_scraping_logs(duck_conn, pg_conn, limit: int = 10000):
     
     duck_cur = duck_conn.cursor()
     try:
-        duck_cur.execute(f"""
-            SELECT id, timestamp, source, level, message, details, created_at 
-            FROM scraping_logs 
-            ORDER BY timestamp DESC 
-            LIMIT {limit}
-        """)
-        logs = duck_cur.fetchall()
-    except Exception:
-        logger.warning("scraping_logs table not found, skipping")
+        # PostgreSQL table has: id, timestamp, source, level, message, posts_scraped, posts_inserted, error
+        # Try to get all columns from DuckDB, then map to PostgreSQL structure
+        try:
+            duck_cur.execute(f"""
+                SELECT id, timestamp, source, level, message, details, created_at, posts_scraped, posts_inserted, error
+                FROM scraping_logs 
+                ORDER BY timestamp DESC 
+                LIMIT {limit}
+            """)
+            logs_full = duck_cur.fetchall()
+            # Map to PostgreSQL columns: id, timestamp, source, level, message, posts_scraped, posts_inserted, error
+            # DuckDB: id, timestamp, source, level, message, details, created_at, posts_scraped, posts_inserted, error
+            # PostgreSQL: id, timestamp, source, level, message, posts_scraped, posts_inserted, error
+            processed_logs = [(log[0], log[1], log[2], log[3], log[4], log[7] or 0, log[8] or 0, log[9]) for log in logs_full]
+        except Exception:
+            # Fallback: try without details/created_at
+            duck_cur.execute(f"""
+                SELECT id, timestamp, source, level, message, posts_scraped, posts_inserted, error
+                FROM scraping_logs 
+                ORDER BY timestamp DESC 
+                LIMIT {limit}
+            """)
+            logs = duck_cur.fetchall()
+            processed_logs = [(log[0], log[1], log[2], log[3], log[4], log[5] or 0, log[6] or 0, log[7]) for log in logs]
+    except Exception as e:
+        logger.warning(f"scraping_logs table not found or error: {e}, skipping")
         return 0
     
-    if not logs:
+    if not processed_logs:
         logger.info("No logs to migrate")
         return 0
     
     pg_cur = pg_conn.cursor()
     
     insert_query = """
-        INSERT INTO scraping_logs (id, timestamp, source, level, message, details, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO scraping_logs (id, timestamp, source, level, message, posts_scraped, posts_inserted, error)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT DO NOTHING
     """
-    
-    # Convert details to JSONB-compatible format
-    processed_logs = []
-    for log in logs:
-        log_list = list(log)
-        # Details field (index 5) - ensure it's a valid JSON string or None
-        if log_list[5]:
-            import json
-            try:
-                if isinstance(log_list[5], str):
-                    json.loads(log_list[5])  # Validate
-                else:
-                    log_list[5] = json.dumps(log_list[5])
-            except (json.JSONDecodeError, TypeError):
-                log_list[5] = None
-        processed_logs.append(tuple(log_list))
     
     batch_size = 500
     for i in range(0, len(processed_logs), batch_size):
