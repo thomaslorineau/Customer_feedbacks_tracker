@@ -1013,7 +1013,11 @@ async def get_product_opportunities(
         for post in posts:
             content = (post.get('content', '') or '').lower()
             sentiment = post.get('sentiment_label', 'neutral')
-            relevance = post.get('relevance_score', 0.3) or 0.3  # Default to 0.3 if not set
+            # Ensure relevance is a float (handle string conversion from DB)
+            try:
+                relevance = float(post.get('relevance_score', 0.3) or 0.3)
+            except (ValueError, TypeError):
+                relevance = 0.3  # Default if conversion fails
             
             # Detect products mentioned in post
             # A post can match multiple products, so we count it for all matching products
