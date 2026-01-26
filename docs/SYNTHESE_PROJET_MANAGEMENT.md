@@ -37,34 +37,50 @@
 
 ---
 
-### ⏱️ Comparatif Temps de Développement : Avec vs Sans IA
+### ⏱️ Comparatif Temps de Développement : Trois Profils Comparés
 
-**Contexte important :** Ce projet a été développé par un **ingénieur généraliste** (non spécialisé développement), ce qui rend le gain de temps encore plus significatif. Les estimations "Sans IA" sont basées sur un développeur expérimenté, un généraliste aurait besoin de **30-50% de temps supplémentaire**.
+**Contexte important :** Ce projet a été développé par un **ingénieur généraliste** (non spécialisé développement) avec VibeCoding. Le comparatif ci-dessous montre trois profils pour démontrer l'efficacité de l'assistance IA.
 
-| Composant | Sans IA (Développeur Senior) | Avec VibeCoding (Ingénieur Généraliste) | Gain |
-|-----------|------------------------------|------------------------------------------|------|
-| **Architecture & Design** | 3-5 jours | 1-2 jours | **60-70%** |
-| **Backend API (25 687 lignes)** | 25-30 jours | ~1 semaine | **70-75%** |
-| **10+ Scrapers** | 15-20 jours | ~3 jours | **80-85%** |
-| **Frontend Dashboard (26 701 lignes)** | 30-40 jours | ~1 semaine | **75-80%** |
-| **Migrations (SQLite→DuckDB→PostgreSQL)** | 10-14 jours | ~3 jours | **75-80%** |
-| **Architecture Docker** | 5-7 jours | ~1 jour | **80-85%** |
-| **Refactoring modulaire** | 7-10 jours | ~2 jours | **75-80%** |
-| **Audits Sécurité (Phase 1+2)** | 8-10 jours | ~4 jours | **50-60%** |
-| **Système notifications** | 5-7 jours | ~2 jours | **70-75%** |
-| **Tests E2E & Documentation** | 10-15 jours | ~3 jours | **75-80%** |
-| **Debugging & Optimisation** | 10-15 jours | ~2 jours | **85-90%** |
-| **TOTAL** | **118-161 jours (4-6 mois)** | **15-20 jours (3-4 semaines)** | **75-85%** |
+| Composant | Dev Junior (Sans IA) | Dev Expérimenté (Sans IA) | Ingénieur Généraliste (Avec VibeCoding) | Gain vs Junior | Gain vs Expérimenté |
+|-----------|---------------------|---------------------------|------------------------------------------|----------------|---------------------|
+| **Architecture & Design** | 5-8 jours | 3-5 jours | 1-2 jours | **75-85%** | **60-70%** |
+| **Backend API (25 687 lignes)** | 35-45 jours | 25-30 jours | ~1 semaine | **80-85%** | **70-75%** |
+| **10+ Scrapers** | 20-30 jours | 15-20 jours | ~3 jours | **85-90%** | **80-85%** |
+| **Frontend Dashboard (26 701 lignes)** | 45-60 jours | 30-40 jours | ~1 semaine | **85-90%** | **75-80%** |
+| **Migrations (SQLite→DuckDB→PostgreSQL)** | 15-20 jours | 10-14 jours | ~3 jours | **80-85%** | **75-80%** |
+| **Architecture Docker** | 8-12 jours | 5-7 jours | ~1 jour | **85-90%** | **80-85%** |
+| **Refactoring modulaire** | 12-18 jours | 7-10 jours | ~2 jours | **85-90%** | **75-80%** |
+| **Audits Sécurité (Phase 1+2)** | 12-15 jours | 8-10 jours | ~4 jours | **70-75%** | **50-60%** |
+| **Système notifications** | 8-12 jours | 5-7 jours | ~2 jours | **75-85%** | **70-75%** |
+| **Tests E2E & Documentation** | 15-20 jours | 10-15 jours | ~3 jours | **80-85%** | **75-80%** |
+| **Debugging & Optimisation** | 20-30 jours | 10-15 jours | ~2 jours | **90-95%** | **85-90%** |
+| **TOTAL** | **195-270 jours (6-9 mois)** | **118-161 jours (4-6 mois)** | **15-20 jours (3-4 semaines)** | **90-93%** | **75-85%** |
 
-**Hypothèses Sans IA :** Développeur expérimenté (~250 lignes/jour), recherche/architecture 30%, debugging 25%, tests 20%, documentation 10%
+**Hypothèses par profil :**
 
-**Note importante :** Un ingénieur généraliste sans IA aurait besoin de **30-50% de temps supplémentaire** (soit **5-9 mois** au lieu de 4-6 mois) pour :
-- Apprendre les technologies (FastAPI, PostgreSQL, Docker, etc.)
-- Comprendre les meilleures pratiques
-- Résoudre les problèmes techniques complexes
-- Faire des erreurs nécessitant des refactorings
+**Développeur Junior (Sans IA) :**
+- Productivité : ~150-200 lignes/jour
+- Recherche/architecture : 40% du temps
+- Debugging : 35% du temps
+- Tests : 15% du temps
+- Documentation : 10% du temps
+- Besoin d'assistance fréquente
 
-**Avec VibeCoding, un généraliste atteint la productivité d'un développeur expérimenté** grâce à l'assistance IA.
+**Développeur Expérimenté (Sans IA) :**
+- Productivité : ~250 lignes/jour
+- Recherche/architecture : 30% du temps
+- Debugging : 25% du temps
+- Tests : 20% du temps
+- Documentation : 10% du temps
+- Autonome, bonnes pratiques maîtrisées
+
+**Ingénieur Généraliste (Avec VibeCoding) :**
+- Productivité : ~2 500-3 500 lignes/jour (10-14x)
+- Recherche/architecture : Assistée par IA (60-70% de temps économisé)
+- Debugging : Détection précoce (50-60% de temps économisé)
+- Tests : Patterns suggérés (30-40% de temps économisé)
+- Documentation : Auto-générée (70-80% de temps économisé)
+- **Résultat : Productivité équivalente à un développeur expérimenté**
 
 ---
 
@@ -75,25 +91,43 @@
 │              TEMPS DE DÉVELOPPEMENT COMPARATIF                   │
 └─────────────────────────────────────────────────────────────────┘
 
-Sans IA (Développeur expérimenté)
+Développeur Junior (Sans IA)
+███████████████████████████████████████████████████████████████████
+│                                                                 │
+│ 6-9 mois (195-270 jours)                                       │
+│                                                                 │
+│ • Architecture & Design: 5-8 jours                            │
+│ • Backend API: 35-45 jours                                     │
+│ • Scrapers: 20-30 jours                                        │
+│ • Frontend: 45-60 jours                                        │
+│ • Migrations: 15-20 jours                                      │
+│ • Docker: 8-12 jours                                           │
+│ • Refactoring: 12-18 jours                                     │
+│ • Sécurité: 12-15 jours                                        │
+│ • Notifications: 8-12 jours                                     │
+│ • Tests & Docs: 15-20 jours                                    │
+│ • Debugging: 20-30 jours                                       │
+└─────────────────────────────────────────────────────────────────┘
+
+Développeur Expérimenté (Sans IA)
 ███████████████████████████████████████████████████████████████████
 │                                                                 │
 │ 4-6 mois (118-161 jours)                                       │
-│ (Ingénieur généraliste: 5-9 mois - 30-50% de temps supplémentaire)│
 │                                                                 │
 │ • Architecture & Design: 3-5 jours                            │
 │ • Backend API: 25-30 jours                                     │
 │ • Scrapers: 15-20 jours                                        │
 │ • Frontend: 30-40 jours                                        │
-│ • Migrations: 5-7 jours                                         │
+│ • Migrations: 10-14 jours                                      │
 │ • Docker: 5-7 jours                                             │
 │ • Refactoring: 7-10 jours                                       │
+│ • Sécurité: 8-10 jours                                          │
 │ • Notifications: 5-7 jours                                      │
 │ • Tests & Docs: 10-15 jours                                    │
 │ • Debugging: 10-15 jours                                       │
 └─────────────────────────────────────────────────────────────────┘
 
-Avec VibeCoding (Réalité - Ingénieur Généraliste)
+Ingénieur Généraliste (Avec VibeCoding - Réalité)
 ███
 │                                                                 │
 │ 3-4 semaines (15-20 jours) - 52 388 lignes                     │
@@ -109,31 +143,45 @@ Avec VibeCoding (Réalité - Ingénieur Généraliste)
 │ ✅ Productivité équivalente à un développeur expérimenté      │
 └─────────────────────────────────────────────────────────────────┘
 
-GAIN DE TEMPS: 75-85% ⚡
+GAIN DE TEMPS: 90-93% vs Junior | 75-85% vs Expérimenté ⚡
 ```
 
 ---
 
 ### 💰 Analyse Coût-Bénéfice
 
-#### Scénario 1 : Ingénieur Généraliste (sans IA)
-- **Profil :** Ingénieur généraliste, non spécialisé développement
-- **Salaire mensuel estimé :** 4 000-6 000€
-- **Durée estimée :** 5-9 mois (150-270 jours) - **30-50% plus long qu'un développeur expérimenté**
-- **Coût total :** 20 000-54 000€
+#### Scénario 1 : Développeur Junior (sans IA)
+- **Profil :** Développeur junior, 1-3 ans d'expérience
+- **Salaire mensuel estimé :** 3 000-4 500€
+- **Durée estimée :** 6-9 mois (195-270 jours)
+- **Coût total :** 18 000-40 500€
 - **Volume de code :** 52 388 lignes
-- **Productivité :** ~150-200 lignes/jour (apprentissage + développement)
-- **Risques supplémentaires :** 
-  - Temps d'apprentissage des technologies (FastAPI, PostgreSQL, Docker, etc.)
+- **Productivité :** ~150-200 lignes/jour
+- **Risques :** 
+  - Courbe d'apprentissage importante
   - Erreurs architecturales nécessitant refactoring majeur
-  - Retards fréquents dus à la courbe d'apprentissage
+  - Retards fréquents dus au manque d'expérience
   - Bugs non détectés en production
   - Architecture sous-optimale nécessitant refactoring
   - Documentation incomplète
   - Tests insuffisants
-  - Besoin d'assistance externe pour les parties complexes
+  - Besoin d'assistance/supervision fréquente
 
-#### Scénario 2 : Ingénieur Généraliste avec VibeCoding (Réalité)
+#### Scénario 2 : Développeur Expérimenté (sans IA)
+- **Profil :** Développeur expérimenté, 5+ ans d'expérience
+- **Salaire mensuel estimé :** 5 000-7 000€
+- **Durée estimée :** 4-6 mois (118-161 jours)
+- **Coût total :** 20 000-42 000€
+- **Volume de code :** 52 388 lignes
+- **Productivité :** ~250 lignes/jour
+- **Risques :** 
+  - Retards possibles
+  - Bugs non détectés en production
+  - Architecture sous-optimale nécessitant refactoring
+  - Documentation incomplète
+  - Tests insuffisants
+
+#### Scénario 3 : Ingénieur Généraliste avec VibeCoding (Réalité)
 - **Profil :** Ingénieur généraliste, non spécialisé développement
 - **Coût VibeCoding :** ~20-30€/mois (abonnement)
 - **Durée :** 3-4 semaines (15-20 jours) - **Même durée qu'un développeur expérimenté !**
@@ -152,10 +200,11 @@ GAIN DE TEMPS: 75-85% ⚡
   - ✅ **Pas besoin d'assistance externe** : L'IA remplace l'expertise manquante
 
 **ROI estimé :** 
-- **Réduction de 80-90% du temps de développement** (vs généraliste sans IA)
-- **Économie : 16 000-48 000€** (coût évité vs généraliste sans IA)
-- **ROI : ~500-2 000x** (investissement 20-30€ vs économie 16k-48k€)
-- **Gain supplémentaire :** Productivité équivalente à un développeur expérimenté sans l'être
+- **Réduction de 90-93% du temps** vs développeur junior (6-9 mois → 3-4 semaines)
+- **Réduction de 75-85% du temps** vs développeur expérimenté (4-6 mois → 3-4 semaines)
+- **Économie : 15 000-40 000€** (coût évité vs junior) ou **15 000-35 000€** (vs expérimenté)
+- **ROI : ~500-2 000x** (investissement 20-30€ vs économie 15k-40k€)
+- **Gain supplémentaire :** Un généraliste avec IA = Productivité d'un développeur expérimenté
 
 ---
 
