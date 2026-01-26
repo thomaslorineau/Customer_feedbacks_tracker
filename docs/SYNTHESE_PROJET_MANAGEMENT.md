@@ -22,7 +22,7 @@
 
 | Métrique | Valeur |
 |----------|--------|
-| **Lignes de code** | ~18 691 lignes |
+| **Lignes de code** | ~25 000+ lignes (backend: ~25 687 Python, frontend: ~13 000 HTML/CSS/JS) |
 | **Fichiers** | 43 fichiers |
 | **Sources de scraping** | 10+ sources |
 | **Endpoints API** | 50+ endpoints |
@@ -32,49 +32,24 @@
 
 ---
 
-### ⏱️ Estimation Temps de Développement
+### ⏱️ Comparatif Temps de Développement : Avec vs Sans IA
 
-#### 🚀 **Avec VibeCoding (Réalité)**
+| Composant | Sans IA (Développeur Senior) | Avec VibeCoding (Réalité) | Gain |
+|-----------|------------------------------|---------------------------|------|
+| **Architecture & Design** | 3-5 jours | 1-2 jours | **60-70%** |
+| **Backend API (~25 687 lignes)** | 25-30 jours | ~1 semaine | **70-75%** |
+| **10+ Scrapers** | 15-20 jours | ~3 jours | **80-85%** |
+| **Frontend Dashboard (~13 000 lignes)** | 30-40 jours | ~1 semaine | **75-80%** |
+| **Migrations (SQLite→DuckDB→PostgreSQL)** | 10-14 jours | ~3 jours | **75-80%** |
+| **Architecture Docker** | 5-7 jours | ~1 jour | **80-85%** |
+| **Refactoring modulaire** | 7-10 jours | ~2 jours | **75-80%** |
+| **Audits Sécurité (Phase 1+2)** | 8-10 jours | ~4 jours | **50-60%** |
+| **Système notifications** | 5-7 jours | ~2 jours | **70-75%** |
+| **Tests E2E & Documentation** | 10-15 jours | ~3 jours | **75-80%** |
+| **Debugging & Optimisation** | 10-15 jours | ~2 jours | **85-90%** |
+| **TOTAL** | **118-161 jours (4-6 mois)** | **15-20 jours (3-4 semaines)** | **75-85%** |
 
-| Phase | Durée | Détails |
-|-------|-------|---------|
-| **MVP Initial** | ~1 semaine | Architecture de base, 5 scrapers, frontend simple |
-| **Refactoring** | ~2 jours | Migration monolithique → modulaire (20 janvier) |
-| **Migration PostgreSQL** | ~2 jours | Migration DuckDB → PostgreSQL + scripts |
-| **Architecture Docker** | ~1 jour | Setup multi-services (25 janvier) |
-| **Fonctionnalités avancées** | ~1 semaine | Dashboard, notifications, détection automatique |
-| **Tests & Documentation** | ~3 jours | Tests E2E, documentation complète |
-| **TOTAL RÉEL** | **~3-4 semaines** | Développement intensif avec assistance IA |
-
-**Temps total estimé : 3-4 semaines** (développement à temps partiel/plein selon les phases)
-
----
-
-#### 👨‍💻 **Sans IA (Estimation développeur expérimenté)**
-
-**Hypothèses de calcul :**
-- Développeur expérimenté : ~250 lignes/jour (code de qualité + tests + documentation)
-- Temps de recherche/architecture : 30% du temps de codage
-- Debugging et résolution de problèmes : 25% du temps
-- Tests et validation : 20% du temps
-- Documentation : 10% du temps
-
-| Composant | Complexité | Temps estimé |
-|-----------|------------|--------------|
-| **Architecture initiale** | Design, choix techniques | 3-5 jours |
-| **Backend API (5 725 lignes)** | FastAPI, endpoints, validation | 25-30 jours |
-| **10+ Scrapers (2 232 lignes)** | APIs variées, fallbacks, anti-bot | 15-20 jours |
-| **Frontend Dashboard (12 966 lignes)** | HTML/CSS/JS, Chart.js, interactivité | 30-40 jours |
-| **Migration DuckDB → PostgreSQL** | Scripts migration, tests | 5-7 jours |
-| **Architecture Docker** | Dockerfiles, compose, orchestration | 5-7 jours |
-| **Refactoring modulaire** | Restructuration complète | 7-10 jours |
-| **Système notifications email** | SMTP, templates, triggers | 5-7 jours |
-| **Détection automatique "answered"** | APIs externes, logique métier | 3-5 jours |
-| **Tests E2E & Documentation** | Suite complète, docs techniques | 10-15 jours |
-| **Debugging & Optimisation** | Résolution bugs, performance | 10-15 jours |
-| **TOTAL ESTIMÉ** | | **118-161 jours** |
-
-**Temps total estimé : 4-6 mois** (développeur expérimenté à temps plein)
+**Hypothèses Sans IA :** Développeur expérimenté (~250 lignes/jour), recherche/architecture 30%, debugging 25%, tests 20%, documentation 10%
 
 ---
 
@@ -205,12 +180,44 @@ GAIN DE TEMPS: 75-85% ⚡
 │                          TIMELINE DU PROJET                                │
 └─────────────────────────────────────────────────────────────────────────────┘
 
-Phase 1: MVP Initial (Début Janvier 2026) - ~1 semaine
+Phase 0: MVP Initial (Début Janvier 2026) - ~1 semaine
 ├─ Architecture monolithique (main.py ~2000 lignes)
-├─ Base de données: DuckDB (fichier local)
+├─ Base de données: SQLite (fichier local)
 ├─ Scraping: 5 sources (Twitter, Reddit, GitHub, Stack Overflow, Trustpilot)
 ├─ Frontend: Pages HTML simples
 └─ ✅ Livrable: POC fonctionnel
+
+Phase 0.5: Migration SQLite → DuckDB (16 Janvier 2026) - ~1 jour
+├─ Raison: Performance analytics, meilleure gestion des données volumineuses
+├─ Support dual SQLite/DuckDB avec fallback automatique
+├─ Scripts de migration et vérification complets
+├─ Tests: 12/12 réussis (staging + production)
+└─ ✅ Livrable: Base de données optimisée pour analytics
+
+Phase 1: Audit Sécurité Phase 1 (Janvier 2026) - ~2 jours
+├─ Score sécurité initial: 55/100
+├─ 6 vulnérabilités corrigées:
+│  ├─ CORS ouvert à tous → Restreint (localhost uniquement)
+│  ├─ Pas de validation d'entrées → Validation Pydantic + regex
+│  ├─ Secrets hardcodés → Variables d'environnement (.env)
+│  ├─ Logs non structurés → Logging structuré rotatif
+│  ├─ Stack traces exposées → Sanitisation des erreurs
+│  └─ Pas d'index DB → 5 index de performance
+├─ Score après Phase 1: 85/100 (+30 points)
+└─ ✅ Livrable: Application sécurisée pour développement
+
+Phase 1.5: Audit Sécurité Phase 2 (Janvier 2026) - ~2 jours
+├─ 7 vulnérabilités supplémentaires corrigées:
+│  ├─ Absence de rate limiting → Rate limiting 100 req/min par IP
+│  ├─ Pas de headers de sécurité → 7 headers HTTP de sécurité
+│  ├─ Validation paramètres → Validation stricte GET /posts
+│  ├─ Gestion erreurs SQLite → try-finally sur toutes connexions
+│  ├─ Validation insert_post → Limites de taille strictes
+│  ├─ Validation save_queries → Protection injection massive
+│  └─ Clé API exposée → Masquée (action urgente requise)
+├─ Score après Phase 2: 93/100 (+8 points)
+├─ Protection OWASP Top 10: 9/9 applicable
+└─ ✅ Livrable: Application hautement sécurisée (production-ready)
 
 Phase 2: Refactoring Architecture (20 Janvier 2026) - ~2 jours
 ├─ Refactoring monolithique → Architecture modulaire
@@ -270,7 +277,20 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 ## 🏗️ Choix techniques majeurs et justifications
 
-### 1. **Migration DuckDB → PostgreSQL**
+### 1. **Migration SQLite → DuckDB → PostgreSQL**
+
+#### Étape 1: SQLite → DuckDB (16 Janvier 2026)
+
+| Aspect | Avant (SQLite) | Après (DuckDB) | Justification |
+|--------|----------------|----------------|---------------|
+| **Performance analytics** | Lente sur grandes tables | ✅ Très rapide | Optimisé pour requêtes analytiques complexes |
+| **Gestion données volumineuses** | Limité | ✅ Excellente | Meilleure gestion des datasets volumineux |
+| **Requêtes complexes** | Performance dégradée | ✅ Optimisées | Moteur optimisé pour analytics |
+| **Compatibilité** | Standard | ✅ Compatible SQL | Migration transparente |
+
+**Résultat:** Migration réussie en 1 jour, performance analytics améliorée, 12/12 tests réussis.
+
+#### Étape 2: DuckDB → PostgreSQL (Janvier 2026)
 
 | Aspect | Avant (DuckDB) | Après (PostgreSQL) | Justification |
 |--------|----------------|-------------------|----------------|
@@ -283,7 +303,55 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 ---
 
-### 2. **Architecture Monolithique → Modulaire**
+### 2. **Audits de Sécurité et Améliorations**
+
+#### Phase 1: Sécurité Critique (6 correctifs)
+
+**Score:** 55/100 → 85/100 (+30 points)
+
+| Vulnérabilité | Sévérité | Correctif | Impact |
+|---------------|----------|-----------|--------|
+| CORS ouvert à tous | HAUTE | CORS restrictif (localhost) | ✅ Protection CSRF |
+| Pas de validation d'entrées | HAUTE | Validation Pydantic + regex | ✅ Protection injection |
+| Secrets hardcodés | CRITIQUE | Variables d'environnement | ✅ Sécurité credentials |
+| Logs non structurés | MOYENNE | Logging structuré rotatif | ✅ Traçabilité |
+| Stack traces exposées | HAUTE | Sanitisation erreurs | ✅ Pas de fuite d'infos |
+| Pas d'index DB | BASSE | 5 index de performance | ✅ Performance |
+
+#### Phase 2: Sécurité Avancée (7 correctifs)
+
+**Score:** 85/100 → 93/100 (+8 points)
+
+| Vulnérabilité | Sévérité | Correctif | Impact |
+|---------------|----------|-----------|--------|
+| Absence de rate limiting | HAUTE | Rate limiting 100/min par IP | ✅ Protection DoS/DDoS |
+| Pas de headers de sécurité | MOYENNE | 7 headers HTTP | ✅ Protection XSS, clickjacking |
+| Validation paramètres | MOYENNE | Validation stricte | ✅ Protection injection |
+| Gestion erreurs SQLite | MOYENNE | try-finally sur connexions | ✅ Robustesse |
+| Validation insert_post | BASSE | Limites de taille | ✅ Protection saturation |
+| Validation save_queries | BASSE | Protection injection massive | ✅ Sécurité données |
+| Clé API exposée | CRITIQUE | Masquée (à révoquer) | ⚠️ Action urgente |
+
+**Résultat final:** Score sécurité 93/100, protection OWASP Top 10 (9/9 applicable), application production-ready.
+
+**Documentation:** Voir `docs/architecture/SECURITY_OVERVIEW.md` pour les détails complets.
+
+---
+
+### 3. **Migration DuckDB → PostgreSQL**
+
+| Aspect | Avant (DuckDB) | Après (PostgreSQL) | Justification |
+|--------|----------------|-------------------|----------------|
+| **Accès concurrent** | Limité | ✅ Support complet | Multi-utilisateurs, workers parallèles |
+| **Robustesse** | Fichier local | ✅ Serveur dédié | Production-ready, backups, réplication |
+| **Performance** | Rapide pour analytics | ✅ Optimisé pour transactions | Meilleur pour écritures concurrentes |
+| **Écosystème** | Limité | ✅ Large écosystème | Outils admin, monitoring, intégrations |
+
+**Résultat:** Migration réussie sans perte de données, architecture scalable.
+
+---
+
+### 4. **Architecture Monolithique → Modulaire**
 
 | Aspect | Avant | Après | Impact |
 |--------|-------|-------|--------|
@@ -296,7 +364,7 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 ---
 
-### 3. **Architecture Mono-processus → Docker Multi-Services**
+### 5. **Architecture Mono-processus → Docker Multi-Services**
 
 | Problème | Solution | Résultat |
 |----------|---------|----------|
@@ -324,7 +392,7 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 ---
 
-### 4. **Système de Scraping Multi-Sources avec Fallbacks**
+### 6. **Système de Scraping Multi-Sources avec Fallbacks**
 
 **Stratégie implémentée:**
 1. **Méthode primaire:** API ou scraping HTML spécifique
@@ -338,7 +406,7 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 ---
 
-### 5. **Système de Scoring et Filtrage**
+### 7. **Système de Scoring et Filtrage**
 
 **Relevance Score (0-100%):**
 - OVH Brands: 40%
@@ -362,12 +430,16 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 
 | Métrique | Valeur |
 |---------|--------|
-| **Lignes de code backend** | ~15 000 lignes |
+| **Lignes de code backend** | ~25 687 lignes (Python) |
+| **Lignes de code frontend** | ~13 000 lignes (HTML/CSS/JS) |
+| **Total lignes de code** | ~38 687 lignes |
 | **Routers API** | 7 routers modulaires |
 | **Endpoints API** | 50+ endpoints |
 | **Sources de scraping** | 10+ sources |
 | **Tests E2E** | Suite complète |
 | **Documentation** | 100% des endpoints documentés |
+| **Score sécurité** | 93/100 (OWASP Top 10: 9/9) |
+| **Vulnérabilités corrigées** | 13 vulnérabilités (Phase 1 + Phase 2) |
 
 ### Performance
 
@@ -422,15 +494,16 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 - ✅ Déploiement production (en cours)
 - 🔄 Tests de charge et optimisation
 - 📊 Monitoring et alertes opérationnelles
+- 🔗 **Intégration JIRA** pour suivi des actions et tickets
+- 🔌 **Amélioration connecteurs** : Discord, LinkedIn, Twitter (API native)
 
 ### Moyen terme (3-6 mois)
-- 🔄 Intégration Jira pour suivi des actions
 - 👥 Système multi-utilisateurs avec workspaces
 - 📈 Analytics avancés (tendances, prédictions)
+- 🔗 Intégrations supplémentaires (Slack, Teams)
 
 ### Long terme (6-12 mois)
 - 🤖 IA générative pour recommandations automatiques
-- 🔗 Intégrations supplémentaires (Slack, Teams)
 - 📱 Application mobile (optionnel)
 
 ---
