@@ -30,7 +30,7 @@ export class API {
     }
     
     async getPosts(limit = 100, offset = 0) {
-        const url = `${this.baseURL}/posts?limit=${limit}&offset=${offset}`;
+        const url = `${this.baseURL}/api/posts?limit=${limit}&offset=${offset}`;
         console.log('[API] Fetching posts from:', url);
         
         try {
