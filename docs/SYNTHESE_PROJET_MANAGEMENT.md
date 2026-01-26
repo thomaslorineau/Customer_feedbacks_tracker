@@ -85,7 +85,7 @@ Sans IA (Développeur expérimenté)
 Avec VibeCoding (Réalité)
 ███
 │                                                                 │
-│ 3-4 semaines (15-20 jours)                                     │
+│ 3-4 semaines (15-20 jours) - 52 388 lignes                     │
 │                                                                 │
 │ • MVP: ~1 semaine                                              │
 │ • Refactoring: ~2 jours                                        │
@@ -93,6 +93,8 @@ Avec VibeCoding (Réalité)
 │ • Docker: ~1 jour                                              │
 │ • Fonctionnalités avancées: ~1 semaine                        │
 │ • Tests & Docs: ~3 jours                                       │
+│                                                                 │
+│ Productivité: ~2 500-3 500 lignes/jour (10-14x)              │
 └─────────────────────────────────────────────────────────────────┘
 
 GAIN DE TEMPS: 75-85% ⚡
