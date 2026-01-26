@@ -2734,7 +2734,7 @@ function updatePositiveSatisfactionKPI() {
 // Mark post as answered/not answered
 async function markPostAnswered(postId, answered) {
     try {
-        const response = await fetch(`/posts/${postId}/mark-answered?answered=${answered}`, {
+        const response = await fetch(`/api/posts/${postId}/mark-answered?answered=${answered}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -2752,7 +2752,7 @@ async function markPostAnswered(postId, answered) {
         // Reload ALL posts from server to ensure complete sync with database
         try {
             console.log('🔄 Reloading all posts from server to sync with database...');
-            const postsResponse = await fetch(`/posts?limit=10000`);
+            const postsResponse = await fetch(`/api/posts?limit=10000`);
             if (postsResponse.ok) {
                 const updatedPosts = await postsResponse.json();
                 console.log(`✅ Reloaded ${updatedPosts.length} posts from server`);
