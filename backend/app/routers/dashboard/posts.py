@@ -65,7 +65,7 @@ async def update_all_posts_answered_status():
         raise HTTPException(status_code=500, detail=f"Failed to update answered status: {str(e)}")
 
 
-@router.get("/api/posts-for-improvement", tags=["Dashboard", "Posts"])
+@router.get("/posts-for-improvement", tags=["Dashboard", "Posts"])
 async def get_posts_for_improvement(
     limit: int = Query(20, description="Maximum number of posts to return", ge=1, le=1000),
     offset: int = Query(0, description="Offset for pagination", ge=0),
