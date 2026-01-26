@@ -29,11 +29,18 @@ print("[DB] Using PostgreSQL")
 from app.db_postgres import *
 DB_TYPE = "postgresql"
 
-# Explicitly ensure recheck_posts_answered_status is available
-# Import it directly to ensure it's in the module namespace
+# Explicitly ensure these functions are available
+# Import them directly to ensure they're in the module namespace
 import app.db_postgres as pg_module
+
+# Ensure recheck_posts_answered_status is available
 if hasattr(pg_module, 'recheck_posts_answered_status'):
     recheck_posts_answered_status = pg_module.recheck_posts_answered_status
 elif hasattr(pg_module, 'pg_recheck_posts_answered_status'):
-    # Fallback: use the pg_ prefixed version if alias doesn't exist
     recheck_posts_answered_status = pg_module.pg_recheck_posts_answered_status
+
+# Ensure finalize_job is available
+if hasattr(pg_module, 'finalize_job'):
+    finalize_job = pg_module.finalize_job
+elif hasattr(pg_module, 'pg_finalize_job'):
+    finalize_job = pg_module.pg_finalize_job
