@@ -652,8 +652,20 @@ def pg_add_scraping_log(source: str, level: str, message: str,
 
 
 def pg_get_scraping_logs(limit: int = 100, source: str = None, 
-                         level: str = None) -> List[Dict]:
-    """Get scraping logs with filtering."""
+                         level: str = None, offset: int = 0) -> List[Dict]:
+    """Get scraping logs with filtering and pagination."""
+    # Ensure limit and offset are integers
+    try:
+        limit = int(limit) if limit is not None else 100
+        offset = int(offset) if offset is not None else 0
+    except (ValueError, TypeError):
+        limit = 100
+        offset = 0
+    
+    # Ensure positive values
+    limit = max(1, min(limit, 10000))
+    offset = max(0, offset)
+    
     conditions = []
     params = []
     
@@ -671,8 +683,8 @@ def pg_get_scraping_logs(limit: int = 100, source: str = None,
             SELECT * FROM scraping_logs 
             WHERE {where_clause}
             ORDER BY timestamp DESC 
-            LIMIT %s
-        """, params + [limit])
+            LIMIT %s OFFSET %s
+        """, params + [limit, offset])
         return [dict(row) for row in cur.fetchall()]
 
 
