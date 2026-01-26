@@ -82,6 +82,18 @@ async def get_posts_for_improvement(
     Opportunity score is calculated based on sentiment, relevance, and recency.
     """
     try:
+        # Ensure limit and offset are integers (handle string conversion from query params)
+        try:
+            limit = int(limit) if limit is not None else 20
+            offset = int(offset) if offset is not None else 0
+        except (ValueError, TypeError):
+            limit = 20
+            offset = 0
+        
+        # Ensure positive values
+        limit = max(1, min(limit, 1000))  # Cap at 1000
+        offset = max(0, offset)
+        
         # Get all posts (we'll filter and sort in Python for now)
         all_posts = db.get_posts(limit=10000, offset=0)
         
