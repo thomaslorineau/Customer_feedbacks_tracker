@@ -339,6 +339,18 @@ def pg_get_all_posts(limit: int = 1000, offset: int = 0,
                      language: str = None, search: str = None,
                      sort_by: str = 'created_at', sort_order: str = 'DESC') -> List[Dict]:
     """Get posts with filtering and pagination."""
+    # Ensure limit and offset are integers (handle string conversion from query params)
+    try:
+        limit = int(limit) if limit is not None else 1000
+        offset = int(offset) if offset is not None else 0
+    except (ValueError, TypeError):
+        limit = 1000
+        offset = 0
+    
+    # Ensure positive values
+    limit = max(1, limit)
+    offset = max(0, offset)
+    
     conditions = []
     params = []
     
