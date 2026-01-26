@@ -6129,6 +6129,13 @@
             });
             });
         </script>
+        <!-- Force HTTPS redirect for port 11840 -->
+        <script>
+            // Force HTTPS if accessing via HTTP on port 11840
+            if (window.location.protocol === 'http:' && (window.location.port === '11840' || window.location.hostname.includes('gw.lab.core.ovh.net'))) {
+                window.location.replace(window.location.href.replace('http:', 'https:'));
+            }
+        </script>
         <script type="module" src="/dashboard/js/version-loader.js"></script>
         <script src="/js/logo-updater.js"></script>
     </body>

@@ -9,8 +9,14 @@ export class API {
         const hostname = window.location.hostname;
         const port = window.location.port;
         
+        // Force HTTPS for port 11840 (production)
+        let protocol = window.location.protocol;
+        if (port === '11840' || (hostname !== 'localhost' && hostname !== '127.0.0.1' && !port)) {
+            protocol = 'https:';
+        }
+        
         // Default to current hostname and port
-        let baseURL = `${window.location.protocol}//${hostname}`;
+        let baseURL = `${protocol}//${hostname}`;
         
         // If port is specified and not standard, use it
         if (port && port !== '80' && port !== '443' && port !== '') {
