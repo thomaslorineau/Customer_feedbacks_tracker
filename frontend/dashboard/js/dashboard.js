@@ -3304,41 +3304,44 @@ function updatePostsDisplay() {
     const finalDateFrom = document.getElementById('postsDateFrom')?.value || '';
     const finalDateTo = document.getElementById('postsDateTo')?.value || '';
     
-    // Update state with answered filter if it changed
+    // Update state with filters if they changed (but suppress notifications to avoid loops)
     if (state && state.filters) {
+        // Temporarily disable notifications to prevent infinite loops
+        const originalNotify = state.notifyListeners;
+        let shouldNotify = false;
+        state.notifyListeners = () => {
+            shouldNotify = true;
+        };
+        
         if (state.filters.answered !== finalAnsweredFilter) {
-            state.setFilter('answered', finalAnsweredFilter);
+            state.setFilter('answered', finalAnsweredFilter, false); // false = don't notify
         }
-        // Also update other filters to ensure state is in sync
         if (state.filters.sentiment !== finalSentimentFilter) {
-            state.setFilter('sentiment', finalSentimentFilter);
+            state.setFilter('sentiment', finalSentimentFilter, false);
         }
         // Only set source filter if it's not empty and not 'all'
         const normalizedSourceFilter = finalSourceFilter === 'all' ? '' : finalSourceFilter;
         if (state.filters.source !== normalizedSourceFilter) {
-            state.setFilter('source', normalizedSourceFilter);
-        }
-        
-        // Check if source filter is filtering all posts - if so, clear it
-        if (state.filters.source && state.filters.source !== '' && state.filteredPosts.length === 0 && state.posts.length > 0) {
-            console.warn('Source filter is filtering all posts, clearing it. Source was:', state.filters.source);
-            state.setFilter('source', '');
-            const postsSourceFilterEl = document.getElementById('postsSourceFilter');
-            if (postsSourceFilterEl) postsSourceFilterEl.value = 'all';
+            state.setFilter('source', normalizedSourceFilter, false);
         }
         if (state.filters.language !== finalLanguageFilter) {
-            state.setFilter('language', finalLanguageFilter);
+            state.setFilter('language', finalLanguageFilter, false);
         }
         // Always sync product filter from dropdown to state
         if (state.filters.product !== finalProductFilter) {
-            state.setFilter('product', finalProductFilter);
+            state.setFilter('product', finalProductFilter, false);
         }
         if (state.filters.dateFrom !== finalDateFrom) {
-            state.setFilter('dateFrom', finalDateFrom);
+            state.setFilter('dateFrom', finalDateFrom, false);
         }
         if (state.filters.dateTo !== finalDateTo) {
-            state.setFilter('dateTo', finalDateTo);
+            state.setFilter('dateTo', finalDateTo, false);
         }
+        
+        // Restore notifications - only notify if filters actually changed
+        state.notifyListeners = originalNotify;
+        // Don't trigger notification here - updatePostsDisplay is called from updateDashboard
+        // which is already handling the update cycle
     }
 
     // Filter posts manually (don't rely on filteredPosts as it might not include all filters)
