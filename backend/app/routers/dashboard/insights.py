@@ -681,9 +681,10 @@ CRITICAL INSTRUCTIONS:
 
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    mistral_key = os.getenv('MISTRAL_API_KEY')
     llm_provider = os.getenv('LLM_PROVIDER', '').lower()
     
-    if not openai_key and not anthropic_key:
+    if not openai_key and not anthropic_key and not mistral_key:
         return generate_whats_happening_fallback(posts, stats, active_filters)
     
     try:
@@ -716,7 +717,7 @@ CRITICAL INSTRUCTIONS:
                         insights_data = json.loads(json_match.group())
                         return [WhatsHappeningInsight(**insight) for insight in insights_data]
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+        elif llm_provider == 'openai' or (not llm_provider and openai_key and not anthropic_key and not mistral_key):
             # Use OpenAI
             api_key = openai_key
             if api_key:
@@ -729,6 +730,36 @@ CRITICAL INSTRUCTIONS:
                         },
                         json={
                             'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        insights_data = json.loads(json_match.group())
+                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+            # Use Mistral
+            api_key = mistral_key
+            if api_key:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        'https://api.mistral.ai/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
                             'messages': [
                                 {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
                                 {'role': 'user', 'content': prompt}
@@ -820,11 +851,14 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         if env_path.exists():
             load_dotenv(env_path, override=True)
         
-        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
+        openai_key = os.getenv('OPENAI_API_KEY')
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        mistral_key = os.getenv('MISTRAL_API_KEY')
+        api_key = openai_key or anthropic_key or mistral_key
         llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic']
+        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral']
         
-        logger.info(f"get_whats_happening: OpenAI key set: {bool(os.getenv('OPENAI_API_KEY'))}, Anthropic key set: {bool(os.getenv('ANTHROPIC_API_KEY'))}, Provider: {llm_provider}, LLM available: {llm_available}")
+        logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
         
         insights = await generate_whats_happening_insights_with_llm(
             request.posts,
