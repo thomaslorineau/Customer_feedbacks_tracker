@@ -73,7 +73,6 @@ backend/
 │   │   ├── github.py      # GitHub Issues & Discussions
 │   │   ├── stackoverflow.py # Stack Overflow (API)
 │   │   ├── trustpilot.py  # Trustpilot (HTML + API)
-│   │   ├── news.py        # Google News (RSS)
 │   │   ├── ovh_forum.py   # OVH Community Forum
 │   │   ├── mastodon.py    # Mastodon (API)
 │   │   ├── g2_crowd.py    # G2 Crowd (HTML)

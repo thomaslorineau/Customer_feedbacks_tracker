@@ -106,19 +106,6 @@ class TestE2EScrapers:
         assert duration < 30.0, f"Trop lent: {duration}s"
     
     @pytest.mark.asyncio
-    async def test_news_e2e(self, client):
-        """Test E2E complet pour Google News."""
-        print(f"\n🔍 Testing Google News scraper...")
-        start_time = time.time()
-        response = await client.post("/scrape/news", params={"query": "OVH", "limit": 5})
-        duration = time.time() - start_time
-        
-        assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
-        data = response.json()
-        self.validate_scrape_result(data, "Google News")
-        assert duration < 30.0, f"Trop lent: {duration}s"
-    
-    @pytest.mark.asyncio
     async def test_ovh_forum_e2e(self, client):
         """Test E2E complet pour OVH Forum."""
         print(f"\n🔍 Testing OVH Forum scraper...")
@@ -333,7 +320,6 @@ class TestE2EScrapers:
             ("github", "GitHub"),
             ("stackoverflow", "StackOverflow"),
             ("reddit", "Reddit"),
-            ("news", "Google News"),
             ("ovh-forum", "OVH Forum"),
             ("mastodon", "Mastodon"),
             ("g2-crowd", "G2 Crowd"),

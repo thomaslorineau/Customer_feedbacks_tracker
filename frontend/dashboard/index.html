@@ -252,15 +252,16 @@
                         <div class="panel-filters">
                             <button class="filter-btn active" data-filter="all">All Posts</button>
                             <select class="filter-select" id="sentimentFilter">
-                                <option value="all">All Sentiment</option>
-                                <option value="positive">Positive</option>
-                                <option value="negative">Negative</option>
-                                <option value="neutral">Neutral</option>
+                                <option value="all">All Sentiments</option>
+                                <option value="positive">✅ Positive</option>
+                                <option value="negative">❌ Negative</option>
+                                <option value="neutral">➖ Neutral</option>
                             </select>
                             <select class="filter-select" id="languageFilter">
-                                <option value="all">All Language</option>
-                                <option value="fr">Français</option>
-                                <option value="en">English</option>
+                                <option value="all">All Languages</option>
+                                <option value="fr">🇫🇷 Français</option>
+                                <option value="en">🇬🇧 English</option>
+                                <option value="other">🌍 Other</option>
                             </select>
                             <select class="filter-select" id="productFilter">
                                 <option value="all">All Products</option>
@@ -369,27 +370,69 @@
                     </div>
                     <div class="posts-filters-row" style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px;">
                         <select id="postsSentimentFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
-                            <option value="all">All Sentiment</option>
-                            <option value="positive">Positive</option>
-                            <option value="negative">Negative</option>
-                            <option value="neutral">Neutral</option>
+                            <option value="all">All Sentiments</option>
+                            <option value="positive">✅ Positive</option>
+                            <option value="negative">❌ Negative</option>
+                            <option value="neutral">➖ Neutral</option>
                         </select>
                         <select id="postsSourceFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
                             <option value="all">All Sources</option>
+                            <option value="X">🐦 Twitter/X</option>
+                            <option value="Stack Overflow">📚 Stack Overflow</option>
+                            <option value="GitHub">💻 GitHub</option>
+                            <option value="Reddit">🔴 Reddit</option>
+                            <option value="Trustpilot">⭐ Trustpilot</option>
+                            <option value="OVH Forum">💬 OVH Forum</option>
+                            <option value="Mastodon">🐘 Mastodon</option>
+                            <option value="G2 Crowd">⭐ G2 Crowd</option>
+                            <option value="LinkedIn">💼 LinkedIn</option>
+                        </select>
+                        <select id="postsProductFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 180px;">
+                            <option value="all">All OVH Products</option>
+                            <optgroup label="🌐 Web & Hosting">
+                                <option value="Domain">Domain</option>
+                                <option value="WordPress">WordPress</option>
+                                <option value="Email">Email</option>
+                                <option value="Hosting">Hosting</option>
+                            </optgroup>
+                            <optgroup label="☁️ Cloud & Servers">
+                                <option value="VPS">VPS</option>
+                                <option value="Dedicated">Dedicated</option>
+                                <option value="Public Cloud">Public Cloud</option>
+                                <option value="Private Cloud">Private Cloud</option>
+                                <option value="Kubernetes">Kubernetes</option>
+                            </optgroup>
+                            <optgroup label="💾 Storage & Backup">
+                                <option value="Storage">Storage</option>
+                                <option value="Backup">Backup</option>
+                            </optgroup>
+                            <optgroup label="🌍 Network & CDN">
+                                <option value="CDN">CDN</option>
+                                <option value="Load Balancer">Load Balancer</option>
+                                <option value="DDoS Protection">DDoS Protection</option>
+                                <option value="Network">Network</option>
+                            </optgroup>
+                            <optgroup label="🔧 Support & Billing">
+                                <option value="Support">Support</option>
+                                <option value="Billing">Billing</option>
+                                <option value="Manager">Manager</option>
+                                <option value="API">API</option>
+                            </optgroup>
                         </select>
                         <select id="postsLanguageFilter" onchange="handlePostsLanguageFilterChange()" class="filter-select" style="min-width: 150px;">
                             <option value="all">All Languages</option>
-                            <option value="fr">Français</option>
-                            <option value="en">English</option>
+                            <option value="fr">🇫🇷 Français</option>
+                            <option value="en">🇬🇧 English</option>
+                            <option value="other">🌍 Other</option>
                         </select>
                         <select id="postsAnsweredFilter" onchange="updatePostsDisplay()" class="filter-select" style="min-width: 150px;">
                             <option value="all">All Status</option>
-                            <option value="1">Answered</option>
-                            <option value="0">Not Answered</option>
+                            <option value="1">✓ Answered</option>
+                            <option value="0">○ Not Answered</option>
                         </select>
-                        <input type="date" id="postsDateFrom" onchange="updatePostsDisplay()" class="filter-select" title="From Date" placeholder="From" style="min-width: 140px;">
-                        <input type="date" id="postsDateTo" onchange="updatePostsDisplay()" class="filter-select" title="To Date" placeholder="To" style="min-width: 140px;">
-                        <button onclick="clearPostsFilters()" class="filter-btn" style="background: #ef4444; color: white;">Clear Filters</button>
+                        <input type="date" id="postsDateFrom" onchange="updatePostsDisplay()" class="filter-select" title="From Date" style="min-width: 140px;">
+                        <input type="date" id="postsDateTo" onchange="updatePostsDisplay()" class="filter-select" title="To Date" style="min-width: 140px;">
+                        <button onclick="clearPostsFilters()" class="filter-btn" style="background: #ef4444; color: white;">🗑️ Clear</button>
                     </div>
                 </div>
             </div>

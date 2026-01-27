@@ -63,7 +63,6 @@ const HELP_MENU_CONTENT = `
     <li><strong>GitHub:</strong> Issues and discussions via API v3 (requires API key)</li>
     <li><strong>Stack Overflow:</strong> Questions via API v2.3</li>
     <li><strong>Trustpilot:</strong> Reviews via HTML scraping and API (requires API key)</li>
-    <li><strong>Google News:</strong> Articles via RSS feeds (requires API key)</li>
     <li><strong>OVH Forum:</strong> Community discussions via HTML scraping</li>
     <li><strong>Mastodon:</strong> Posts via Mastodon API</li>
     <li><strong>G2 Crowd:</strong> Software reviews via HTML scraping</li>
@@ -119,7 +118,6 @@ const HELP_MENU_CONTENT = `
 <ul>
     <li><strong>OpenAI API Key:</strong> For AI-powered features (recommended actions, insights, product analysis)</li>
     <li><strong>Anthropic API Key:</strong> Alternative LLM provider</li>
-    <li><strong>Google API Key:</strong> Required for Google News scraping</li>
     <li><strong>GitHub API Key:</strong> Required for GitHub issues and discussions</li>
     <li><strong>Trustpilot API Key:</strong> Required for Trustpilot reviews</li>
     <li><strong>Twitter Bearer Token:</strong> Optional, for Twitter API v2 (otherwise uses Nitter)</li>

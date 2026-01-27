@@ -51,6 +51,20 @@ async def mark_post_answered(post_id: int, answered: bool = True):
     return {"success": True, "post_id": post_id, "answered": answered}
 
 
+@router.post("/posts/{post_id}/mark-false-positive", tags=["Dashboard", "Posts"])
+async def mark_false_positive(post_id: int, is_false_positive: bool = True):
+    """Marquer un post comme faux positif ou le retirer de cette catégorie."""
+    success = db.mark_false_positive(post_id, is_false_positive)
+    if not success:
+        raise HTTPException(status_code=404, detail="Post not found or update failed")
+    return {
+        "success": True, 
+        "post_id": post_id, 
+        "is_false_positive": is_false_positive,
+        "message": f"Post {'marked as' if is_false_positive else 'removed from'} false positive"
+    }
+
+
 @router.get("/posts/stats/answered", tags=["Dashboard", "Posts"])
 async def get_answered_stats():
     """Obtenir les statistiques de réponses."""

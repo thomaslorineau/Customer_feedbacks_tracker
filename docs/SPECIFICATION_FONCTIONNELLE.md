@@ -24,7 +24,6 @@ L'application **OVH Customer Feedbacks Tracker** est une plateforme de monitorin
 - ✅ **GitHub** : Issues et discussions via API v3
 - ✅ **Stack Overflow** : Questions via API v2.3
 - ✅ **Trustpilot** : Avis clients via HTML scraping et API
-- ✅ **Google News** : Articles via RSS feeds
 - ✅ **OVH Forum** : Discussions communautaires via HTML scraping
 - ✅ **Mastodon** : Posts via API Mastodon
 - ✅ **G2 Crowd** : Avis logiciels via HTML scraping
@@ -247,7 +246,6 @@ opportunity_score = relevance_score + sentiment_score + recency_score + engageme
 - `POST /scrape/reddit` : Scraper Reddit
 - `POST /scrape/github` : Scraper GitHub
 - `POST /scrape/stackoverflow` : Scraper Stack Overflow
-- `POST /scrape/news` : Scraper Google News
 - `POST /scrape/trustpilot` : Scraper Trustpilot
 - `POST /scrape/ovh-forum` : Scraper OVH Forum
 - `POST /scrape/mastodon` : Scraper Mastodon

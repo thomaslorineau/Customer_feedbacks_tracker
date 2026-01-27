@@ -49,7 +49,6 @@
 │                                    │ HTTP POST /scrape/github                │
 │                                    │ HTTP POST /scrape/stackoverflow         │
 │                                    │ HTTP POST /scrape/reddit                │
-│                                    │ HTTP POST /scrape/news                  │
 │                                    │ HTTP POST /scrape/ovh-forum            │
 │                                    │ HTTP POST /scrape/mastodon             │
 │                                    │ HTTP POST /scrape/g2-crowd             │
@@ -70,7 +69,6 @@
 │  │  ├─ POST /scrape/github             ──┤    (Real data only)         │   │
 │  │  ├─ POST /scrape/stackoverflow      ──┤                             │   │
 │  │  ├─ POST /scrape/reddit             ──┤                             │   │
-│  │  ├─ POST /scrape/news               ──┤                             │   │
 │  │  ├─ POST /scrape/ovh-forum          ──┤                             │   │
 │  │  ├─ POST /scrape/mastodon           ──┤                             │   │
 │  │  ├─ POST /scrape/g2-crowd           ──┘                             │   │
@@ -121,8 +119,6 @@
 │  │  │  └─ scrape_reddit()            ││  └─ RSS feeds                       │
 │  │  │     └─ feedparser (RSS)        ││                                       │
 │  │  │                                ││                                       │
-│  │  ├─ news.py                       ││  News & Articles                     │
-│  │  │  └─ scrape_google_news()       ││  └─ feedparser (RSS)                │
 │  │  │                                ││                                       │
 │  │  ├─ ovh_forum.py                  ││  OVH Community Forum                 │
 │  │  │  └─ scrape_ovh_forum()        ││  └─ HTML scraping                   │
@@ -258,7 +254,6 @@ auto_scrape_job()
        │   ├─ github.scrape_github_issues()
        │   ├─ stackoverflow.scrape_stackoverflow()
        │   ├─ reddit.scrape_reddit()
-       │   ├─ news.scrape_google_news()
        │   ├─ ovh_forum.scrape_ovh_forum()
        │   ├─ mastodon.scrape_mastodon()
        │   └─ g2_crowd.scrape_g2_crowd()
@@ -320,8 +315,7 @@ ovh-complaints-tracker/
 │   │   │   ├── x_scraper.py              # X/Twitter scraper (complaint keywords)
 │   │   │   ├── github.py                 # GitHub Issues (customer experience)
 │   │   │   ├── stackoverflow.py          # Stack Overflow Q&A
-│   │   │   ├── reddit.py                 # Reddit RSS feeds
-│   │   │   └── news.py                   # Google News RSS
+│   │   │   └── reddit.py                 # Reddit RSS feeds
 │   │   │
 │   │   └── analysis/
 │   │       ├── __init__.py

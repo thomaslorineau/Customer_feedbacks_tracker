@@ -47,7 +47,6 @@
 - `scraper/github.py` - GitHub Issues scraper
 - `scraper/stackoverflow.py` - Stack Overflow API scraper
 - `scraper/trustpilot.py` - Trustpilot scraper
-- `scraper/news.py` - Google News RSS scraper
 - `scraper/ovh_forum.py` - OVH Forum scraper
 - `scraper/mastodon.py` - Mastodon API scraper
 - `scraper/g2_crowd.py` - G2 Crowd scraper

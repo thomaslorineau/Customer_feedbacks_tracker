@@ -189,7 +189,7 @@ ovh-complaints-tracker/
 
 ## 🎯 Fonctionnalités
 
-- ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, Google News, LinkedIn
+- ✅ **Scraping multi-sources** : X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, G2 Crowd, OVH Forum, Mastodon, LinkedIn
 - ✅ **Fallback strategies** : Google Search fallback et RSS/Atom feed detection pour maximiser la collecte de données
 - ✅ **Base Keywords System** : Keywords de base configurables (brands, products, problems, leadership) combinés avec keywords utilisateur
 - ✅ **Relevance Scoring** : Score de pertinence automatique (0-100%) pour filtrer les posts non pertinents (< 30% filtrés)
