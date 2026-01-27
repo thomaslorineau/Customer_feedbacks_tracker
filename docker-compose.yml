@@ -54,6 +54,12 @@ services:
     restart: unless-stopped
     networks:
       - ocft_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "nginx"
 
   # API Server - FastAPI with Gunicorn + Uvicorn workers
   api:
