@@ -25,7 +25,7 @@ export class State {
         this.notifyListeners();
     }
     
-    setFilter(key, value) {
+    setFilter(key, value, notify = true) {
         // Don't apply filter if value is empty string and it's a date filter (allow showing all dates)
         if ((key === 'dateFrom' || key === 'dateTo') && value === '') {
             this.filters[key] = '';
@@ -35,7 +35,10 @@ export class State {
         // Reset pagination when filters change
         this.postsPage = 1;
         this.applyFilters();
-        this.notifyListeners();
+        // Only notify listeners if requested (prevents infinite loops)
+        if (notify) {
+            this.notifyListeners();
+        }
     }
     
     applyFilters() {
@@ -183,16 +186,9 @@ export class State {
             return true;
         });
         
-        // Auto-clear source filter if it filters all posts (but avoid infinite loop)
-        if (this.filteredPosts.length === 0 && this.posts.length > 0 && this.filters.source && this.filters.source !== '' && this.filters.source !== 'all' && excludedBySource === this.posts.length) {
-            this.filters.source = '';
-            // Re-apply filters without source filter (but only once to avoid infinite loop)
-            if (!this._clearingSourceFilter) {
-                this._clearingSourceFilter = true;
-                this.applyFilters();
-                this._clearingSourceFilter = false;
-            }
-        }
+        // REMOVED: Auto-clear source filter logic that was causing infinite loops
+        // If a source filter results in 0 posts, that's valid - user may want to see empty state
+        // Users can manually clear the filter if needed
     }
     
     subscribe(listener) {
