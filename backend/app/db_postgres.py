@@ -932,9 +932,10 @@ def init_db() -> None:
     logger.warning("init_db() called - consider using init_postgres.sql for production schema")
     logger.info("Initializing PostgreSQL database schema (basic version)...")
     
-    with get_pg_cursor(dict_cursor=False) as cur:
-        # Posts table (basic schema - use init_postgres.sql for production)
-        cur.execute('''
+    try:
+        with get_pg_cursor(dict_cursor=False) as cur:
+            # Posts table (basic schema - use init_postgres.sql for production)
+            cur.execute('''
             CREATE TABLE IF NOT EXISTS posts (
                 id BIGSERIAL PRIMARY KEY,
                 source VARCHAR(50),
@@ -1003,8 +1004,15 @@ def init_db() -> None:
                 worker_id TEXT
             )
         ''')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)')
-        cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)')
+        # Indexes for jobs (ignore errors if permission denied)
+        try:
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)')
+        except Exception:
+            pass
+        try:
+            cur.execute('CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at)')
+        except Exception:
+            pass
         
         # Job results table
         cur.execute('''
@@ -1073,7 +1081,11 @@ def init_db() -> None:
             )
         ''')
         
-    logger.info("PostgreSQL database schema initialized successfully")
+        logger.info("PostgreSQL database schema initialized successfully")
+    except Exception as e:
+        # Log but don't fail - tables might already exist with different ownership
+        logger.warning(f"Some operations in init_db() failed (this is OK if tables exist): {e}")
+        logger.info("Continuing startup - existing tables will be used")
 
 
 # ============================================
