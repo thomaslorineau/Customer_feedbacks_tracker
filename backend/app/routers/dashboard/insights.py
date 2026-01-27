@@ -687,6 +687,161 @@ CRITICAL INSTRUCTIONS:
     if not openai_key and not anthropic_key and not mistral_key:
         return generate_whats_happening_fallback(posts, stats, active_filters)
     
+    # Helper function to call LLM
+    async def call_llm_for_insights(provider: str, api_key: str, prompt: str) -> Optional[str]:
+        """Call a single LLM and return the response content."""
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                if provider == 'openai':
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+                
+                elif provider == 'anthropic':
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': api_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 2000,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['content'][0]['text']
+                
+                elif provider == 'mistral':
+                    response = await client.post(
+                        'https://api.mistral.ai/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
+        except Exception as e:
+            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+            return None
+        return None
+    
+    # If 2 or more LLMs are configured (and no specific provider is set), call them in parallel and summarize
+    configured_llms = []
+    if openai_key:
+        configured_llms.append(('openai', openai_key, 'OpenAI'))
+    if anthropic_key:
+        configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
+    if mistral_key:
+        configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    
+    # Only use parallel + summarize if 2+ LLMs are configured AND no specific provider is set
+    if len(configured_llms) >= 2 and not llm_provider:
+        logger.info(f"{len(configured_llms)} LLMs configured, calling in parallel and summarizing")
+        try:
+            # Call all configured LLMs in parallel
+            tasks = [call_llm_for_insights(provider, key, prompt) for provider, key, _ in configured_llms]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Collect valid results
+            valid_results = []
+            for i, (provider, _, name) in enumerate(configured_llms):
+                result = results[i]
+                if result and not isinstance(result, Exception):
+                    valid_results.append((name, result))
+            
+            if not valid_results:
+                logger.warning("All LLM calls failed, falling back to single LLM logic")
+            else:
+                # Use the first available LLM to summarize (prefer OpenAI, then Anthropic, then Mistral)
+                summarizer = None
+                summarizer_key = None
+                summarizer_name = None
+                
+                if openai_key:
+                    summarizer = 'openai'
+                    summarizer_key = openai_key
+                    summarizer_name = 'OpenAI'
+                elif anthropic_key:
+                    summarizer = 'anthropic'
+                    summarizer_key = anthropic_key
+                    summarizer_name = 'Anthropic'
+                elif mistral_key:
+                    summarizer = 'mistral'
+                    summarizer_key = mistral_key
+                    summarizer_name = 'Mistral'
+                
+                if summarizer and summarizer_key:
+                    summary_prompt = f"""You are analyzing customer feedback insights from multiple AI models. Below are the insights generated by {len(valid_results)} different AI models:
+
+{chr(10).join([f'{name} insights:{chr(10)}{result}' for name, result in valid_results])}
+
+Your task is to synthesize these insights into a single, comprehensive list of 2-4 best insights. 
+
+Rules:
+- Combine similar insights from different models
+- Prioritize insights that appear in multiple models
+- Keep the best insights based on clarity, actionability, and impact
+- Ensure each insight has a clear type, title, description, icon, metric, and count
+- Do not return an empty array
+
+Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
+[
+  {{
+    "type": "top_product|top_issue|spike|trend|priority",
+    "title": "[ACTIONABLE PROBLEM STATEMENT]",
+    "description": "[Explain the problem based on the insights. Include counts/percentages if relevant.]",
+    "icon": "🎁|💬|⚠️|📊|🎯",
+    "metric": "[percentage or count if relevant, empty string otherwise]",
+    "count": [actual_number if relevant, 0 otherwise]
+  }}
+]"""
+                    
+                    summary_content = await call_llm_for_insights(summarizer, summarizer_key, summary_prompt)
+                    if summary_content:
+                        json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
+                        if json_match:
+                            insights_data = json.loads(json_match.group())
+                            logger.info(f"Generated {len(insights_data)} insights from summarized LLM results ({len(valid_results)} models)")
+                            return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        except Exception as e:
+            logger.error(f"Error in parallel LLM call or summarization: {type(e).__name__}: {e}", exc_info=True)
+            # Fall through to single LLM logic
+    
+    # Single LLM logic (if only 1 is configured, or if parallel call failed)
     try:
         if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
             # Use Anthropic
