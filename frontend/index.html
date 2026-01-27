@@ -4317,9 +4317,9 @@
                         if (progressContainer) {
                             progressContainer.style.display = 'none';
                         }
-                        const jobPanel = document.getElementById('jobPanel');
-                        if (jobPanel) {
-                            jobPanel.style.display = 'none';
+                        const jobPanelEl = document.getElementById('jobPanel');
+                        if (jobPanelEl) {
+                            jobPanelEl.style.display = 'none';
                         }
                         showCancelBtn(false);
                         return;
@@ -4346,8 +4346,9 @@
                             if (progressContainer) {
                                 progressContainer.style.display = 'none';
                             }
-                            if (jobPanel) {
-                                jobPanel.style.display = 'none';
+                            const jobPanelEl = document.getElementById('jobPanel');
+                            if (jobPanelEl) {
+                                jobPanelEl.style.display = 'none';
                             }
                             showCancelBtn(false);
                             return;
