@@ -46,39 +46,72 @@ echo -e "${BLUE}3. Ports exposés:${NC}"
 docker compose ps --format "table {{.Name}}\t{{.Ports}}" 2>/dev/null || docker compose ps
 echo ""
 
-# 4. Vérifier les logs de l'API
-echo -e "${BLUE}4. Dernières lignes des logs API (50 lignes):${NC}"
+# 4. Vérifier les certificats SSL
+echo -e "${BLUE}4. Vérification des certificats SSL:${NC}"
+if [ -f "nginx/ssl/cert.pem" ] && [ -f "nginx/ssl/key.pem" ]; then
+    echo -e "${GREEN}✓ Certificats SSL trouvés${NC}"
+    ls -lh nginx/ssl/
+else
+    echo -e "${RED}✗ Certificats SSL manquants${NC}"
+    echo "   Les certificats sont requis pour HTTPS sur le port 11840"
+    echo "   Générer avec: cd nginx && ./generate-self-signed-cert.sh"
+fi
+echo ""
+
+# 5. Vérifier les logs nginx
+echo -e "${BLUE}5. Dernières lignes des logs nginx (30 lignes):${NC}"
+echo ""
+docker compose logs nginx --tail=30 2>/dev/null || echo "Impossible de récupérer les logs nginx"
+echo ""
+
+# 6. Vérifier la configuration nginx
+echo -e "${BLUE}6. Test de la configuration nginx:${NC}"
+if docker compose exec -T nginx nginx -t 2>/dev/null; then
+    echo -e "${GREEN}✓ Configuration nginx valide${NC}"
+else
+    echo -e "${RED}✗ Erreur dans la configuration nginx${NC}"
+    docker compose exec -T nginx nginx -t 2>&1 || echo "Impossible de tester la configuration"
+fi
+echo ""
+
+# 7. Vérifier les logs de l'API
+echo -e "${BLUE}7. Dernières lignes des logs API (50 lignes):${NC}"
 echo ""
 docker compose logs api --tail=50 2>/dev/null || echo "Impossible de récupérer les logs"
 echo ""
 
-# 5. Vérifier la santé des containers
-echo -e "${BLUE}5. Santé des containers:${NC}"
+# 8. Vérifier la santé des containers
+echo -e "${BLUE}8. Santé des containers:${NC}"
 echo ""
-for service in api postgres redis; do
+for service in api postgres redis nginx; do
     HEALTH=$(docker compose ps --format json | jq -r "select(.Service == \"$service\") | .Health" 2>/dev/null || docker compose ps | grep "$service" | awk '{print $NF}' || echo "unknown")
-    if [ "$HEALTH" = "healthy" ]; then
-        echo -e "  ${GREEN}✓ $service: $HEALTH${NC}"
-    elif [ "$HEALTH" = "unhealthy" ]; then
-        echo -e "  ${RED}✗ $service: $HEALTH${NC}"
+    STATE=$(docker compose ps --format json | jq -r "select(.Service == \"$service\") | .State" 2>/dev/null || docker compose ps | grep "$service" | awk '{print $(NF-1)}' || echo "unknown")
+    if [ "$STATE" = "running" ] || [ "$STATE" = "Up" ]; then
+        if [ "$HEALTH" = "healthy" ]; then
+            echo -e "  ${GREEN}✓ $service: $STATE ($HEALTH)${NC}"
+        elif [ "$HEALTH" = "unhealthy" ]; then
+            echo -e "  ${RED}✗ $service: $STATE ($HEALTH)${NC}"
+        else
+            echo -e "  ${YELLOW}? $service: $STATE ($HEALTH)${NC}"
+        fi
     else
-        echo -e "  ${YELLOW}? $service: $HEALTH${NC}"
+        echo -e "  ${RED}✗ $service: $STATE${NC}"
     fi
 done
 echo ""
 
-# 6. Vérifier les réseaux Docker
-echo -e "${BLUE}6. Réseaux Docker:${NC}"
+# 9. Vérifier les réseaux Docker
+echo -e "${BLUE}9. Réseaux Docker:${NC}"
 docker network ls | grep -E "ocft|customer_feedbacks" || echo "Aucun réseau trouvé"
 echo ""
 
-# 7. Vérifier les volumes
-echo -e "${BLUE}7. Volumes Docker:${NC}"
+# 10. Vérifier les volumes
+echo -e "${BLUE}10. Volumes Docker:${NC}"
 docker volume ls | grep -E "ocft|customer_feedbacks|postgres|redis" || echo "Aucun volume trouvé"
 echo ""
 
-# 8. Tester la connexion PostgreSQL
-echo -e "${BLUE}8. Test de connexion PostgreSQL:${NC}"
+# 11. Tester la connexion PostgreSQL
+echo -e "${BLUE}11. Test de connexion PostgreSQL:${NC}"
 if docker compose exec -T postgres pg_isready -U ocft_user -d ocft_tracker 2>/dev/null; then
     echo -e "${GREEN}✓ PostgreSQL est accessible${NC}"
 else
@@ -86,8 +119,8 @@ else
 fi
 echo ""
 
-# 9. Vérifier les ports en écoute
-echo -e "${BLUE}9. Ports en écoute sur le système:${NC}"
+# 12. Vérifier les ports en écoute
+echo -e "${BLUE}12. Ports en écoute sur le système:${NC}"
 if command -v ss > /dev/null 2>&1; then
     ss -tlnp 2>/dev/null | grep -E ":11840|:5432|:6379" || echo "Aucun des ports 11840, 5432, 6379 n'est en écoute"
 elif command -v netstat > /dev/null 2>&1; then
@@ -97,26 +130,29 @@ else
 fi
 echo ""
 
-# 10. Tester la connexion HTTP locale
-echo -e "${BLUE}10. Test de connexion HTTP locale:${NC}"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:11840/health 2>/dev/null || echo "000")
-if echo "$HTTP_CODE" | grep -qE "200|404|401|403"; then
+# 13. Tester la connexion HTTP/HTTPS locale
+echo -e "${BLUE}13. Test de connexion HTTP locale (devrait rediriger vers HTTPS):${NC}"
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L http://localhost:11840/health 2>/dev/null || echo "000")
+if echo "$HTTP_CODE" | grep -qE "200|301|302|404|401|403"; then
     echo -e "${GREEN}✓ Le serveur répond sur localhost:11840 (Code: $HTTP_CODE)${NC}"
 else
     echo -e "${RED}✗ Le serveur ne répond pas sur localhost:11840${NC}"
-    echo "  Tentative de connexion..."
-    curl -v http://localhost:11840/ 2>&1 | head -20 || echo "Erreur de connexion"
-    echo ""
-    echo "  Vérification alternative sur le port 8000..."
-    HTTP_CODE_8000=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health 2>/dev/null || echo "000")
-    if echo "$HTTP_CODE_8000" | grep -qE "200|404|401|403"; then
-        echo -e "${YELLOW}⚠️  Le serveur répond sur localhost:8000 (peut-être un problème de mapping de port)${NC}"
-    fi
 fi
 echo ""
 
-# 11. Vérifier la configuration docker-compose
-echo -e "${BLUE}11. Configuration des ports dans docker-compose.yml:${NC}"
+echo -e "${BLUE}14. Test de connexion HTTPS locale:${NC}"
+HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k https://localhost:11840/health 2>/dev/null || echo "000")
+if echo "$HTTPS_CODE" | grep -qE "200|404|401|403"; then
+    echo -e "${GREEN}✓ Le serveur HTTPS répond sur localhost:11840 (Code: $HTTPS_CODE)${NC}"
+else
+    echo -e "${RED}✗ Le serveur HTTPS ne répond pas sur localhost:11840${NC}"
+    echo "  Tentative de connexion..."
+    curl -k -v https://localhost:11840/health 2>&1 | head -20 || echo "Erreur de connexion"
+fi
+echo ""
+
+# 15. Vérifier la configuration docker-compose
+echo -e "${BLUE}15. Configuration des ports dans docker-compose.yml:${NC}"
 if [ -f "docker-compose.yml" ]; then
     grep -A 5 "ports:" docker-compose.yml | head -10 || echo "Configuration non trouvée"
 else
@@ -124,8 +160,8 @@ else
 fi
 echo ""
 
-# 12. Vérifier les variables d'environnement
-echo -e "${BLUE}12. Variables d'environnement importantes:${NC}"
+# 16. Vérifier les variables d'environnement
+echo -e "${BLUE}16. Variables d'environnement importantes:${NC}"
 if [ -f ".env" ]; then
     grep -E "POSTGRES_|DATABASE_URL|CORS_ORIGINS" .env 2>/dev/null | sed 's/\(PASSWORD\|SECRET\)=.*/PASSWORD=***/' || echo "Variables non trouvées"
 else
@@ -150,6 +186,21 @@ fi
 if ! docker compose ps | grep -q "11840"; then
     echo -e "${YELLOW}⚠️  Le port 11840 n'est pas exposé${NC}"
     echo "   Vérifiez docker-compose.yml"
+    echo ""
+fi
+
+# Vérifier si nginx est démarré
+if ! docker compose ps | grep -q "nginx.*Up"; then
+    echo -e "${RED}✗ Le container nginx n'est pas démarré${NC}"
+    echo "   Commande: docker compose up -d nginx"
+    echo "   Vérifiez les certificats SSL: ls -la nginx/ssl/"
+    echo ""
+fi
+
+# Vérifier si les certificats SSL existent
+if [ ! -f "nginx/ssl/cert.pem" ] || [ ! -f "nginx/ssl/key.pem" ]; then
+    echo -e "${RED}✗ Les certificats SSL sont manquants${NC}"
+    echo "   Générer avec: cd nginx && ./generate-self-signed-cert.sh"
     echo ""
 fi
 
