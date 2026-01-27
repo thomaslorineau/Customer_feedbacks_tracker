@@ -74,12 +74,18 @@ export async function loadVersion(force = false) {
 // Make loadVersion available globally
 window.loadVersion = loadVersion;
 
-// Auto-load version when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadVersion);
-} else {
-    loadVersion();
+// Auto-load version when DOM is ready (use setTimeout to ensure all declarations are processed)
+function initVersionLoader() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadVersion);
+    } else {
+        // Use setTimeout to ensure all module code is fully evaluated
+        setTimeout(loadVersion, 0);
+    }
 }
+
+// Initialize after module is fully loaded
+initVersionLoader();
 
 // Auto-refresh version every 5 minutes (instead of 30 seconds to reduce log noise)
 let versionRefreshInterval = null;
