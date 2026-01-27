@@ -849,13 +849,6 @@
                             <span class="btn-text">StackOverflow</span>
                             <span class="btn-spinner" style="display:none;"></span>
                         </button>
-                        <button id="btnScrapeNews" onclick="scrapeNews()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
-                            onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
-                            onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
-                            <span style="font-size: 1.5em;">📰</span>
-                            <span class="btn-text">Google News</span>
-                            <span class="btn-spinner" style="display:none;"></span>
-                        </button>
                         <button id="btnScrapeReddit" onclick="scrapeReddit()" style="padding: 14px 16px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-weight: 500; font-size: 0.9em; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 6px;"
                             onmouseover="this.style.background='var(--bg-card-hover)'; this.style.borderColor='var(--accent-primary)'; this.style.transform='translateY(-2px)';"
                             onmouseout="this.style.background='var(--bg-secondary)'; this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)';">
@@ -1012,16 +1005,48 @@
             
             <select id="sourceFilter">
                 <option value="">All Sources</option>
-                <option value="X/Twitter">🐦 Twitter/X</option>
+                <option value="X">🐦 Twitter/X</option>
                 <option value="Stack Overflow">📚 Stack Overflow</option>
                 <option value="GitHub">💻 GitHub</option>
                 <option value="Reddit">🔴 Reddit</option>
-                <option value="Google News">📰 Google News</option>
                 <option value="Trustpilot">⭐ Trustpilot</option>
                 <option value="OVH Forum">💬 OVH Forum</option>
                 <option value="Mastodon">🐘 Mastodon</option>
                 <option value="G2 Crowd">⭐ G2 Crowd</option>
-                <option value="Discord">💬 Discord</option>
+                <option value="LinkedIn">💼 LinkedIn</option>
+            </select>
+            
+            <select id="ovhProductFilter" title="Filter by OVH Product">
+                <option value="">All OVH Products</option>
+                <optgroup label="🌐 Web & Hosting">
+                    <option value="Domain">Domain</option>
+                    <option value="WordPress">WordPress</option>
+                    <option value="Email">Email</option>
+                    <option value="Hosting">Hosting</option>
+                </optgroup>
+                <optgroup label="☁️ Cloud & Servers">
+                    <option value="VPS">VPS</option>
+                    <option value="Dedicated">Dedicated</option>
+                    <option value="Public Cloud">Public Cloud</option>
+                    <option value="Private Cloud">Private Cloud</option>
+                    <option value="Kubernetes">Kubernetes</option>
+                </optgroup>
+                <optgroup label="💾 Storage & Backup">
+                    <option value="Storage">Storage</option>
+                    <option value="Backup">Backup</option>
+                </optgroup>
+                <optgroup label="🌍 Network & CDN">
+                    <option value="CDN">CDN</option>
+                    <option value="Load Balancer">Load Balancer</option>
+                    <option value="DDoS Protection">DDoS Protection</option>
+                    <option value="Network">Network</option>
+                </optgroup>
+                <optgroup label="🔧 Support & Billing">
+                    <option value="Support">Support</option>
+                    <option value="Billing">Billing</option>
+                    <option value="Manager">Manager</option>
+                    <option value="API">API</option>
+                </optgroup>
             </select>
             
             <select id="languageFilter">
@@ -1031,44 +1056,10 @@
                 <option value="other">🌍 Other</option>
             </select>
             
-            <select id="ovhProductFilter" title="Filter by OVH Product">
-                <option value="">All OVH Products</option>
-                <optgroup label="🌐 Web & Hosting">
-                    <option value="web-hosting">Web Hosting</option>
-                    <option value="wordpress">WordPress Hosting</option>
-                    <option value="email">Email / Exchange</option>
-                    <option value="domain">Domain Names</option>
-                </optgroup>
-                <optgroup label="☁️ Cloud & Servers">
-                    <option value="vps">VPS (Virtual Private Server)</option>
-                    <option value="dedicated">Dedicated Servers</option>
-                    <option value="public-cloud">Public Cloud</option>
-                    <option value="private-cloud">Private Cloud</option>
-                    <option value="hosted-private-cloud">Hosted Private Cloud</option>
-                </optgroup>
-                <optgroup label="💾 Storage & Backup">
-                    <option value="object-storage">Object Storage</option>
-                    <option value="cloud-archive">Cloud Archive</option>
-                    <option value="nas-ha">NAS-HA</option>
-                    <option value="veeam">Veeam Backup</option>
-                </optgroup>
-                <optgroup label="🌍 Network & CDN">
-                    <option value="cdn">CDN</option>
-                    <option value="load-balancer">Load Balancer</option>
-                    <option value="ddos">DDoS Protection</option>
-                    <option value="vrack">vRack</option>
-                </optgroup>
-                <optgroup label="📱 Telecom">
-                    <option value="voip">VoIP / Telephony</option>
-                    <option value="sms">SMS</option>
-                    <option value="fax">Fax</option>
-                </optgroup>
-                <optgroup label="🔧 Support & Billing">
-                    <option value="support">Customer Support</option>
-                    <option value="billing">Billing Issues</option>
-                    <option value="manager">OVH Manager</option>
-                    <option value="api">OVH API</option>
-                </optgroup>
+            <select id="answeredFilter">
+                <option value="">All Status</option>
+                <option value="1">✓ Answered</option>
+                <option value="0">○ Not Answered</option>
             </select>
             
             <input type="date" id="dateFrom" title="From Date" placeholder="From">
@@ -1212,13 +1203,6 @@
                                 <div>
                                     <strong style="color: var(--text-primary);">StackOverflow</strong><br>
                                     <small style="color: var(--text-secondary);">Technical questions and answers</small>
-                                </div>
-                            </li>
-                            <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
-                                <span style="font-size: 1.5em; margin-right: 10px;">📰</span>
-                                <div>
-                                    <strong style="color: var(--text-primary);">Google News</strong><br>
-                                    <small style="color: var(--text-secondary);">Press articles and news</small>
                                 </div>
                             </li>
                             <li style="padding: 10px; margin-bottom: 8px; background: var(--bg-card); border-radius: 6px; display: flex; align-items: center;">
@@ -1479,7 +1463,6 @@
                 <ul>
                     <li><strong>🐦 X (Twitter)</strong> - Real-time customer complaints and feedback</li>
                     <li><strong>📚 Stack Overflow</strong> - Technical support questions</li>
-                    <li><strong>📰 Google News</strong> - News articles and press releases</li>
                     <li><strong>🔴 Reddit</strong> - Community discussions and feedback</li>
                     <li><strong>⭐ Trustpilot</strong> - Customer reviews and ratings</li>
                     <li><strong>💻 GitHub</strong> - Issues and discussions</li>
@@ -1579,7 +1562,6 @@
                 <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>🐦 X (Twitter)</strong> - Real-time customer complaints and feedback</li>
                     <li><strong>📚 Stack Overflow</strong> - Technical support questions</li>
-                    <li><strong>📰 Google News</strong> - News articles and press releases</li>
                     <li><strong>🔴 Reddit</strong> - Community discussions and feedback</li>
                     <li><strong>⭐ Trustpilot</strong> - Customer reviews and ratings</li>
                     <li><strong>💻 GitHub</strong> - Issues and discussions</li>
@@ -1636,7 +1618,7 @@
                 <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">💾 Features</h2>
                 <ul style="color:var(--text-secondary); line-height:1.8; margin-left:20px;">
                     <li><strong>Timeline Filter:</strong> Select date ranges to analyze posts over time</li>
-                    <li><strong>Source Filter:</strong> Focus on specific platforms (X, Reddit, Google News, etc.)</li>
+                    <li><strong>Source Filter:</strong> Focus on specific platforms (X, Reddit, Trustpilot, etc.)</li>
                     <li><strong>Sentiment Filter:</strong> Show only positive, negative, or neutral posts</li>
                     <li><strong>Text Search:</strong> Search for specific keywords within post content</li>
                     <li><strong>Cancel Button:</strong> Stop long-running scraping operations</li>
@@ -1657,7 +1639,7 @@
                     <li><strong style="color:#ff8787;">❌ Reddit:</strong> Uses aggressive anti-scraping (403 Forbidden). Would require OAuth2 authentication and API credentials. Disabled for simplicity.</li>
                     <li><strong style="color:#ff8787;">❌ LinkedIn:</strong> Strictly prohibits automated data extraction in Terms of Service. No public API available for posts. Scraping violates legal terms.</li>
                     <li><strong style="color:#ff8787;">❌ Facebook:</strong> No public API for accessing posts. Requires special app review by Meta. Data extraction heavily restricted for privacy/security reasons.</li>
-                    <li><strong style="color:#34d399;">✅ Supported Instead:</strong> X/Twitter, GitHub Issues, Stack Overflow, Reddit (RSS), Google News - All have public APIs or RSS feeds accessible without authentication</li>
+                    <li><strong style="color:#34d399;">✅ Supported Instead:</strong> X/Twitter, GitHub Issues, Stack Overflow, Reddit (RSS), Trustpilot - All have public APIs or RSS feeds accessible without authentication</li>
                 </ul>
 
                 <h2 style="color:var(--accent-primary); margin-top:30px; margin-bottom:15px;">🔧 Technical Details</h2>
@@ -1826,6 +1808,8 @@
                 ovhProductFilter: document.getElementById('ovhProductFilter').value,
                 sourceFilter: document.getElementById('sourceFilter').value,
                 sentimentFilter: document.getElementById('sentimentFilter').value,
+                languageFilter: document.getElementById('languageFilter').value,
+                answeredFilter: document.getElementById('answeredFilter').value,
                 dateFrom: document.getElementById('dateFrom').value,
                 dateTo: document.getElementById('dateTo').value,
             };
@@ -2171,6 +2155,65 @@
             return null; // No product detected
         }
         
+        // Mark post as false positive/not false positive
+        async function markAsFalsePositive(postId, isFalsePositive) {
+            try {
+                const response = await fetch(`/api/posts/${postId}/mark-false-positive?is_false_positive=${isFalsePositive}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+                    throw new Error(`Failed to mark post: ${errorData.detail || response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log(`✅ Post ${postId} successfully ${isFalsePositive ? 'marked as' : 'removed from'} false positive`);
+                
+                // Reload posts from server
+                try {
+                    console.log('🔄 Reloading posts from server...');
+                    const postsResponse = await fetch(`/api/posts?limit=10000`);
+                    if (postsResponse.ok) {
+                        const updatedPosts = await postsResponse.json();
+                        console.log(`✅ Reloaded ${updatedPosts.length} posts from server`);
+                        
+                        // Update allPosts and re-render
+                        allPosts = updatedPosts;
+                        renderPosts();
+                        updateStats(allPosts);
+                    }
+                } catch (reloadError) {
+                    console.error('❌ Could not reload posts from server:', reloadError);
+                    // Fallback: update local state
+                    const post = allPosts.find(p => p.id === postId);
+                    if (post) {
+                        post.is_false_positive = isFalsePositive;
+                        renderPosts();
+                        updateStats(allPosts);
+                    }
+                }
+                
+                // Show success message
+                const message = isFalsePositive 
+                    ? 'Post marqué comme faux positif (exclu des analyses)'
+                    : 'Post retiré des faux positifs (inclus dans les analyses)';
+                showToast(message, 'success');
+                
+                return result;
+            } catch (error) {
+                console.error('❌ Error marking post as false positive:', error);
+                showToast(`Erreur: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+        
+        // Make markAsFalsePositive globally available
+        window.markAsFalsePositive = markAsFalsePositive;
+
         function editProductLabel(postId, currentLabel) {
             const newLabel = prompt(`Edit product label for post #${postId}:\n\nCurrent: ${currentLabel || '(none)'}\n\nEnter new label (or leave empty to remove):`, currentLabel || '');
             
@@ -2792,6 +2835,7 @@
             document.getElementById('sentimentFilter').value = '';
             document.getElementById('ovhProductFilter').value = '';
             document.getElementById('languageFilter').value = '';
+            document.getElementById('answeredFilter').value = '';
             document.getElementById('dateFrom').value = '';
             document.getElementById('dateTo').value = '';
             document.getElementById('sortBy').value = 'date-desc';
@@ -2813,46 +2857,40 @@
             const sentimentFilter = document.getElementById('sentimentFilter').value;
             const ovhProductFilter = document.getElementById('ovhProductFilter').value;
             const languageFilter = document.getElementById('languageFilter').value;
+            const answeredFilter = document.getElementById('answeredFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
 
-            // Define OVH product patterns
+            // Define OVH product patterns (aligned with product-detection.js labels)
             const ovhProductPatterns = {
                 // Web & Hosting
-                'web-hosting': /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host)\w*/i,
-                'wordpress': /\b(wordpress|wp\s*host)\w*/i,
-                'email': /\b(email|exchange|mail|mx|zimbra)\w*/i,
-                'domain': /\b(domain|domaine|dns|zone|registrar)\w*/i,
+                'Domain': /\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b/i,
+                'WordPress': /\b(wordpress|wp\s*host|wp\s*config)\b/i,
+                'Email': /\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b/i,
+                'Hosting': /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b/i,
                 
                 // Cloud & Servers
-                'vps': /\b(vps|virtual\s*private\s*server)\w*/i,
-                'dedicated': /\b(dedicated|dédié|bare\s*metal)\w*/i,
-                'public-cloud': /\b(public\s*cloud|openstack|instance)\w*/i,
-                'private-cloud': /\b(private\s*cloud|vmware)\w*/i,
-                'hosted-private-cloud': /\b(hosted\s*private\s*cloud|hpc)\w*/i,
+                'VPS': /\b(vps|virtual\s*private\s*server|kimsufi)\b/i,
+                'Dedicated': /\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b/i,
+                'Public Cloud': /\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b/i,
+                'Private Cloud': /\b(private\s*cloud|vmware|vsphere)\b/i,
+                'Kubernetes': /\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b/i,
                 
                 // Storage & Backup
-                'object-storage': /\b(object\s*storage|swift|s3)\w*/i,
-                'cloud-archive': /\b(cloud\s*archive|archive)\w*/i,
-                'nas-ha': /\b(nas|nas-ha)\w*/i,
-                'veeam': /\b(veeam|backup)\w*/i,
+                'Storage': /\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b/i,
+                'Backup': /\b(backup|veeam|archive|snapshot|restore)\b/i,
                 
                 // Network & CDN
-                'cdn': /\b(cdn|content\s*delivery)\w*/i,
-                'load-balancer': /\b(load\s*balancer|iplb)\w*/i,
-                'ddos': /\b(ddos|anti-ddos|protection)\w*/i,
-                'vrack': /\b(vrack|private\s*network)\w*/i,
-                
-                // Telecom
-                'voip': /\b(voip|telephony|téléphonie|sip)\w*/i,
-                'sms': /\b(sms|text\s*message)\w*/i,
-                'fax': /\b(fax|fax2mail)\w*/i,
+                'CDN': /\b(cdn|content\s*delivery|cache)\b/i,
+                'Load Balancer': /\b(load\s*balancer|iplb|lb|balancing)\b/i,
+                'DDoS Protection': /\b(ddos|anti-ddos|protection|mitigation)\b/i,
+                'Network': /\b(network|vrack|vlan|ip\s*address|subnet)\b/i,
                 
                 // Support & Billing
-                'support': /\b(support|ticket|assistance|help)\w*/i,
-                'billing': /\b(billing|facture|invoice|payment|paiement|refund|rembours)\w*/i,
-                'manager': /\b(manager|control\s*panel|espace\s*client)\w*/i,
-                'api': /\b(api|sdk|integration)\w*/i,
+                'Support': /\b(support|ticket|assistance|help|service\s*client|customer\s*service)\b/i,
+                'Billing': /\b(billing|facture|invoice|payment|paiement|refund|rembours|subscription)\b/i,
+                'Manager': /\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b/i,
+                'API': /\b(api|sdk|integration|rest\s*api|webhook)\b/i,
             };
 
             let filtered = allPosts.filter(post => {
@@ -2889,6 +2927,13 @@
                 const matchesSentiment = !sentimentFilter || post.sentiment_label === sentimentFilter;
                 const matchesLanguage = !languageFilter || post.language === languageFilter;
                 
+                // Answered filter
+                let matchesAnswered = true;
+                if (answeredFilter !== '') {
+                    const isAnswered = post.is_answered === 1 || post.is_answered === true || post.is_answered === '1';
+                    matchesAnswered = (answeredFilter === '1') ? isAnswered : !isAnswered;
+                }
+                
                 // OVH Product filter - only applies if a product is selected
                 let matchesProduct = true;
                 if (ovhProductFilter && ovhProductPatterns[ovhProductFilter]) {
@@ -2903,7 +2948,7 @@
                     if (dateTo && postDate > dateTo) matchesDate = false;
                 }
                 
-                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage;
+                return matchesSearch && matchesSource && matchesSentiment && matchesProduct && matchesDate && matchesLanguage && matchesAnswered;
             });
 
             // Debug log to track filtering
@@ -2914,6 +2959,7 @@
                     sentiment: sentimentFilter || 'all',
                     product: ovhProductFilter || 'all',
                     language: languageFilter || 'all',
+                    answered: answeredFilter || 'all',
                     dateRange: (dateFrom || dateTo) ? `${dateFrom || '*'} to ${dateTo || '*'}` : 'all'
                 });
             }
@@ -2927,6 +2973,7 @@
                 if (sentimentFilter) activeFilters.push(`Sentiment: ${sentimentFilter}`);
                 if (ovhProductFilter) activeFilters.push(`Product: ${ovhProductFilter}`);
                 if (languageFilter) activeFilters.push(`Language: ${languageFilter}`);
+                if (answeredFilter) activeFilters.push(`Status: ${answeredFilter === '1' ? 'Answered' : 'Not Answered'}`);
                 if (dateFrom || dateTo) activeFilters.push(`Date: ${dateFrom || '*'} to ${dateTo || '*'}`);
                 
                 const filterInfo = activeFilters.length > 0 
@@ -3038,8 +3085,12 @@
             document.getElementById('neutralPosts').textContent = neutral;
             
             // Update GLOBAL stats (all posts in DB)
-            // Filter out samples AND posts with relevance_score = 0 (same as dashboard)
+            // Filter out samples, false positives AND posts with relevance_score = 0 (same as dashboard)
             const allRealPosts = allPosts.filter(post => {
+                // Filter out false positives
+                const isFalsePositive = post.is_false_positive === true || post.is_false_positive === 1 || post.is_false_positive === '1';
+                if (isFalsePositive) return false;
+                
                 // Filter out sample posts
                 const url = post.url || '';
                 const isSample = (
@@ -3756,6 +3807,7 @@
             const sentimentFilter = document.getElementById('sentimentFilter').value;
             const ovhProductFilter = document.getElementById('ovhProductFilter').value;
             const languageFilter = document.getElementById('languageFilter').value;
+            const answeredFilter = document.getElementById('answeredFilter').value;
             const dateFrom = document.getElementById('dateFrom').value;
             const dateTo = document.getElementById('dateTo').value;
             
@@ -3765,6 +3817,7 @@
             if (sentimentFilter) count++;
             if (ovhProductFilter) count++;
             if (languageFilter) count++;
+            if (answeredFilter) count++;
             if (dateFrom || dateTo) count++;
             
             const countEl = document.getElementById('activeFiltersCount');
@@ -4017,12 +4070,6 @@
             const keywords = loadKeywords();
             const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
             await startSingleSourceJob('stackoverflow', 'Stack Overflow', combinedQuery, 100, 'btnScrapeStackOverflow');
-        }
-
-        async function scrapeNews() {
-            const keywords = loadKeywords();
-            const combinedQuery = keywords && keywords.length > 0 ? keywords.join(' ') : '';
-            await startSingleSourceJob('news', 'Google News', combinedQuery, 50, 'btnScrapeNews');
         }
 
         async function scrapeReddit() {
@@ -5492,7 +5539,7 @@
 
             addLog(`🔎 Running searches for ${keywords.length} keywords (limit=${limit})`, 'info');
 
-            const sources = ['x','github','stackoverflow','reddit','news','trustpilot','discord'];
+            const sources = ['x','github','stackoverflow','reddit','trustpilot','discord'];
 
             try {
                 for (const kw of keywords) {

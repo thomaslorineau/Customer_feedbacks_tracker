@@ -230,7 +230,6 @@ python run_scrape_x.py
 - ✅ `POST /scrape/github` : Scraper GitHub Issues
 - ✅ `POST /scrape/stackoverflow` : Scraper Stack Overflow
 - ✅ `POST /scrape/trustpilot` : Scraper Trustpilot reviews
-- ✅ `POST /scrape/news` : Scraper Google News
 - ✅ `POST /generate-improvement-ideas` : Générer des idées avec LLM
 - ✅ `POST /admin/cleanup-duplicates` : Nettoyer les doublons
 - ✅ `POST /admin/cleanup-hackernews-posts` : Supprimer les posts Hacker News
@@ -248,7 +247,7 @@ La base de données PostgreSQL est initialisée automatiquement lors du premier 
 - ✅ Détection automatique de doublons (URL + contenu+auteur+source)
 - ✅ Scraper X (Nitter instances)
 - ✅ Scraper Reddit (RSS feeds)
-- ✅ Scraper GitHub, Stack Overflow, Trustpilot, Google News
+- ✅ Scraper GitHub, Stack Overflow, Trustpilot
 - ✅ Frontend dashboard avec filtres avancés
 - ✅ Backlog sidebar avec commentaires
 - ✅ Génération d'idées avec LLM (OpenAI/Anthropic)

@@ -1059,7 +1059,7 @@ function renderProductList(sortedProducts, remainingCount, allProducts, total, c
         const filterIndicator = document.createElement('div');
         filterIndicator.className = 'product-filter-active';
         filterIndicator.innerHTML = `
-            Filtered by: ${activeProductFilter}
+            📦 ${state.filters.product}
             <button onclick="clearProductFilter()" title="Clear filter">×</button>
         `;
         productList.insertBefore(filterIndicator, productList.firstChild);
@@ -1251,8 +1251,6 @@ function getSourceIcon(source) {
         'Twitter': '🐦',
         'Trustpilot': '⭐',
         'Reddit': '🔴',
-        'News': '📰',
-        'Google News': '📰',
         'GitHub': '💻',
         'Stack Overflow': '📚'
     };
@@ -1298,22 +1296,82 @@ function sortPosts(sortValue) {
 
 function filterByProduct(product) {
     if (!state) return;
+    
+    // Reset dropdowns to 'all' since they don't have matching values for distribution labels
     const productFilter = document.getElementById('productFilter');
     if (productFilter) {
-        productFilter.value = product;
-        state.setFilter('product', product);
-        updateDashboard();
+        productFilter.value = 'all';
+    }
+    const postsProductFilter = document.getElementById('postsProductFilter');
+    if (postsProductFilter) {
+        postsProductFilter.value = 'all';
+    }
+    
+    // Update state with the product label from Distribution panel
+    state.setFilter('product', product);
+    
+    // Refresh displays
+    updateDashboard();
+    updatePostsDisplay();
+    
+    // Show visual indicator of active filter
+    showProductFilterIndicator(product);
+    
+    // Scroll to posts section
+    const postsSection = document.getElementById('postsSection');
+    if (postsSection) {
+        postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    console.log('Filtered by product:', product);
+}
+
+function showProductFilterIndicator(product) {
+    // Remove existing indicator
+    const existingIndicator = document.getElementById('productFilterIndicator');
+    if (existingIndicator) existingIndicator.remove();
+    
+    if (!product || product === 'all') return;
+    
+    // Add indicator near posts section
+    const postsHeader = document.querySelector('.posts-section-header h2');
+    if (postsHeader) {
+        const indicator = document.createElement('span');
+        indicator.id = 'productFilterIndicator';
+        indicator.style.cssText = 'display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; padding: 4px 12px; background: rgba(0, 212, 255, 0.15); border-radius: 20px; font-size: 0.75em; font-weight: 600; color: var(--accent-primary);';
+        indicator.innerHTML = `
+            📦 ${product}
+            <button onclick="clearProductFilter()" style="background: none; border: none; color: var(--accent-primary); cursor: pointer; font-size: 1.2em; line-height: 1; padding: 0;" title="Clear filter">×</button>
+        `;
+        postsHeader.appendChild(indicator);
     }
 }
 
 function clearProductFilter() {
     if (!state) return;
+    
+    // Update timeline filter
     const productFilter = document.getElementById('productFilter');
     if (productFilter) {
         productFilter.value = 'all';
-        state.setFilter('product', 'all');
-        updateDashboard();
     }
+    
+    // Update posts filter
+    const postsProductFilter = document.getElementById('postsProductFilter');
+    if (postsProductFilter) {
+        postsProductFilter.value = 'all';
+    }
+    
+    // Remove visual indicator
+    const indicator = document.getElementById('productFilterIndicator');
+    if (indicator) indicator.remove();
+    
+    // Update state and refresh
+    state.setFilter('product', 'all');
+    updateDashboard();
+    updatePostsDisplay();
+    
+    console.log('Product filter cleared');
 }
 
 function showMoreProducts() {
@@ -1420,6 +1478,34 @@ function resetFilters() {
     if (dateFromInput) dateFromInput.value = '';
     if (dateToInput) dateToInput.value = '';
     
+    // Reset Posts section filters
+    const postsSentimentFilter = document.getElementById('postsSentimentFilter');
+    if (postsSentimentFilter) postsSentimentFilter.value = 'all';
+    
+    const postsSourceFilter = document.getElementById('postsSourceFilter');
+    if (postsSourceFilter) postsSourceFilter.value = 'all';
+    
+    const postsProductFilter = document.getElementById('postsProductFilter');
+    if (postsProductFilter) postsProductFilter.value = 'all';
+    
+    const postsLanguageFilter = document.getElementById('postsLanguageFilter');
+    if (postsLanguageFilter) postsLanguageFilter.value = 'all';
+    
+    const postsAnsweredFilter = document.getElementById('postsAnsweredFilter');
+    if (postsAnsweredFilter) postsAnsweredFilter.value = 'all';
+    
+    const postsDateFrom = document.getElementById('postsDateFrom');
+    if (postsDateFrom) postsDateFrom.value = '';
+    
+    const postsDateTo = document.getElementById('postsDateTo');
+    if (postsDateTo) postsDateTo.value = '';
+    
+    const postsSortBy = document.getElementById('postsSortBy');
+    if (postsSortBy) postsSortBy.value = 'date-desc';
+    
+    // Reset pagination
+    postsCurrentOffset = 0;
+    
     // Clear critical filter flag
     state.criticalFilterActive = false;
     
@@ -1428,6 +1514,9 @@ function resetFilters() {
     
     // Update dashboard (this will trigger state subscription which updates timeline)
     updateDashboard();
+    
+    // Update posts display
+    updatePostsDisplay();
     
     // Force timeline chart update to ensure it refreshes
     // The state subscription should handle this, but we ensure it happens
@@ -2806,6 +2895,79 @@ async function markPostAnswered(postId, answered) {
 // Make markPostAnswered globally available
 window.markPostAnswered = markPostAnswered;
 
+// Mark post as false positive/not false positive
+async function markAsFalsePositive(postId, isFalsePositive) {
+    try {
+        const response = await fetch(`/api/posts/${postId}/mark-false-positive?is_false_positive=${isFalsePositive}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+            throw new Error(`Failed to mark post: ${errorData.detail || response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`✅ Post ${postId} successfully ${isFalsePositive ? 'marked as' : 'removed from'} false positive`);
+        
+        // Reload ALL posts from server to ensure complete sync with database
+        try {
+            console.log('🔄 Reloading posts from server...');
+            const postsResponse = await fetch(`/api/posts?limit=10000`);
+            if (postsResponse.ok) {
+                const updatedPosts = await postsResponse.json();
+                console.log(`✅ Reloaded ${updatedPosts.length} posts from server`);
+                
+                if (state) {
+                    // Filter valid posts (exclude samples and relevance_score = 0)
+                    const validPosts = filterValidPosts(updatedPosts);
+                    
+                    // Completely replace state.posts with fresh data from server
+                    state.setPosts(validPosts);
+                    console.log(`✅ State updated with ${validPosts.length} valid posts`);
+                }
+            } else {
+                throw new Error(`Failed to reload posts: ${postsResponse.status} ${postsResponse.statusText}`);
+            }
+        } catch (reloadError) {
+            console.error('❌ Could not reload posts from server:', reloadError);
+            // Fallback: update local state only
+            if (state && state.posts) {
+                const post = state.posts.find(p => p.id === postId);
+                if (post) {
+                    post.is_false_positive = isFalsePositive;
+                    state.applyFilters();
+                    state.notifyListeners();
+                }
+            }
+        }
+        
+        // Refresh the dashboard and posts display
+        updateDashboard();
+        if (document.getElementById('postsGallery')) {
+            updatePostsDisplay();
+        }
+        
+        // Show success message
+        const message = isFalsePositive 
+            ? 'Post marqué comme faux positif (exclu des analyses)'
+            : 'Post retiré des faux positifs (inclus dans les analyses)';
+        alert(message);
+        
+        return result;
+    } catch (error) {
+        console.error('❌ Error marking post as false positive:', error);
+        alert(`Erreur lors du marquage du post: ${error.message}`);
+        throw error;
+    }
+}
+
+// Make markAsFalsePositive globally available
+window.markAsFalsePositive = markAsFalsePositive;
+
 // Generate PowerPoint Report
 /**
  * Capture a Chart.js canvas as base64 image
@@ -3039,10 +3201,43 @@ function updatePostsDisplay() {
     const sortBy = document.getElementById('postsSortBy')?.value || 'date-desc';
     const sentimentFilter = document.getElementById('postsSentimentFilter')?.value || 'all';
     const sourceFilter = document.getElementById('postsSourceFilter')?.value || 'all';
+    const productFilter = document.getElementById('postsProductFilter')?.value || 'all';
     const languageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
     const answeredFilter = document.getElementById('postsAnsweredFilter')?.value || 'all';
     const dateFrom = document.getElementById('postsDateFrom')?.value || '';
     const dateTo = document.getElementById('postsDateTo')?.value || '';
+    
+    // OVH Product patterns for filtering (aligned with product-detection.js labels)
+    const ovhProductPatterns = {
+        // Web & Hosting
+        'Domain': /\b(domain|domaine|dns|zone|registrar|nameserver|\.ovh|\.com|\.net|\.org)\b/i,
+        'WordPress': /\b(wordpress|wp\s*host|wp\s*config)\b/i,
+        'Email': /\b(email|exchange|mail|mx\s*record|zimbra|smtp|imap|pop3|mailbox)\b/i,
+        'Hosting': /\b(web\s*host|hosting|hébergement|mutualisé|shared\s*host|web\s*server)\b/i,
+        
+        // Cloud & Servers
+        'VPS': /\b(vps|virtual\s*private\s*server|kimsufi)\b/i,
+        'Dedicated': /\b(dedicated|dédié|bare\s*metal|server\s*dedicated|serveur\s*dédié)\b/i,
+        'Public Cloud': /\b(public\s*cloud|openstack|instance|compute|ovhcloud|ovh\s*cloud)\b/i,
+        'Private Cloud': /\b(private\s*cloud|vmware|vsphere)\b/i,
+        'Kubernetes': /\b(kubernetes|k8s|managed\s*k8s|container|pod|deployment)\b/i,
+        
+        // Storage & Backup
+        'Storage': /\b(object\s*storage|swift|s3|storage|cloud\s*storage|object\s*store)\b/i,
+        'Backup': /\b(backup|veeam|archive|snapshot|restore)\b/i,
+        
+        // Network & CDN
+        'CDN': /\b(cdn|content\s*delivery|cache)\b/i,
+        'Load Balancer': /\b(load\s*balancer|iplb|lb|balancing)\b/i,
+        'DDoS Protection': /\b(ddos|anti-ddos|protection|mitigation)\b/i,
+        'Network': /\b(network|vrack|vlan|ip\s*address|subnet)\b/i,
+        
+        // Support & Billing
+        'Support': /\b(support|ticket|assistance|help|service\s*client|customer\s*service)\b/i,
+        'Billing': /\b(billing|facture|invoice|payment|paiement|refund|rembours|subscription)\b/i,
+        'Manager': /\b(manager|control\s*panel|espace\s*client|ovh\s*manager|panel)\b/i,
+        'API': /\b(api|sdk|integration|rest\s*api|webhook)\b/i
+    };
     
     // Get global search filter from state
     const globalSearch = state.filters?.search || '';
@@ -3095,11 +3290,15 @@ function updatePostsDisplay() {
                 postsDateToEl.value = state.filters.dateTo;
             }
         }
+        
+        // Note: Product filter sync removed - dropdown value takes priority
+        // When user changes dropdown manually, it should not be overwritten by state
     }
     
     // Use synced values after potential updates
     const finalSentimentFilter = document.getElementById('postsSentimentFilter')?.value || 'all';
     const finalSourceFilter = document.getElementById('postsSourceFilter')?.value || 'all';
+    const finalProductFilter = document.getElementById('postsProductFilter')?.value || 'all';
     const finalLanguageFilter = document.getElementById('postsLanguageFilter')?.value || 'all';
     const finalAnsweredFilter = document.getElementById('postsAnsweredFilter')?.value || 'all';
     const finalDateFrom = document.getElementById('postsDateFrom')?.value || '';
@@ -3129,6 +3328,10 @@ function updatePostsDisplay() {
         }
         if (state.filters.language !== finalLanguageFilter) {
             state.setFilter('language', finalLanguageFilter);
+        }
+        // Always sync product filter from dropdown to state
+        if (state.filters.product !== finalProductFilter) {
+            state.setFilter('product', finalProductFilter);
         }
         if (state.filters.dateFrom !== finalDateFrom) {
             state.setFilter('dateFrom', finalDateFrom);
@@ -3191,8 +3394,37 @@ function updatePostsDisplay() {
             if (finalDateFrom && postDate < finalDateFrom) matchesDate = false;
             if (finalDateTo && postDate > finalDateTo) matchesDate = false;
         }
+        
+        // Product filter - check both dropdown patterns AND state filter
+        let matchesProduct = true;
+        const stateProductFilter = state.filters?.product;
+        
+        // If dropdown has a specific value, use patterns
+        if (finalProductFilter && finalProductFilter !== 'all' && ovhProductPatterns[finalProductFilter]) {
+            matchesProduct = ovhProductPatterns[finalProductFilter].test(post.content || '');
+        }
+        // If state has a product filter (from Distribution panel click), use keyword matching
+        else if (stateProductFilter && stateProductFilter !== 'all' && stateProductFilter !== finalProductFilter) {
+            const content = (post.content || '').toLowerCase();
+            const productLower = stateProductFilter.toLowerCase();
+            // Keywords for common products from Distribution panel
+            const distributionKeywords = {
+                'vps': ['vps', 'virtual private server'],
+                'hosting': ['hosting', 'web hosting', 'hébergement'],
+                'domain': ['domain', 'domaine', 'dns', 'registrar'],
+                'public cloud': ['public cloud', 'openstack', 'horizon'],
+                'dedicated server': ['dedicated', 'serveur dédié', 'bare metal'],
+                'email': ['email', 'mail', 'exchange', 'smtp'],
+                'storage': ['storage', 'stockage', 's3', 'object storage'],
+                'cdn': ['cdn', 'content delivery'],
+                'kubernetes': ['kubernetes', 'k8s'],
+                'database': ['database', 'mysql', 'postgresql', 'mongodb']
+            };
+            const keywords = distributionKeywords[productLower] || [productLower];
+            matchesProduct = keywords.some(kw => content.includes(kw));
+        }
 
-        return matchesSource && matchesSentiment && matchesLanguage && matchesAnswered && matchesDate;
+        return matchesSource && matchesSentiment && matchesLanguage && matchesAnswered && matchesDate && matchesProduct;
     });
 
     // Filter out posts with relevance_score = 0 BEFORE pagination
@@ -3308,6 +3540,7 @@ function clearPostsFilters() {
     const postsSentimentFilterEl = document.getElementById('postsSentimentFilter');
     const postsLanguageFilterEl = document.getElementById('postsLanguageFilter');
     const postsAnsweredFilterEl = document.getElementById('postsAnsweredFilter');
+    const postsProductFilterEl = document.getElementById('postsProductFilter');
     const postsDateFromEl = document.getElementById('postsDateFrom');
     const postsDateToEl = document.getElementById('postsDateTo');
     const postsSortByEl = document.getElementById('postsSortBy');
@@ -3315,6 +3548,7 @@ function clearPostsFilters() {
     if (postsSortByEl) postsSortByEl.value = 'date-desc';
     if (postsSentimentFilterEl) postsSentimentFilterEl.value = 'all';
     if (postsSourceFilterEl) postsSourceFilterEl.value = 'all';
+    if (postsProductFilterEl) postsProductFilterEl.value = 'all';
     if (postsLanguageFilterEl) postsLanguageFilterEl.value = 'all';
     if (postsAnsweredFilterEl) postsAnsweredFilterEl.value = 'all';
     if (postsDateFromEl) postsDateFromEl.value = '';
@@ -3326,6 +3560,7 @@ function clearPostsFilters() {
         state.setFilter('sentiment', 'all');
         state.setFilter('language', 'all');
         state.setFilter('answered', 'all');
+        state.setFilter('product', 'all');
         state.setFilter('dateFrom', '');
         state.setFilter('dateTo', '');
     }
@@ -3347,6 +3582,10 @@ function clearPostsFilters() {
     if (answeredFilterEl) {
         answeredFilterEl.value = 'all';
     }
+    const productFilterEl = document.getElementById('productFilter');
+    if (productFilterEl) {
+        productFilterEl.value = 'all';
+    }
     
     // Reset pagination
     postsCurrentOffset = 0;
@@ -3360,32 +3599,19 @@ function clearPostsFilters() {
 }
 
 function updatePostsSourceFilter() {
-    if (!state || !state.posts) return;
-    
-    const sourceFilter = document.getElementById('postsSourceFilter');
-    if (!sourceFilter) return;
-
-    // Get unique sources
-    const sources = new Set();
-    state.posts.forEach(post => {
-        if (post.source) {
-            let normalized = post.source;
-            if (post.source === 'GitHub Issues' || post.source === 'GitHub Discussions') {
-                normalized = 'GitHub';
-            } else if (post.source.startsWith('Mastodon (')) {
-                normalized = 'Mastodon';
-            }
-            sources.add(normalized);
-        }
-    });
-
-    const currentValue = sourceFilter.value;
-    sourceFilter.innerHTML = '<option value="all">All Sources</option>' + 
-        Array.from(sources).sort().map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
-    
-    if (currentValue && Array.from(sources).includes(currentValue)) {
-        sourceFilter.value = currentValue;
-    }
+    // Source filter is now defined in HTML with fixed options (same as data collection page)
+    // This function is kept for backward compatibility but does nothing
+    // The filter options are:
+    // - All Sources
+    // - X (Twitter/X)
+    // - Stack Overflow
+    // - GitHub
+    // - Reddit
+    // - Trustpilot
+    // - OVH Forum
+    // - Mastodon
+    // - G2 Crowd
+    // - LinkedIn
 }
 
 // Helper functions (from data collection page)

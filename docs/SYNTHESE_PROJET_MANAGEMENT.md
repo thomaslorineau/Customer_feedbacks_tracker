@@ -563,7 +563,7 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 3. **RSS Detector:** Détection automatique de feeds RSS/Atom
 4. **Final:** Liste vide (pas de données mockées)
 
-**Sources supportées:** 10+ sources (Twitter/X, Reddit, GitHub, Stack Overflow, Trustpilot, Google News, OVH Forum, Mastodon, G2 Crowd, LinkedIn)
+**Sources supportées:** 9+ sources (Twitter/X, Reddit, GitHub, Stack Overflow, Trustpilot, OVH Forum, Mastodon, G2 Crowd, LinkedIn)
 
 **Résultat:** Taux de collecte élevé même en cas de changement d'API ou de blocage.
 

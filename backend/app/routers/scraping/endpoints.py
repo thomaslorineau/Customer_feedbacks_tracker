@@ -5,7 +5,7 @@ from typing import List
 import logging
 
 from .base import log_scraping, process_and_save_items, get_query_with_base_keywords
-from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin
+from ...scraper import x_scraper, stackoverflow, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin
 from ...analysis import sentiment, country_detection
 from ... import database as db
 
@@ -412,36 +412,6 @@ async def scrape_g2_crowd_endpoint(request: Request, query: str = "OVH", limit: 
         error_msg = f"{type(e).__name__}: {str(e)[:200]}"
         log_scraping(source_name, "error", f"Scraper error: {error_msg}")
         logger.error(f"Error scraping G2 Crowd: {e}", exc_info=True)
-        items = []
-    
-    added, skipped_duplicates, errors = process_and_save_items(items, source_name)
-    
-    if skipped_duplicates > 0:
-        log_scraping(source_name, "info", f"Skipped {skipped_duplicates} duplicate posts")
-    
-    if errors > 0:
-        log_scraping(source_name, "warning", f"Encountered {errors} errors during processing")
-    
-    log_scraping(source_name, "success" if added > 0 else "warning", 
-                f"Scraping completed: {added} added, {skipped_duplicates} duplicates, {errors} errors")
-    return {'added': added}
-
-
-@router.post("/scrape/news", response_model=ScrapeResult)
-async def scrape_news_endpoint(request: Request, query: str = "OVH", limit: int = 50):
-    """Scrape Google News for articles about OVH."""
-    source_name = "Google News"
-    query = get_query_with_base_keywords(query, source_name)
-    
-    log_scraping(source_name, "info", f"Starting scrape with query='{query}', limit={limit}")
-    items = []
-    try:
-        items = await news.scrape_google_news_async(query, limit=limit)
-        log_scraping(source_name, "info", f"Scraper returned {len(items)} items")
-    except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)[:200]}"
-        log_scraping(source_name, "error", f"Scraper error: {error_msg}")
-        logger.error(f"Error scraping Google News: {e}", exc_info=True)
         items = []
     
     added, skipped_duplicates, errors = process_and_save_items(items, source_name)

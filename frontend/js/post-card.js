@@ -91,50 +91,69 @@ function renderPostCard(post, options = {}) {
                 <div class="post-content">${escapeHtml(post.content || '')}</div>
             </div>
             <div class="post-footer">
-                <div class="post-meta-badges">
-                    <span class="sentiment ${getSentimentClass(post.sentiment_label)}" title="Sentiment Score: ${(post.sentiment_score || 0).toFixed(2)}">
-                        ${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'} 
-                        ${(post.sentiment_label || 'neutral').charAt(0).toUpperCase() + (post.sentiment_label || 'neutral').slice(1)} ${(post.sentiment_score || 0).toFixed(2)}
-                    </span>
-                    ${(() => {
-                        const isAnswered = post.is_answered === 1 || post.is_answered === true;
-                        return isAnswered ? `
-                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, false)" class="post-action-btn btn-answered" title="Post répondu${post.answered_by ? ' par ' + escapeHtml(post.answered_by) : ''}${post.answered_at ? ' le ' + escapeHtml(post.answered_at) : ''} - Cliquer pour marquer comme non répondu">
-                        <span class="btn-icon">✓</span>
-                        <span class="btn-text">Answered</span>
-                    </button>
-                    ` : `
-                    <button onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, true)" class="post-action-btn btn-answered" style="opacity: 0.6;" title="Marquer comme répondu">
-                        <span class="btn-icon">✓</span>
-                        <span class="btn-text">Answered</span>
-                    </button>
-                    `;
-                    })()}
-                    <span class="relevance-badge ${relevanceClass}" title="Score de pertinence : ${(relevanceScore * 100).toFixed(0)}% - Indique à quel point ce post est lié à OVH
-
-Calculé à partir de :
-• Marques OVH (40%) : OVH, OVHCloud, Kimsufi, etc.
-• URLs OVH (30%) : Liens vers ovh.com, ovhcloud.com
-• Direction OVH (20%) : Mentions de dirigeants OVH
-• Produits OVH (10%) : VPS, hosting, domain, etc.
-
-Les posts avec un score < 30% sont automatiquement filtrés.">
-                        ${relevanceIcon} Relevance: ${(relevanceScore * 100).toFixed(0)}%
-                    </span>
-                </div>
-                <div class="post-actions">
-                    <button onclick="${options.onPreviewClickName || 'openPostPreview'}(${post.id})" class="post-action-btn btn-preview">
-                        <span class="btn-icon">👁️</span>
-                        <span class="btn-text">Preview</span>
-                    </button>
-                    <a href="${escapeHtml(post.url || '#')}" target="_blank" class="post-action-btn btn-view">
-                        <span class="btn-icon">🔗</span>
-                        <span class="btn-text">View</span>
-                    </a>
-                    <button onclick="${options.onSaveClickName || 'addPostToBacklog'}(${post.id})" class="post-action-btn btn-save">
-                        <span class="btn-icon">💾</span>
-                        <span class="btn-text">Save</span>
-                    </button>
+                <div class="footer-columns">
+                    <!-- Column 1: Info -->
+                    <div class="footer-col footer-info">
+                        <div class="info-item">
+                            <span class="info-icon ${getSentimentClass(post.sentiment_label)}">${post.sentiment_label === 'positive' ? '😊' : post.sentiment_label === 'negative' ? '😞' : '😐'}</span>
+                            <span class="info-label">${(post.sentiment_label || 'neutral').charAt(0).toUpperCase() + (post.sentiment_label || 'neutral').slice(1)}</span>
+                            <span class="info-value">${(post.sentiment_score || 0).toFixed(2)}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-icon ${relevanceClass}">${relevanceScore >= 0.7 ? '🟢' : relevanceScore >= 0.4 ? '🟡' : '🔴'}</span>
+                            <span class="info-label">Relevance</span>
+                            <span class="info-value">${(relevanceScore * 100).toFixed(0)}%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Column 2: Status -->
+                    <div class="footer-col footer-status">
+                        ${(() => {
+                            const isAnswered = post.is_answered === 1 || post.is_answered === true;
+                            return `
+                        <button class="status-btn ${isAnswered ? 'status-active' : ''}" 
+                                onclick="window.markPostAnswered && window.markPostAnswered(${post.id}, ${!isAnswered})">
+                            ${isAnswered ? '✓' : '○'} ${isAnswered ? 'Answered' : 'Answer'}
+                        </button>
+                        `;
+                        })()}
+                        ${(() => {
+                            const isFalsePositive = post.is_false_positive === true || post.is_false_positive === 1 || post.is_false_positive === '1';
+                            return `
+                        <button class="status-btn ${isFalsePositive ? 'status-warning' : ''}" 
+                                onclick="window.markAsFalsePositive && window.markAsFalsePositive(${post.id}, ${!isFalsePositive})">
+                            ✗ ${isFalsePositive ? 'False positive' : 'False positive'}
+                        </button>
+                        `;
+                        })()}
+                    </div>
+                    
+                    <!-- Column 3: Actions -->
+                    <div class="footer-col footer-actions">
+                        <button onclick="${options.onPreviewClickName || 'openPostPreview'}(${post.id})" class="action-btn" title="Preview">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Preview
+                        </button>
+                        <a href="${escapeHtml(post.url || '#')}" target="_blank" class="action-btn" title="View">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                            View
+                        </a>
+                        <button onclick="${options.onSaveClickName || 'addPostToBacklog'}(${post.id})" class="action-btn action-primary" title="Save">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                <polyline points="17 21 17 13 7 13 7 21"/>
+                                <polyline points="7 3 7 8 15 8"/>
+                            </svg>
+                            Save
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

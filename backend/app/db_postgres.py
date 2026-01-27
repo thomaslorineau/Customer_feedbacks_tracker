@@ -375,6 +375,12 @@ def pg_get_all_posts(limit: int = 1000, offset: int = 0,
     sort_col = sort_by if sort_by in valid_sort_cols else 'created_at'
     sort_dir = 'ASC' if sort_order.upper() == 'ASC' else 'DESC'
     
+    # Exclude false positives by default
+    if where_clause:
+        where_clause += " AND (is_false_positive = FALSE OR is_false_positive IS NULL)"
+    else:
+        where_clause = "(is_false_positive = FALSE OR is_false_positive IS NULL)"
+    
     query = f"""
         SELECT * FROM posts 
         WHERE {where_clause}
@@ -413,6 +419,8 @@ def pg_get_post_count(source: str = None, sentiment: str = None,
         params.append(language)
     
     where_clause = " AND ".join(conditions) if conditions else "1=1"
+    # Exclude false positives from count
+    where_clause += " AND (is_false_positive = FALSE OR is_false_positive IS NULL)"
     
     with get_pg_cursor() as cur:
         cur.execute(f"SELECT COUNT(*) as count FROM posts WHERE {where_clause}", params)
@@ -491,23 +499,25 @@ def pg_delete_hackernews_posts() -> int:
 # ============================================
 
 def pg_get_sentiment_stats() -> Dict[str, int]:
-    """Get sentiment distribution statistics."""
+    """Get sentiment distribution statistics (excluding false positives)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             SELECT sentiment_label, COUNT(*) as count 
             FROM posts 
             WHERE sentiment_label IS NOT NULL
+            AND (is_false_positive = FALSE OR is_false_positive IS NULL)
             GROUP BY sentiment_label
         """)
         return {row['sentiment_label']: row['count'] for row in cur.fetchall()}
 
 
 def pg_get_source_stats() -> Dict[str, int]:
-    """Get posts count per source."""
+    """Get posts count per source (excluding false positives)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             SELECT source, COUNT(*) as count 
             FROM posts 
+            WHERE (is_false_positive = FALSE OR is_false_positive IS NULL)
             GROUP BY source 
             ORDER BY count DESC
         """)
@@ -515,11 +525,12 @@ def pg_get_source_stats() -> Dict[str, int]:
 
 
 def pg_get_language_stats() -> Dict[str, int]:
-    """Get posts count per language."""
+    """Get posts count per language (excluding false positives)."""
     with get_pg_cursor() as cur:
         cur.execute("""
             SELECT language, COUNT(*) as count 
             FROM posts 
+            WHERE (is_false_positive = FALSE OR is_false_positive IS NULL)
             GROUP BY language 
             ORDER BY count DESC
         """)
@@ -527,13 +538,14 @@ def pg_get_language_stats() -> Dict[str, int]:
 
 
 def pg_get_timeline_stats(days: int = 30) -> List[Dict]:
-    """Get posts per day for timeline chart."""
+    """Get posts per day for timeline chart (excluding false positives)."""
     with get_pg_cursor() as cur:
         # Use make_interval() for proper parameterized interval
         cur.execute("""
             SELECT DATE(created_at) as date, COUNT(*) as count
             FROM posts
             WHERE created_at >= NOW() - make_interval(days => %s)
+            AND (is_false_positive = FALSE OR is_false_positive IS NULL)
             GROUP BY DATE(created_at)
             ORDER BY date
         """, (days,))
@@ -542,34 +554,31 @@ def pg_get_timeline_stats(days: int = 30) -> List[Dict]:
 
 
 def pg_get_answered_stats() -> Dict[str, Any]:
-    """Get statistics about answered vs unanswered posts."""
+    """Get statistics about answered vs unanswered posts (excluding false positives)."""
     with get_pg_cursor() as cur:
-        # Total posts
-        cur.execute("SELECT COUNT(*) as total FROM posts")
+        # Total posts (excluding false positives)
+        cur.execute("""
+            SELECT COUNT(*) as total 
+            FROM posts 
+            WHERE (is_false_positive = FALSE OR is_false_positive IS NULL)
+        """)
         total = cur.fetchone()['total']
         
-        # Answered posts (is_answered = 1, stored as INTEGER)
-        # Also check for NULL values which should be treated as unanswered
-        cur.execute("""
-            SELECT COUNT(*) as answered 
-            FROM posts 
-            WHERE is_answered = 1 OR is_answered IS NULL
-        """)
-        answered = cur.fetchone()['answered']
-        
-        # Actually, let's be more precise: only count posts where is_answered = 1 explicitly
+        # Answered posts (is_answered = 1, stored as INTEGER, excluding false positives)
         cur.execute("""
             SELECT COUNT(*) as answered 
             FROM posts 
             WHERE is_answered = 1
+            AND (is_false_positive = FALSE OR is_false_positive IS NULL)
         """)
         answered = cur.fetchone()['answered']
         
-        # Unanswered posts (is_answered = 0 OR NULL)
+        # Unanswered posts (is_answered = 0 OR NULL, excluding false positives)
         cur.execute("""
             SELECT COUNT(*) as unanswered 
             FROM posts 
-            WHERE is_answered = 0 OR is_answered IS NULL
+            WHERE (is_answered = 0 OR is_answered IS NULL)
+            AND (is_false_positive = FALSE OR is_false_positive IS NULL)
         """)
         unanswered = cur.fetchone()['unanswered']
         
@@ -1127,6 +1136,22 @@ def pg_finalize_job(job_id: str, status: str, error_message: str = None) -> bool
 finalize_job = pg_finalize_job
 
 # Answered status functions
+def pg_mark_false_positive(post_id: int, is_false_positive: bool) -> bool:
+    """Mark or unmark a post as false positive."""
+    with get_pg_cursor() as cur:
+        # First check if post exists
+        cur.execute("SELECT id FROM posts WHERE id = %s", (post_id,))
+        if not cur.fetchone():
+            return False
+        
+        # Update the is_false_positive flag
+        cur.execute(
+            "UPDATE posts SET is_false_positive = %s WHERE id = %s",
+            (is_false_positive, post_id)
+        )
+        return cur.rowcount > 0
+
+
 def pg_update_post_answered_status(post_id: int, answered: bool, method: str = 'manual') -> bool:
     """Update the answered status of a post."""
     with get_pg_cursor() as cur:
@@ -1348,6 +1373,7 @@ def pg_update_all_posts_answered_status_from_metadata() -> int:
 
 update_post_answered_status = pg_update_post_answered_status
 detect_and_update_answered_status = pg_detect_and_update_answered_status
+mark_false_positive = pg_mark_false_positive
 update_all_posts_answered_status_from_metadata = pg_update_all_posts_answered_status_from_metadata
 recheck_posts_answered_status = pg_recheck_posts_answered_status
 

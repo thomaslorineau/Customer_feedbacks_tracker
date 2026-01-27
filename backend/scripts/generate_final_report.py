@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from datetime import datetime
 from app.scraper import (
-    trustpilot, github, stackoverflow, reddit, news, mastodon, linkedin
+    trustpilot, github, stackoverflow, reddit, mastodon, linkedin
 )
 from app.scraper.circuit_breaker import get_all_circuit_breakers
 from app.scraper.http_client import close_http_client
@@ -27,7 +27,6 @@ async def generate_final_report():
         ("GitHub", github.scrape_github_issues_async, True),
         ("StackOverflow", stackoverflow.scrape_stackoverflow_async, True),
         ("Reddit", reddit.scrape_reddit_async, True),
-        ("Google News", news.scrape_google_news_async, True),
         ("Mastodon", mastodon.scrape_mastodon_async, True),
         ("LinkedIn", linkedin.scrape_linkedin_async, True),
         ("X/Twitter", None, False),  # Sync seulement (Selenium)
@@ -118,7 +117,6 @@ async def generate_final_report():
         ("POST /scrape/github", "✅ Async"),
         ("POST /scrape/stackoverflow", "✅ Async"),
         ("POST /scrape/reddit", "✅ Async"),
-        ("POST /scrape/news", "✅ Async"),
         ("POST /scrape/mastodon", "✅ Async"),
         ("POST /scrape/linkedin", "✅ Async"),
         ("POST /scrape/keywords", "✅ Async (asyncio.gather)"),

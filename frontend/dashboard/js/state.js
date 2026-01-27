@@ -60,6 +60,12 @@ export class State {
             );
             if (isSample) return false;
             
+            // Filter out false positives by default (unless explicitly included in filters)
+            const isFalsePositive = post.is_false_positive === true || post.is_false_positive === 1 || post.is_false_positive === '1';
+            if (isFalsePositive && !this.filters.includeFalsePositives) {
+                return false;
+            }
+            
             // Search filter
             if (this.filters.search) {
                 const searchLower = this.filters.search.toLowerCase();

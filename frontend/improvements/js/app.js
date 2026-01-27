@@ -1348,7 +1348,6 @@ function openImprovementInsightPostsDrawer(posts, title, description, insight) {
             'News': '📰',
             'GitHub': '🐙',
             'LinkedIn': '💼',
-            'Google News': '📰',
             'Stack Overflow': '💬',
             'Mastodon': '🐘'
         };
@@ -1849,7 +1848,6 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
             'OVH Forum': '💬',
             'Stack Overflow': '📚',
             'GitHub': '💻',
-            'Google News': '📰',
             'Mastodon': '🐘',
             'G2 Crowd': '⭐'
         };

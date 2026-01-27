@@ -10,7 +10,7 @@ import os
 import functools
 
 from ... import db
-from ...scraper import x_scraper, stackoverflow, news, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin, discord
+from ...scraper import x_scraper, stackoverflow, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin, discord
 from ...scraper import keyword_expander
 from ...analysis import sentiment, country_detection, relevance_scorer
 from ...config import keywords_base
@@ -142,7 +142,6 @@ async def _run_scrape_for_source_async(source: str, query: str, limit: int, use_
             'trustpilot': safe_scraper_wrapper(trustpilot.scrape_trustpilot_reviews_async, 'Trustpilot', is_async=True),
             'stackoverflow': safe_scraper_wrapper(stackoverflow.scrape_stackoverflow_async, 'StackOverflow', is_async=True),
             'reddit': safe_scraper_wrapper(reddit.scrape_reddit_async, 'Reddit', is_async=True),
-            'news': safe_scraper_wrapper(news.scrape_google_news_async, 'Google News', is_async=True),
             'mastodon': safe_scraper_wrapper(mastodon.scrape_mastodon_async, 'Mastodon', is_async=True),
             'linkedin': safe_scraper_wrapper(linkedin.scrape_linkedin_async, 'LinkedIn', is_async=True),
             'discord': safe_scraper_wrapper(discord.scrape_discord_async, 'Discord', is_async=True),
@@ -351,7 +350,6 @@ def _run_scrape_for_source_sync(source: str, query: str, limit: int, use_keyword
         'github': lambda q, l: github.scrape_github_issues(q, limit=l),
         'stackoverflow': lambda q, l: stackoverflow.scrape_stackoverflow(q, limit=l),
         'reddit': lambda q, l: reddit.scrape_reddit(q, limit=l),
-        'news': lambda q, l: news.scrape_google_news(q, limit=l),
         'trustpilot': lambda q, l: trustpilot.scrape_trustpilot_reviews(q, limit=l),
     }
     func = mapper.get(source)
