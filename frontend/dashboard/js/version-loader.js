@@ -3,6 +3,10 @@
 let API = null;
 let api = null;
 
+// Initialize version check variables before they're used
+let lastVersionCheck = 0;
+const VERSION_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 async function initAPI() {
     if (!api) {
         try {
@@ -79,8 +83,6 @@ if (document.readyState === 'loading') {
 
 // Auto-refresh version every 5 minutes (instead of 30 seconds to reduce log noise)
 let versionRefreshInterval = null;
-let lastVersionCheck = 0;
-const VERSION_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 function startVersionAutoRefresh() {
     // Clear existing interval if any
