@@ -753,8 +753,31 @@ function setupEventListeners() {
         if (state) {
             console.log('Filtering by source:', source);
             
-            // Set source filter
+            // Set source filter in state
             state.setFilter('source', source || '');
+            
+            // Update the posts source filter dropdown ONLY if user hasn't manually changed it
+            // Check if dropdown is still at default 'all' before updating
+            const postsSourceFilterEl = document.getElementById('postsSourceFilter');
+            if (postsSourceFilterEl) {
+                const currentValue = postsSourceFilterEl.value || 'all';
+                // Only update if dropdown is still at default or matches current state
+                if (currentValue === 'all' || currentValue === source || (!source && currentValue === 'all')) {
+                    if (source && source !== '') {
+                        // Check if source exists in dropdown options
+                        const optionExists = Array.from(postsSourceFilterEl.options).some(opt => 
+                            opt.value === source || opt.textContent.includes(source)
+                        );
+                        if (optionExists) {
+                            postsSourceFilterEl.value = source;
+                        }
+                    } else {
+                        // Clear filter - set to 'all'
+                        postsSourceFilterEl.value = 'all';
+                    }
+                }
+                // If user has manually changed dropdown, don't override it
+            }
             
             // Update dashboard
             updateDashboard();
@@ -1034,35 +1057,112 @@ function renderProductList(sortedProducts, remainingCount, allProducts, total, c
     // Calculate max count for relative scaling (makes bars longer)
     const maxCount = sortedProducts.length > 0 ? sortedProducts[0][1] : 1;
     
+    // Get active product filter (from dropdown or state)
+    const postsProductFilterEl = document.getElementById('postsProductFilter');
+    const dropdownProductFilter = postsProductFilterEl?.value || 'all';
+    const stateProductFilter = state?.filters?.product || 'all';
+    const activeProductFilter = (dropdownProductFilter !== 'all') ? dropdownProductFilter : 
+                                (stateProductFilter !== 'all') ? stateProductFilter : null;
+    
     productList.innerHTML = sortedProducts.map(([product, count], index) => {
         const percentage = total > 0 ? ((count / total) * 100).toFixed(0) : 0;
         // Use relative scaling based on max count for longer bars
         const relativeWidth = maxCount > 0 ? ((count / maxCount) * 100).toFixed(0) : 0;
+        
+        // Check if this product is currently filtered (fuzzy matching)
+        // Also check against product labels from getProductLabelSimple
+        let isFiltered = false;
+        if (activeProductFilter) {
+            const productLower = product.toLowerCase();
+            const filterLower = activeProductFilter.toLowerCase();
+            
+            // Exact match
+            if (productLower === filterLower) {
+                isFiltered = true;
+            }
+            // Partial match
+            else if (productLower.includes(filterLower) || filterLower.includes(productLower)) {
+                isFiltered = true;
+            }
+            // Check common variations
+            else {
+                const variations = {
+                    'domain': ['domain', 'domaine', 'dns'],
+                    'vps': ['vps', 'virtual private server'],
+                    'hosting': ['hosting', 'web hosting', 'hébergement'],
+                    'public cloud': ['public cloud', 'publiccloud', 'openstack'],
+                    'dedicated': ['dedicated', 'dedicated server', 'serveur dédié'],
+                    'email': ['email', 'mail', 'exchange']
+                };
+                const filterVariations = variations[filterLower] || [filterLower];
+                const productVariations = variations[productLower] || [productLower];
+                isFiltered = filterVariations.some(v => productVariations.includes(v) || productLower.includes(v));
+            }
+        }
+        
+        // Enhanced visual styling for filtered product
+        const filteredStyle = isFiltered ? `
+            border: 3px solid var(--accent-primary) !important;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2) 0%, rgba(0, 212, 255, 0.1) 100%) !important;
+            border-radius: 8px;
+            padding: 6px;
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+            transform: scale(1.02);
+            transition: all 0.2s ease;
+        ` : '';
+        
         return `
-            <div class="product-item" data-product="${product}">
-                <div class="product-color" style="background: ${colors[index % colors.length]}"></div>
+            <div class="product-item ${isFiltered ? 'product-item-filtered' : ''}" data-product="${product}" style="${filteredStyle}">
+                <div class="product-color" style="background: ${colors[index % colors.length]}${isFiltered ? '; box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);' : ''}"></div>
                 <div class="product-bar-container">
-                    <div class="product-bar" style="width: ${relativeWidth}%; background: ${colors[index % colors.length]}"></div>
+                    <div class="product-bar" style="width: ${relativeWidth}%; background: ${colors[index % colors.length]}${isFiltered ? '; box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);' : ''}"></div>
                 </div>
                 <div class="product-info">
-                    <span class="product-name">${product}</span>
-                    <span class="product-percentage">${percentage}%</span>
+                    <span class="product-name" style="${isFiltered ? 'font-weight: 700; color: var(--accent-primary);' : ''}">${product}${isFiltered ? ' ✓' : ''}</span>
+                    <span class="product-percentage" style="${isFiltered ? 'font-weight: 700; color: var(--accent-primary);' : ''}">${percentage}%</span>
                     <span class="product-count">${count} posts</span>
                 </div>
             </div>
         `;
     }).join('');
     
-    // Show active filter if any
-    const activeProductFilter = state && state.filters.product && state.filters.product !== 'all';
+    // Show active filter indicator at the top if any - make it more visible
     if (activeProductFilter) {
+        // Remove existing indicator first
+        const existingIndicator = productList.querySelector('.product-filter-indicator');
+        if (existingIndicator) existingIndicator.remove();
+        
         const filterIndicator = document.createElement('div');
-        filterIndicator.className = 'product-filter-active';
+        filterIndicator.className = 'product-filter-indicator';
+        filterIndicator.style.cssText = `
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 12px 16px; 
+            margin-bottom: 16px; 
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.25) 0%, rgba(0, 212, 255, 0.15) 100%); 
+            border-radius: 10px; 
+            border: 2px solid var(--accent-primary); 
+            font-size: 0.9em; 
+            font-weight: 700; 
+            color: var(--accent-primary);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.3);
+        `;
         filterIndicator.innerHTML = `
-            📦 ${state.filters.product}
-            <button onclick="clearProductFilter()" title="Clear filter">×</button>
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 1.2em;">📦</span>
+                <span>Filtre actif: <strong>${escapeHtml(String(activeProductFilter))}</strong></span>
+            </span>
+            <button onclick="clearProductFilter()" style="background: rgba(0, 212, 255, 0.2); border: 1px solid var(--accent-primary); color: var(--accent-primary); cursor: pointer; font-size: 1.1em; line-height: 1; padding: 4px 8px; border-radius: 6px; font-weight: 700; transition: all 0.2s ease;" 
+                    onmouseover="this.style.background='rgba(0, 212, 255, 0.3)'; this.style.transform='scale(1.1)'" 
+                    onmouseout="this.style.background='rgba(0, 212, 255, 0.2)'; this.style.transform='scale(1)'" 
+                    title="Clear filter">×</button>
         `;
         productList.insertBefore(filterIndicator, productList.firstChild);
+    } else {
+        // Remove indicator if no filter
+        const existingIndicator = productList.querySelector('.product-filter-indicator');
+        if (existingIndicator) existingIndicator.remove();
     }
     
     // Add event listeners to product items
@@ -1317,11 +1417,8 @@ function filterByProduct(product) {
     // Show visual indicator of active filter
     showProductFilterIndicator(product);
     
-    // Scroll to posts section
-    const postsSection = document.getElementById('postsSection');
-    if (postsSection) {
-        postsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    // DON'T scroll to posts section - user wants to stay on the chart
+    // Removed: postsSection.scrollIntoView()
     
     console.log('Filtered by product:', product);
 }
@@ -1331,7 +1428,20 @@ function showProductFilterIndicator(product) {
     const existingIndicator = document.getElementById('productFilterIndicator');
     if (existingIndicator) existingIndicator.remove();
     
-    if (!product || product === 'all') return;
+    // Handle boolean true/false - convert to string or skip
+    if (product === true) {
+        // If product is true, try to get the actual product name from state
+        if (state && state.filters && state.filters.product && state.filters.product !== 'all') {
+            product = state.filters.product;
+        } else {
+            return; // Can't display if we don't have a product name
+        }
+    }
+    
+    if (!product || product === 'all' || product === false) return;
+    
+    // Ensure product is a string
+    const productName = String(product);
     
     // Add indicator near posts section
     const postsHeader = document.querySelector('.posts-section-header h2');
@@ -1340,7 +1450,7 @@ function showProductFilterIndicator(product) {
         indicator.id = 'productFilterIndicator';
         indicator.style.cssText = 'display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; padding: 4px 12px; background: rgba(0, 212, 255, 0.15); border-radius: 20px; font-size: 0.75em; font-weight: 600; color: var(--accent-primary);';
         indicator.innerHTML = `
-            📦 ${product}
+            📦 ${escapeHtml(productName)}
             <button onclick="clearProductFilter()" style="background: none; border: none; color: var(--accent-primary); cursor: pointer; font-size: 1.2em; line-height: 1; padding: 0;" title="Clear filter">×</button>
         `;
         postsHeader.appendChild(indicator);
@@ -3243,22 +3353,21 @@ function updatePostsDisplay() {
     const globalSearch = state.filters?.search || '';
     
     // Sync local filters with global state filters if they exist
+    // BUT: For source filter, DON'T sync from state to dropdown - let dropdown control it completely
+    // This allows user to freely change the dropdown without it being overridden
     if (state.filters) {
-        // Sync sentiment filter
-        if (state.filters.sentiment && state.filters.sentiment !== 'all') {
+        // Sync sentiment filter - only if state has a different value AND dropdown hasn't been manually changed
+        const currentSentimentValue = document.getElementById('postsSentimentFilter')?.value || 'all';
+        if (state.filters.sentiment && state.filters.sentiment !== 'all' && currentSentimentValue === 'all') {
             const postsSentimentFilterEl = document.getElementById('postsSentimentFilter');
             if (postsSentimentFilterEl && postsSentimentFilterEl.value !== state.filters.sentiment) {
                 postsSentimentFilterEl.value = state.filters.sentiment;
             }
         }
         
-        // Sync source filter
-        if (state.filters.source) {
-            const postsSourceFilterEl = document.getElementById('postsSourceFilter');
-            if (postsSourceFilterEl && postsSourceFilterEl.value !== state.filters.source) {
-                postsSourceFilterEl.value = state.filters.source;
-            }
-        }
+        // DON'T sync source filter from state to dropdown - dropdown controls the filter completely
+        // User can freely change it, and state will be updated to match dropdown below
+        // This prevents the dropdown from being overridden when user changes it manually
         
         // Sync language filter
         if (state.filters.language && state.filters.language !== 'all') {
@@ -3319,8 +3428,11 @@ function updatePostsDisplay() {
         if (state.filters.sentiment !== finalSentimentFilter) {
             state.setFilter('sentiment', finalSentimentFilter, false);
         }
-        // Only set source filter if it's not empty and not 'all'
+        // Sync source filter - allow user to change it freely
+        // Normalize: 'all' means no filter (empty string)
         const normalizedSourceFilter = finalSourceFilter === 'all' ? '' : finalSourceFilter;
+        // Always update state to match dropdown (user's choice takes priority)
+        // This ensures that when user selects 'all', the state filter is cleared
         if (state.filters.source !== normalizedSourceFilter) {
             state.setFilter('source', normalizedSourceFilter, false);
         }
@@ -3402,29 +3514,35 @@ function updatePostsDisplay() {
         let matchesProduct = true;
         const stateProductFilter = state.filters?.product;
         
-        // If dropdown has a specific value, use patterns
-        if (finalProductFilter && finalProductFilter !== 'all' && ovhProductPatterns[finalProductFilter]) {
-            matchesProduct = ovhProductPatterns[finalProductFilter].test(post.content || '');
-        }
-        // If state has a product filter (from Distribution panel click), use keyword matching
-        else if (stateProductFilter && stateProductFilter !== 'all' && stateProductFilter !== finalProductFilter) {
-            const content = (post.content || '').toLowerCase();
-            const productLower = stateProductFilter.toLowerCase();
-            // Keywords for common products from Distribution panel
-            const distributionKeywords = {
-                'vps': ['vps', 'virtual private server'],
-                'hosting': ['hosting', 'web hosting', 'hébergement'],
-                'domain': ['domain', 'domaine', 'dns', 'registrar'],
-                'public cloud': ['public cloud', 'openstack', 'horizon'],
-                'dedicated server': ['dedicated', 'serveur dédié', 'bare metal'],
-                'email': ['email', 'mail', 'exchange', 'smtp'],
-                'storage': ['storage', 'stockage', 's3', 'object storage'],
-                'cdn': ['cdn', 'content delivery'],
-                'kubernetes': ['kubernetes', 'k8s'],
-                'database': ['database', 'mysql', 'postgresql', 'mongodb']
-            };
-            const keywords = distributionKeywords[productLower] || [productLower];
-            matchesProduct = keywords.some(kw => content.includes(kw));
+        // Determine which product filter to use (dropdown takes priority if set, otherwise use state)
+        const activeProductFilter = (finalProductFilter && finalProductFilter !== 'all') ? finalProductFilter : 
+                                    (stateProductFilter && stateProductFilter !== 'all') ? stateProductFilter : null;
+        
+        if (activeProductFilter) {
+            // First try pattern matching (for dropdown values)
+            if (ovhProductPatterns[activeProductFilter]) {
+                matchesProduct = ovhProductPatterns[activeProductFilter].test(post.content || '');
+            } else {
+                // Fallback to keyword matching (for Distribution panel values)
+                const content = (post.content || '').toLowerCase();
+                const productLower = activeProductFilter.toLowerCase();
+                // Extended keywords for common products from Distribution panel
+                const distributionKeywords = {
+                    'vps': ['vps', 'virtual private server'],
+                    'hosting': ['hosting', 'web hosting', 'hébergement'],
+                    'domain': ['domain', 'domaine', 'dns', 'registrar'],
+                    'public cloud': ['public cloud', 'openstack', 'horizon'],
+                    'dedicated': ['dedicated', 'dedicated server', 'serveur dédié', 'bare metal'],
+                    'dedicated server': ['dedicated', 'dedicated server', 'serveur dédié', 'bare metal'],
+                    'email': ['email', 'mail', 'exchange', 'smtp'],
+                    'storage': ['storage', 'stockage', 's3', 'object storage'],
+                    'cdn': ['cdn', 'content delivery'],
+                    'kubernetes': ['kubernetes', 'k8s'],
+                    'database': ['database', 'mysql', 'postgresql', 'mongodb']
+                };
+                const keywords = distributionKeywords[productLower] || [productLower];
+                matchesProduct = keywords.some(kw => content.includes(kw));
+            }
         }
 
         return matchesSource && matchesSentiment && matchesLanguage && matchesAnswered && matchesDate && matchesProduct;
