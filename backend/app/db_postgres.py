@@ -710,9 +710,15 @@ def pg_create_job_record(job_id: str, job_type: str = 'scrape_source', payload: 
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
             """, (job_id, job_type, Json(payload or {}), status, 0))
-            return cur.rowcount > 0
+            inserted = cur.rowcount > 0
+            if not inserted:
+                # Job already exists, that's OK
+                logger.debug(f"Job {job_id[:8]} already exists in DB")
+            else:
+                logger.info(f"Created job record {job_id[:8]} in DB")
+            return True  # Return True even if already exists (idempotent)
         except Exception as e:
-            logger.warning(f"Failed to create job record {job_id[:8]}: {e}")
+            logger.error(f"Failed to create job record {job_id[:8]}: {e}", exc_info=True)
             return False
 
 def pg_enqueue_job(job_type: str, payload: Dict, priority: int = 0,
@@ -1130,10 +1136,19 @@ get_scraping_logs = pg_get_scraping_logs
 create_job_record = pg_create_job_record
 def get_job_record(job_id: str) -> Optional[Dict]:
     """Get a job by ID."""
-    with get_pg_cursor() as cur:
-        cur.execute("SELECT * FROM jobs WHERE id = %s", (job_id,))
-        row = cur.fetchone()
-        return dict(row) if row else None
+    try:
+        with get_pg_cursor() as cur:
+            cur.execute("SELECT * FROM jobs WHERE id = %s", (job_id,))
+            row = cur.fetchone()
+            if row:
+                # RealDictCursor already returns dict-like object, but ensure it's a proper dict
+                if hasattr(row, 'keys'):
+                    return dict(row)
+                return row
+            return None
+    except Exception as e:
+        logger.error(f"Error retrieving job {job_id[:8]} from DB: {e}", exc_info=True)
+        return None
 
 update_job_progress = pg_update_job_status
 get_all_jobs = pg_get_pending_jobs
