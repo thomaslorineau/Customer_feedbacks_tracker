@@ -159,8 +159,14 @@ export async function updateWhatsHappening(state) {
                 console.log('[whats-happening.js] Calling LLM API for insights...');
                 const response = await apiInstance.getWhatsHappeningInsights(posts, statsForLLM, activeFiltersDescription, analysisFocus);
                 insights = response.insights || [];
-                llmAvailable = response.llm_available !== false;
+                llmAvailable = true; // Toujours true car pas de fallback
                 console.log('[whats-happening.js] LLM API response received, insights:', insights.length);
+                
+                // Si le LLM retourne 0 insights, c'est une erreur (pas de fallback)
+                if (insights.length === 0 && posts.length > 0) {
+                    throw new Error('LLM analysis returned no insights. Please try again or check your LLM configuration.');
+                }
+                
                 analysisCompleted = true;
             } else {
                 throw new Error('Method not available in API class');
@@ -210,6 +216,11 @@ export async function updateWhatsHappening(state) {
             }
             
             if (!response.ok) {
+                // Si erreur 503, c'est que LLM n'est pas disponible
+                if (response.status === 503) {
+                    const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+                    throw new Error(errorData.detail || 'LLM analysis unavailable');
+                }
                 throw new Error(`Failed to get What's Happening insights: ${response.statusText}`);
             }
             
@@ -218,35 +229,18 @@ export async function updateWhatsHappening(state) {
             llmAvailable = data.llm_available !== false;
             console.log('[whats-happening.js] LLM API response received, insights:', insights.length);
             
-            // Si le LLM retourne 0 insights, utiliser le fallback côté backend
-            // Le backend devrait toujours retourner au moins un insight via le fallback
+            // Si le LLM retourne 0 insights, c'est une erreur (pas de fallback)
             if (insights.length === 0 && posts.length > 0) {
-                console.warn('[whats-happening.js] LLM returned 0 insights, backend should have used fallback');
-                // Le backend devrait avoir généré un fallback, mais si ce n'est pas le cas,
-                // on génère un insight basique côté frontend
-                const total = posts.length;
-                const positive = posts.filter(p => p.sentiment_label === 'positive').length;
-                const negative = posts.filter(p => p.sentiment_label === 'negative').length;
-                const neutral = posts.filter(p => p.sentiment_label === 'neutral' || !p.sentiment_label).length;
-                
-                insights = [{
-                    type: 'trend',
-                    title: `Analysis of ${total} posts${activeFiltersDescription && activeFiltersDescription !== 'All posts (no filters)' ? ` (${activeFiltersDescription})` : ''}`,
-                    description: `Analyzed ${total} posts (${positive} positive, ${negative} negative, ${neutral} neutral).`,
-                    icon: '📊',
-                    metric: '',
-                    count: total
-                }];
+                throw new Error('LLM analysis returned no insights. Please try again or check your LLM configuration.');
             }
             
             analysisCompleted = true;
         }
     } catch (error) {
-        console.warn('[whats-happening.js] Failed to get LLM insights:', error);
+        console.error('[whats-happening.js] Failed to get LLM insights:', error);
         // Mark analysis as completed even on error so overlay hides
         analysisCompleted = true;
-        // Refresh button is always visible - no need to show/hide it
-        // Show error message with retry option instead of fallback
+        // Show error message - no fallback, just error
         const content = document.getElementById('whatsHappeningContent');
         if (content) {
             // Hide overlay after showing error message
@@ -258,25 +252,33 @@ export async function updateWhatsHappening(state) {
                     console.log('[whats-happening.js] Overlay hidden after error');
                 }
             }, 500);
+            
             // Check if it's a timeout error
             const isTimeout = error.message && (error.message.includes('timeout') || error.message.includes('Timeout'));
-            const errorMessage = isTimeout 
-                ? `LLM analysis timed out after 2.5 minutes. This can happen when multiple LLMs are configured and the synthesis takes too long. Please try again or consider using a single LLM provider.`
-                : `AI-powered analysis failed. ${error.message || 'Please check your LLM API keys in Settings.'}`;
+            // Check if it's a 503 error (LLM unavailable)
+            const isUnavailable = error.message && (error.message.includes('unavailable') || error.message.includes('No API keys'));
+            
+            const errorTitle = isTimeout 
+                ? 'LLM Analysis Timeout' 
+                : isUnavailable 
+                    ? 'LLM Analysis Unavailable'
+                    : 'LLM Analysis Failed';
+            
+            const errorMessage = error.message || 'Please check your LLM API keys in Settings.';
             
             content.innerHTML = `
-                <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ ${isTimeout ? 'LLM Analysis Timeout' : 'LLM Analysis Unavailable'}</h3>
+                <div style="text-align: center; padding: 20px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 2px solid #ef4444; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 12px 0; color: #dc2626;">❌ ${errorTitle}</h3>
                     <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
                         ${errorMessage}
                     </p>
-                    ${!isTimeout ? `
+                    ${isUnavailable ? `
                     <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
-                        Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights.
+                        Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline; font-weight: 500;">Settings</a> to enable AI-powered insights.
                     </p>
                     ` : ''}
-                    <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
-                        ${isTimeout ? 'Tip: With 3 LLMs configured, the synthesis process can take longer. Consider using 1-2 LLMs for faster results.' : 'Without LLM, only basic statistics are available (not dynamic insights).'}
+                    <p style="margin: 0 0 16px 0; font-size: 0.9em; color: var(--text-muted);">
+                        ${isTimeout ? 'Tip: With multiple LLMs configured, the synthesis process can take longer. Consider using 1-2 LLMs for faster results.' : 'AI analysis is required to generate insights. No fallback statistics will be displayed.'}
                     </p>
                     <button onclick="refreshWhatsHappening()" class="btn-refresh-analysis" style="margin-top: 16px; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500;">
                         🔄 Retry Analysis
@@ -284,17 +286,8 @@ export async function updateWhatsHappening(state) {
                 </div>
             `;
         }
-        // Still show spike detection if available (basic detection)
-        if (spikeDetected) {
-            insights.push({
-                type: 'spike',
-                title: 'Spike in Negative Feedback Detected',
-                description: `${spikePercentage > 0 ? `+${spikePercentage}%` : 'Significant'} more than average. ${recentNegative} negative posts in past 48h.`,
-                icon: '⚠️',
-                metric: spikePercentage > 0 ? `+${spikePercentage}%` : '',
-                count: recentNegative
-            });
-        }
+        // Pas de fallback - si erreur, on affiche juste l'erreur
+        return;
     } finally {
         // Clear the safety timeout - overlay will be hidden after displaying results
         clearTimeout(overlayTimeout);
@@ -527,33 +520,7 @@ export async function updateWhatsHappening(state) {
     
     console.log('[whats-happening.js] Content element found, updating with', insights.length, 'insights', 'llm_available:', llmAvailable);
     
-    // Vérifier si l'analyse vient du LLM ou du fallback
-    if (llmAvailable === false) {
-        console.warn('[whats-happening.js] Analysis is using fallback (hardcoded data), not LLM');
-        // Afficher un message d'avertissement au lieu des insights en dur
-        content.innerHTML = `
-            <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
-                <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ LLM Analysis Unavailable</h3>
-                <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
-                    AI-powered analysis requires an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights based on your feedback analysis.
-                </p>
-                <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
-                    Without LLM, only basic statistics are available (not dynamic insights).
-                </p>
-            </div>
-        `;
-        // IMPORTANT: Hide overlay even when LLM is unavailable
-        setTimeout(() => {
-            if (overlay) {
-                overlay.style.setProperty('display', 'none', 'important');
-                overlay.style.setProperty('visibility', 'hidden', 'important');
-                overlay.style.setProperty('opacity', '0', 'important');
-                console.log('[whats-happening.js] Overlay hidden (LLM unavailable case)');
-            }
-        }, 500);
-        // Ne pas afficher les insights du fallback (données en dur)
-        return;
-    }
+    // Plus de vérification de fallback - si on arrive ici, c'est que le LLM a fonctionné
     
     let contentHTML = '';
     

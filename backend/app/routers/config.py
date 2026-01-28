@@ -559,10 +559,18 @@ async def set_llm_config(
     mistral_key = pg_get_config('MISTRAL_API_KEY')
     llm_provider = pg_get_config('LLM_PROVIDER') or 'openai'
     
+    # Normaliser les chaînes vides en None
+    if openai_key == '':
+        openai_key = None
+    if anthropic_key == '':
+        anthropic_key = None
+    if mistral_key == '':
+        mistral_key = None
+    
     # Log what we're returning to help diagnose persistence issues
-    logger.info(f"Returning LLM config - OpenAI: {'set' if openai_key else 'not set'}, "
-                f"Anthropic: {'set' if anthropic_key else 'not set'}, "
-                f"Mistral: {'set' if mistral_key else 'not set'}")
+    logger.info(f"Returning LLM config - OpenAI: {'set' if openai_key else 'not set'} (length: {len(openai_key) if openai_key else 0}), "
+                f"Anthropic: {'set' if anthropic_key else 'not set'} (length: {len(anthropic_key) if anthropic_key else 0}), "
+                f"Mistral: {'set' if mistral_key else 'not set'} (length: {len(mistral_key) if mistral_key else 0})")
     
     return LLMConfigResponse(
         provider=llm_provider,
@@ -593,7 +601,20 @@ async def set_api_key(
         raise HTTPException(status_code=400, detail="Provider is required")
     
     if keys and isinstance(keys, dict):
-        if not keys:
+        # Pour Discord, vérifier si au moins une clé est fournie OU si Discord est déjà configuré
+        if provider == 'discord':
+            has_any_value = any(v and v.strip() for v in keys.values())
+            if not has_any_value:
+                # Si toutes les valeurs sont vides, vérifier si Discord est déjà configuré
+                # Si oui, permettre la sauvegarde (les valeurs existantes seront conservées)
+                discord_bot_token = pg_get_config('DISCORD_BOT_TOKEN')
+                discord_guild_id = pg_get_config('DISCORD_GUILD_ID')
+                if discord_bot_token or discord_guild_id:
+                    logger.info("Discord already configured, allowing save with empty values (will keep existing)")
+                else:
+                    # Discord n'est pas configuré et toutes les valeurs sont vides
+                    raise HTTPException(status_code=400, detail="At least one Discord key is required (Bot Token or Guild ID)")
+        elif not keys:
             raise HTTPException(status_code=400, detail="At least one key is required")
     elif key:
         keys = {provider: key}
@@ -613,7 +634,39 @@ async def set_api_key(
                 logger.error(f"❌ Failed to save {key_name} to database: {e}")
                 raise HTTPException(status_code=500, detail=f"Failed to save {key_name}: {str(e)}")
         else:
-            # Supprimer si valeur vide
+            # Si la valeur est vide, vérifier si elle existe déjà dans la base de données
+            # Si elle existe, ne pas la supprimer (l'utilisateur n'a peut-être pas modifié ce champ)
+            existing_value = pg_get_config(key_name)
+            if existing_value:
+                logger.info(f"⚠️ Skipping deletion of {key_name} because it exists in database and was not explicitly cleared")
+                continue
+            
+            # Pour Discord, ne pas supprimer automatiquement si l'autre clé existe
+            # L'utilisateur doit explicitement vider les deux champs pour supprimer
+            if provider == 'discord':
+                # Vérifier si l'autre clé Discord existe encore dans la requête
+                if key_name == 'DISCORD_BOT_TOKEN':
+                    other_key = keys.get('DISCORD_GUILD_ID', '')
+                    if other_key and other_key.strip():
+                        logger.info(f"⚠️ Skipping deletion of {key_name} because Guild ID is still set")
+                        continue
+                    # Vérifier aussi dans la base de données
+                    other_key_db = pg_get_config('DISCORD_GUILD_ID')
+                    if other_key_db:
+                        logger.info(f"⚠️ Skipping deletion of {key_name} because Guild ID exists in database")
+                        continue
+                elif key_name == 'DISCORD_GUILD_ID':
+                    other_key = keys.get('DISCORD_BOT_TOKEN', '')
+                    if other_key and other_key.strip():
+                        logger.info(f"⚠️ Skipping deletion of {key_name} because Bot Token is still set")
+                        continue
+                    # Vérifier aussi dans la base de données
+                    other_key_db = pg_get_config('DISCORD_BOT_TOKEN')
+                    if other_key_db:
+                        logger.info(f"⚠️ Skipping deletion of {key_name} because Bot Token exists in database")
+                        continue
+            
+            # Supprimer seulement si vraiment vide et pas de conflit
             try:
                 pg_delete_config(key_name)
                 if key_name in os.environ:

@@ -36,13 +36,25 @@ def get_llm_api_keys():
     try:
         from ...database import pg_get_config
         
-        # Récupérer depuis la base de données en premier
+        # Récupérer depuis la base de données en premier (source de vérité)
+        # Ne pas utiliser les variables d'environnement comme fallback car elles peuvent être obsolètes
         openai_key = pg_get_config('OPENAI_API_KEY')
         anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
         mistral_key = pg_get_config('MISTRAL_API_KEY')
         llm_provider = pg_get_config('LLM_PROVIDER')
         
-        # Fallback sur les variables d'environnement si pas en base
+        # Normaliser les valeurs : convertir les chaînes vides en None
+        if openai_key == '':
+            openai_key = None
+        if anthropic_key == '':
+            anthropic_key = None
+        if mistral_key == '':
+            mistral_key = None
+        if llm_provider == '':
+            llm_provider = None
+        
+        # Fallback sur les variables d'environnement UNIQUEMENT si vraiment pas en base (None)
+        # Mais ce fallback ne devrait normalement jamais être utilisé car les clés sont en base
         if not openai_key:
             openai_key = os.getenv('OPENAI_API_KEY')
         if not anthropic_key:
@@ -57,6 +69,8 @@ def get_llm_api_keys():
             llm_provider = llm_provider.lower()
         else:
             llm_provider = 'openai'
+        
+        logger.debug(f"get_llm_api_keys: OpenAI={bool(openai_key)}, Anthropic={bool(anthropic_key)}, Mistral={bool(mistral_key)}, Provider={llm_provider}")
             
         return openai_key, anthropic_key, mistral_key, llm_provider
     except Exception as e:
@@ -957,8 +971,11 @@ CRITICAL INSTRUCTIONS:
     logger.info(f"generate_whats_happening_insights_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
     
     if not openai_key and not anthropic_key and not mistral_key:
-        logger.warning("generate_whats_happening_insights_with_llm: No API keys available, using fallback")
-        return generate_whats_happening_fallback(posts, stats, active_filters), True
+        logger.error("generate_whats_happening_insights_with_llm: No API keys available, raising HTTPException")
+        raise HTTPException(
+            status_code=503,
+            detail="LLM analysis unavailable: No API keys configured. Please configure at least one LLM API key (OpenAI, Anthropic, or Mistral) in Settings to enable AI-powered insights."
+        )
     
     # Helper function to call LLM
     async def call_llm_for_insights(provider: str, api_key: str, prompt: str) -> Optional[str]:
@@ -1034,14 +1051,28 @@ CRITICAL INSTRUCTIONS:
                     logger.info(f"Mistral API call successful, content length: {len(content)}")
                     return content
         except httpx.HTTPStatusError as e:
-            logger.error(f"{provider} API HTTP error: {e.response.status_code} - {e.response.text[:200]}")
-            return None
+            error_text = e.response.text[:500] if hasattr(e.response, 'text') else str(e)
+            logger.error(f"{provider} API HTTP error: {e.response.status_code} - {error_text}")
+            # Propager l'erreur HTTP spécifique au lieu de retourner None
+            raise HTTPException(
+                status_code=503,
+                detail=f"{provider} API error ({e.response.status_code}): {error_text}. Please check your API key."
+            )
         except httpx.TimeoutException as e:
             logger.error(f"{provider} API timeout error: {e}")
-            return None
+            raise HTTPException(
+                status_code=503,
+                detail=f"{provider} API timeout: The request took too long. Please try again."
+            )
+        except HTTPException:
+            # Re-raise HTTP exceptions
+            raise
         except Exception as e:
             logger.error(f"{provider} API error: {type(e).__name__}: {e}", exc_info=True)
-            return None
+            raise HTTPException(
+                status_code=503,
+                detail=f"{provider} API error: {str(e)}. Please check your API key and try again."
+            )
     
     # If 2 or more LLMs are configured (and no specific provider is set), call them in parallel and summarize
     configured_llms = []
@@ -1169,8 +1200,8 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
         provider_to_use = None
         api_key_to_use = None
         
+        # Si un provider spécifique est défini, vérifier s'il a une clé disponible
         if llm_provider:
-            # Si un provider spécifique est défini, l'utiliser
             if llm_provider == 'openai' and openai_key:
                 provider_to_use = 'openai'
                 api_key_to_use = openai_key
@@ -1180,6 +1211,18 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
             elif llm_provider == 'mistral' and mistral_key:
                 provider_to_use = 'mistral'
                 api_key_to_use = mistral_key
+            else:
+                # Le provider spécifié n'a pas de clé, utiliser le premier disponible
+                logger.warning(f"LLM provider '{llm_provider}' specified but no key available, using first available LLM")
+                if openai_key:
+                    provider_to_use = 'openai'
+                    api_key_to_use = openai_key
+                elif anthropic_key:
+                    provider_to_use = 'anthropic'
+                    api_key_to_use = anthropic_key
+                elif mistral_key:
+                    provider_to_use = 'mistral'
+                    api_key_to_use = mistral_key
         else:
             # Sinon, utiliser le premier disponible (priorité: OpenAI > Anthropic > Mistral)
             if openai_key:
@@ -1193,7 +1236,7 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                 api_key_to_use = mistral_key
         
         if provider_to_use and api_key_to_use:
-            logger.info(f"Using single LLM: {provider_to_use} (key length: {len(api_key_to_use)})")
+            logger.info(f"Using single LLM: {provider_to_use} (key length: {len(api_key_to_use)}, key starts with: {api_key_to_use[:10] if len(api_key_to_use) > 10 else 'short'})")
             try:
                 content = await call_llm_for_insights(provider_to_use, api_key_to_use, prompt)
                 logger.info(f"LLM call completed, content received: {bool(content)}, content length: {len(content) if content else 0}")
@@ -1211,20 +1254,50 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                                 logger.warning(f"{provider_to_use} returned empty insights array")
                         except (json.JSONDecodeError, KeyError, TypeError) as e:
                             logger.error(f"Error parsing {provider_to_use} response: {e}. Content: {content[:500]}")
+                            raise HTTPException(
+                                status_code=503,
+                                detail=f"LLM analysis failed: Invalid response format from {provider_to_use}. Please try again."
+                            )
                     else:
                         logger.warning(f"No JSON array found in {provider_to_use} response. Content length: {len(content)}, first 500 chars: {content[:500]}")
+                        raise HTTPException(
+                            status_code=503,
+                            detail=f"LLM analysis failed: {provider_to_use} did not return valid JSON. Please check your API key and try again."
+                        )
                 else:
-                    logger.warning(f"{provider_to_use} returned None or empty content")
+                    logger.error(f"{provider_to_use} returned None or empty content")
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"LLM analysis failed: {provider_to_use} returned no content. Please check your API key and try again."
+                    )
+            except HTTPException:
+                # Re-raise HTTP exceptions (from call_llm_for_insights or parsing errors)
+                raise
             except Exception as e:
                 logger.error(f"Exception during LLM call to {provider_to_use}: {type(e).__name__}: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"{provider_to_use} API error: {str(e)}. Please check your API key and try again."
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"LLM analysis failed: {provider_to_use} API error: {str(e)}. Please check your API key and try again."
+                )
         else:
-            logger.warning(f"No LLM provider selected. provider_to_use: {provider_to_use}, api_key_to_use: {bool(api_key_to_use)}")
-        
-        logger.warning("No valid LLM response received, using fallback")
-        return generate_whats_happening_fallback(posts, stats, active_filters), True
+            logger.error(f"No LLM provider selected. provider_to_use: {provider_to_use}, api_key_to_use: {bool(api_key_to_use)}, openai_key: {bool(openai_key)}, anthropic_key: {bool(anthropic_key)}, mistral_key: {bool(mistral_key)}")
+            raise HTTPException(
+                status_code=503,
+                detail="LLM analysis failed: No LLM provider available. Please configure at least one LLM API key in Settings."
+            )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like the one above for no API keys)
+        raise
     except Exception as e:
-        logger.error(f"LLM API error: {type(e).__name__}: {e}. Using fallback.", exc_info=True)
-        return generate_whats_happening_fallback(posts, stats, active_filters), True
+        logger.error(f"LLM API error: {type(e).__name__}: {e}. Raising HTTPException.", exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail=f"LLM analysis failed: {str(e)}. Please check your API keys and try again."
+        )
 
 
 def generate_whats_happening_fallback(
@@ -1306,39 +1379,59 @@ async def get_whats_happening(request: WhatsHappeningRequest):
     start_time = time.time()
     try:
         # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
-        api_key = openai_key or anthropic_key or mistral_key
-        # LLM est disponible si au moins une clé API est configurée
-        # Le provider peut être None/empty, dans ce cas on utilisera le premier disponible
-        llm_available = bool(api_key)
+        try:
+            openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        except Exception as e:
+            logger.error(f"Error getting LLM API keys: {type(e).__name__}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=503,
+                detail="LLM analysis unavailable: Error retrieving API keys. Please check your configuration."
+            )
         
-        logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
+        api_key = openai_key or anthropic_key or mistral_key
+        
+        # Si pas de clés API, on lève une exception (pas de fallback)
+        if not api_key:
+            logger.error("get_whats_happening: No LLM API keys configured, raising HTTPException")
+            raise HTTPException(
+                status_code=503,
+                detail="LLM analysis unavailable: No API keys configured. Please configure at least one LLM API key (OpenAI, Anthropic, or Mistral) in Settings to enable AI-powered insights."
+            )
+        
+        logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
         logger.info(f"get_whats_happening: OpenAI key length: {len(openai_key) if openai_key else 0}, Anthropic key length: {len(anthropic_key) if anthropic_key else 0}, Mistral key length: {len(mistral_key) if mistral_key else 0}")
         logger.info(f"get_whats_happening: Starting LLM analysis for {len(request.posts)} posts")
         
-        insights, used_fallback = await generate_whats_happening_insights_with_llm(
-            request.posts,
-            request.stats,
-            request.active_filters,
-            request.analysis_focus or ""
-        )
+        # Cette fonction peut lever une HTTPException si pas de clés API ou si les appels LLM échouent
+        try:
+            insights, _ = await generate_whats_happening_insights_with_llm(
+                request.posts,
+                request.stats,
+                request.active_filters,
+                request.analysis_focus or ""
+            )
+        except HTTPException:
+            # Re-raise HTTPException (like 503 for no API keys) without modification
+            raise
+        except Exception as e:
+            logger.error(f"Error in generate_whats_happening_insights_with_llm: {type(e).__name__}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=503,
+                detail=f"LLM analysis failed: {str(e)}. Please check your API keys and try again."
+            )
         
         elapsed_time = time.time() - start_time
-        logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights, used_fallback={used_fallback}")
+        logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights")
+        logger.info(f"get_whats_happening: Insight titles: {[insight.title for insight in insights]}")
         
-        # Si le fallback a été utilisé explicitement, mettre llm_available à False
-        if used_fallback:
-            logger.warning(f"get_whats_happening: Fallback was used explicitly, setting llm_available=False")
-            llm_available = False
-        elif llm_available:
-            # Si on a des clés API et que le fallback n'a pas été utilisé, c'est du LLM
-            logger.info(f"get_whats_happening: LLM was used successfully (used_fallback=False), keeping llm_available=True")
-            logger.info(f"get_whats_happening: Insight titles: {[insight.title for insight in insights]}")
-        
-        logger.info(f"get_whats_happening: Returning response with {len(insights)} insights, llm_available={llm_available}")
-        return WhatsHappeningResponse(insights=insights, llm_available=llm_available)
+        # Toujours True car on a vérifié qu'il y a des clés API au début et pas de fallback
+        logger.info(f"get_whats_happening: Returning response with {len(insights)} insights, llm_available=True")
+        return WhatsHappeningResponse(insights=insights, llm_available=True)
+    except HTTPException:
+        # Re-raise HTTPException (like 503 for no API keys) without modification
+        raise
     except Exception as e:
-        logger.error(f"Failed to generate What's Happening insights: {e}", exc_info=True)
+        logger.error(f"Failed to generate What's Happening insights: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate insights: {str(e)}")
 
 
@@ -1966,6 +2059,7 @@ Format your response as a JSON object with this structure:
     try:
         # Try to use configured provider or any available
         content = None
+        # Si un provider spécifique est défini, vérifier s'il a une clé disponible
         if llm_provider == 'anthropic' and anthropic_key:
             content = await call_llm('anthropic', anthropic_key, prompt)
         elif llm_provider == 'mistral' and mistral_key:
@@ -1973,7 +2067,10 @@ Format your response as a JSON object with this structure:
         elif llm_provider == 'openai' and openai_key:
             content = await call_llm('openai', openai_key, prompt)
         else:
-            # Try any available (prefer OpenAI, then Anthropic, then Mistral)
+            # Le provider spécifié n'a pas de clé, ou aucun provider spécifié
+            # Utiliser le premier disponible (priorité: OpenAI > Anthropic > Mistral)
+            if llm_provider and not content:
+                logger.warning(f"[Improvements Analysis] LLM provider '{llm_provider}' specified but no key available, using first available LLM")
             if openai_key:
                 content = await call_llm('openai', openai_key, prompt)
             elif anthropic_key:
