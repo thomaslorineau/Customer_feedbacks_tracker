@@ -6,6 +6,7 @@ console.log('API_BASE_URL:', API_BASE_URL);
 
 // State
 let configData = null;
+let ovhModelsCache = null; // Cache for OVH models
 
 // Load and display version
 let versionData = null;
@@ -183,6 +184,10 @@ async function loadConfiguration() {
         
         configData = await response.json();
         console.log('Configuration loaded:', configData);
+        
+        // Load OVH models dynamically if OVH is configured
+        await loadOVHModels();
+        
         renderLLM();
         renderScrapersAPIKeys();
         renderRateLimiting();
@@ -292,6 +297,52 @@ function updateThemeToggle() {
     }
 }
 
+// Load OVH Models Dynamically
+async function loadOVHModels() {
+    // Check if OVH is configured
+    const ovhKeyData = configData?.api_keys?.ovh;
+    if (!ovhKeyData || !ovhKeyData.configured) {
+        console.log('[loadOVHModels] OVH not configured, skipping model fetch');
+        ovhModelsCache = null;
+        return;
+    }
+    
+    try {
+        console.log('[loadOVHModels] Fetching available models from OVH endpoint...');
+        const response = await fetch(`${API_BASE_URL}/api/ovh/models?t=${Date.now()}`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Failed to fetch OVH models: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            console.warn('[loadOVHModels] Error fetching OVH models:', data.error);
+            ovhModelsCache = null;
+            return;
+        }
+        
+        if (data.models && data.models.length > 0) {
+            ovhModelsCache = data.models;
+            console.log(`[loadOVHModels] Successfully loaded ${data.models.length} models:`, data.models);
+        } else {
+            console.warn('[loadOVHModels] No models found in response');
+            ovhModelsCache = null;
+        }
+    } catch (error) {
+        console.error('[loadOVHModels] Error loading OVH models:', error);
+        ovhModelsCache = null;
+        // Don't show error to user - fallback to static list
+    }
+}
+
 // Render LLM Section
 function renderLLM() {
     const container = document.getElementById('llmContainer');
@@ -308,6 +359,27 @@ function renderLLM() {
     }
     
     const llmProviders = [
+        { 
+            id: 'ovh', 
+            name: 'OVH AI Endpoints', 
+            icon: '☁️',
+            description: 'OVH AI Endpoints - OpenAI-compatible API (DeepSeek, Llama, Qwen, Mistral)',
+            docsUrl: 'https://endpoints.ai.cloud.ovh.net/',
+            hasModelSelect: true,
+            models: [
+                'Llama-3.1-70B-Instruct',
+                'Qwen-2.5-72B-Instruct',
+                'Qwen-2.5-32B-Instruct',
+                'Qwen-2.5-14B-Instruct',
+                'Llama-3.1-8B-Instruct',
+                'Mistral-7B-Instruct',
+                'Mixtral-8x7B-Instruct',
+                'DeepSeek-R1-Distill-Qwen-32B',
+                'DeepSeek-V2.5',
+                'Meta-Llama-3.1-70B-Instruct',
+                'Meta-Llama-3.1-8B-Instruct'
+            ]
+        },
         { 
             id: 'openai', 
             name: 'OpenAI', 
@@ -550,16 +622,22 @@ function attachButtonListeners(providerId) {
 }
 
 function renderProviderCard(provider) {
-    const keyData = configData.api_keys[provider.id];
+    const keyData = configData?.api_keys?.[provider.id];
     // For Discord, check if it exists even if not configured (it needs to be shown)
-    if (!keyData && provider.id !== 'discord') {
+    if (!keyData && provider.id !== 'discord' && provider.id !== 'ovh') {
         console.warn(`No key data for provider: ${provider.id}`);
         return '';
     }
-    // For Discord, create default keyData if missing
+    // For Discord and OVH, create default keyData if missing
     const actualKeyData = keyData || { configured: false, masked: null, length: 0 };
-    const isConfigured = actualKeyData.configured || false;
+    // Explicitly check configured status - ensure it's a boolean
+    const isConfigured = actualKeyData.configured === true;
     const maskedKey = actualKeyData.masked || 'Not configured';
+    
+    // Debug log for LLM providers
+    if (['openai', 'anthropic', 'mistral', 'ovh'].includes(provider.id)) {
+        console.log(`[renderProviderCard] ${provider.id}: configured=${actualKeyData.configured}, isConfigured=${isConfigured}, keyData:`, actualKeyData);
+    }
     
     return `
         <div class="api-key-card" data-provider="${provider.id}">
@@ -650,7 +728,7 @@ function renderProviderCard(provider) {
                                     </div>
                                 </div>
                             `).join('') :
-                            // Single field (default)
+                            // Single field (default) or OVH with model selector
                             `
                                 <div class="form-group">
                                     <label for="key-input-${provider.id}">API Key</label>
@@ -670,6 +748,39 @@ function renderProviderCard(provider) {
                                         </button>
                                     </div>
                                 </div>
+                                ${provider.hasModelSelect && provider.models ? `
+                                    <div class="form-group">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                            <label for="model-select-${provider.id}" style="margin: 0;">Model</label>
+                                            ${provider.id === 'ovh' ? `
+                                                <button 
+                                                    type="button" 
+                                                    onclick="loadOVHModels().then(() => renderLLM());" 
+                                                    style="background: var(--accent-color); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"
+                                                    title="Refresh available models from OVH endpoint"
+                                                >
+                                                    🔄 Refresh Models
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                        <select 
+                                            id="model-select-${provider.id}"
+                                            class="api-key-input"
+                                            style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem;"
+                                        >
+                                            ${provider.models.map(model => `
+                                                <option value="${model}" ${model === (provider.defaultModel || provider.models[0]) ? 'selected' : ''}>${model}</option>
+                                            `).join('')}
+                                        </select>
+                                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em;">
+                                            ${provider.id === 'ovh' && ovhModelsCache && ovhModelsCache.length > 0 
+                                                ? `${ovhModelsCache.length} models loaded from your OVH endpoint`
+                                                : provider.id === 'ovh'
+                                                    ? 'Select the model to use with OVH AI Endpoints (click Refresh to load available models)'
+                                                    : 'Select the model to use with OVH AI Endpoints'}
+                                        </p>
+                                    </div>
+                                ` : ''}
                             `
                         }
                         <div class="form-actions">
@@ -730,6 +841,7 @@ async function enableEditMode(provider) {
     
     // Get provider info
     const llmProviders = [
+        { id: 'ovh', name: 'OVH AI Endpoints', icon: '☁️', docsUrl: 'https://endpoints.ai.cloud.ovh.net/' },
         { id: 'openai', name: 'OpenAI', icon: '🤖', docsUrl: 'https://platform.openai.com/api-keys' },
         { id: 'anthropic', name: 'Anthropic', icon: '🧠', docsUrl: 'https://console.anthropic.com/' },
         { id: 'mistral', name: 'Mistral AI', icon: '🌊', docsUrl: 'https://console.mistral.ai/api-keys/' }
@@ -766,6 +878,7 @@ async function enableEditMode(provider) {
         'openai': 'OPENAI_API_KEY',
         'anthropic': 'ANTHROPIC_API_KEY',
         'mistral': 'MISTRAL_API_KEY',
+        'ovh': 'OVH_API_KEY',
         'github': 'GITHUB_TOKEN',
         'trustpilot': 'TRUSTPILOT_API_KEY',
         'twitter': 'TWITTER_BEARER_TOKEN'
@@ -841,12 +954,35 @@ async function enableEditMode(provider) {
                 </div>
             `;
         } else {
-            // Single field provider
+            // Single field provider or OVH (special case with model selector)
             const fieldName = fieldMap[provider];
-            if (!fieldName) {
+            if (!fieldName && provider !== 'ovh') {
                 console.error(`Field name not found for provider: ${provider}`);
                 return;
             }
+            
+            // Check if OVH (needs model selector)
+            const isOVH = provider === 'ovh';
+            const ovhKeyData = isOVH ? configData.api_keys?.ovh : null;
+            const currentModel = isOVH ? (ovhKeyData?.model || 'Llama-3.1-70B-Instruct') : null;
+            const currentEndpoint = isOVH ? (ovhKeyData?.endpoint || 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1') : null;
+            
+            // Use dynamic OVH models if available, otherwise fallback to static list
+            const ovhModelsForSelect = isOVH && ovhModelsCache && ovhModelsCache.length > 0 
+                ? ovhModelsCache 
+                : isOVH ? [
+                    'Llama-3.1-70B-Instruct',
+                    'Qwen-2.5-72B-Instruct',
+                    'Qwen-2.5-32B-Instruct',
+                    'Qwen-2.5-14B-Instruct',
+                    'Llama-3.1-8B-Instruct',
+                    'Mistral-7B-Instruct',
+                    'Mixtral-8x7B-Instruct',
+                    'DeepSeek-R1-Distill-Qwen-32B',
+                    'DeepSeek-V2.5',
+                    'Meta-Llama-3.1-70B-Instruct',
+                    'Meta-Llama-3.1-8B-Instruct'
+                ] : [];
             
             editFormHtml = `
                 <div class="api-key-form-container">
@@ -860,6 +996,7 @@ async function enableEditMode(provider) {
                                     class="api-key-input"
                                     placeholder="Enter your ${providerInfo.name} API key"
                                     autocomplete="off"
+                                    ${isOVH && ovhKeyData?.masked ? `value="${ovhKeyData.masked}"` : ''}
                                 />
                                 <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -869,6 +1006,46 @@ async function enableEditMode(provider) {
                             </button>
                         </div>
                     </div>
+                    ${isOVH ? `
+                        <div class="form-group">
+                            <label for="endpoint-input-${provider}">Endpoint URL</label>
+                            <input 
+                                type="text" 
+                                id="endpoint-input-${provider}"
+                                class="api-key-input"
+                                placeholder="https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"
+                                value="${currentEndpoint || ''}"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <label for="model-select-${provider}" style="margin: 0;">Model</label>
+                                <button 
+                                    type="button" 
+                                    onclick="loadOVHModels().then(() => { enableEditMode('${provider}'); });" 
+                                    style="background: var(--accent-color); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"
+                                    title="Refresh available models from OVH endpoint"
+                                >
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                            <select 
+                                id="model-select-${provider}"
+                                class="api-key-input"
+                                style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem;"
+                            >
+                                ${ovhModelsForSelect.map(model => `
+                                    <option value="${model}" ${currentModel === model ? 'selected' : ''}>${model}</option>
+                                `).join('')}
+                            </select>
+                            <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em;">
+                                ${ovhModelsCache && ovhModelsCache.length > 0 
+                                    ? `${ovhModelsCache.length} models loaded from your OVH endpoint`
+                                    : 'Click Refresh to load available models from your OVH endpoint'}
+                            </p>
+                        </div>
+                    ` : ''}
                     <div class="form-actions">
                         <button type="submit" class="btn-save-key" id="save-btn-${provider}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -915,9 +1092,13 @@ async function enableEditMode(provider) {
 // Exit Edit Mode
 function exitEditMode(provider) {
     // Reload configuration to restore the original view
-    loadConfiguration().then(() => {
+    loadConfiguration().then(async () => {
+        // Reload OVH models if OVH provider
+        if (provider === 'ovh') {
+            await loadOVHModels();
+        }
         // Re-render the specific provider card
-        const llmProviders = ['openai', 'anthropic', 'mistral'];
+        const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
         if (llmProviders.includes(provider)) {
             renderLLM();
         } else {
@@ -954,6 +1135,7 @@ async function saveAPIKey(provider) {
         { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
         { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
         { id: 'mistral', fields: [{ name: 'MISTRAL_API_KEY' }] },
+        { id: 'ovh', fields: [{ name: 'OVH_API_KEY' }, { name: 'OVH_ENDPOINT_URL' }, { name: 'OVH_MODEL' }] },
         { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
         { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
         { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
@@ -972,28 +1154,67 @@ async function saveAPIKey(provider) {
     let hasEmptyField = false;
     
     for (const field of providerConfig.fields) {
-        const inputId = providerConfig.fields.length > 1 
-            ? `key-input-${provider}-${field.name}`
-            : `key-input-${provider}`;
+        let inputId;
+        if (provider === 'ovh') {
+            // OVH has special input IDs
+            if (field.name === 'OVH_API_KEY') {
+                inputId = `key-input-${provider}`;
+            } else if (field.name === 'OVH_ENDPOINT_URL') {
+                inputId = `endpoint-input-${provider}`;
+            } else if (field.name === 'OVH_MODEL') {
+                // Model comes from select, handled separately
+                continue;
+            } else {
+                inputId = `key-input-${provider}-${field.name}`;
+            }
+        } else if (providerConfig.fields.length > 1) {
+            inputId = `key-input-${provider}-${field.name}`;
+        } else {
+            inputId = `key-input-${provider}`;
+        }
+        
         const input = document.getElementById(inputId);
-        if (!input) {
-            console.error(`Input field not found: ${inputId} for field ${field.name}`);
+        if (!input && field.name !== 'OVH_MODEL') {
+            // For OVH_ENDPOINT_URL, it's optional (has default), so don't error
+            if (provider === 'ovh' && field.name === 'OVH_ENDPOINT_URL') {
+                console.log(`[saveAPIKey] OVH endpoint field not found, will use default`);
+                continue;
+            }
+            console.error(`[saveAPIKey] Input field not found: ${inputId} for field ${field.name}`);
             showError(`Input field not found for ${field.name}`);
             return;
         }
-        const value = input.value.trim();
-        console.log(`[saveAPIKey] Field ${field.name}: value length = ${value.length}, value = ${value.substring(0, 10)}...`);
-        if (!value) {
-            hasEmptyField = true;
+        if (input) {
+            const value = input.value.trim();
+            console.log(`[saveAPIKey] Field ${field.name}: value length = ${value.length}, value = ${value.substring(0, 10)}...`);
+            if (!value && field.name !== 'OVH_ENDPOINT_URL') {
+                hasEmptyField = true;
+            }
+            values[field.name] = value;
         }
-        values[field.name] = value;
+    }
+    
+    // For OVH, also get model from select and set default endpoint if not provided
+    if (provider === 'ovh') {
+        const modelSelect = document.getElementById(`model-select-${provider}`);
+        if (modelSelect) {
+            values.OVH_MODEL = modelSelect.value;
+        } else {
+            values.OVH_MODEL = 'Llama-3.1-70B-Instruct'; // Default
+        }
+        
+        // Set default endpoint if not provided
+        if (!values.OVH_ENDPOINT_URL || values.OVH_ENDPOINT_URL.trim() === '') {
+            values.OVH_ENDPOINT_URL = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1';
+            console.log(`[saveAPIKey] Using default OVH endpoint: ${values.OVH_ENDPOINT_URL}`);
+        }
     }
     
     console.log(`[saveAPIKey] Collected values for ${provider}:`, Object.keys(values));
     
     // Allow empty values for LLM providers (to clear existing keys)
     // For Discord, both fields are required if one is filled
-    const llmProviders = ['openai', 'anthropic', 'mistral'];
+    const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
     if (hasEmptyField && !llmProviders.includes(provider)) {
         // For Discord, check if at least one field is filled - if so, both are required
         if (provider === 'discord') {
@@ -1034,6 +1255,19 @@ async function saveAPIKey(provider) {
             payload = { anthropic_api_key: values.ANTHROPIC_API_KEY };
         } else if (provider === 'mistral') {
             payload = { mistral_api_key: values.MISTRAL_API_KEY };
+        } else if (provider === 'ovh') {
+            // OVH needs API key, endpoint URL, and model
+            // Use values already collected (including defaults)
+            payload = { 
+                ovh_api_key: values.OVH_API_KEY || '',
+                ovh_endpoint_url: values.OVH_ENDPOINT_URL || 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1',
+                ovh_model: values.OVH_MODEL || 'Llama-3.1-70B-Instruct'
+            };
+            console.log(`[saveAPIKey] OVH payload:`, { 
+                api_key_length: payload.ovh_api_key?.length || 0,
+                endpoint: payload.ovh_endpoint_url,
+                model: payload.ovh_model
+            });
         } else {
             // For other providers, use a generic endpoint
             // Send all fields as a single request
@@ -1062,7 +1296,7 @@ async function saveAPIKey(provider) {
             return;
         }
         
-        // For OpenAI, Anthropic, and Mistral, use existing endpoint
+        // For OpenAI, Anthropic, Mistral, and OVH, use existing endpoint
         const response = await fetch(`${API_BASE_URL}/api/llm-config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1090,12 +1324,17 @@ async function saveAPIKey(provider) {
         // Reload again to get the latest data
         await loadConfiguration();
         
+        // Reload OVH models if OVH was updated
+        if (provider === 'ovh') {
+            await loadOVHModels();
+        }
+        
         showSuccess(`${provider.toUpperCase()} API key saved successfully!`);
         
         // Update badges and re-render sections
         if (configData && configData.api_keys) {
             // Check if it's an LLM provider
-            const llmProviders = ['openai', 'anthropic', 'mistral'];
+            const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
             if (llmProviders.includes(provider)) {
                 renderLLM();
             } else {
@@ -1128,6 +1367,7 @@ async function deleteAPIKey(provider) {
         { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
         { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
         { id: 'mistral', fields: [{ name: 'MISTRAL_API_KEY' }] },
+        { id: 'ovh', fields: [{ name: 'OVH_API_KEY' }, { name: 'OVH_ENDPOINT_URL' }, { name: 'OVH_MODEL' }] },
         { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
         { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
         { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
@@ -1150,6 +1390,8 @@ async function deleteAPIKey(provider) {
             payload = { anthropic_api_key: '' };
         } else if (provider === 'mistral') {
             payload = { mistral_api_key: '' };
+        } else if (provider === 'ovh') {
+            payload = { ovh_api_key: '', ovh_endpoint_url: '', ovh_model: '' };
         } else {
             // For other providers, send empty values for all fields
             const emptyValues = {};
@@ -1167,19 +1409,28 @@ async function deleteAPIKey(provider) {
                 throw new Error(`Failed to delete API key: ${errorText}`);
             }
             
-            // Reload configuration to refresh display
-            await loadConfiguration();
-            
-            // Re-render the specific section
-            if (provider === 'discord' || provider === 'linkedin' || provider === 'twitter') {
-                renderScrapersAPIKeys();
-            }
-            
-            showSuccess(`${provider.toUpperCase()} API key(s) deleted successfully!`);
-            return;
+        // Reload configuration to refresh display
+        await loadConfiguration();
+        
+        // Small delay to ensure backend has processed the update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reload again to get the latest data
+        await loadConfiguration();
+        
+        // Re-render the specific section
+        const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
+        if (llmProviders.includes(provider)) {
+            renderLLM();
+        } else if (provider === 'discord' || provider === 'linkedin' || provider === 'twitter') {
+            renderScrapersAPIKeys();
         }
         
-        // For OpenAI, Anthropic, and Mistral, use existing endpoint with empty string
+        showSuccess(`${provider.toUpperCase()} API key(s) deleted successfully!`);
+        return;
+        }
+        
+        // For OpenAI, Anthropic, Mistral, and OVH, use existing endpoint with empty string
         const response = await fetch(`${API_BASE_URL}/api/llm-config`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1207,18 +1458,20 @@ async function deleteAPIKey(provider) {
         // Reload again to get the latest data
         await loadConfiguration();
         
-        showSuccess(`${provider.toUpperCase()} API key deleted successfully!`);
-        
-        // Update badges and re-render sections
-        if (configData && configData.api_keys) {
-            // Check if it's an LLM provider
-            const llmProviders = ['openai', 'anthropic', 'mistral'];
-            if (llmProviders.includes(provider)) {
-                renderLLM();
-            } else {
-                renderScrapersAPIKeys();
-            }
+        // Reload OVH models if OVH was deleted
+        if (provider === 'ovh') {
+            await loadOVHModels();
         }
+        
+        // Force re-render sections to update badges
+        const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
+        if (llmProviders.includes(provider)) {
+            renderLLM();
+        } else {
+            renderScrapersAPIKeys();
+        }
+        
+        showSuccess(`${provider.toUpperCase()} API key deleted successfully!`);
         
     } catch (error) {
         console.error('Error deleting API key:', error);
@@ -1226,8 +1479,9 @@ async function deleteAPIKey(provider) {
     }
 }
 
-// Make deleteAPIKey available globally
+// Make functions available globally
 window.deleteAPIKey = deleteAPIKey;
+window.loadOVHModels = loadOVHModels;
 
 // Show Success
 function showSuccess(message) {
