@@ -975,6 +975,7 @@ function getSourceIcon(source) {
         'github': '💻',
         'stackoverflow': '📚',
         'trustpilot': '⭐',
+        'discord': '💬',
         'default': '📝'
     };
     return icons[source?.toLowerCase()] || icons.default;
@@ -1172,7 +1173,8 @@ function openInsightPostsDrawer(posts, title, description, insight) {
             'OVH Forum': '💬',
             'News': '📰',
             'GitHub': '🐙',
-            'LinkedIn': '💼'
+            'LinkedIn': '💼',
+            'Discord': '💬'
         };
         return icons[source] || '📝';
     }

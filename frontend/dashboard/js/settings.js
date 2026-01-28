@@ -298,7 +298,49 @@ function updateThemeToggle() {
 }
 
 // Load OVH Models Dynamically
-async function loadOVHModels() {
+async function loadOVHModels(forceApiKey = null, forceEndpoint = null) {
+    // If forceApiKey is provided, use it instead of checking configData
+    // This allows loading models even when OVH is not yet saved/configured
+    if (forceApiKey) {
+        console.log('[loadOVHModels] Loading models with provided API key (force mode)');
+        try {
+            const endpoint = forceEndpoint || 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1';
+            const response = await fetch(`${API_BASE_URL}/api/ovh/models?t=${Date.now()}`, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch OVH models: ${response.status} ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                console.warn('[loadOVHModels] Error fetching OVH models:', data.error);
+                ovhModelsCache = [];
+                return;
+            }
+            
+            if (data.models && data.models.length > 0) {
+                ovhModelsCache = data.models;
+                console.log(`[loadOVHModels] Successfully loaded ${data.models.length} models from OVH endpoint (force mode)`);
+                return;
+            } else {
+                console.warn('[loadOVHModels] No models found in response');
+                ovhModelsCache = [];
+                return;
+            }
+        } catch (error) {
+            console.error('[loadOVHModels] Error loading OVH models (force mode):', error);
+            ovhModelsCache = [];
+            return;
+        }
+    }
+    
     // Check if OVH is configured
     const ovhKeyData = configData?.api_keys?.ovh;
     if (!ovhKeyData || !ovhKeyData.configured) {
@@ -325,21 +367,25 @@ async function loadOVHModels() {
         
         if (data.error) {
             console.warn('[loadOVHModels] Error fetching OVH models:', data.error);
-            ovhModelsCache = null;
+            ovhModelsCache = [];
+            // Show error in UI if possible
             return;
         }
         
         if (data.models && data.models.length > 0) {
             ovhModelsCache = data.models;
-            console.log(`[loadOVHModels] Successfully loaded ${data.models.length} models:`, data.models);
+            console.log(`[loadOVHModels] Successfully loaded ${data.models.length} models from OVH endpoint`);
+            // Re-render LLM section to update the select dropdown
+            renderLLM();
         } else {
             console.warn('[loadOVHModels] No models found in response');
-            ovhModelsCache = null;
+            ovhModelsCache = [];
         }
     } catch (error) {
         console.error('[loadOVHModels] Error loading OVH models:', error);
-        ovhModelsCache = null;
-        // Don't show error to user - fallback to static list
+        ovhModelsCache = [];
+        // Re-render to show error state
+        renderLLM();
     }
 }
 
@@ -358,27 +404,22 @@ function renderLLM() {
         return;
     }
     
+    // Use dynamic OVH models if available, otherwise empty array (will be loaded dynamically)
+    const ovhModels = ovhModelsCache && ovhModelsCache.length > 0 
+        ? ovhModelsCache 
+        : []; // Empty list - models will be loaded dynamically from endpoint
+    
     const llmProviders = [
         { 
             id: 'ovh', 
             name: 'OVH AI Endpoints', 
             icon: '☁️',
-            description: 'OVH AI Endpoints - OpenAI-compatible API (DeepSeek, Llama, Qwen, Mistral)',
+            description: ovhModelsCache && ovhModelsCache.length > 0 
+                ? `OVH AI Endpoints - ${ovhModelsCache.length} models available`
+                : 'OVH AI Endpoints - OpenAI-compatible API (DeepSeek, Llama, Qwen, Mistral)',
             docsUrl: 'https://endpoints.ai.cloud.ovh.net/',
             hasModelSelect: true,
-            models: [
-                'Llama-3.1-70B-Instruct',
-                'Qwen-2.5-72B-Instruct',
-                'Qwen-2.5-32B-Instruct',
-                'Qwen-2.5-14B-Instruct',
-                'Llama-3.1-8B-Instruct',
-                'Mistral-7B-Instruct',
-                'Mixtral-8x7B-Instruct',
-                'DeepSeek-R1-Distill-Qwen-32B',
-                'DeepSeek-V2.5',
-                'Meta-Llama-3.1-70B-Instruct',
-                'Meta-Llama-3.1-8B-Instruct'
-            ]
+            models: ovhModels // Use dynamic models (empty array if not loaded yet)
         },
         { 
             id: 'openai', 
@@ -697,6 +738,22 @@ function renderProviderCard(provider) {
                         </svg>
                         Length: ${keyData.length} chars
                     </div>
+                    ${provider.id === 'ovh' && keyData.model ? `
+                    <div class="info-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        Model: <a href="https://endpoints.ai.cloud.ovh.net/" target="_blank" style="color: #6366f1; text-decoration: underline; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;" onmouseover="this.style.color='#4f46e5'; this.style.textDecoration='underline'; this.style.opacity='0.8'" onmouseout="this.style.color='#6366f1'; this.style.textDecoration='underline'; this.style.opacity='1'" title="Voir la documentation OVH AI Endpoints pour ${keyData.model}">
+                            <span>${keyData.model}</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; flex-shrink: 0;">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                        </a>
+                    </div>
+                    ` : ''}
                     <div class="info-item">
                         <a href="${provider.docsUrl}" target="_blank" style="color: var(--accent-color); text-decoration: none;">
                             📄 Get API Key
@@ -756,7 +813,9 @@ function renderProviderCard(provider) {
                                                 <button 
                                                     type="button" 
                                                     onclick="loadOVHModels().then(() => renderLLM());" 
-                                                    style="background: var(--accent-color); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"
+                                                    style="background: #6366f1; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.2s;"
+                                                    onmouseover="this.style.background='#4f46e5'" 
+                                                    onmouseout="this.style.background='#6366f1'"
                                                     title="Refresh available models from OVH endpoint"
                                                 >
                                                     🔄 Refresh Models
@@ -767,10 +826,13 @@ function renderProviderCard(provider) {
                                             id="model-select-${provider.id}"
                                             class="api-key-input"
                                             style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem;"
+                                            ${provider.id === 'ovh' && (!provider.models || provider.models.length === 0) ? 'disabled' : ''}
                                         >
-                                            ${provider.models.map(model => `
+                                            ${provider.models && provider.models.length > 0 ? provider.models.map(model => `
                                                 <option value="${model}" ${model === (provider.defaultModel || provider.models[0]) ? 'selected' : ''}>${model}</option>
-                                            `).join('')}
+                                            `).join('') : `
+                                                <option value="">Loading models...</option>
+                                            `}
                                         </select>
                                         <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em;">
                                             ${provider.id === 'ovh' && ovhModelsCache && ovhModelsCache.length > 0 
@@ -889,6 +951,34 @@ async function enableEditMode(provider) {
     const apiKeyInfo = card.querySelector('.api-key-info');
     
     if (apiKeyValue && apiKeyInfo) {
+        // For single-field providers (including OVH), fetch the real API key from the server
+        let realApiKey = '';
+        if (!multiFieldProviders[provider]) {
+            try {
+                const revealResponse = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}&t=${Date.now()}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (revealResponse.ok) {
+                    const revealData = await revealResponse.json();
+                    realApiKey = revealData.key || '';
+                    if (realApiKey) {
+                        console.log(`[enableEditMode] Revealed API key for ${provider}, length: ${realApiKey.length}`);
+                    } else {
+                        console.warn(`[enableEditMode] No key found for ${provider}`);
+                    }
+                } else {
+                    const errorText = await revealResponse.text();
+                    console.warn(`[enableEditMode] Failed to reveal key for ${provider}: ${revealResponse.status} - ${errorText}`);
+                }
+            } catch (error) {
+                console.error(`[enableEditMode] Error revealing key for ${provider}:`, error);
+                // Continue with empty value - user can enter it manually
+            }
+        }
+        
         let editFormHtml = '';
         
         // Handle multi-field providers (LinkedIn, Discord)
@@ -934,11 +1024,11 @@ async function enableEditMode(provider) {
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                             <circle cx="12" cy="12" r="3"/>
-                                        </svg>
-                                    </button>
-                                </div>
+                                    </svg>
+                                </button>
                             </div>
-                        `).join('')}
+                        </div>
+                    `).join('')}
                         <div class="form-actions">
                             <button type="submit" class="btn-primary" id="save-btn-${provider}">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -946,7 +1036,11 @@ async function enableEditMode(provider) {
                                 </svg>
                                 Save API Key
                             </button>
-                            <button type="button" class="btn-secondary" onclick="exitEditMode('${provider}')">
+                            <button type="button" class="btn-cancel" onclick="exitEditMode('${provider}')" style="background: #ef4444; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease;" onmouseover="this.style.background='#dc2626'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)'">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
+                                    <line x1="18" y1="6" x2="6" y2="18"/>
+                                    <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
                                 Cancel
                             </button>
                         </div>
@@ -967,22 +1061,11 @@ async function enableEditMode(provider) {
             const currentModel = isOVH ? (ovhKeyData?.model || 'Llama-3.1-70B-Instruct') : null;
             const currentEndpoint = isOVH ? (ovhKeyData?.endpoint || 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1') : null;
             
-            // Use dynamic OVH models if available, otherwise fallback to static list
+            // Use dynamic OVH models if available, otherwise show empty list
+            // Models will be loaded automatically when OVH is configured
             const ovhModelsForSelect = isOVH && ovhModelsCache && ovhModelsCache.length > 0 
                 ? ovhModelsCache 
-                : isOVH ? [
-                    'Llama-3.1-70B-Instruct',
-                    'Qwen-2.5-72B-Instruct',
-                    'Qwen-2.5-32B-Instruct',
-                    'Qwen-2.5-14B-Instruct',
-                    'Llama-3.1-8B-Instruct',
-                    'Mistral-7B-Instruct',
-                    'Mixtral-8x7B-Instruct',
-                    'DeepSeek-R1-Distill-Qwen-32B',
-                    'DeepSeek-V2.5',
-                    'Meta-Llama-3.1-70B-Instruct',
-                    'Meta-Llama-3.1-8B-Instruct'
-                ] : [];
+                : []; // Empty list - models loaded dynamically
             
             editFormHtml = `
                 <div class="api-key-form-container">
@@ -996,7 +1079,7 @@ async function enableEditMode(provider) {
                                     class="api-key-input"
                                     placeholder="Enter your ${providerInfo.name} API key"
                                     autocomplete="off"
-                                    ${isOVH && ovhKeyData?.masked ? `value="${ovhKeyData.masked}"` : ''}
+                                    value="${realApiKey || ''}"
                                 />
                                 <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1023,8 +1106,10 @@ async function enableEditMode(provider) {
                                 <label for="model-select-${provider}" style="margin: 0;">Model</label>
                                 <button 
                                     type="button" 
-                                    onclick="loadOVHModels().then(() => { enableEditMode('${provider}'); });" 
-                                    style="background: var(--accent-color); color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"
+                                    id="refresh-models-btn-${provider}"
+                                    style="background: #6366f1; color: white; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; transition: background 0.2s;"
+                                    onmouseover="this.style.background='#4f46e5'" 
+                                    onmouseout="this.style.background='#6366f1'"
                                     title="Refresh available models from OVH endpoint"
                                 >
                                     🔄 Refresh
@@ -1034,10 +1119,13 @@ async function enableEditMode(provider) {
                                 id="model-select-${provider}"
                                 class="api-key-input"
                                 style="padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 0.95rem;"
+                                ${ovhModelsForSelect.length === 0 ? 'disabled' : ''}
                             >
-                                ${ovhModelsForSelect.map(model => `
+                                ${ovhModelsForSelect.length > 0 ? ovhModelsForSelect.map(model => `
                                     <option value="${model}" ${currentModel === model ? 'selected' : ''}>${model}</option>
-                                `).join('')}
+                                `).join('') : `
+                                    <option value="">Loading models from endpoint...</option>
+                                `}
                             </select>
                             <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em;">
                                 ${ovhModelsCache && ovhModelsCache.length > 0 
@@ -1053,8 +1141,8 @@ async function enableEditMode(provider) {
                             </svg>
                             Save API Key
                         </button>
-                        <button type="button" class="btn-get-key" onclick="exitEditMode('${provider}')" style="background: var(--text-secondary);">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <button type="button" class="btn-cancel" onclick="exitEditMode('${provider}')" style="background: #ef4444; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; font-size: 0.9rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; transition: all 0.2s ease;" onmouseover="this.style.background='#dc2626'; this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#ef4444'; this.style.transform='translateY(0)'">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px;">
                                 <line x1="18" y1="6" x2="6" y2="18"/>
                                 <line x1="6" y1="6" x2="18" y2="18"/>
                             </svg>
@@ -1081,6 +1169,113 @@ async function enableEditMode(provider) {
                 // Single field provider
                 const input = document.getElementById(`key-input-${provider}`);
                 if (input) {
+                    // For OVH, verify that the key was properly loaded
+                    if (provider === 'ovh' && realApiKey && input.value !== realApiKey) {
+                        console.warn(`[enableEditMode] OVH key mismatch: input has ${input.value.length} chars, realApiKey has ${realApiKey.length} chars. Updating input...`);
+                        input.value = realApiKey;
+                    }
+                    
+                    // For OVH, add event listener to auto-load models when a valid key is entered
+                    if (provider === 'ovh') {
+                        const modelSelect = document.getElementById(`model-select-${provider}`);
+                        let debounceTimer = null;
+                        
+                        const checkAndLoadModels = async () => {
+                            const currentKey = input.value.trim();
+                            const endpointInput = document.getElementById(`endpoint-input-${provider}`);
+                            const currentEndpoint = endpointInput ? endpointInput.value.trim() : 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1';
+                            
+                            // Check if key looks valid (length >= 50 for OVH JWT tokens)
+                            if (currentKey.length >= 50 && currentKey.length <= 500) {
+                                console.log(`[enableEditMode] Valid OVH key detected (${currentKey.length} chars), loading models...`);
+                                // Disable select while loading
+                                if (modelSelect) {
+                                    modelSelect.disabled = true;
+                                    modelSelect.innerHTML = '<option value="">Loading models...</option>';
+                                }
+                                
+                                try {
+                                    // Temporarily save the key to test loading models
+                                    // First, save the key temporarily, then load models, then restore if needed
+                                    const tempSaveResponse = await fetch(`${API_BASE_URL}/api/llm-config`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            ovh_api_key: currentKey,
+                                            ovh_endpoint_url: currentEndpoint || 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
+                                        })
+                                    });
+                                    
+                                    if (!tempSaveResponse.ok) {
+                                        throw new Error('Failed to save key temporarily');
+                                    }
+                                    
+                                    // Now load models using the regular endpoint
+                                    const testResponse = await fetch(`${API_BASE_URL}/api/ovh/models?t=${Date.now()}`);
+                                    
+                                    if (testResponse.ok) {
+                                        const testData = await testResponse.json();
+                                        if (testData.models && testData.models.length > 0) {
+                                            // Update cache and select
+                                            ovhModelsCache = testData.models;
+                                            if (modelSelect) {
+                                                modelSelect.disabled = false;
+                                                const currentValue = modelSelect.value || '';
+                                                modelSelect.innerHTML = testData.models.map(model => 
+                                                    `<option value="${model}" ${model === currentValue ? 'selected' : ''}>${model}</option>`
+                                                ).join('');
+                                                console.log(`[enableEditMode] Models loaded and select updated (${testData.models.length} models)`);
+                                            }
+                                        } else if (modelSelect) {
+                                            modelSelect.disabled = false;
+                                            modelSelect.innerHTML = `<option value="">${testData.error || 'No models found'}</option>`;
+                                        }
+                                    } else {
+                                        const errorData = await testResponse.json().catch(() => ({ error: 'Failed to load models' }));
+                                        if (modelSelect) {
+                                            modelSelect.disabled = false;
+                                            modelSelect.innerHTML = `<option value="">Error: ${errorData.error || 'Failed to load models'}</option>`;
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('[enableEditMode] Error loading models:', error);
+                                    if (modelSelect) {
+                                        modelSelect.disabled = false;
+                                        modelSelect.innerHTML = '<option value="">Error loading models - check your API key</option>';
+                                    }
+                                }
+                            } else if (currentKey.length > 0 && currentKey.length < 50) {
+                                // Key is too short, might be masked or invalid
+                                if (modelSelect && (!ovhModelsCache || ovhModelsCache.length === 0)) {
+                                    modelSelect.disabled = true;
+                                    modelSelect.innerHTML = '<option value="">Enter a valid API key (282 chars) to load models</option>';
+                                }
+                            }
+                        };
+                        
+                        // Listen for input changes with debounce (reduced to 800ms for faster response)
+                        input.addEventListener('input', () => {
+                            clearTimeout(debounceTimer);
+                            debounceTimer = setTimeout(checkAndLoadModels, 800); // Wait 0.8 seconds after user stops typing
+                        });
+                        
+                        // Also check immediately if key is already present
+                        if (input.value && input.value.length >= 50) {
+                            checkAndLoadModels();
+                        }
+                        
+                        // Add click handler for Refresh button
+                        const refreshBtn = document.getElementById(`refresh-models-btn-${provider}`);
+                        if (refreshBtn) {
+                            refreshBtn.addEventListener('click', async () => {
+                                console.log('[enableEditMode] Refresh button clicked');
+                                await checkAndLoadModels();
+                            });
+                        }
+                    }
+                    
                     input.focus();
                     input.select();
                 }
@@ -1208,6 +1403,131 @@ async function saveAPIKey(provider) {
             values.OVH_ENDPOINT_URL = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1';
             console.log(`[saveAPIKey] Using default OVH endpoint: ${values.OVH_ENDPOINT_URL}`);
         }
+        
+        // CRITICAL: Check if API key field contains a masked value (short length)
+        // If the key is too short (< 50 chars), it's likely a masked value
+        // In this case, fetch the real key from the server before saving
+        const apiKeyInput = document.getElementById(`key-input-${provider}`);
+        if (apiKeyInput && values.OVH_API_KEY) {
+            const keyLength = values.OVH_API_KEY.length;
+            // OVH JWT tokens are typically 200+ characters, so if we have < 50, it's likely masked
+            if (keyLength < 50) {
+                console.log(`[saveAPIKey] OVH API key appears to be masked (${keyLength} chars), fetching real key from server...`);
+                try {
+                    const revealResponse = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}&t=${Date.now()}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (revealResponse.ok) {
+                        const revealData = await revealResponse.json();
+                        if (revealData.key && revealData.key.length >= 50) {
+                            console.log(`[saveAPIKey] Retrieved real OVH API key from server (${revealData.key.length} chars)`);
+                            values.OVH_API_KEY = revealData.key;
+                        } else {
+                            // If revealed key is also too short, it means it's corrupted in DB
+                            // Don't save the masked value - keep existing key or show error
+                            console.error(`[saveAPIKey] Revealed key is also too short (${revealData.key?.length || 0} chars). Key may be corrupted in database.`);
+                            showError('OVH API key appears to be corrupted. Please re-enter your full API key.');
+                            saveBtn.disabled = false;
+                            saveBtn.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6L9 17l-5-5"/>
+                                </svg>
+                                Save API Key
+                            `;
+                            return;
+                        }
+                    } else {
+                        // If reveal fails, don't save masked value
+                        console.error(`[saveAPIKey] Failed to reveal key. Not saving masked value.`);
+                        showError('Could not retrieve API key. Please re-enter your full API key.');
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = `
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 6L9 17l-5-5"/>
+                            </svg>
+                            Save API Key
+                        `;
+                        return;
+                    }
+                } catch (error) {
+                    console.error(`[saveAPIKey] Error revealing key:`, error);
+                    // Don't save masked value - show error
+                    showError('Error retrieving API key. Please re-enter your full API key.');
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                        Save API Key
+                    `;
+                    return;
+                }
+            } else {
+                // Key is long enough (>= 50 chars), it's likely the real key
+                // Ensure it's not empty and has reasonable length
+                if (keyLength >= 50 && keyLength <= 500) {
+                    console.log(`[saveAPIKey] OVH API key from input field is valid (${keyLength} chars), will be saved`);
+                }
+            }
+        } else if (apiKeyInput) {
+            // Field exists - check if it's empty or has a valid key
+            const currentValue = apiKeyInput.value || '';
+            if (!currentValue || currentValue.trim() === '') {
+                // Field is empty - try to get existing key to preserve it
+                console.log(`[saveAPIKey] OVH API key field is empty, fetching existing key to preserve it...`);
+                try {
+                    const revealResponse = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}&t=${Date.now()}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (revealResponse.ok) {
+                        const revealData = await revealResponse.json();
+                        if (revealData.key && revealData.key.length >= 50) {
+                            console.log(`[saveAPIKey] Preserving existing OVH API key (${revealData.key.length} chars)`);
+                            values.OVH_API_KEY = revealData.key;
+                        } else {
+                            console.warn(`[saveAPIKey] Existing key is too short or missing (${revealData.key?.length || 0} chars)`);
+                        }
+                    } else {
+                        console.warn(`[saveAPIKey] Could not fetch existing key (status ${revealResponse.status})`);
+                    }
+                } catch (error) {
+                    console.warn(`[saveAPIKey] Could not fetch existing key to preserve:`, error);
+                    // Continue - user might want to clear the key
+                }
+            } else if (currentValue.length >= 50) {
+                // Field has a valid key - use it
+                console.log(`[saveAPIKey] Using OVH API key from input field (${currentValue.length} chars)`);
+                values.OVH_API_KEY = currentValue;
+            } else {
+                // Field has a short value - might be masked, fetch real key
+                console.log(`[saveAPIKey] OVH API key field has short value (${currentValue.length} chars), fetching real key...`);
+                try {
+                    const revealResponse = await fetch(`${API_BASE_URL}/api/config/reveal-key?provider=${provider}&t=${Date.now()}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (revealResponse.ok) {
+                        const revealData = await revealResponse.json();
+                        if (revealData.key && revealData.key.length >= 50) {
+                            console.log(`[saveAPIKey] Retrieved real OVH API key from server (${revealData.key.length} chars)`);
+                            values.OVH_API_KEY = revealData.key;
+                        } else {
+                            console.warn(`[saveAPIKey] Revealed key is also too short (${revealData.key?.length || 0} chars)`);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[saveAPIKey] Could not fetch real key:`, error);
+                }
+            }
+        }
     }
     
     console.log(`[saveAPIKey] Collected values for ${provider}:`, Object.keys(values));
@@ -1312,7 +1632,32 @@ async function saveAPIKey(provider) {
                 const errorText = await response.text();
                 errorMessage = errorText || errorMessage;
             }
+            
+            // For OVH, provide more specific error message
+            if (provider === 'ovh' && errorMessage.includes('masked') || errorMessage.includes('corrupted') || errorMessage.includes('too short')) {
+                errorMessage = 'La clé API OVH semble être masquée ou corrompue. Veuillez ré-entrer votre clé API complète (282 caractères).';
+            }
+            
             throw new Error(errorMessage);
+        }
+        
+        // CRITICAL: For OVH, verify the saved key length after save
+        if (provider === 'ovh' && payload.ovh_api_key) {
+            // Reload configuration to verify
+            await loadConfiguration();
+            const savedOvhKey = configData?.api_keys?.ovh;
+            if (savedOvhKey && savedOvhKey.configured) {
+                const savedLength = savedOvhKey.length || 0;
+                const expectedLength = payload.ovh_api_key.length;
+                
+                if (savedLength < 50) {
+                    throw new Error(`La clé API sauvegardée est corrompue (${savedLength} caractères au lieu de ${expectedLength}). Veuillez ré-entrer votre clé API complète.`);
+                }
+                
+                if (Math.abs(savedLength - expectedLength) > 10) {
+                    console.warn(`[saveAPIKey] Saved key length mismatch: expected ~${expectedLength}, got ${savedLength}`);
+                }
+            }
         }
         
         // Reload configuration with cache-busting to ensure fresh data

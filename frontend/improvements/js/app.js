@@ -569,7 +569,8 @@ function getSourceIcon(source) {
         'OVH Forum': '💬',
         'News': '📰',
         'Stack Overflow': '📚',
-        'GitHub': '💻'
+        'GitHub': '💻',
+        'Discord': '💬'
     };
     return icons[source] || '📝';
 }
@@ -1348,7 +1349,8 @@ function openImprovementInsightPostsDrawer(posts, title, description, insight) {
             'GitHub': '🐙',
             'LinkedIn': '💼',
             'Stack Overflow': '💬',
-            'Mastodon': '🐘'
+            'Mastodon': '🐘',
+            'Discord': '💬'
         };
         return icons[source] || '📝';
     }
@@ -1848,7 +1850,8 @@ function openPainPointDrawerContent(title, description, posts, painPoint) {
             'Stack Overflow': '📚',
             'GitHub': '💻',
             'Mastodon': '🐘',
-            'G2 Crowd': '⭐'
+            'G2 Crowd': '⭐',
+            'Discord': '💬'
         };
         return icons[source] || '📝';
     }

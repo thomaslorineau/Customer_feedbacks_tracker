@@ -1352,7 +1352,8 @@ function getSourceIcon(source) {
         'Trustpilot': '⭐',
         'Reddit': '🔴',
         'GitHub': '💻',
-        'Stack Overflow': '📚'
+        'Stack Overflow': '📚',
+        'Discord': '💬'
     };
     return icons[source] || '📝';
 }
@@ -2605,6 +2606,7 @@ function updateCriticalPostsDrawer(filters) {
             'github': '💻',
             'stackoverflow': '📚',
             'trustpilot': '⭐',
+            'discord': '💬',
             'default': '📝'
         };
         return icons[source?.toLowerCase()] || icons.default;

@@ -847,6 +847,66 @@ def pg_delete_base_keyword(category: str, keyword: str) -> bool:
 # App Config Functions (for storing API keys and settings)
 # ============================================
 
+def _clean_ovh_api_key(value: str) -> str:
+    """
+    Clean OVH API key to ensure it only contains ASCII-safe characters.
+    JWT tokens should only contain: A-Z, a-z, 0-9, +, /, =, -, _, .
+    
+    Returns:
+        str: Cleaned key, or empty string if key is invalid/corrupted
+    """
+    if not value:
+        return ''
+    
+    # First, ensure we can safely encode/decode the string
+    try:
+        # Try to encode as UTF-8 and decode back to catch any encoding issues
+        value = value.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+    except Exception:
+        return ''
+    
+    # Keep only ASCII characters that are valid in JWT/base64
+    # JWT format: header.payload.signature (separated by dots)
+    # Base64 characters: A-Z, a-z, 0-9, +, /, = (and - and _ for URL-safe base64)
+    cleaned = ''.join(c for c in value if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+    
+    # Validate that cleaned key is reasonable length (JWT tokens are typically 200+ chars)
+    # If key is too short (< 50 chars), it's likely corrupted/masked
+    if len(cleaned) < 50:
+        logger.warning(f"OVH API key too short after cleaning ({len(cleaned)} chars), likely corrupted")
+        return ''
+    
+    return cleaned
+
+
+def _validate_ovh_api_key(value: str) -> bool:
+    """
+    Validate that an OVH API key is valid and not corrupted.
+    
+    Returns:
+        bool: True if key is valid, False otherwise
+    """
+    if not value:
+        return False
+    
+    # Check length (JWT tokens are typically 200+ characters)
+    if len(value) < 50:
+        return False
+    
+    # Check that it contains only valid JWT/base64 characters
+    valid_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-/=_.')
+    if not all(c in valid_chars for c in value):
+        return False
+    
+    # Check that it's ASCII-safe
+    try:
+        value.encode('ascii')
+    except UnicodeEncodeError:
+        return False
+    
+    return True
+
+
 def pg_get_config(key: str) -> Optional[str]:
     """Get a configuration value from app_config table."""
     try:
@@ -873,16 +933,97 @@ def pg_get_config(key: str) -> Optional[str]:
                     if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
                         # It's a JSON-encoded string, decode it
                         try:
-                            import json
-                            return json.loads(value)
+                            decoded_value = json.loads(value)
                         except (json.JSONDecodeError, TypeError):
                             # If JSON parsing fails, return the string without outer quotes
-                            return value[1:-1] if len(value) > 2 else value
-                    return value
+                            decoded_value = value[1:-1] if len(value) > 2 else value
+                    else:
+                        decoded_value = value
+                    
+                    # Clean OVH API key if this is the OVH_API_KEY - do this IMMEDIATELY
+                    if key == 'OVH_API_KEY' and decoded_value:
+                        # First, ensure we can safely work with the string
+                        try:
+                            # Try to encode/decode to catch any encoding issues early
+                            decoded_value.encode('utf-8').decode('utf-8')
+                        except (UnicodeEncodeError, UnicodeDecodeError):
+                            # If encoding fails, force UTF-8 with error replacement
+                            decoded_value = decoded_value.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+                        
+                        cleaned = _clean_ovh_api_key(decoded_value)
+                        if cleaned != decoded_value:
+                            logger.warning(f"OVH API key contained non-ASCII characters, cleaned: {len(decoded_value)} -> {len(cleaned)} chars")
+                            # CRITICAL: Save the cleaned version back to database IMMEDIATELY
+                            # Use a direct database call to avoid recursion
+                            if cleaned:
+                                try:
+                                    # Use a new cursor to avoid conflicts
+                                    pool = _get_pool()
+                                    conn = pool.getconn()
+                                    try:
+                                        save_cur = conn.cursor()
+                                        json_value = json.dumps(cleaned)
+                                        save_cur.execute(
+                                            """
+                                            INSERT INTO app_config (key, value, updated_at)
+                                            VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
+                                            ON CONFLICT (key) 
+                                            DO UPDATE SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                                            """,
+                                            (key, json_value, json_value)
+                                        )
+                                        conn.commit()
+                                        logger.info(f"OVH API key cleaned and saved to database (length: {len(cleaned)})")
+                                    finally:
+                                        pool.putconn(conn)
+                                except Exception as e:
+                                    logger.error(f"Failed to save cleaned OVH API key: {e}")
+                        return cleaned if cleaned else None
+                    
+                    return decoded_value
                 
                 # If it's a dict or other type, convert to string
                 # But typically JSONB stores strings directly
-                return str(value) if value else None
+                str_value = str(value) if value else None
+                
+                # Clean OVH API key if this is the OVH_API_KEY
+                if key == 'OVH_API_KEY' and str_value:
+                    # First, ensure we can safely work with the string
+                    try:
+                        str_value.encode('utf-8').decode('utf-8')
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        str_value = str_value.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+                    
+                    cleaned = _clean_ovh_api_key(str_value)
+                    if cleaned != str_value:
+                        logger.warning(f"OVH API key contained non-ASCII characters, cleaned: {len(str_value)} -> {len(cleaned)} chars")
+                        # CRITICAL: Save the cleaned version back to database IMMEDIATELY
+                        if cleaned:
+                            try:
+                                # Use a new connection to avoid conflicts
+                                pool = _get_pool()
+                                conn = pool.getconn()
+                                try:
+                                    save_cur = conn.cursor()
+                                    json_value = json.dumps(cleaned)
+                                    save_cur.execute(
+                                        """
+                                        INSERT INTO app_config (key, value, updated_at)
+                                        VALUES (%s, %s::jsonb, CURRENT_TIMESTAMP)
+                                        ON CONFLICT (key) 
+                                        DO UPDATE SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                                        """,
+                                        (key, json_value, json_value)
+                                    )
+                                    conn.commit()
+                                    logger.info(f"OVH API key cleaned and saved to database (length: {len(cleaned)})")
+                                finally:
+                                    pool.putconn(conn)
+                            except Exception as e:
+                                logger.error(f"Failed to save cleaned OVH API key: {e}")
+                    return cleaned if cleaned else None
+                
+                return str_value
             return None
     except Exception as e:
         logger.error(f"Error getting config key {key}: {e}")
@@ -892,6 +1033,29 @@ def pg_get_config(key: str) -> Optional[str]:
 def pg_set_config(key: str, value: str) -> bool:
     """Set a configuration value in app_config table."""
     try:
+        # CRITICAL: For OVH API key, validate and clean BEFORE saving
+        if key == 'OVH_API_KEY' and value:
+            # First validate the key
+            if not _validate_ovh_api_key(value):
+                logger.error(f"OVH API key validation failed (length: {len(value)}). Key appears corrupted or masked. Refusing to save.")
+                return False
+            
+            # Clean the key
+            cleaned_value = _clean_ovh_api_key(value)
+            if not cleaned_value:
+                logger.error(f"OVH API key cleaning resulted in empty string. Refusing to save corrupted key.")
+                return False
+            
+            # Validate again after cleaning
+            if not _validate_ovh_api_key(cleaned_value):
+                logger.error(f"OVH API key validation failed after cleaning. Refusing to save.")
+                return False
+            
+            if cleaned_value != value:
+                logger.warning(f"OVH API key cleaned before save: {len(value)} -> {len(cleaned_value)} chars")
+            
+            value = cleaned_value
+        
         with get_pg_cursor() as cur:
             # Use JSONB to store the value as a JSON string
             # PostgreSQL JSONB will store it correctly, and we'll extract it properly in pg_get_config
@@ -907,6 +1071,38 @@ def pg_set_config(key: str, value: str) -> bool:
                 """,
                 (key, json_value, json_value)
             )
+            
+            # CRITICAL: Verify the saved value for OVH_API_KEY
+            if key == 'OVH_API_KEY':
+                cur.execute("SELECT value FROM app_config WHERE key = %s", (key,))
+                saved_result = cur.fetchone()
+                if saved_result:
+                    saved_value = saved_result['value']
+                    # Extract string from JSONB
+                    if isinstance(saved_value, str):
+                        if len(saved_value) >= 2 and saved_value.startswith('"') and saved_value.endswith('"'):
+                            try:
+                                saved_value = json.loads(saved_value)
+                            except:
+                                saved_value = saved_value[1:-1] if len(saved_value) > 2 else saved_value
+                    elif not isinstance(saved_value, str):
+                        saved_value = str(saved_value)
+                    
+                    # Verify saved value is valid
+                    if not _validate_ovh_api_key(saved_value):
+                        logger.error(f"Saved OVH API key failed validation! Length: {len(saved_value)}")
+                        # Try to fix by re-saving
+                        cur.execute(
+                            """
+                            UPDATE app_config 
+                            SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
+                            WHERE key = %s
+                            """,
+                            (json_value, key)
+                        )
+                    else:
+                        logger.info(f"OVH API key saved and verified successfully (length: {len(saved_value)})")
+            
             logger.debug(f"Config key {key} saved successfully (length: {len(value)})")
             return True
     except Exception as e:

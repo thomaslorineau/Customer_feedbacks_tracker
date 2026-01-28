@@ -25,29 +25,89 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def normalize_ovh_model_name(model: Optional[str]) -> Optional[str]:
+def safe_error_text(text: str, max_length: int = 500) -> str:
     """
-    Normalize OVH model name to ensure compatibility.
-    Converts deprecated model names to their correct format.
-    Returns None if no model is specified (user must configure it).
+    Safely encode text to ASCII, replacing problematic characters.
+    Ensures the text can be safely used in HTTP headers (which require ASCII).
+    """
+    if not text:
+        return ""
+    try:
+        # Force ASCII encoding for HTTP headers - httpx requires ASCII
+        # First encode to UTF-8, then decode to ASCII with replacement
+        encoded = text.encode('utf-8', errors='replace')
+        decoded = encoded.decode('ascii', errors='replace')
+        # Truncate if needed
+        if len(decoded) > max_length:
+            decoded = decoded[:max_length]
+        return decoded
+    except Exception:
+        # If everything fails, return empty string
+        return ""
+
+
+def normalize_ovh_model_name(model: Optional[str], available_models: Optional[List[str]] = None) -> Optional[str]:
+    """
+    Normalize OVH model name to match available models on the endpoint.
+    Uses case-insensitive matching against available models to find the exact name.
+    Returns None if no model is specified or if model doesn't exist in available models.
     """
     if not model:
         return None  # No default model - user must specify
     
-    # Convert deprecated model names to None (user must configure a valid model)
+    # Trim whitespace
+    model = model.strip()
+    
+    # If we have available models, use them to find the exact match (case-insensitive)
+    if available_models:
+        model_lower = model.lower()
+        for available_model in available_models:
+            if available_model.lower() == model_lower:
+                # Return the exact name from available models (preserves exact casing)
+                if available_model != model:
+                    logger.info(f"Matched OVH model name: '{model}' -> '{available_model}' (from available models)")
+                return available_model
+        # Model not found in available models
+        logger.warning(f"OVH model '{model}' not found in available models: {available_models[:5] if len(available_models) > 5 else available_models}")
+        return None
+    
+    # If no available models provided, try basic normalization (for backward compatibility)
+    # But this should rarely be used - prefer passing available_models
     deprecated_models = {
         'Mistral-Large-2407': None,
         'mistral-large-2407': None,
         'mistral-large-latest': None,
-        'DeepSeek-R1-Distill-Qwen-32B': None  # This model doesn't exist on all endpoints
+        'DeepSeek-R1-Distill-Qwen-32B': None
     }
     
     if model in deprecated_models:
         logger.warning(f"Model name '{model}' is deprecated or not available. Please configure a valid model in Settings.")
         return None
     
-    # Return the model as-is - let the API call fail with a clear error if it's invalid
+    # Return the model as-is if no available models to check against
+    # This allows the API call to proceed, but it may fail if the model doesn't exist
     return model
+
+
+async def _get_ovh_available_models(ovh_key: str, ovh_endpoint: str) -> List[str]:
+    """
+    Helper function to fetch available models from OVH endpoint.
+    Returns empty list if fetch fails.
+    """
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f'{ovh_endpoint}/models',
+                headers={'Authorization': f'Bearer {ovh_key}'}
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if isinstance(data, dict) and 'data' in data:
+                    return [m.get('id', '') for m in data['data'] if 'id' in m]
+    except Exception as e:
+        logger.warning(f"Could not fetch available OVH models: {e}")
+    return []
 
 
 def get_llm_api_keys():
@@ -86,6 +146,16 @@ def get_llm_api_keys():
             ovh_model = None
         if llm_provider == '':
             llm_provider = None
+        
+        # Clean OVH API key: remove any non-ASCII characters that might have been corrupted
+        # This fixes the issue where Unicode characters (like bullet points U+2022) get into the key
+        # JWT tokens contain: header.payload.signature (dots are required)
+        if ovh_key:
+            # Keep only ASCII characters that are valid in JWT/base64 (A-Z, a-z, 0-9, +, /, =, -, _, .)
+            cleaned_key = ''.join(c for c in ovh_key if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+            if cleaned_key != ovh_key:
+                logger.warning(f"OVH API key contained non-ASCII characters, cleaned: {len(ovh_key)} -> {len(cleaned_key)} chars")
+                ovh_key = cleaned_key if cleaned_key else None
         
         # Fallback sur les variables d'environnement UNIQUEMENT si vraiment pas en base (None)
         # Mais ce fallback ne devrait normalement jamais être utilisé car les clés sont en base
@@ -252,18 +322,37 @@ Focus on actionable improvements that address real customer pain points. Be spec
                 
                 elif provider == 'ovh':
                     # OVH AI Endpoints uses OpenAI-compatible API
-                    url = f"{ovh_endpoint}/chat/completions"
-                    model = normalize_ovh_model_name(ovh_model)
+                    # Protect against encoding issues in headers and URL
+                    ovh_endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=500)
+                    api_key_safe = safe_error_text(str(api_key) if api_key else "", max_length=500)
+                    url = f"{ovh_endpoint_safe}/chat/completions"
                     
-                    # Check if model is configured
+                    # Get available models from endpoint to validate model name
+                    available_models = []
+                    try:
+                        async with httpx.AsyncClient(timeout=5.0) as check_client:
+                            check_response = await check_client.get(
+                                f'{ovh_endpoint_safe}/models',
+                                headers={'Authorization': f'Bearer {api_key_safe}'}
+                            )
+                            if check_response.status_code == 200:
+                                check_data = check_response.json()
+                                if isinstance(check_data, dict) and 'data' in check_data:
+                                    available_models = [m.get('id', '') for m in check_data['data'] if 'id' in m]
+                    except Exception as e:
+                        logger.warning(f"Could not fetch available OVH models for validation: {e}")
+                    
+                    model = normalize_ovh_model_name(ovh_model, available_models)
+                    
+                    # Check if model is configured and exists in available models
                     if not model:
-                        logger.error("OVH AI model not configured")
+                        logger.error(f"OVH AI model not configured or not found. Available models: {available_models[:5] if available_models else 'unknown'}")
                         return None
                     
                     response = await client.post(
                         url,
                         headers={
-                            'Authorization': f'Bearer {api_key}',
+                            'Authorization': f'Bearer {api_key_safe}',
                             'Content-Type': 'application/json'
                         },
                         json={
@@ -666,17 +755,24 @@ Be specific and reference actual content from the posts when possible."""
                 
                 elif provider == 'ovh':
                     # OVH AI Endpoints uses OpenAI-compatible API
-                    model = normalize_ovh_model_name(ovh_model)
+                    # Protect against encoding issues in headers and URL
+                    ovh_endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=500)
+                    api_key_safe = safe_error_text(str(api_key) if api_key else "", max_length=500)
                     
-                    # Check if model is configured
+                    # Get available models from endpoint to validate model name
+                    available_models = await _get_ovh_available_models(api_key_safe, ovh_endpoint_safe)
+                    
+                    model = normalize_ovh_model_name(ovh_model, available_models)
+                    
+                    # Check if model is configured and exists in available models
                     if not model:
-                        logger.error("[Recommended Actions] OVH AI model not configured")
+                        logger.error(f"[Recommended Actions] OVH AI model not configured or not found. Available models: {available_models[:5] if available_models else 'unknown'}")
                         return None
                     
                     response = await client.post(
-                        f'{ovh_endpoint}/chat/completions',
+                        f'{ovh_endpoint_safe}/chat/completions',
                         headers={
-                            'Authorization': f'Bearer {api_key}',
+                            'Authorization': f'Bearer {api_key_safe}',
                             'Content-Type': 'application/json'
                         },
                         json={
@@ -1204,7 +1300,10 @@ CRITICAL INSTRUCTIONS:
                 
                 elif provider == 'ovh':
                     # OVH AI Endpoints uses OpenAI-compatible API
-                    url = endpoint_url or ovh_endpoint
+                    # Protect against encoding issues in headers and URL
+                    endpoint_url_raw = endpoint_url or ovh_endpoint
+                    endpoint_url_safe = safe_error_text(str(endpoint_url_raw) if endpoint_url_raw else "", max_length=500)
+                    api_key_safe = safe_error_text(str(api_key) if api_key else "", max_length=500)
                     model = normalize_ovh_model_name(model_name or ovh_model)
                     
                     # Check if model is configured
@@ -1214,10 +1313,13 @@ CRITICAL INSTRUCTIONS:
                             detail="OVH AI model not configured. Please select a valid model in Settings (e.g., Llama-3.1-70B-Instruct, Qwen-2.5-72B-Instruct)."
                         )
                     
+                    # Log the model being used for debugging
+                    logger.info(f"Using OVH model: '{model}' (normalized from: '{model_name or ovh_model}') on endpoint: {endpoint_url_safe}")
+                    
                     response = await client.post(
-                        f'{url}/chat/completions',
+                        f'{endpoint_url_safe}/chat/completions',
                         headers={
-                            'Authorization': f'Bearer {api_key}',
+                            'Authorization': f'Bearer {api_key_safe}',
                             'Content-Type': 'application/json'
                         },
                         json={
@@ -1236,41 +1338,121 @@ CRITICAL INSTRUCTIONS:
                     logger.info(f"OVH AI API call successful, content length: {len(content)}")
                     return content
         except httpx.HTTPStatusError as e:
-            error_text = e.response.text[:500] if hasattr(e.response, 'text') else str(e)
-            logger.error(f"{provider} API HTTP error: {e.response.status_code} - {error_text}")
+            # Safely extract error text - protect against encoding issues
+            error_text = ""
+            try:
+                if hasattr(e.response, 'text'):
+                    raw_text = e.response.text
+                    # Safely encode/decode to UTF-8
+                    if isinstance(raw_text, str):
+                        error_text = raw_text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:500]
+                    else:
+                        error_text = str(raw_text).encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:500]
+                else:
+                    error_text = str(e).encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:500]
+            except Exception:
+                error_text = f"HTTP {e.response.status_code} error"
+            
+            try:
+                logger.error(f"{provider} API HTTP error: {e.response.status_code} - {error_text}")
+            except Exception:
+                logger.error(f"API HTTP error: {e.response.status_code}")
             
             # Special handling for 404 model_not_found errors
             if e.response.status_code == 404 and provider == 'ovh':
                 try:
                     error_json = e.response.json()
-                    if error_json.get('error', {}).get('code') == 'model_not_found':
-                        model_name = error_json.get('error', {}).get('message', '').split('`')[1] if '`' in error_json.get('error', {}).get('message', '') else 'unknown'
-                        raise HTTPException(
-                            status_code=503,
-                            detail=f"OVH AI model '{model_name}' not found on your endpoint. Please check available models in Settings and update the model name. Common models: Llama-3.1-70B-Instruct, Qwen-2.5-72B-Instruct, or check your OVH AI Endpoints documentation."
-                        )
-                except (ValueError, KeyError, IndexError):
-                    pass
+                    error_info = error_json.get('error', {})
+                    
+                    # Try multiple ways to extract model name from error
+                    model_name = model or 'unknown'
+                    error_message = error_info.get('message', '')
+                    
+                    # Method 1: Extract from error message (format: "model `model-name` not found")
+                    if '`' in error_message:
+                        parts = error_message.split('`')
+                        if len(parts) >= 2:
+                            model_name = parts[1]
+                    # Method 2: Extract from param field
+                    elif 'param' in error_info:
+                        model_name = error_info.get('param', model_name)
+                    # Method 3: Use the configured model name
+                    elif model:
+                        model_name = model
+                    
+                    # Try to fetch available models to suggest alternatives
+                    available_models = []
+                    try:
+                        from ..database import pg_get_config
+                        ovh_key_check = pg_get_config('OVH_API_KEY')
+                        ovh_endpoint_check = pg_get_config('OVH_ENDPOINT_URL')
+                        if ovh_key_check and ovh_endpoint_check:
+                            import httpx
+                            async with httpx.AsyncClient(timeout=5.0) as check_client:
+                                check_response = await check_client.get(
+                                    f'{ovh_endpoint_check}/models',
+                                    headers={'Authorization': f'Bearer {ovh_key_check}'}
+                                )
+                                if check_response.status_code == 200:
+                                    check_data = check_response.json()
+                                    if isinstance(check_data, dict) and 'data' in check_data:
+                                        available_models = [m.get('id', '') for m in check_data['data'] if 'id' in m]
+                    except Exception:
+                        pass
+                    
+                    # Build error message with available models if found
+                    error_detail = f"OVH AI model '{model_name}' not found on your endpoint."
+                    if available_models:
+                        error_detail += f" Available models: {', '.join(available_models[:5])}"
+                        if len(available_models) > 5:
+                            error_detail += f" (and {len(available_models) - 5} more)"
+                    else:
+                        error_detail += " Please check available models in Settings and update the model name."
+                    
+                    raise HTTPException(
+                        status_code=503,
+                        detail=error_detail
+                    )
+                except HTTPException:
+                    raise  # Re-raise HTTPException
+                except (ValueError, KeyError, IndexError, Exception) as parse_err:
+                    # If we can't parse the error, use generic message with configured model
+                    raise HTTPException(
+                        status_code=503,
+                        detail=f"OVH AI model '{model or 'unknown'}' not found on your endpoint. Please check available models in Settings and update the model name."
+                    )
             
             # Propager l'erreur HTTP spécifique au lieu de retourner None
+            # Use safe_error_text to ensure ASCII-safe error message
+            provider_safe = safe_error_text(str(provider), max_length=50)
+            error_text_safe = safe_error_text(error_text, max_length=500)
             raise HTTPException(
                 status_code=503,
-                detail=f"{provider} API error ({e.response.status_code}): {error_text}. Please check your API key and model configuration."
+                detail=f"{provider_safe} API error ({e.response.status_code}): {error_text_safe}. Please check your API key and model configuration."
             )
         except httpx.TimeoutException as e:
-            logger.error(f"{provider} API timeout error: {e}")
+            try:
+                logger.error(f"{provider} API timeout error")
+            except Exception:
+                logger.error("API timeout error")
+            provider_safe = safe_error_text(str(provider), max_length=50)
             raise HTTPException(
                 status_code=503,
-                detail=f"{provider} API timeout: The request took too long. Please try again."
+                detail=f"{provider_safe} API timeout: The request took too long. Please try again."
             )
         except HTTPException:
             # Re-raise HTTP exceptions
             raise
         except Exception as e:
-            logger.error(f"{provider} API error: {type(e).__name__}: {e}", exc_info=True)
+            try:
+                logger.error(f"{provider} API error: {type(e).__name__}", exc_info=True)
+            except Exception:
+                logger.error("API error occurred", exc_info=True)
+            provider_safe = safe_error_text(str(provider), max_length=50)
+            error_msg_safe = safe_error_text(str(e), max_length=200)
             raise HTTPException(
                 status_code=503,
-                detail=f"{provider} API error: {str(e)}. Please check your API key and try again."
+                detail=f"{provider_safe} API error: {error_msg_safe}. Please check your API key and try again."
             )
     
     # If 2 or more LLMs are configured (and no specific provider is set), call them in parallel and summarize
@@ -2139,17 +2321,27 @@ CRITICAL INSTRUCTIONS:
                 
                 elif provider == 'ovh':
                     # OVH AI Endpoints uses OpenAI-compatible API
-                    model = normalize_ovh_model_name(ovh_model)
+                    # Protect against encoding issues in headers and URL
+                    ovh_endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=500)
+                    api_key_safe = safe_error_text(str(api_key) if api_key else "", max_length=500)
                     
-                    # Check if model is configured
+                    # Get available models from endpoint to validate model name
+                    available_models = await _get_ovh_available_models(api_key_safe, ovh_endpoint_safe)
+                    
+                    model = normalize_ovh_model_name(ovh_model, available_models)
+                    
+                    # Check if model is configured and exists in available models
                     if not model:
-                        logger.error("[Improvements Analysis] OVH AI model not configured")
+                        logger.error(f"[Improvements Analysis] OVH AI model not configured or not found. Available models: {available_models[:5] if available_models else 'unknown'}")
                         return None
                     
+                    # Log the model being used for debugging
+                    logger.info(f"[Improvements Analysis] Using OVH model: '{model}' (from: '{ovh_model}') on endpoint: {ovh_endpoint_safe}")
+                    
                     response = await client.post(
-                        f'{ovh_endpoint}/chat/completions',
+                        f'{ovh_endpoint_safe}/chat/completions',
                         headers={
-                            'Authorization': f'Bearer {api_key}',
+                            'Authorization': f'Bearer {api_key_safe}',
                             'Content-Type': 'application/json'
                         },
                         json={
@@ -2165,8 +2357,61 @@ CRITICAL INSTRUCTIONS:
                     response.raise_for_status()
                     result = response.json()
                     return result['choices'][0]['message']['content']
+        except httpx.HTTPStatusError as e:
+            # Special handling for OVH model_not_found errors
+            if e.response.status_code == 404 and provider == 'ovh':
+                try:
+                    error_json = e.response.json()
+                    error_info = error_json.get('error', {})
+                    
+                    # Try multiple ways to extract model name from error
+                    model_name = ovh_model or 'unknown'
+                    error_message = error_info.get('message', '')
+                    
+                    # Method 1: Extract from error message (format: "model `model-name` not found")
+                    if '`' in error_message:
+                        parts = error_message.split('`')
+                        if len(parts) >= 2:
+                            model_name = parts[1]
+                    # Method 2: Extract from param field
+                    elif 'param' in error_info:
+                        model_name = error_info.get('param', model_name)
+                    # Method 3: Use the configured model name
+                    elif ovh_model:
+                        model_name = ovh_model
+                    
+                    # Try to fetch available models to suggest alternatives
+                    available_models = []
+                    try:
+                        from ..database import pg_get_config
+                        ovh_key_check = pg_get_config('OVH_API_KEY')
+                        ovh_endpoint_check = pg_get_config('OVH_ENDPOINT_URL')
+                        if ovh_key_check and ovh_endpoint_check:
+                            import httpx
+                            async with httpx.AsyncClient(timeout=5.0) as check_client:
+                                check_response = await check_client.get(
+                                    f'{ovh_endpoint_check}/models',
+                                    headers={'Authorization': f'Bearer {ovh_key_check}'}
+                                )
+                                if check_response.status_code == 200:
+                                    check_data = check_response.json()
+                                    if isinstance(check_data, dict) and 'data' in check_data:
+                                        available_models = [m.get('id', '') for m in check_data['data'] if 'id' in m]
+                    except Exception:
+                        pass
+                    
+                    logger.error(f"[Improvements Analysis] OVH model '{model_name}' not found on endpoint")
+                    if available_models:
+                        logger.error(f"[Improvements Analysis] Available models: {', '.join(available_models[:5])}")
+                    return None
+                except (ValueError, KeyError, IndexError, Exception):
+                    logger.error(f"[Improvements Analysis] OVH API HTTP error: {e.response.status_code}")
+                    return None
+            
+            logger.warning(f"[Improvements Analysis] {provider} API HTTP error ({e.response.status_code}): {e}")
+            return None
         except Exception as e:
-            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+            logger.warning(f"[Improvements Analysis] {provider} API error: {type(e).__name__}: {e}")
             return None
         return None
     
@@ -2321,11 +2566,13 @@ Format your response as a JSON object with this structure:
             content = await call_llm('anthropic', anthropic_key, prompt)
         elif llm_provider == 'mistral' and mistral_key:
             content = await call_llm('mistral', mistral_key, prompt)
+        elif llm_provider == 'ovh' and ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt)
         elif llm_provider == 'openai' and openai_key:
             content = await call_llm('openai', openai_key, prompt)
         else:
             # Le provider spécifié n'a pas de clé, ou aucun provider spécifié
-            # Utiliser le premier disponible (priorité: OpenAI > Anthropic > Mistral)
+            # Utiliser le premier disponible (priorité: OpenAI > Anthropic > Mistral > OVH)
             if llm_provider and not content:
                 logger.warning(f"[Improvements Analysis] LLM provider '{llm_provider}' specified but no key available, using first available LLM")
             if openai_key:
@@ -2334,6 +2581,8 @@ Format your response as a JSON object with this structure:
                 content = await call_llm('anthropic', anthropic_key, prompt)
             elif mistral_key:
                 content = await call_llm('mistral', mistral_key, prompt)
+            elif ovh_key:
+                content = await call_llm('ovh', ovh_key, prompt)
         
         if content:
             # Extract JSON from response
