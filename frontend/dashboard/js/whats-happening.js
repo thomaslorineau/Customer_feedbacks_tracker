@@ -1353,11 +1353,16 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
         const { API } = await import('./api.js');
         const api = new API();
         const response = await api.getRecommendedActions(posts, recentPosts, stats, 5);
+        console.log('[Recommended Actions] API response:', response);
         const actions = response.actions || [];
         const llmAvailable = response.llm_available !== false; // Default to true if not specified
         
+        console.log('[Recommended Actions] Actions received:', actions.length, 'actions');
+        console.log('[Recommended Actions] LLM available:', llmAvailable);
+        
         // Render actions
         if (actions.length > 0) {
+            console.log('[Recommended Actions] Rendering', actions.length, 'actions');
             actionsContainer.innerHTML = `
                 <div class="recommended-actions-header">
                     <h3>Recommended Actions</h3>
