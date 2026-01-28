@@ -423,8 +423,12 @@ async def set_llm_config(
     
     logger.info("LLM configuration updated - saving to database")
     
+    # Get the payload as dict to check which fields were actually provided
+    payload_dict = payload.model_dump(exclude_unset=True)
+    
     # Store in PostgreSQL app_config table (persistent across restarts)
-    if payload.openai_api_key is not None:
+    # Only update keys that were explicitly provided in the request
+    if 'openai_api_key' in payload_dict:
         if payload.openai_api_key and payload.openai_api_key.strip():
             pg_set_config('OPENAI_API_KEY', payload.openai_api_key.strip())
             logger.info("OpenAI API key saved to database")
@@ -432,7 +436,7 @@ async def set_llm_config(
             pg_delete_config('OPENAI_API_KEY')
             logger.info("OpenAI API key removed from database")
     
-    if payload.anthropic_api_key is not None:
+    if 'anthropic_api_key' in payload_dict:
         if payload.anthropic_api_key and payload.anthropic_api_key.strip():
             pg_set_config('ANTHROPIC_API_KEY', payload.anthropic_api_key.strip())
             logger.info("Anthropic API key saved to database")
@@ -440,7 +444,7 @@ async def set_llm_config(
             pg_delete_config('ANTHROPIC_API_KEY')
             logger.info("Anthropic API key removed from database")
     
-    if payload.mistral_api_key is not None:
+    if 'mistral_api_key' in payload_dict:
         if payload.mistral_api_key and payload.mistral_api_key.strip():
             pg_set_config('MISTRAL_API_KEY', payload.mistral_api_key.strip())
             logger.info("Mistral API key saved to database")
@@ -453,19 +457,20 @@ async def set_llm_config(
         logger.info(f"LLM provider set to: {payload.llm_provider}")
     
     # Update environment variables for current session (so it works immediately)
-    if payload.openai_api_key is not None:
-        if payload.openai_api_key:
-            os.environ['OPENAI_API_KEY'] = payload.openai_api_key
+    # Only update keys that were explicitly provided
+    if 'openai_api_key' in payload_dict:
+        if payload.openai_api_key and payload.openai_api_key.strip():
+            os.environ['OPENAI_API_KEY'] = payload.openai_api_key.strip()
         elif 'OPENAI_API_KEY' in os.environ:
             del os.environ['OPENAI_API_KEY']
-    if payload.anthropic_api_key is not None:
-        if payload.anthropic_api_key:
-            os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key
+    if 'anthropic_api_key' in payload_dict:
+        if payload.anthropic_api_key and payload.anthropic_api_key.strip():
+            os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key.strip()
         elif 'ANTHROPIC_API_KEY' in os.environ:
             del os.environ['ANTHROPIC_API_KEY']
-    if payload.mistral_api_key is not None:
-        if payload.mistral_api_key:
-            os.environ['MISTRAL_API_KEY'] = payload.mistral_api_key
+    if 'mistral_api_key' in payload_dict:
+        if payload.mistral_api_key and payload.mistral_api_key.strip():
+            os.environ['MISTRAL_API_KEY'] = payload.mistral_api_key.strip()
         elif 'MISTRAL_API_KEY' in os.environ:
             del os.environ['MISTRAL_API_KEY']
     if payload.llm_provider:
@@ -474,11 +479,11 @@ async def set_llm_config(
     # Also update the config singleton if it exists
     try:
         from ..config import config
-        if payload.openai_api_key is not None:
+        if 'openai_api_key' in payload_dict:
             config.openai_api_key = payload.openai_api_key if payload.openai_api_key else None
-        if payload.anthropic_api_key is not None:
+        if 'anthropic_api_key' in payload_dict:
             config.anthropic_api_key = payload.anthropic_api_key if payload.anthropic_api_key else None
-        if payload.mistral_api_key is not None:
+        if 'mistral_api_key' in payload_dict:
             config.mistral_api_key = payload.mistral_api_key if payload.mistral_api_key else None
         if payload.llm_provider:
             config.llm_provider = payload.llm_provider
