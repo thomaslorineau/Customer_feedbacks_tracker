@@ -100,10 +100,13 @@ if ($existingTables -and $existingTables -notmatch "ERROR") {
     foreach ($table in $tables) {
         $table = $table.Trim()
         if ($table) {
+            # Changer le propriétaire
             & $psql -U postgres -d $dbName -c "ALTER TABLE IF EXISTS $table OWNER TO $dbUser;" 2>&1 | Out-Null
+            # Donner toutes les permissions
+            & $psql -U postgres -d $dbName -c "GRANT ALL PRIVILEGES ON TABLE $table TO $dbUser;" 2>&1 | Out-Null
         }
     }
-    Write-Host "   ✅ Propriétaires des tables corrigés" -ForegroundColor Green
+    Write-Host "   ✅ Propriétaires et permissions des tables corrigés" -ForegroundColor Green
 }
 
 # ============================================
