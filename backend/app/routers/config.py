@@ -209,6 +209,32 @@ async def get_config():
         ovh_endpoint = None
     if ovh_model == '':
         ovh_model = None
+    
+    # CRITICAL: Clean OVH API key to ensure correct length calculation
+    # This prevents the issue where a corrupted/masked key shows wrong length
+    if ovh_key:
+        # Check if key appears to be corrupted (too short for a JWT token)
+        # OVH JWT tokens are typically 200+ characters
+        if len(ovh_key) < 50:
+            logger.error(f"OVH API key appears corrupted (only {len(ovh_key)} chars). Expected 200+ chars for JWT token. Key may have been saved as masked value.")
+            # Don't use corrupted key - set to None so it shows as not configured
+            ovh_key = None
+        else:
+            # Import cleaning function
+            from ..db_postgres import _clean_ovh_api_key
+            cleaned_ovh_key = _clean_ovh_api_key(ovh_key)
+            # Only use cleaned key if it's different and not empty
+            # If cleaned key is significantly shorter, it might be corrupted - log warning
+            if cleaned_ovh_key != ovh_key:
+                if len(cleaned_ovh_key) < len(ovh_key) * 0.5:
+                    # Key was significantly shortened - might be corrupted
+                    logger.warning(f"OVH API key length changed significantly during cleaning: {len(ovh_key)} -> {len(cleaned_ovh_key)} chars")
+                # Save cleaned version back to database if different
+                if cleaned_ovh_key and len(cleaned_ovh_key) >= 50:
+                    from ..database import pg_set_config
+                    pg_set_config('OVH_API_KEY', cleaned_ovh_key)
+                    logger.info(f"OVH API key cleaned in get_config: {len(ovh_key)} -> {len(cleaned_ovh_key)} chars")
+            ovh_key = cleaned_ovh_key if cleaned_ovh_key else ovh_key
     if github_token == '':
         github_token = None
     if trustpilot_key == '':
@@ -524,8 +550,57 @@ async def set_llm_config(
     if 'ovh_api_key' in raw_payload_dict:
         ovh_value = payload.ovh_api_key.strip() if payload.ovh_api_key else None
         if ovh_value:
-            pg_set_config('OVH_API_KEY', ovh_value)
-            logger.info("OVH API key saved to database")
+            # CRITICAL: Validate OVH API key before saving
+            from ..db_postgres import _clean_ovh_api_key, _validate_ovh_api_key
+            
+            # Check if key is too short (likely masked/corrupted)
+            if len(ovh_value) < 50:
+                logger.error(f"OVH API key too short ({len(ovh_value)} chars). Refusing to save masked/corrupted key.")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"OVH API key appears to be masked or corrupted (only {len(ovh_value)} characters). Please enter the full API key (typically 200+ characters)."
+                )
+            
+            # Clean the key
+            cleaned_ovh_value = _clean_ovh_api_key(ovh_value)
+            if not cleaned_ovh_value or len(cleaned_ovh_value) < 50:
+                logger.error(f"OVH API key cleaning failed or resulted in invalid key (length: {len(cleaned_ovh_value) if cleaned_ovh_value else 0})")
+                raise HTTPException(
+                    status_code=400,
+                    detail="OVH API key is invalid or corrupted. Please enter a valid API key."
+                )
+            
+            # Validate the cleaned key
+            if not _validate_ovh_api_key(cleaned_ovh_value):
+                logger.error(f"OVH API key validation failed after cleaning (length: {len(cleaned_ovh_value)})")
+                raise HTTPException(
+                    status_code=400,
+                    detail="OVH API key validation failed. Please check your API key format."
+                )
+            
+            if cleaned_ovh_value != ovh_value:
+                logger.warning(f"OVH API key cleaned before save: {len(ovh_value)} -> {len(cleaned_ovh_value)} chars")
+            
+            # Save the cleaned and validated key
+            success = pg_set_config('OVH_API_KEY', cleaned_ovh_value)
+            if not success:
+                logger.error("Failed to save OVH API key to database")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to save OVH API key. Please try again."
+                )
+            
+            # Verify the saved key
+            from ..database import pg_get_config
+            saved_key = pg_get_config('OVH_API_KEY')
+            if not saved_key or len(saved_key) < 50:
+                logger.error(f"Saved OVH API key verification failed (length: {len(saved_key) if saved_key else 0})")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to verify saved OVH API key. Please try again."
+                )
+            
+            logger.info(f"OVH API key saved and verified successfully (length: {len(saved_key)})")
         else:
             pg_delete_config('OVH_API_KEY')
             logger.info("OVH API key removed from database")
@@ -1071,39 +1146,44 @@ async def update_pain_points_config(payload: PainPointsPayload):
     **Security:**
     - Requires authentication
     - Only returns the key if it exists
+    - Reads from database (source of truth)
     
     **Query Parameters:**
-    - `provider`: Provider name (openai, anthropic, mistral, github, trustpilot, linkedin, twitter)
+    - `provider`: Provider name (openai, anthropic, mistral, ovh, github, trustpilot, linkedin, twitter)
     """,
     tags=["Configuration"]
 )
-async def reveal_key(provider: str = Query(..., description="Provider name (openai, anthropic, mistral, github, trustpilot, linkedin, twitter)")):
-    """Reveal API key for editing purposes."""
-    from pathlib import Path
-    from dotenv import load_dotenv
+async def reveal_key(provider: str = Query(..., description="Provider name (openai, anthropic, mistral, ovh, github, trustpilot, linkedin, twitter)")):
+    """Reveal API key for editing purposes. Reads from database."""
+    from ..database import pg_get_config
     
-    # Reload .env to get latest values
-    backend_path = Path(__file__).resolve().parents[2]
-    env_path = backend_path / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
+    # Normalize provider name to lowercase
+    provider = provider.lower().strip() if provider else None
     
-    # Map provider names to environment variable names
+    # Map provider names to database config keys
     provider_map = {
         'openai': 'OPENAI_API_KEY',
         'anthropic': 'ANTHROPIC_API_KEY',
         'mistral': 'MISTRAL_API_KEY',
+        'ovh': 'OVH_API_KEY',
         'github': 'GITHUB_TOKEN',
         'trustpilot': 'TRUSTPILOT_API_KEY',
         'linkedin': 'LINKEDIN_CLIENT_ID',  # Note: LinkedIn has both client_id and client_secret
         'twitter': 'TWITTER_BEARER_TOKEN'
     }
     
-    if not provider or provider not in provider_map:
-        raise HTTPException(status_code=400, detail=f"Invalid provider: {provider}. Valid providers: {', '.join(provider_map.keys())}")
+    if not provider:
+        raise HTTPException(status_code=400, detail="Provider parameter is required")
     
-    env_var_name = provider_map[provider]
-    key_value = os.getenv(env_var_name)
+    if provider not in provider_map:
+        raise HTTPException(status_code=400, detail=f"Invalid provider: '{provider}'. Valid providers: {', '.join(sorted(provider_map.keys()))}")
+    
+    config_key = provider_map[provider]
+    key_value = pg_get_config(config_key)
+    
+    # Normalize empty strings to None
+    if key_value == '':
+        key_value = None
     
     if not key_value:
         raise HTTPException(status_code=404, detail=f"API key not found for provider: {provider}")
@@ -1227,6 +1307,138 @@ class OVHModelsResponse(BaseModel):
     error: Optional[str] = Field(None, description="Error message if models could not be fetched")
 
 
+class OVHModelsTestRequest(BaseModel):
+    """Request model for testing OVH API key and loading models."""
+    api_key: Optional[str] = Field(None, description="OVH API key to test (optional, uses saved key if not provided)")
+    endpoint_url: Optional[str] = Field(None, description="OVH endpoint URL (optional, uses saved or default if not provided)")
+
+
+@router.post(
+    "/api/ovh/models/test",
+    response_model=OVHModelsResponse,
+    summary="Test OVH API Key and Get Available Models",
+    description="""
+    Tests an OVH API key and retrieves the list of available models.
+    Useful for loading models before saving the API key.
+    
+    **Request Body:**
+    ```json
+    {
+        "api_key": "your-ovh-api-key",
+        "endpoint_url": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1"
+    }
+    ```
+    
+    **Returns:**
+    - `models`: List of available model names
+    - `endpoint`: The endpoint URL used to fetch models
+    - `error`: Error message if models could not be fetched
+    """,
+    tags=["Configuration", "LLM", "OVH"]
+)
+async def test_ovh_models(request: OVHModelsTestRequest):
+    """Test OVH API key and get available models."""
+    try:
+        import httpx
+        from ..database import pg_get_config
+        from .dashboard.insights import safe_error_text
+        
+        # Use provided API key or get from database
+        ovh_key = request.api_key if request.api_key else pg_get_config('OVH_API_KEY')
+        ovh_endpoint = request.endpoint_url if request.endpoint_url else pg_get_config('OVH_ENDPOINT_URL')
+        
+        # Normalize empty strings
+        if ovh_key == '':
+            ovh_key = None
+        if ovh_endpoint == '':
+            ovh_endpoint = None
+        
+        # Clean API key
+        if ovh_key:
+            cleaned_key = ''.join(c for c in ovh_key if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+            if cleaned_key != ovh_key:
+                logger.warning(f"OVH API key contained non-ASCII characters, cleaned: {len(ovh_key)} -> {len(cleaned_key)} chars")
+            ovh_key = cleaned_key if cleaned_key else None
+        
+        # Use default endpoint if not provided
+        if not ovh_endpoint:
+            ovh_endpoint = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
+        
+        if not ovh_key:
+            endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+            return OVHModelsResponse(
+                models=[],
+                endpoint=endpoint_safe,
+                error="OVH API key is required"
+            )
+        
+        # Call OVH AI Endpoints /models endpoint
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            ovh_key_ascii = ''.join(c for c in ovh_key if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+            ovh_key_safe = ovh_key_ascii if ovh_key_ascii else ""
+            
+            if ovh_endpoint:
+                ovh_endpoint_ascii = ''.join(c for c in str(ovh_endpoint) if ord(c) < 128)
+                ovh_endpoint_safe = ovh_endpoint_ascii if ovh_endpoint_ascii else ""
+            else:
+                ovh_endpoint_safe = ""
+            
+            auth_header = f'Bearer {ovh_key_safe}'
+            models_url = f'{ovh_endpoint_safe}/models'
+            
+            try:
+                response = await client.get(
+                    models_url,
+                    headers={
+                        'Authorization': auth_header,
+                        'Content-Type': 'application/json'
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, dict) and 'data' in data:
+                        models = [m.get('id', '') for m in data['data'] if 'id' in m]
+                        return OVHModelsResponse(
+                            models=models,
+                            endpoint=ovh_endpoint_safe,
+                            error=None
+                        )
+                    else:
+                        return OVHModelsResponse(
+                            models=[],
+                            endpoint=ovh_endpoint_safe,
+                            error="Invalid response format from OVH endpoint"
+                        )
+                else:
+                    error_text = safe_error_text(response.text, max_length=200)
+                    return OVHModelsResponse(
+                        models=[],
+                        endpoint=ovh_endpoint_safe,
+                        error=f"Failed to fetch models: {response.status_code} - {error_text}"
+                    )
+            except httpx.TimeoutException:
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=ovh_endpoint_safe,
+                    error="Request timeout - OVH endpoint may be unreachable"
+                )
+            except Exception as e:
+                error_msg = safe_error_text(str(e), max_length=200)
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=ovh_endpoint_safe,
+                    error=f"Error fetching models: {error_msg}"
+                )
+    except Exception as e:
+        error_msg = safe_error_text(str(e), max_length=200)
+        return OVHModelsResponse(
+            models=[],
+            endpoint="",
+            error=f"Unexpected error: {error_msg}"
+        )
+
+
 @router.get(
     "/api/ovh/models",
     response_model=OVHModelsResponse,
@@ -1256,102 +1468,558 @@ class OVHModelsResponse(BaseModel):
 )
 async def get_ovh_models():
     """Get available models from OVH AI Endpoints."""
+    # Wrap ENTIRE function in try/except to catch ANY encoding errors
+    try:
+        import httpx
+        from ..database import pg_get_config
+        from .dashboard.insights import safe_error_text
+        
+        # Get OVH configuration from database
+        ovh_key = pg_get_config('OVH_API_KEY')
+        ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+        
+        # Normalize empty strings
+        if ovh_key == '':
+            ovh_key = None
+        if ovh_endpoint == '':
+            ovh_endpoint = None
+        
+        # Clean API key: remove any non-ASCII characters that might have been corrupted
+        # This fixes the issue where Unicode characters (like bullet points) get into the key
+        # JWT tokens contain: header.payload.signature (dots are required)
+        if ovh_key:
+            # Keep only ASCII characters that are valid in JWT/base64 (A-Z, a-z, 0-9, +, /, =, -, _, .)
+            cleaned_key = ''.join(c for c in ovh_key if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+            if cleaned_key != ovh_key:
+                try:
+                    logger.warning(f"OVH API key contained non-ASCII characters, cleaned: {len(ovh_key)} -> {len(cleaned_key)} chars")
+                except Exception:
+                    # If logging fails due to encoding, skip it
+                    pass
+                ovh_key = cleaned_key if cleaned_key else None
+        
+        # Use default endpoint if not configured
+        if not ovh_endpoint:
+            ovh_endpoint = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
+        
+        if not ovh_key:
+            endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+            return OVHModelsResponse(
+                models=[],
+                endpoint=endpoint_safe,
+                error="OVH API key not configured. Please configure your OVH API key in Settings."
+            )
+        
+        # Now safe to proceed with API call
+        # Call OVH AI Endpoints /models endpoint (OpenAI-compatible)
+        # Protect headers against encoding issues - ensure all values are ASCII-safe
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Safely encode API key and endpoint for headers
+            # httpx requires ASCII for headers, so we must ensure ASCII encoding
+            # The key should already be cleaned, but double-check DIRECTLY without safe_error_text
+            # to avoid any encoding issues in safe_error_text itself
+            if ovh_key:
+                # Ensure key is ASCII-safe (should already be cleaned, but verify)
+                # Direct filtering without any string operations that might fail
+                # JWT tokens contain: header.payload.signature (dots are required)
+                ovh_key_ascii = ''.join(c for c in ovh_key if ord(c) < 128 and (c.isalnum() or c in '+-/=_.'))
+                ovh_key_safe = ovh_key_ascii if ovh_key_ascii else ""
+            else:
+                ovh_key_safe = ""
+            
+            # Also clean endpoint directly
+            if ovh_endpoint:
+                ovh_endpoint_ascii = ''.join(c for c in str(ovh_endpoint) if ord(c) < 128)
+                ovh_endpoint_safe = ovh_endpoint_ascii if ovh_endpoint_ascii else ""
+            else:
+                ovh_endpoint_safe = ""
+            
+            # Double-check: ensure headers are ASCII-safe
+            auth_header = f'Bearer {ovh_key_safe}'
+            try:
+                # Test if it can be encoded as ASCII
+                auth_header.encode('ascii')
+            except UnicodeEncodeError as e:
+                # If not, force ASCII with replacement
+                try:
+                    auth_header = auth_header.encode('ascii', errors='replace').decode('ascii', errors='replace')
+                except Exception as e2:
+                    # Ultimate fallback: use only the last 4 chars
+                    auth_header = f'Bearer ***{ovh_key_safe[-4:] if len(ovh_key_safe) > 4 else ""}'
+            
+            # Also ensure endpoint URL is ASCII-safe
+            endpoint_url = f'{ovh_endpoint_safe}/models'
+            try:
+                endpoint_url.encode('ascii')
+            except UnicodeEncodeError:
+                endpoint_url = endpoint_url.encode('ascii', errors='replace').decode('ascii', errors='replace')
+            
+            # Build headers with direct ASCII filtering - no string operations that might fail
+            safe_headers = {}
+            # Authorization header - already cleaned
+            auth_value_ascii = ''.join(c for c in auth_header if ord(c) < 128)
+            safe_headers['Authorization'] = auth_value_ascii
+            
+            # Content-Type header - always ASCII
+            safe_headers['Content-Type'] = 'application/json'
+            
+            # Final verification: ensure all header values can be encoded as ASCII
+            for header_name, header_value in safe_headers.items():
+                try:
+                    header_value.encode('ascii')
+                except UnicodeEncodeError:
+                    # If still can't encode, filter directly
+                    safe_headers[header_name] = ''.join(c for c in str(header_value) if ord(c) < 128)
+            
+            # Final verification: ensure headers can be encoded as ASCII before calling httpx
+            # httpx will try to encode headers internally, so we must be 100% sure they're ASCII
+            try:
+                # Test encoding of each header value
+                for header_name, header_value in safe_headers.items():
+                    header_value.encode('ascii')
+            except UnicodeEncodeError as header_err:
+                # If headers still can't be encoded, log and return error
+                try:
+                    logger.error("Headers still contain non-ASCII after cleaning")
+                except Exception:
+                    pass
+                endpoint_safe = ''.join(c for c in str(ovh_endpoint) if ord(c) < 128) if ovh_endpoint else ""
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="Error fetching models: API key contains invalid characters"
+                )
+            
+            # Wrap httpx call in try/except to catch encoding errors during request construction
+            try:
+                response = await client.get(
+                    endpoint_url,
+                    headers=safe_headers
+                )
+            except UnicodeEncodeError as httpx_encoding_err:
+                # This error occurs when httpx tries to encode headers internally
+                # Return a clean error message without trying to include the exception details
+                endpoint_safe = ''.join(c for c in str(ovh_endpoint) if ord(c) < 128) if ovh_endpoint else ""
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="Error fetching models: API key contains invalid characters. Please regenerate your API key."
+                )
+            
+            if response.status_code == 401:
+                endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="Authentication failed. Please check your OVH API key."
+                )
+            
+            if response.status_code == 404:
+                # Some endpoints might not support /models, try alternative approach
+                try:
+                    logger.warning("OVH endpoint does not support /models endpoint")
+                except Exception:
+                    pass
+                endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="Models endpoint not available. Please configure the model manually."
+                )
+            
+            # Safely handle response - protect against encoding errors
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as status_err:
+                # Re-raise to be caught by outer handler
+                raise status_err
+            except Exception as status_err:
+                # If raise_for_status fails due to encoding, wrap it
+                raise httpx.HTTPStatusError(
+                    message=f"HTTP {response.status_code}",
+                    request=response.request,
+                    response=response
+                )
+            
+            # Safely parse JSON response - protect against encoding issues
+            # First decode the response content to UTF-8 with error replacement
+            try:
+                # Decode response content to UTF-8 first, then parse JSON
+                response_content = response.content.decode('utf-8', errors='replace')
+                import json
+                result = json.loads(response_content)
+            except (UnicodeDecodeError, UnicodeEncodeError) as encoding_err:
+                # If encoding fails, try with latin-1 as fallback
+                try:
+                    response_content = response.content.decode('latin-1', errors='replace')
+                    import json
+                    result = json.loads(response_content)
+                except Exception:
+                    # If everything fails, return error
+                    endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+                    return OVHModelsResponse(
+                        models=[],
+                        endpoint=endpoint_safe,
+                        error="Failed to decode API response. Please check your endpoint configuration."
+                    )
+            except Exception as json_err:
+                # If JSON parsing fails, try to get text safely
+                try:
+                    try:
+                        logger.warning("Failed to parse JSON response")
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+                endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="Failed to parse API response. Please check your endpoint configuration."
+                )
+            
+            # Extract model IDs from the response
+            # OpenAI-compatible API returns: {"data": [{"id": "model-name", ...}, ...]}
+            models = []
+            if isinstance(result, dict) and 'data' in result:
+                # Safely extract model IDs - protect against encoding issues
+                try:
+                    models = [safe_error_text(str(model.get('id', '')), max_length=100) for model in result['data'] if 'id' in model]
+                    # Filter out empty strings
+                    models = [m for m in models if m]
+                except Exception:
+                    models = []
+            elif isinstance(result, list):
+                try:
+                    models = [safe_error_text(str(model.get('id', '')), max_length=100) for model in result if isinstance(model, dict) and 'id' in model]
+                    models = [m for m in models if m]
+                except Exception:
+                    models = []
+            
+            if not models:
+                try:
+                    logger.warning("No models found in OVH response")
+                except Exception:
+                    pass
+                endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=endpoint_safe,
+                    error="No models found in the response. Please check your endpoint configuration."
+                )
+            
+            try:
+                logger.info(f"Successfully retrieved {len(models)} models from OVH endpoint")
+            except Exception:
+                pass
+            endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+            return OVHModelsResponse(
+                models=sorted(models),  # Sort alphabetically for better UX
+                endpoint=endpoint_safe,
+                error=None
+            )
+            
+    except httpx.TimeoutException:
+        try:
+            logger.error("Timeout while fetching models from OVH endpoint")
+        except Exception:
+            pass
+        endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+        return OVHModelsResponse(
+            models=[],
+            endpoint=endpoint_safe,
+            error="Request timeout. Please check your endpoint URL and network connection."
+        )
+    except httpx.HTTPStatusError as e:
+        # Safely extract error text with UTF-8 encoding
+        try:
+            if hasattr(e.response, 'content'):
+                error_text = e.response.content.decode('utf-8', errors='replace')[:200]
+            elif hasattr(e.response, 'text'):
+                # Safely extract text - protect against encoding issues
+                try:
+                    response_text = e.response.text
+                    if isinstance(response_text, str):
+                        error_text = response_text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:200]
+                    else:
+                        error_text = str(response_text).encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:200]
+                except Exception:
+                    error_text = f"HTTP {e.response.status_code} error"
+            else:
+                try:
+                    error_text = str(e).encode('utf-8', errors='replace').decode('utf-8', errors='replace')[:200]
+                except Exception:
+                    error_text = f"HTTP {e.response.status_code} error"
+        except (UnicodeDecodeError, AttributeError, UnicodeEncodeError):
+            error_text = f"HTTP {e.response.status_code} error"
+        
+        # Ensure error_text is safe for JSON serialization
+        try:
+            error_text_safe = error_text.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            error_text_safe = f"HTTP {e.response.status_code} error"
+        
+        # Log with safe text (logger might have encoding issues)
+        try:
+            logger.error(f"HTTP error while fetching OVH models: {e.response.status_code}")
+        except Exception:
+            pass
+        
+        endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+        return OVHModelsResponse(
+            models=[],
+            endpoint=endpoint_safe,
+            error=f"HTTP error {e.response.status_code}: {error_text_safe}"
+        )
+    except Exception as e:
+        # Safely encode error message - handle encoding errors during str() conversion
+        error_msg_safe = "Error fetching models"
+        error_type_name = "Exception"
+        
+        try:
+            error_type_name = type(e).__name__
+        except Exception:
+            pass
+        
+        # Try to get error message safely using safe_error_text
+        try:
+            # For UnicodeEncodeError, don't try to get the message - it may contain non-ASCII
+            if isinstance(e, (UnicodeEncodeError, UnicodeDecodeError)):
+                error_msg_safe = safe_error_text("Error fetching models: encoding issue", max_length=200)
+            else:
+                # Use repr() first, which is safer than str()
+                try:
+                    error_repr = repr(e)
+                    # Remove the class name and parentheses if present
+                    if error_repr.startswith(error_type_name + '('):
+                        error_msg = error_repr[len(error_type_name) + 1:-1]
+                    else:
+                        error_msg = error_repr
+                    
+                    # Use safe_error_text to ensure ASCII-safe encoding
+                    error_msg_safe = safe_error_text(error_msg, max_length=500)
+                    if not error_msg_safe or error_msg_safe == "":
+                        error_msg_safe = safe_error_text(f"Error fetching models: {error_type_name}", max_length=200)
+                except Exception:
+                    # If repr() fails, use type name only
+                    error_msg_safe = safe_error_text(f"Error fetching models: {error_type_name}", max_length=200)
+        except Exception:
+            # If everything fails, use type name only
+            try:
+                error_msg_safe = safe_error_text(f"Error fetching models: {error_type_name}", max_length=200)
+            except Exception:
+                error_msg_safe = "Error fetching models"
+        
+        # Log safely - avoid using the error message in f-string if it might cause issues
+        try:
+            logger.error("Error fetching OVH models", exc_info=True)
+        except Exception:
+            pass
+        
+        # Safely create response - protect against any encoding issues
+        try:
+            endpoint_safe = safe_error_text(str(ovh_endpoint) if ovh_endpoint else "", max_length=200)
+            return OVHModelsResponse(
+                models=[],
+                endpoint=endpoint_safe,
+                error=error_msg_safe
+            )
+        except Exception as resp_err:
+            # Ultimate fallback - return minimal safe response
+            try:
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint="",
+                    error="Error fetching models"
+                )
+            except Exception:
+                # If even this fails, raise a simple HTTPException
+                raise HTTPException(
+                    status_code=500,
+                    detail="Error fetching OVH models"
+                )
+    except (UnicodeEncodeError, UnicodeDecodeError) as encoding_err:
+        # Catch encoding errors specifically - these can happen anywhere in the function
+        # DO NOT try to log or use the exception message - it may contain non-ASCII
+        try:
+            logger.error("Encoding error in get_ovh_models")
+        except Exception:
+            pass
+        # Return a simple ASCII-safe error message
+        return OVHModelsResponse(
+            models=[],
+            endpoint="",
+            error="Error fetching models: encoding issue"
+        )
+    except Exception as e:
+        # Catch ALL other exceptions that might escape
+        try:
+            logger.error("Unexpected error in get_ovh_models")
+        except Exception:
+            pass
+        return OVHModelsResponse(
+            models=[],
+            endpoint="",
+            error="Error fetching models"
+        )
+
+
+@router.get(
+    "/api/ovh/test",
+    summary="Test OVH AI Configuration",
+    description="""
+    Tests the OVH AI configuration by attempting to connect to the endpoint and make a simple API call.
+    
+    **Returns:**
+    - `configured`: Whether OVH is configured (key, endpoint, model)
+    - `connection_ok`: Whether the connection to the endpoint is successful
+    - `api_call_ok`: Whether a test API call succeeds
+    - `error`: Error message if any step fails
+    - `details`: Detailed information about each step
+    
+    **Example Response:**
+    ```json
+    {
+        "configured": true,
+        "connection_ok": true,
+        "api_call_ok": true,
+        "error": null,
+        "details": {
+            "has_key": true,
+            "has_endpoint": true,
+            "has_model": true,
+            "endpoint": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+            "model": "Mistral-7B-Instruct",
+            "key_length": 12
+        }
+    }
+    ```
+    """,
+    tags=["Configuration", "LLM", "OVH"]
+)
+async def test_ovh_config():
+    """Test OVH AI configuration and connection."""
     import httpx
     from ..database import pg_get_config
+    
+    result = {
+        "configured": False,
+        "connection_ok": False,
+        "api_call_ok": False,
+        "error": None,
+        "details": {}
+    }
     
     # Get OVH configuration from database
     ovh_key = pg_get_config('OVH_API_KEY')
     ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+    ovh_model = pg_get_config('OVH_MODEL')
     
     # Normalize empty strings
     if ovh_key == '':
         ovh_key = None
     if ovh_endpoint == '':
         ovh_endpoint = None
+    if ovh_model == '':
+        ovh_model = None
     
     # Use default endpoint if not configured
     if not ovh_endpoint:
         ovh_endpoint = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
     
-    if not ovh_key:
-        return OVHModelsResponse(
-            models=[],
-            endpoint=ovh_endpoint,
-            error="OVH API key not configured. Please configure your OVH API key in Settings."
-        )
+    result["details"] = {
+        "has_key": bool(ovh_key),
+        "has_endpoint": bool(ovh_endpoint),
+        "has_model": bool(ovh_model),
+        "endpoint": ovh_endpoint,
+        "model": ovh_model,
+        "key_length": len(ovh_key) if ovh_key else 0
+    }
     
+    # Check if configured
+    if not ovh_key:
+        result["error"] = "OVH API key not configured. Please configure your OVH API key in Settings."
+        return result
+    
+    if not ovh_model:
+        result["error"] = "OVH model not configured. Please select a model in Settings."
+        return result
+    
+    result["configured"] = True
+    
+    # Test connection
     try:
-        # Call OVH AI Endpoints /models endpoint (OpenAI-compatible)
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f'{ovh_endpoint}/models',
-                headers={
-                    'Authorization': f'Bearer {ovh_key}',
-                    'Content-Type': 'application/json'
-                }
-            )
-            
-            if response.status_code == 401:
-                return OVHModelsResponse(
-                    models=[],
-                    endpoint=ovh_endpoint,
-                    error="Authentication failed. Please check your OVH API key."
+            # Test 1: Try to connect to endpoint
+            try:
+                response = await client.get(
+                    f'{ovh_endpoint}/models',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    }
                 )
+                result["connection_ok"] = True
+                result["details"]["connection_status"] = response.status_code
+            except httpx.TimeoutException:
+                result["error"] = "Connection timeout. Please check your endpoint URL and network connection."
+                return result
+            except httpx.ConnectError:
+                result["error"] = "Connection failed. Please check your endpoint URL."
+                return result
+            except Exception as e:
+                result["error"] = f"Connection error: {str(e)}"
+                return result
             
-            if response.status_code == 404:
-                # Some endpoints might not support /models, try alternative approach
-                logger.warning(f"OVH endpoint {ovh_endpoint} does not support /models endpoint")
-                return OVHModelsResponse(
-                    models=[],
-                    endpoint=ovh_endpoint,
-                    error="Models endpoint not available. Please configure the model manually."
+            # Test 2: Try a simple API call
+            try:
+                test_response = await client.post(
+                    f'{ovh_endpoint}/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': ovh_model,
+                        'messages': [
+                            {'role': 'user', 'content': 'Hello'}
+                        ],
+                        'max_tokens': 10
+                    }
                 )
+                
+                if test_response.status_code == 200:
+                    result["api_call_ok"] = True
+                    result["details"]["api_call_status"] = 200
+                elif test_response.status_code == 401:
+                    result["error"] = "Authentication failed. Please check your OVH API key."
+                    result["details"]["api_call_status"] = 401
+                elif test_response.status_code == 404:
+                    # Try to get more details
+                    try:
+                        error_json = test_response.json()
+                        if error_json.get('error', {}).get('code') == 'model_not_found':
+                            result["error"] = f"Model '{ovh_model}' not found on your endpoint. Please check available models in Settings."
+                        else:
+                            result["error"] = f"API call failed (404): {error_json.get('error', {}).get('message', 'Unknown error')}"
+                    except:
+                        result["error"] = f"API call failed (404): Model or endpoint not found"
+                    result["details"]["api_call_status"] = 404
+                else:
+                    result["error"] = f"API call failed ({test_response.status_code})"
+                    result["details"]["api_call_status"] = test_response.status_code
+                    try:
+                        error_text = test_response.text[:200]
+                        result["details"]["api_call_error"] = error_text
+                    except:
+                        pass
+            except httpx.TimeoutException:
+                result["error"] = "API call timeout. The endpoint may be slow or unavailable."
+            except Exception as e:
+                result["error"] = f"API call error: {str(e)}"
             
-            response.raise_for_status()
-            result = response.json()
-            
-            # Extract model IDs from the response
-            # OpenAI-compatible API returns: {"data": [{"id": "model-name", ...}, ...]}
-            models = []
-            if isinstance(result, dict) and 'data' in result:
-                models = [model['id'] for model in result['data'] if 'id' in model]
-            elif isinstance(result, list):
-                models = [model['id'] for model in result if isinstance(model, dict) and 'id' in model]
-            
-            if not models:
-                logger.warning(f"No models found in OVH response: {result}")
-                return OVHModelsResponse(
-                    models=[],
-                    endpoint=ovh_endpoint,
-                    error="No models found in the response. Please check your endpoint configuration."
-                )
-            
-            logger.info(f"Successfully retrieved {len(models)} models from OVH endpoint: {models[:5]}...")
-            return OVHModelsResponse(
-                models=sorted(models),  # Sort alphabetically for better UX
-                endpoint=ovh_endpoint,
-                error=None
-            )
-            
-    except httpx.TimeoutException:
-        logger.error(f"Timeout while fetching models from OVH endpoint: {ovh_endpoint}")
-        return OVHModelsResponse(
-            models=[],
-            endpoint=ovh_endpoint,
-            error="Request timeout. Please check your endpoint URL and network connection."
-        )
-    except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error while fetching OVH models: {e.response.status_code} - {e.response.text[:200]}")
-        return OVHModelsResponse(
-            models=[],
-            endpoint=ovh_endpoint,
-            error=f"HTTP error {e.response.status_code}: {e.response.text[:200]}"
-        )
     except Exception as e:
-        logger.error(f"Error fetching OVH models: {type(e).__name__}: {e}", exc_info=True)
-        return OVHModelsResponse(
-            models=[],
-            endpoint=ovh_endpoint,
-            error=f"Error fetching models: {str(e)}"
-        )
+        result["error"] = f"Unexpected error: {str(e)}"
+    
+    return result
 

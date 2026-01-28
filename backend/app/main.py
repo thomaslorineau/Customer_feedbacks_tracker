@@ -194,9 +194,31 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """Handle HTTP exceptions and ensure JSON responses."""
+    # Safely encode error detail to avoid ASCII encoding issues
+    def safe_detail(detail):
+        """Safely encode error detail to UTF-8."""
+        if not detail:
+            return ""
+        try:
+            if isinstance(detail, str):
+                # Ensure UTF-8 encoding, replace problematic characters
+                return detail.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+            else:
+                # If not a string, convert and clean
+                detail_str = str(detail)
+                return detail_str.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        except Exception:
+            # Ultimate fallback: ASCII-only
+            try:
+                return str(detail).encode('ascii', errors='replace').decode('ascii', errors='replace')
+            except Exception:
+                return "An error occurred"
+    
+    safe_detail_text = safe_detail(exc.detail)
+    
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": exc.detail}
+        content={"detail": safe_detail_text}
     )
 
 @app.exception_handler(RequestValidationError)

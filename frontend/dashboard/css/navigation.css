@@ -197,11 +197,20 @@ body.v1-page {
     font-size: 0.75em;
     font-weight: 700;
     color: white;
-    cursor: default;
+    cursor: pointer;
     user-select: none;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.beta-badge:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    box-shadow: 0 4px 8px rgba(245, 158, 11, 0.4);
+    transform: translateY(-1px);
 }
 
 /* Version badge in nav */
