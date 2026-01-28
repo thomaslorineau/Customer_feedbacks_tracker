@@ -25,9 +25,13 @@ class DiscordScraper(BaseScraper):
         if self._config is None:
             # Use relative import like other scrapers
             from ..config import config
+            from ..database import pg_get_config
+            import os
+            
             self._config = config
-            self._bot_token = config.get_api_key("discord")
-            self._guild_id = config.discord_guild_id
+            # Récupérer depuis la base de données en priorité, puis config/env
+            self._bot_token = pg_get_config('DISCORD_BOT_TOKEN') or config.get_api_key("discord") or os.getenv('DISCORD_BOT_TOKEN')
+            self._guild_id = pg_get_config('DISCORD_GUILD_ID') or config.discord_guild_id or os.getenv('DISCORD_GUILD_ID')
         return self._config
     
     @property

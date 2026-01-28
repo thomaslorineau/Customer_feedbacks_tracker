@@ -10,6 +10,7 @@
 
 let sourceChart = null;
 let currentState = null;
+let isCreatingChart = false; // Flag to prevent concurrent chart creation
 
 /**
  * Initialize the source chart
@@ -160,6 +161,12 @@ function updateSourceChartFromState(state) {
  * Render the source chart using Chart.js
  */
 function renderSourceChart(sourceData, sentimentBySource) {
+    // Prevent concurrent chart creation
+    if (isCreatingChart) {
+        console.log('[source-chart-v2.js] Chart creation already in progress, skipping...');
+        return;
+    }
+    
     const canvas = document.getElementById('sourceChart');
     if (!canvas) {
         console.warn('[source-chart-v2.js] Canvas element "sourceChart" not found');
@@ -223,8 +230,27 @@ function renderSourceChart(sourceData, sentimentBySource) {
     
     // Destroy existing chart if it exists
     if (sourceChart) {
-        sourceChart.destroy();
-        sourceChart = null;
+        try {
+            sourceChart.destroy();
+            sourceChart = null;
+        } catch (e) {
+            console.warn('[source-chart-v2.js] Error destroying existing chart:', e);
+            sourceChart = null;
+        }
+    }
+    
+    // Also check Chart.js registry for any existing chart on this canvas
+    const canvasElement = document.getElementById('sourceChart');
+    if (canvasElement && typeof Chart !== 'undefined' && Chart.getChart) {
+        const existingChart = Chart.getChart(canvasElement);
+        if (existingChart) {
+            console.log('[source-chart-v2.js] Found existing chart in Chart.js registry, destroying it');
+            try {
+                existingChart.destroy();
+            } catch (e) {
+                console.warn('[source-chart-v2.js] Error destroying chart from registry:', e);
+            }
+        }
     }
     
     // Wait for next frame to ensure DOM is fully rendered
@@ -235,6 +261,19 @@ function renderSourceChart(sourceData, sentimentBySource) {
         if (!canvasElement) {
             console.warn('[source-chart-v2.js] Canvas not found in requestAnimationFrame');
             return;
+        }
+        
+        // Double-check that no chart exists on this canvas
+        if (typeof Chart !== 'undefined' && Chart.getChart) {
+            const existingChart = Chart.getChart(canvasElement);
+            if (existingChart) {
+                console.warn('[source-chart-v2.js] Chart still exists in registry, destroying it again');
+                try {
+                    existingChart.destroy();
+                } catch (e) {
+                    console.warn('[source-chart-v2.js] Error destroying chart in requestAnimationFrame:', e);
+                }
+            }
         }
         
         // Get container dimensions for Chart.js
@@ -305,14 +344,67 @@ function renderSourceChart(sourceData, sentimentBySource) {
         });
         
         // Small delay to ensure overlay is fully hidden and DOM is stable
+        // Also ensure any previous chart is fully destroyed
         setTimeout(() => {
-            createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
+            // Set flag to prevent concurrent creation
+            if (isCreatingChart) {
+                console.log('[source-chart-v2.js] Chart creation already in progress, aborting');
+                return;
+            }
+            isCreatingChart = true;
+            
+            try {
+                // Final check before creating chart
+                if (typeof Chart !== 'undefined' && Chart.getChart) {
+                    const existingChart = Chart.getChart(canvasElement);
+                    if (existingChart) {
+                        console.warn('[source-chart-v2.js] Chart still exists before createChartInstance, destroying');
+                        try {
+                            existingChart.destroy();
+                        } catch (e) {
+                            console.warn('[source-chart-v2.js] Error destroying chart before create:', e);
+                        }
+                    }
+                }
+                createChartInstance(ctx, canvasElement, sourceData, sentimentBySource);
+            } finally {
+                // Reset flag after a short delay to allow chart creation to complete
+                setTimeout(() => {
+                    isCreatingChart = false;
+                }, 100);
+            }
         }, 50);
     });
 }
 
 // Separate function to create chart instance
 function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
+    // Final safety check: destroy any existing chart on this canvas
+    if (typeof Chart !== 'undefined' && Chart.getChart) {
+        const existingChart = Chart.getChart(canvas);
+        if (existingChart) {
+            console.warn('[source-chart-v2.js] Found existing chart in createChartInstance, destroying it');
+            try {
+                existingChart.destroy();
+            } catch (e) {
+                console.warn('[source-chart-v2.js] Error destroying chart in createChartInstance:', e);
+            }
+        }
+    }
+    
+    // Also destroy our global reference if it exists
+    if (sourceChart) {
+        try {
+            if (!sourceChart.destroyed) {
+                sourceChart.destroy();
+            }
+            sourceChart = null;
+        } catch (e) {
+            console.warn('[source-chart-v2.js] Error destroying sourceChart global:', e);
+            sourceChart = null;
+        }
+    }
+    
     // Prepare data
     const sources = Object.keys(sourceData);
     const counts = Object.values(sourceData);
@@ -535,6 +627,9 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
         dataPoints: sourceChart?.data?.datasets?.[0]?.data?.length || 0,
         labels: sourceChart?.data?.labels?.length || 0
     });
+    
+    // Reset creation flag after successful creation
+    isCreatingChart = false;
     
     // Force chart update to ensure rendering
     if (sourceChart) {

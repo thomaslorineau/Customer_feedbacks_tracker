@@ -72,14 +72,8 @@ def get_llm_api_keys():
 
 async def generate_ideas_with_llm(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
     """Generate improvement ideas using LLM API."""
-    from pathlib import Path
-    from dotenv import load_dotenv
-    
-    # Reload .env to get latest values
-    backend_path = Path(__file__).resolve().parents[3]
-    env_path = backend_path / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
+    # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
+    # Ne pas utiliser load_dotenv avec override=True car cela peut écraser les clés en mémoire
     
     # Filter posts to prioritize negative/neutral for improvement ideas
     relevant_posts = [p for p in posts if p.get('sentiment_label') in ['negative', 'neutral']]
@@ -619,13 +613,8 @@ async def generate_whats_happening_insights_with_llm(
     analysis_focus: str = ""
 ) -> List[WhatsHappeningInsight]:
     """Generate What's Happening insights using LLM API."""
-    # Reload .env to get latest API keys (in case they were updated)
-    from pathlib import Path
-    from dotenv import load_dotenv
-    backend_path = Path(__file__).resolve().parents[3]
-    env_path = backend_path / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
+    # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
+    # Ne pas utiliser load_dotenv avec override=True car cela peut écraser les clés en mémoire
     
     # Prepare posts for analysis (focus on negative posts and recent ones)
     negative_posts = [p for p in posts if p.get('sentiment_label') == 'negative']
@@ -719,10 +708,8 @@ CRITICAL INSTRUCTIONS:
 - DO NOT use placeholder examples - generate insights based on what you actually find in the posts
 - Prioritize insights that can lead to immediate action"""
 
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    mistral_key = os.getenv('MISTRAL_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    # Récupérer les clés API depuis la base de données en priorité
+    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
     
     if not openai_key and not anthropic_key and not mistral_key:
         return generate_whats_happening_fallback(posts, stats, active_filters)
@@ -873,9 +860,17 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                     if summary_content:
                         json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
                         if json_match:
-                            insights_data = json.loads(json_match.group())
-                            logger.info(f"Generated {len(insights_data)} insights from summarized LLM results ({len(valid_results)} models)")
-                            return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                            try:
+                                insights_data = json.loads(json_match.group())
+                                logger.info(f"Generated {len(insights_data)} insights from summarized LLM results ({len(valid_results)} models)")
+                                if insights_data:
+                                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                                else:
+                                    logger.warning("Summarized LLM response returned empty insights array")
+                            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                                logger.error(f"Error parsing summarized LLM response: {e}. Content: {summary_content[:500]}")
+                        else:
+                            logger.warning(f"No JSON array found in summarized LLM response. Content: {summary_content[:500]}")
         
         except Exception as e:
             logger.error(f"Error in parallel LLM call or summarization: {type(e).__name__}: {e}", exc_info=True)
@@ -909,8 +904,17 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                     
                     json_match = re.search(r'\[.*\]', content, re.DOTALL)
                     if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                        try:
+                            insights_data = json.loads(json_match.group())
+                            logger.info(f"Parsed {len(insights_data)} insights from Anthropic response")
+                            if insights_data:
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                            else:
+                                logger.warning("Anthropic returned empty insights array")
+                        except (json.JSONDecodeError, KeyError, TypeError) as e:
+                            logger.error(f"Error parsing Anthropic response: {e}. Content: {content[:500]}")
+                    else:
+                        logger.warning(f"No JSON array found in Anthropic response. Content: {content[:500]}")
         
         elif llm_provider == 'openai' or (not llm_provider and openai_key and not anthropic_key and not mistral_key):
             # Use OpenAI
@@ -939,8 +943,17 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                     
                     json_match = re.search(r'\[.*\]', content, re.DOTALL)
                     if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                        try:
+                            insights_data = json.loads(json_match.group())
+                            logger.info(f"Parsed {len(insights_data)} insights from OpenAI response")
+                            if insights_data:
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                            else:
+                                logger.warning("OpenAI returned empty insights array")
+                        except (json.JSONDecodeError, KeyError, TypeError) as e:
+                            logger.error(f"Error parsing OpenAI response: {e}. Content: {content[:500]}")
+                    else:
+                        logger.warning(f"No JSON array found in OpenAI response. Content: {content[:500]}")
         
         elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
             # Use Mistral
@@ -969,9 +982,19 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                     
                     json_match = re.search(r'\[.*\]', content, re.DOTALL)
                     if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                        try:
+                            insights_data = json.loads(json_match.group())
+                            logger.info(f"Parsed {len(insights_data)} insights from Mistral response")
+                            if insights_data:
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                            else:
+                                logger.warning("Mistral returned empty insights array")
+                        except (json.JSONDecodeError, KeyError, TypeError) as e:
+                            logger.error(f"Error parsing Mistral response: {e}. Content: {content[:500]}")
+                    else:
+                        logger.warning(f"No JSON array found in Mistral response. Content: {content[:500]}")
         
+        logger.warning("No valid LLM response received, using fallback")
         return generate_whats_happening_fallback(posts, stats, active_filters)
     except Exception as e:
         logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
@@ -986,10 +1009,12 @@ def generate_whats_happening_fallback(
     active_filters: str = ""
 ) -> List[WhatsHappeningInsight]:
     """Fallback rule-based insights generator."""
+    logger.info(f"Using fallback insights generator. Posts: {len(posts)}, Stats: {stats}, Filters: {active_filters}")
     insights = []
     
     negative = stats.get('negative', 0)
     recent_negative = stats.get('recent_negative', 0)
+    total = stats.get('total', len(posts))
     spike_detected = stats.get('spike_detected', False)
     
     # Spike alert
@@ -1031,6 +1056,22 @@ def generate_whats_happening_fallback(
             count=top_issue_count
         ))
     
+    # Si aucun insight n'a été généré, créer au moins un insight informatif
+    if not insights and total > 0:
+        positive = stats.get('positive', 0)
+        neutral = stats.get('neutral', 0)
+        filter_note = f" (filtered: {active_filters})" if active_filters and active_filters != "All posts (no filters)" else ""
+        insights.append(WhatsHappeningInsight(
+            type="trend",
+            title=f"Analysis of {total} posts{filter_note}",
+            description=f"Analyzed {total} posts ({positive} positive, {negative} negative, {neutral} neutral). No significant patterns detected at this time.",
+            icon="📊",
+            metric="",
+            count=total
+        ))
+        logger.info(f"Added default insight for {total} posts with filters: {active_filters}")
+    
+    logger.info(f"Fallback generated {len(insights)} insights")
     return insights
 
 
@@ -1038,14 +1079,7 @@ def generate_whats_happening_fallback(
 async def get_whats_happening(request: WhatsHappeningRequest):
     """Generate What's Happening insights based on filtered posts using LLM."""
     try:
-        # Reload .env to get latest API keys (in case they were updated)
-        from pathlib import Path
-        from dotenv import load_dotenv
-        backend_path = Path(__file__).resolve().parents[3]
-        env_path = backend_path / ".env"
-        if env_path.exists():
-            load_dotenv(env_path, override=True)
-        
+        # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
         openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
         api_key = openai_key or anthropic_key or mistral_key
         llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral']
@@ -1160,11 +1194,12 @@ Generate a sentence in English that summarizes the top improvement ideas in a cl
 @router.get("/pain-points", response_model=PainPointsResponse, tags=["Dashboard", "Insights"])
 async def get_pain_points_endpoint(
     days: int = Query(30, description="Number of days to look back", ge=1, le=365),
-    limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=50)
+    limit: int = Query(5, description="Maximum number of pain points to return", ge=1, le=50),
+    product: Optional[str] = Query(None, description="Filter by product name (e.g., 'Domain', 'VPS', 'Email')")
 ):
-    """Get recurring pain points from posts in the last N days."""
+    """Get recurring pain points from posts in the last N days, optionally filtered by product."""
     try:
-        return await get_pain_points(days=days, limit=limit)
+        return await get_pain_points(days=days, limit=limit, product=product)
     except Exception as e:
         logger.error(f"Error getting pain points: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get pain points: {str(e)}")
@@ -1346,14 +1381,8 @@ async def generate_improvements_analysis_with_llm(
     product_filter: str = None
 ) -> ImprovementsAnalysisResponse:
     """Generate improvements analysis with insights and ROI using LLM."""
-    from pathlib import Path
-    from dotenv import load_dotenv
-    
-    # Reload .env to get latest values
-    backend_path = Path(__file__).resolve().parents[3]
-    env_path = backend_path / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=True)
+    # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
+    # Ne pas utiliser load_dotenv avec override=True car cela peut écraser les clés en mémoire
     
     # Prepare posts for analysis (focus on negative/neutral posts)
     posts_for_analysis = []
