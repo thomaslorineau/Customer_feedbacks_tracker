@@ -6,7 +6,7 @@ from typing import List, Dict, Tuple
 
 from ... import database as db
 from ...analysis import sentiment, country_detection, relevance_scorer
-from ...config import keywords_base
+from ...keywords import keywords_base
 
 logger = logging.getLogger(__name__)
 
