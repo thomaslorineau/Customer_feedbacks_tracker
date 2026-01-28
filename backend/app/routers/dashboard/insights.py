@@ -448,8 +448,8 @@ Be specific and reference actual content from the posts when possible."""
     openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
     
     if not openai_key and not anthropic_key and not mistral_key:
-        logger.info("[Recommended Actions] No LLM API key configured, returning empty list")
-        return []
+        logger.info("[Recommended Actions] No LLM API key configured, using fallback")
+        return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
     
     # Helper function to call a single LLM
     async def call_llm_for_actions(provider: str, api_key: str, prompt: str) -> Optional[str]:
