@@ -241,7 +241,7 @@ scheduler = BackgroundScheduler()
 def startup_event():
     db.init_db()
     
-    # Load LLM API keys from database into environment variables
+    # Load API keys from database into environment variables
     # This ensures keys persist across Docker container restarts
     try:
         from .database import pg_get_config
@@ -249,6 +249,8 @@ def startup_event():
         anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
         mistral_key = pg_get_config('MISTRAL_API_KEY')
         llm_provider = pg_get_config('LLM_PROVIDER')
+        discord_bot_token = pg_get_config('DISCORD_BOT_TOKEN')
+        discord_guild_id = pg_get_config('DISCORD_GUILD_ID')
         
         if openai_key:
             os.environ['OPENAI_API_KEY'] = openai_key
@@ -262,6 +264,12 @@ def startup_event():
         if llm_provider:
             os.environ['LLM_PROVIDER'] = llm_provider
             logger.info(f"✅ Loaded LLM provider from database: {llm_provider}")
+        if discord_bot_token:
+            os.environ['DISCORD_BOT_TOKEN'] = discord_bot_token
+            logger.info("✅ Loaded Discord bot token from database")
+        if discord_guild_id:
+            os.environ['DISCORD_GUILD_ID'] = discord_guild_id
+            logger.info("✅ Loaded Discord guild ID from database")
     except Exception as e:
         logger.warning(f"Could not load API keys from database at startup: {e}")
     

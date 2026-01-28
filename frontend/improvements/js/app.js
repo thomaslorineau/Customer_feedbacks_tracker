@@ -148,7 +148,13 @@ async function loadPainPoints() {
     
     try {
         console.log('Loading pain points...');
-        const response = await fetch(`/api/pain-points?days=${currentPeriodDays}&limit=5`);
+        // Build URL with product filter if active
+        let url = `/api/pain-points?days=${currentPeriodDays}&limit=5`;
+        if (currentProductFilter) {
+            url += `&product=${encodeURIComponent(currentProductFilter)}`;
+            console.log('Loading pain points filtered by product:', currentProductFilter);
+        }
+        const response = await fetch(url);
         console.log('Pain points response status:', response.status, response.statusText);
         
         if (!response.ok) {
@@ -161,60 +167,12 @@ async function loadPainPoints() {
         const data = await response.json();
         console.log('Pain points data received:', data);
         
-        // Filter pain points by product if filter is active
+        // Backend already filters by product if currentProductFilter is set
+        // So we can use the pain points directly
         let filteredPainPoints = data.pain_points || [];
-        if (currentProductFilter) {
-            // Filter pain points by checking if their posts match the product
-            const dateFrom = getDateFrom(currentPeriodDays);
-            
-            // Import product detection function first
-            const { getProductLabel } = await import('/dashboard/js/product-detection.js');
-            
-            // Fetch posts with date filter (don't use search filter, we'll filter by product label instead)
-            const postsResponse = await fetch(`/api/posts-for-improvement?limit=1000&offset=0&date_from=${dateFrom}`);
-            if (postsResponse.ok) {
-                const postsData = await postsResponse.json();
-                let allPosts = postsData.posts || [];
-                
-                // Filter posts to ensure they match the product label (more accurate than search)
-                // Also filter by sentiment (negative/neutral only, matching backend logic)
-                const productPosts = allPosts.filter(post => {
-                    const productLabel = getProductLabel(post.id, post.content, post.language);
-                    const sentiment = post.sentiment_label || 'neutral';
-                    return productLabel === currentProductFilter && (sentiment === 'negative' || sentiment === 'neutral');
-                });
-                
-                // Filter pain points based on whether their keywords match posts with the product
-                // AND recalculate post counts accurately
-                filteredPainPoints = filteredPainPoints.map(pp => {
-                    // Get keywords for this pain point
-                    const keywords = PAIN_POINT_KEYWORDS[pp.title] || [];
-                    if (keywords.length === 0) return null;
-                    
-                    // Find matching posts for this pain point within the product posts
-                    // (productPosts are already filtered by sentiment)
-                    const matchingPosts = productPosts.filter(post => {
-                        const content = (post.content || '').toLowerCase();
-                        return keywords.some(keyword => content.includes(keyword.toLowerCase()));
-                    });
-                    
-                    // Only include pain points that have matching posts
-                    if (matchingPosts.length === 0) return null;
-                    
-                    // Sort by opportunity score (descending) for better ordering
-                    matchingPosts.sort((a, b) => (b.opportunity_score || 0) - (a.opportunity_score || 0));
-                    
-                    return {
-                        ...pp,
-                        posts_count: matchingPosts.length,
-                        posts: matchingPosts // Store ALL matching posts for drawer (not just 3)
-                    };
-                }).filter(pp => pp !== null && pp.posts_count > 0);
-                
-                // Sort by post count (descending) to show most relevant first
-                filteredPainPoints.sort((a, b) => b.posts_count - a.posts_count);
-            }
-        }
+        
+        // Store pain points globally for drawer access
+        window.currentPainPoints = filteredPainPoints;
         
         if (!filteredPainPoints || filteredPainPoints.length === 0) {
             const periodText = getPeriodText(currentPeriodDays);
@@ -1045,15 +1003,26 @@ async function loadImprovementsAnalysis() {
     
     // Set a timeout to hide overlay after max 60 seconds (safety measure)
     const overlayTimeout = setTimeout(() => {
-        if (overlay) {
-            overlay.style.display = 'none';
+        const timeoutOverlay = document.getElementById('improvementsOverlay');
+        if (timeoutOverlay) {
+            timeoutOverlay.style.setProperty('display', 'none', 'important');
+            timeoutOverlay.style.setProperty('visibility', 'hidden', 'important');
+            timeoutOverlay.style.setProperty('opacity', '0', 'important');
+            timeoutOverlay.setAttribute('hidden', '');
+            console.log('[improvements] Overlay hidden by timeout (60s safety)');
         }
     }, 60000);
     
     try {
         // Get pain points and products data with current period filter
-        const painPointsResponse = await fetch(`/api/pain-points?days=${currentPeriodDays}&limit=10`);
+        // Build URL with product filter if active
+        let painPointsUrl = `/api/pain-points?days=${currentPeriodDays}&limit=10`;
+        if (currentProductFilter) {
+            painPointsUrl += `&product=${encodeURIComponent(currentProductFilter)}`;
+        }
+        
         const dateFrom = getDateFrom(currentPeriodDays);
+        const painPointsResponse = await fetch(painPointsUrl);
         const productsResponse = await fetch(`/api/product-opportunities?date_from=${dateFrom}`);
         
         if (!painPointsResponse.ok || !productsResponse.ok) {
@@ -1063,20 +1032,13 @@ async function loadImprovementsAnalysis() {
         const painPointsData = await painPointsResponse.json();
         const productsData = await productsResponse.json();
         
-        // Filter pain points and products by current product filter if active
+        // Backend already filters pain points by product if currentProductFilter is set
         let filteredPainPoints = painPointsData.pain_points || [];
         let filteredProducts = productsData.products || [];
         
         if (currentProductFilter) {
             // Filter products to only show the selected one
             filteredProducts = productsData.products.filter(p => p.product === currentProductFilter);
-            // Filter pain points that mention the product (simplified - could be improved)
-            filteredPainPoints = painPointsData.pain_points.filter(pp => {
-                const titleLower = (pp.title || '').toLowerCase();
-                const descLower = (pp.description || '').toLowerCase();
-                const productLower = currentProductFilter.toLowerCase();
-                return titleLower.includes(productLower) || descLower.includes(productLower);
-            });
         }
         
         // Get posts for analysis (filtered if product filter is active)
@@ -1151,6 +1113,7 @@ async function loadImprovementsAnalysis() {
         }
         
         const analysis = await analysisResponse.json();
+        console.log('[improvements] Analysis received, insights:', analysis.insights?.length || 0);
         
         // Store posts globally for drawer access
         window.currentImprovementsPosts = postsData.posts || [];
@@ -1212,6 +1175,8 @@ async function loadImprovementsAnalysis() {
             roiContainer.innerHTML = '';
         }
         
+        console.log('[improvements] Analysis display completed, hiding overlay...');
+        
     } catch (error) {
         console.error('Error loading improvements analysis:', error);
         if (insightsContainer) {
@@ -1233,7 +1198,12 @@ async function loadImprovementsAnalysis() {
         setTimeout(() => {
             const finalOverlay = document.getElementById('improvementsOverlay');
             if (finalOverlay) {
-                finalOverlay.style.display = 'none';
+                // Use setProperty with important to override the display: flex !important
+                finalOverlay.style.setProperty('display', 'none', 'important');
+                finalOverlay.style.setProperty('visibility', 'hidden', 'important');
+                finalOverlay.style.setProperty('opacity', '0', 'important');
+                finalOverlay.setAttribute('hidden', '');
+                console.log('[improvements] Overlay hidden after analysis');
             }
         }, 300);
     }

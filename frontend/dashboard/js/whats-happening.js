@@ -199,6 +199,28 @@ export async function updateWhatsHappening(state) {
             insights = data.insights || [];
             llmAvailable = data.llm_available !== false;
             console.log('[whats-happening.js] LLM API response received, insights:', insights.length);
+            
+            // Si le LLM retourne 0 insights, utiliser le fallback côté backend
+            // Le backend devrait toujours retourner au moins un insight via le fallback
+            if (insights.length === 0 && posts.length > 0) {
+                console.warn('[whats-happening.js] LLM returned 0 insights, backend should have used fallback');
+                // Le backend devrait avoir généré un fallback, mais si ce n'est pas le cas,
+                // on génère un insight basique côté frontend
+                const total = posts.length;
+                const positive = posts.filter(p => p.sentiment_label === 'positive').length;
+                const negative = posts.filter(p => p.sentiment_label === 'negative').length;
+                const neutral = posts.filter(p => p.sentiment_label === 'neutral' || !p.sentiment_label).length;
+                
+                insights = [{
+                    type: 'trend',
+                    title: `Analysis of ${total} posts${activeFiltersDescription && activeFiltersDescription !== 'All posts (no filters)' ? ` (${activeFiltersDescription})` : ''}`,
+                    description: `Analyzed ${total} posts (${positive} positive, ${negative} negative, ${neutral} neutral).`,
+                    icon: '📊',
+                    metric: '',
+                    count: total
+                }];
+            }
+            
             analysisCompleted = true;
         }
     } catch (error) {
@@ -585,7 +607,10 @@ export async function updateWhatsHappening(state) {
     
     content.innerHTML = contentHTML;
     console.log('[whats-happening.js] Content HTML set successfully');
-    // Don't hide overlay here - wait for recommended actions to complete
+    
+    // Wait a bit to ensure content is rendered before hiding overlay
+    // This ensures users can see the content even if it's brief
+    const contentRenderedDelay = insights.length > 0 ? 500 : 300; // Longer delay if insights exist
     
     // Update Recommended Actions with full context (using stats from LLM analysis)
     // Note: activeFilters was already declared earlier in the function
@@ -611,19 +636,35 @@ export async function updateWhatsHappening(state) {
     updateRecommendedActions(posts, recentPosts, recentNegative, spikeDetected, topProduct, topIssue, activeFilters)
         .then(() => {
             console.log('[whats-happening.js] Recommended actions updated, hiding overlay now');
-            // Hide overlay AFTER recommended actions are also displayed
+            // Hide overlay AFTER recommended actions are also displayed AND content is rendered
             setTimeout(() => {
                 if (overlay) {
-                    overlay.style.setProperty('display', 'none', 'important');
-                    overlay.style.setProperty('visibility', 'hidden', 'important');
-                    overlay.style.setProperty('opacity', '0', 'important');
-                    console.log('[whats-happening.js] Overlay hidden after all content display');
+                    // Double-check that content is actually visible before hiding
+                    const contentElement = document.getElementById('whatsHappeningContent');
+                    const hasContent = contentElement && contentElement.innerHTML.trim() !== '';
+                    
+                    if (hasContent) {
+                        overlay.style.setProperty('display', 'none', 'important');
+                        overlay.style.setProperty('visibility', 'hidden', 'important');
+                        overlay.style.setProperty('opacity', '0', 'important');
+                        console.log('[whats-happening.js] Overlay hidden after all content display');
+                    } else {
+                        console.warn('[whats-happening.js] Content not ready, delaying overlay hide');
+                        // Retry after a bit more time
+                        setTimeout(() => {
+                            if (overlay) {
+                                overlay.style.setProperty('display', 'none', 'important');
+                                overlay.style.setProperty('visibility', 'hidden', 'important');
+                                overlay.style.setProperty('opacity', '0', 'important');
+                            }
+                        }, 500);
+                    }
                 }
-            }, 200); // Small delay to ensure content is rendered
+            }, contentRenderedDelay); // Use dynamic delay based on whether insights exist
         })
         .catch(error => {
             console.error('Error in updateRecommendedActions:', error);
-            // Hide overlay even on error, but with a delay
+            // Hide overlay even on error, but with a longer delay to ensure content is visible
             setTimeout(() => {
                 if (overlay) {
                     overlay.style.setProperty('display', 'none', 'important');
@@ -631,7 +672,7 @@ export async function updateWhatsHappening(state) {
                     overlay.style.setProperty('opacity', '0', 'important');
                     console.log('[whats-happening.js] Overlay hidden after error');
                 }
-            }, 500);
+            }, contentRenderedDelay + 300);
         });
     
     // Don't hide overlay here anymore - wait for recommended actions to complete

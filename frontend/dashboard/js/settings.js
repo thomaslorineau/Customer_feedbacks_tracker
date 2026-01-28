@@ -530,12 +530,15 @@ function attachButtonListeners(providerId) {
 
 function renderProviderCard(provider) {
     const keyData = configData.api_keys[provider.id];
-    if (!keyData) {
+    // For Discord, check if it exists even if not configured (it needs to be shown)
+    if (!keyData && provider.id !== 'discord') {
         console.warn(`No key data for provider: ${provider.id}`);
         return '';
     }
-    const isConfigured = keyData.configured || false;
-    const maskedKey = keyData.masked || 'Not configured';
+    // For Discord, create default keyData if missing
+    const actualKeyData = keyData || { configured: false, masked: null, length: 0 };
+    const isConfigured = actualKeyData.configured || false;
+    const maskedKey = actualKeyData.masked || 'Not configured';
     
     return `
         <div class="api-key-card" data-provider="${provider.id}">
@@ -705,7 +708,8 @@ async function enableEditMode(provider) {
         { id: 'github', name: 'GitHub', icon: '🐙', docsUrl: 'https://github.com/settings/tokens' },
         { id: 'trustpilot', name: 'Trustpilot', icon: '⭐', docsUrl: 'https://developers.trustpilot.com/' },
         { id: 'linkedin', name: 'LinkedIn', icon: '💼', docsUrl: 'https://www.linkedin.com/developers/apps' },
-        { id: 'twitter', name: 'Twitter/X API', icon: '🐦', docsUrl: 'https://developer.twitter.com/en/portal/dashboard' }
+        { id: 'twitter', name: 'Twitter/X API', icon: '🐦', docsUrl: 'https://developer.twitter.com/en/portal/dashboard' },
+        { id: 'discord', name: 'Discord', icon: '💬', docsUrl: 'https://discord.com/developers/docs/getting-started' }
     ];
     
     const providerInfo = [...llmProviders, ...scraperProviders].find(p => p.id === provider);
@@ -714,50 +718,102 @@ async function enableEditMode(provider) {
         return;
     }
     
-    // Determine field name
+    // Check if provider requires multiple fields (like LinkedIn, Discord)
+    const multiFieldProviders = {
+        'linkedin': [
+            { name: 'LINKEDIN_CLIENT_ID', label: 'Client ID' },
+            { name: 'LINKEDIN_CLIENT_SECRET', label: 'Client Secret' }
+        ],
+        'discord': [
+            { name: 'DISCORD_BOT_TOKEN', label: 'Bot Token' },
+            { name: 'DISCORD_GUILD_ID', label: 'Guild (Server) ID' }
+        ]
+    };
+    
+    // Determine field name for single-field providers
     const fieldMap = {
         'openai': 'OPENAI_API_KEY',
         'anthropic': 'ANTHROPIC_API_KEY',
         'mistral': 'MISTRAL_API_KEY',
         'github': 'GITHUB_TOKEN',
         'trustpilot': 'TRUSTPILOT_API_KEY',
-        'linkedin': 'LINKEDIN_CLIENT_ID',
         'twitter': 'TWITTER_BEARER_TOKEN'
     };
-    
-    const fieldName = fieldMap[provider];
-    if (!fieldName) {
-        console.error(`Field name not found for provider: ${provider}`);
-        return;
-    }
-    
-    // Don't reveal the key for security - leave input empty
-    // User must enter the full key when editing
-    let currentKey = '';
     
     // Replace the configured view with edit form
     const apiKeyValue = card.querySelector('.api-key-value');
     const apiKeyInfo = card.querySelector('.api-key-info');
     
     if (apiKeyValue && apiKeyInfo) {
-        const editFormHtml = `
-            <div class="api-key-form-container">
-                <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider}');">
-                    <div class="form-group">
-                        <label for="key-input-${provider}">API Key</label>
-                        <div class="input-with-button">
-                            <input 
-                                type="password" 
-                                id="key-input-${provider}"
-                                class="api-key-input"
-                                placeholder="Enter your ${providerInfo.name} API key"
-                                value="${currentKey}"
-                                autocomplete="off"
-                            />
-                            <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}')">
+        let editFormHtml = '';
+        
+        // Handle multi-field providers (LinkedIn, Discord)
+        if (multiFieldProviders[provider]) {
+            const fields = multiFieldProviders[provider];
+            editFormHtml = `
+                <div class="api-key-form-container">
+                    <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider}');">
+                        ${fields.map(field => `
+                            <div class="form-group">
+                                <label for="key-input-${provider}-${field.name}">${field.label}</label>
+                                <div class="input-with-button">
+                                    <input 
+                                        type="password" 
+                                        id="key-input-${provider}-${field.name}"
+                                        class="api-key-input"
+                                        placeholder="Enter your ${field.label}"
+                                        autocomplete="off"
+                                    />
+                                    <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}-${field.name}')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="save-btn-${provider}">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                                    <polyline points="17 21 17 13 7 13 7 21"/>
+                                    <polyline points="7 3 7 8 15 8"/>
+                                </svg>
+                                Save API Key
+                            </button>
+                            <button type="button" class="btn-secondary" onclick="exitEditMode('${provider}')">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+        } else {
+            // Single field provider
+            const fieldName = fieldMap[provider];
+            if (!fieldName) {
+                console.error(`Field name not found for provider: ${provider}`);
+                return;
+            }
+            
+            editFormHtml = `
+                <div class="api-key-form-container">
+                    <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider}');">
+                        <div class="form-group">
+                            <label for="key-input-${provider}">API Key</label>
+                            <div class="input-with-button">
+                                <input 
+                                    type="password" 
+                                    id="key-input-${provider}"
+                                    class="api-key-input"
+                                    placeholder="Enter your ${providerInfo.name} API key"
+                                    autocomplete="off"
+                                />
+                                <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
                                 </svg>
                             </button>
                         </div>
@@ -782,15 +838,26 @@ async function enableEditMode(provider) {
                 </form>
             </div>
         `;
+        }
         
         apiKeyValue.outerHTML = editFormHtml;
         
-        // Focus on input after a short delay
+        // Focus on first input after a short delay
         setTimeout(() => {
-            const input = document.getElementById(`key-input-${provider}`);
-            if (input) {
-                input.focus();
-                input.select();
+            // For multi-field providers, focus on first field
+            if (multiFieldProviders[provider]) {
+                const firstField = multiFieldProviders[provider][0];
+                const input = document.getElementById(`key-input-${provider}-${firstField.name}`);
+                if (input) {
+                    input.focus();
+                }
+            } else {
+                // Single field provider
+                const input = document.getElementById(`key-input-${provider}`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
             }
         }, 100);
     }
@@ -841,7 +908,8 @@ async function saveAPIKey(provider) {
         { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
         { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
         { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
-        { id: 'twitter', fields: [{ name: 'TWITTER_BEARER_TOKEN' }] }
+        { id: 'twitter', fields: [{ name: 'TWITTER_BEARER_TOKEN' }] },
+        { id: 'discord', fields: [{ name: 'DISCORD_BOT_TOKEN' }, { name: 'DISCORD_GUILD_ID' }] }
     ];
     
     const providerConfig = providers.find(p => p.id === provider);
@@ -871,10 +939,25 @@ async function saveAPIKey(provider) {
     }
     
     // Allow empty values for LLM providers (to clear existing keys)
+    // For Discord, both fields are required if one is filled
     const llmProviders = ['openai', 'anthropic', 'mistral'];
     if (hasEmptyField && !llmProviders.includes(provider)) {
-        showError('Please fill in all required fields');
-        return;
+        // For Discord, check if at least one field is filled - if so, both are required
+        if (provider === 'discord') {
+            const hasBotToken = values['DISCORD_BOT_TOKEN'] && values['DISCORD_BOT_TOKEN'].trim();
+            const hasGuildId = values['DISCORD_GUILD_ID'] && values['DISCORD_GUILD_ID'].trim();
+            if (hasBotToken || hasGuildId) {
+                // At least one is filled, both are required
+                if (!hasBotToken || !hasGuildId) {
+                    showError('Both Bot Token and Guild ID are required for Discord');
+                    return;
+                }
+            }
+            // If both are empty, allow clearing
+        } else {
+            showError('Please fill in all required fields');
+            return;
+        }
     }
     
     // Disable button and show loading
@@ -899,10 +982,19 @@ async function saveAPIKey(provider) {
                 body: JSON.stringify({ provider: provider, keys: values })
             });
             
-            if (!response.ok) throw new Error('Failed to save API key');
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to save API key: ${errorText}`);
+            }
             
-            // Reload configuration
+            // Reload configuration to refresh display
             await loadConfiguration();
+            
+            // Re-render the specific section
+            if (provider === 'discord' || provider === 'linkedin' || provider === 'twitter') {
+                renderScrapersAPIKeys();
+            }
+            
             showSuccess(`${provider.toUpperCase()} API key(s) saved successfully!`);
             return;
         }

@@ -14,9 +14,9 @@ if ($connections) {
             Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
         }
     }
-    Write-Host "✅ Serveur arrêté" -ForegroundColor Green
+    Write-Host "[OK] Serveur arrete" -ForegroundColor Green
 } else {
-    Write-Host "ℹ️  Aucun serveur trouvé sur le port 8000" -ForegroundColor Cyan
+    Write-Host "[INFO] Aucun serveur trouve sur le port 8000" -ForegroundColor Cyan
 }
 
 # Optionnel: arrêter PostgreSQL aussi
@@ -29,8 +29,8 @@ if ($response -eq "O" -or $response -eq "o") {
     $dataDir = "C:\Users\tlorinea\scoop\apps\postgresql\current\data"
     
     if (Test-Path $pgCtl) {
-        Write-Host "Arrêt de PostgreSQL..." -ForegroundColor Yellow
+        Write-Host "Arret de PostgreSQL..." -ForegroundColor Yellow
         & $pgCtl stop -D $dataDir 2>&1 | Out-Null
-        Write-Host "   ✅ PostgreSQL arrêté" -ForegroundColor Green
+        Write-Host "   [OK] PostgreSQL arrete" -ForegroundColor Green
     }
 }

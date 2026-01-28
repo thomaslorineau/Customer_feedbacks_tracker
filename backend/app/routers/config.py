@@ -176,21 +176,56 @@ async def get_config():
     from pathlib import Path
     from dotenv import load_dotenv
     
-    # Reload .env to get latest values
+    # Récupérer depuis la base de données en priorité, puis variables d'environnement
+    # IMPORTANT: Load from DB FIRST, then .env (DB takes priority)
+    from ..database import pg_get_config
+    
+    # Get from database first (this is the source of truth)
+    openai_key = pg_get_config('OPENAI_API_KEY')
+    anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
+    mistral_key = pg_get_config('MISTRAL_API_KEY')
+    github_token = pg_get_config('GITHUB_TOKEN')
+    trustpilot_key = pg_get_config('TRUSTPILOT_API_KEY')
+    linkedin_client_id = pg_get_config('LINKEDIN_CLIENT_ID')
+    linkedin_client_secret = pg_get_config('LINKEDIN_CLIENT_SECRET')
+    twitter_bearer = pg_get_config('TWITTER_BEARER_TOKEN')
+    discord_bot_token = pg_get_config('DISCORD_BOT_TOKEN')
+    discord_guild_id = pg_get_config('DISCORD_GUILD_ID')
+    
+    # Fallback to .env only if not in database (don't override DB values)
+    # Reload .env to get latest values, but don't override existing env vars
     backend_path = Path(__file__).resolve().parents[2]
     env_path = backend_path / ".env"
     if env_path.exists():
-        load_dotenv(env_path, override=True)
+        # Load .env but don't override existing env vars (which may have DB values)
+        load_dotenv(env_path, override=False)
     
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    mistral_key = os.getenv('MISTRAL_API_KEY')
-    github_token = os.getenv('GITHUB_TOKEN')
-    trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
-    linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
-    linkedin_client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
-    twitter_bearer = os.getenv('TWITTER_BEARER_TOKEN')
-    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    # Use env vars as fallback only if not in database
+    if not openai_key:
+        openai_key = os.getenv('OPENAI_API_KEY')
+    if not anthropic_key:
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+    if not mistral_key:
+        mistral_key = os.getenv('MISTRAL_API_KEY')
+    if not github_token:
+        github_token = os.getenv('GITHUB_TOKEN')
+    if not trustpilot_key:
+        trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
+    if not linkedin_client_id:
+        linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
+    if not linkedin_client_secret:
+        linkedin_client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
+    if not twitter_bearer:
+        twitter_bearer = os.getenv('TWITTER_BEARER_TOKEN')
+    if not discord_bot_token:
+        discord_bot_token = os.getenv('DISCORD_BOT_TOKEN')
+    if not discord_guild_id:
+        discord_guild_id = os.getenv('DISCORD_GUILD_ID')
+    provider = pg_get_config('LLM_PROVIDER') or os.getenv('LLM_PROVIDER', 'openai')
+    if provider:
+        provider = provider.lower()
+    else:
+        provider = 'openai'
     environment = os.getenv('ENVIRONMENT', 'development')
     
     def mask_key(key):
@@ -243,8 +278,16 @@ async def get_config():
                 "configured": bool(twitter_bearer),
                 "masked": mask_key(twitter_bearer),
                 "length": len(twitter_bearer) if twitter_bearer else 0
+            },
+            "discord": {
+                "configured": bool(discord_bot_token and discord_guild_id),
+                "masked": mask_key(discord_bot_token) if discord_bot_token else None,
+                "length": len(discord_bot_token) if discord_bot_token else 0,
+                "guild_id": discord_guild_id if discord_guild_id else None
             }
         },
+        # Ensure Discord is always present in response (even if not configured)
+        # This is needed for the frontend to display the Discord card
         "rate_limiting": {
             "requests_per_window": 100,
             "window_seconds": 60
@@ -464,8 +507,10 @@ async def set_llm_config(
 async def set_api_key(
     payload: dict
 ):
-    """Set a generic API key (for Google, GitHub, Trustpilot, LinkedIn, Twitter, etc.)."""
-    from pathlib import Path
+    """Set a generic API key (for Google, GitHub, Trustpilot, LinkedIn, Twitter, Discord, etc.)."""
+    from ..database import pg_set_config, pg_delete_config
+    import os
+    
     logger.info(f"API key updated for provider: {payload.get('provider')}")
     provider = payload.get('provider')
     keys = payload.get('keys')
@@ -482,28 +527,55 @@ async def set_api_key(
     else:
         raise HTTPException(status_code=400, detail="Key(s) are required")
     
-    backend_path = Path(__file__).resolve().parents[2]
-    env_path = backend_path / ".env"
-    
-    # Read existing .env if it exists
-    env_vars = {}
-    if env_path.exists():
-        with open(env_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    key_name, value = line.split("=", 1)
-                    env_vars[key_name.strip()] = value.strip()
-    
-    # Update the keys
+    # Sauvegarder dans la base de données PostgreSQL (comme pour les LLM)
     for key_name, key_value in keys.items():
-        env_vars[key_name] = key_value
-        os.environ[key_name] = key_value
+        if key_value and key_value.strip():
+            # Sauvegarder dans la base de données
+            try:
+                pg_set_config(key_name, key_value.strip())
+                # Mettre à jour les variables d'environnement pour la session courante
+                os.environ[key_name] = key_value.strip()
+                logger.info(f"✅ Saved {key_name} to database (length: {len(key_value.strip())})")
+            except Exception as e:
+                logger.error(f"❌ Failed to save {key_name} to database: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to save {key_name}: {str(e)}")
+        else:
+            # Supprimer si valeur vide
+            try:
+                pg_delete_config(key_name)
+                if key_name in os.environ:
+                    del os.environ[key_name]
+                logger.info(f"✅ Removed {key_name} from database")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to remove {key_name} from database: {e}")
     
-    # Write back to .env
-    with open(env_path, "w", encoding="utf-8") as f:
-        for key_name, value in env_vars.items():
-            f.write(f"{key_name}={value}\n")
+    # Mettre à jour le singleton config si disponible
+    try:
+        from ..config import config
+        if provider == 'discord':
+            if 'DISCORD_BOT_TOKEN' in keys:
+                config.discord_bot_token = keys.get('DISCORD_BOT_TOKEN') or None
+            if 'DISCORD_GUILD_ID' in keys:
+                config.discord_guild_id = keys.get('DISCORD_GUILD_ID') or None
+        elif provider == 'github' and 'GITHUB_TOKEN' in keys:
+            config.github_token = keys.get('GITHUB_TOKEN') or None
+        elif provider == 'trustpilot' and 'TRUSTPILOT_API_KEY' in keys:
+            config.trustpilot_api_key = keys.get('TRUSTPILOT_API_KEY') or None
+        elif provider == 'linkedin':
+            if 'LINKEDIN_CLIENT_ID' in keys:
+                config.linkedin_client_id = keys.get('LINKEDIN_CLIENT_ID') or None
+            if 'LINKEDIN_CLIENT_SECRET' in keys:
+                config.linkedin_client_secret = keys.get('LINKEDIN_CLIENT_SECRET') or None
+        elif provider == 'twitter':
+            if 'TWITTER_BEARER_TOKEN' in keys:
+                config.twitter_bearer_token = keys.get('TWITTER_BEARER_TOKEN') or None
+            if 'TWITTER_API_KEY' in keys:
+                config.twitter_api_key = keys.get('TWITTER_API_KEY') or None
+            if 'TWITTER_API_SECRET' in keys:
+                config.twitter_api_secret = keys.get('TWITTER_API_SECRET') or None
+        logger.info("Config singleton updated for current session")
+    except Exception as e:
+        logger.warning(f"Could not update config singleton: {e}")
     
     return {"success": True, "message": f"{provider} API key(s) saved successfully"}
 
