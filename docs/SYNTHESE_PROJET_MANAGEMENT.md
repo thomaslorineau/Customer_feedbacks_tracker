@@ -15,7 +15,7 @@
 **Innovation:** Projet développé **100% avec VibeCoding (Cursor AI)** par un **ingénieur généraliste** (non spécialisé développement), démontrant l'efficacité de l'assistance IA pour créer des applications professionnelles complètes même sans expertise technique approfondie.
 
 **🌐 Accès à l'application :**
-- **Production :** http://gw.lab.core.ovh.net:11840
+- **Production :** https://gw2sdev-docker.ovh.net:11840
 - **Local :** http://localhost:8000 (développement)
 
 ---

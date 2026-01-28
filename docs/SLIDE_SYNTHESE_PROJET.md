@@ -12,7 +12,7 @@
 | **Architecture** | Multi-services Docker (5 services) |
 | **Sources de scraping** | 10+ sources |
 | **Score sécurité** | **93/100** (OWASP Top 10: 9/9) |
-| **URL Production** | http://gw.lab.core.ovh.net:11840 |
+| **URL Production** | https://gw2sdev-docker.ovh.net:11840 |
 
 ---
 

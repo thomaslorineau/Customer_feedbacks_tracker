@@ -1279,7 +1279,7 @@ def generate_whats_happening_fallback(
     active_filters: str = ""
 ) -> List[WhatsHappeningInsight]:
     """Fallback rule-based insights generator."""
-    logger.info(f"Using fallback insights generator. Posts: {len(posts)}, Stats: {stats}, Filters: {active_filters}")
+    logger.warning(f"Using fallback insights generator (no LLM available). Posts: {len(posts)}, Stats: {stats}, Filters: {active_filters}")
     insights = []
     
     negative = stats.get('negative', 0)
@@ -1370,24 +1370,38 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         elapsed_time = time.time() - start_time
         logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights")
         
-        # Vérifier si les insights viennent du fallback (ils ont un format spécifique)
-        # Le fallback génère des insights avec des titres génériques comme "Spike in Negative Feedback Detected"
-        # Si on a des clés API mais que les insights semblent être du fallback, mettre llm_available à False
+        # Vérifier si les insights viennent du fallback
+        # Le fallback génère des insights avec des titres très spécifiques et génériques
+        # On vérifie si TOUS les insights correspondent exactement au format fallback
         if llm_available and insights:
-            # Vérifier si les insights ont l'air génériques (fallback)
-            fallback_indicators = [
-                "Spike in Negative Feedback Detected",
-                "Top Product Impacted:",
-                "Top Issue:",
-                "Analysis of"
+            # Patterns très spécifiques du fallback (doivent correspondre exactement)
+            fallback_exact_patterns = [
+                "Spike in Negative Feedback Detected",  # Titre exact du fallback
+                "Top Product Impacted:",  # Format exact du fallback
+                'Top Issue: "',  # Format exact avec guillemets
+                "Analysis of"  # Format exact du fallback par défaut
             ]
-            has_fallback_pattern = any(
-                any(indicator in insight.title for indicator in fallback_indicators)
-                for insight in insights
-            )
-            if has_fallback_pattern:
-                logger.warning(f"get_whats_happening: LLM is configured but insights look like fallback. Setting llm_available=False. This might indicate an LLM error.")
+            
+            # Vérifier si TOUS les insights correspondent exactement aux patterns fallback
+            # Si un seul insight ne correspond pas, c'est probablement du LLM
+            all_match_fallback = True
+            for insight in insights:
+                title_matches = any(
+                    insight.title.startswith(pattern) or pattern in insight.title
+                    for pattern in fallback_exact_patterns
+                )
+                if not title_matches:
+                    all_match_fallback = False
+                    break
+            
+            # Si tous les insights correspondent exactement au fallback ET qu'on a des clés API,
+            # c'est probablement que le LLM a échoué silencieusement
+            if all_match_fallback and len(insights) > 0:
+                logger.warning(f"get_whats_happening: LLM is configured but ALL insights match fallback patterns exactly. Setting llm_available=False. This likely indicates an LLM error or fallback was used.")
                 llm_available = False
+            else:
+                # Au moins un insight ne correspond pas au fallback, donc c'est probablement du LLM
+                logger.info(f"get_whats_happening: Insights don't all match fallback patterns, assuming LLM was used successfully. llm_available={llm_available}")
         
         return WhatsHappeningResponse(insights=insights, llm_available=llm_available)
     except Exception as e:

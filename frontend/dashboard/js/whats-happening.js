@@ -249,6 +249,15 @@ export async function updateWhatsHappening(state) {
         // Show error message with retry option instead of fallback
         const content = document.getElementById('whatsHappeningContent');
         if (content) {
+            // Hide overlay after showing error message
+            setTimeout(() => {
+                if (overlay) {
+                    overlay.style.setProperty('display', 'none', 'important');
+                    overlay.style.setProperty('visibility', 'hidden', 'important');
+                    overlay.style.setProperty('opacity', '0', 'important');
+                    console.log('[whats-happening.js] Overlay hidden after error');
+                }
+            }, 500);
             // Check if it's a timeout error
             const isTimeout = error.message && (error.message.includes('timeout') || error.message.includes('Timeout'));
             const errorMessage = isTimeout 
@@ -290,6 +299,11 @@ export async function updateWhatsHappening(state) {
         // Clear the safety timeout - overlay will be hidden after displaying results
         clearTimeout(overlayTimeout);
         // Don't hide overlay here - wait until after displaying results
+        // But ensure analysisCompleted is set if not already
+        if (!analysisCompleted) {
+            analysisCompleted = true;
+            console.warn('[whats-happening.js] Analysis marked as completed in finally block (error case)');
+        }
     }
     
     // Update stats cards with click handlers
@@ -528,6 +542,15 @@ export async function updateWhatsHappening(state) {
                 </p>
             </div>
         `;
+        // IMPORTANT: Hide overlay even when LLM is unavailable
+        setTimeout(() => {
+            if (overlay) {
+                overlay.style.setProperty('display', 'none', 'important');
+                overlay.style.setProperty('visibility', 'hidden', 'important');
+                overlay.style.setProperty('opacity', '0', 'important');
+                console.log('[whats-happening.js] Overlay hidden (LLM unavailable case)');
+            }
+        }, 500);
         // Ne pas afficher les insights du fallback (données en dur)
         return;
     }
