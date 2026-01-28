@@ -95,7 +95,7 @@ async def _get_ovh_available_models(ovh_key: str, ovh_endpoint: str) -> List[str
     Returns empty list if fetch fails.
     """
     try:
-        import httpx
+        # httpx is already imported at module level
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
                 f'{ovh_endpoint}/models',
@@ -1387,7 +1387,7 @@ CRITICAL INSTRUCTIONS:
                         ovh_key_check = pg_get_config('OVH_API_KEY')
                         ovh_endpoint_check = pg_get_config('OVH_ENDPOINT_URL')
                         if ovh_key_check and ovh_endpoint_check:
-                            import httpx
+                            # httpx is already imported at module level, no need to import again
                             async with httpx.AsyncClient(timeout=5.0) as check_client:
                                 check_response = await check_client.get(
                                     f'{ovh_endpoint_check}/models',
@@ -2387,7 +2387,7 @@ CRITICAL INSTRUCTIONS:
                         ovh_key_check = pg_get_config('OVH_API_KEY')
                         ovh_endpoint_check = pg_get_config('OVH_ENDPOINT_URL')
                         if ovh_key_check and ovh_endpoint_check:
-                            import httpx
+                            # httpx is already imported at module level, no need to import again
                             async with httpx.AsyncClient(timeout=5.0) as check_client:
                                 check_response = await check_client.get(
                                     f'{ovh_endpoint_check}/models',

@@ -1153,10 +1153,19 @@ def init_db() -> None:
     which has proper types (BIGSERIAL, TIMESTAMP WITH TIME ZONE, etc.) and indexes.
     This function is kept for backward compatibility but should not be used in production.
     """
-    logger.warning("init_db() called - consider using init_postgres.sql for production schema")
+    import os
+    environment = os.getenv('ENVIRONMENT', 'development').lower()
+    
+    # Only show warning in production if init_postgres.sql wasn't used
+    if environment == 'production':
+        logger.info("init_db() called in production - tables should already exist from init_postgres.sql")
+    else:
+        logger.warning("init_db() called - consider using init_postgres.sql for production schema")
+    
     logger.info("Initializing PostgreSQL database schema (basic version)...")
     
     try:
+        # Use context manager properly to avoid cursor closure issues
         with get_pg_cursor(dict_cursor=False) as cur:
             # Posts table (basic schema - use init_postgres.sql for production)
             cur.execute('''
