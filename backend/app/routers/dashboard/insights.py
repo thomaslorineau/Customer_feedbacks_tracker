@@ -31,7 +31,7 @@ def get_llm_api_keys():
     puis depuis les variables d'environnement comme fallback.
     
     Returns:
-        tuple: (openai_key, anthropic_key, mistral_key, llm_provider)
+        tuple: (openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider)
     """
     try:
         from ...database import pg_get_config
@@ -41,6 +41,9 @@ def get_llm_api_keys():
         openai_key = pg_get_config('OPENAI_API_KEY')
         anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
         mistral_key = pg_get_config('MISTRAL_API_KEY')
+        ovh_key = pg_get_config('OVH_API_KEY')
+        ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+        ovh_model = pg_get_config('OVH_MODEL')
         llm_provider = pg_get_config('LLM_PROVIDER')
         
         # Normaliser les valeurs : convertir les chaînes vides en None
@@ -50,6 +53,12 @@ def get_llm_api_keys():
             anthropic_key = None
         if mistral_key == '':
             mistral_key = None
+        if ovh_key == '':
+            ovh_key = None
+        if ovh_endpoint == '':
+            ovh_endpoint = None
+        if ovh_model == '':
+            ovh_model = None
         if llm_provider == '':
             llm_provider = None
         
@@ -61,6 +70,12 @@ def get_llm_api_keys():
             anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if not mistral_key:
             mistral_key = os.getenv('MISTRAL_API_KEY')
+        if not ovh_key:
+            ovh_key = os.getenv('OVH_API_KEY')
+        if not ovh_endpoint:
+            ovh_endpoint = os.getenv('OVH_ENDPOINT_URL', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1')
+        if not ovh_model:
+            ovh_model = os.getenv('OVH_MODEL', 'DeepSeek-R1-Distill-Qwen-32B')
         if not llm_provider:
             llm_provider = os.getenv('LLM_PROVIDER', 'openai')
         
@@ -70,9 +85,9 @@ def get_llm_api_keys():
         else:
             llm_provider = 'openai'
         
-        logger.debug(f"get_llm_api_keys: OpenAI={bool(openai_key)}, Anthropic={bool(anthropic_key)}, Mistral={bool(mistral_key)}, Provider={llm_provider}")
+        logger.debug(f"get_llm_api_keys: OpenAI={bool(openai_key)}, Anthropic={bool(anthropic_key)}, Mistral={bool(mistral_key)}, OVH={bool(ovh_key)}, Provider={llm_provider}")
             
-        return openai_key, anthropic_key, mistral_key, llm_provider
+        return openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider
     except Exception as e:
         logger.warning(f"Erreur lors de la récupération des clés API depuis la base de données: {e}")
         # Fallback complet sur les variables d'environnement
@@ -80,6 +95,9 @@ def get_llm_api_keys():
             os.getenv('OPENAI_API_KEY'),
             os.getenv('ANTHROPIC_API_KEY'),
             os.getenv('MISTRAL_API_KEY'),
+            os.getenv('OVH_API_KEY'),
+            os.getenv('OVH_ENDPOINT_URL', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'),
+            os.getenv('OVH_MODEL', 'DeepSeek-R1-Distill-Qwen-32B'),
             os.getenv('LLM_PROVIDER', 'openai').lower()
         )
 
@@ -133,11 +151,11 @@ Format your response as a JSON array with this structure:
 
 Focus on actionable improvements that address real customer pain points. Be specific and practical."""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
     logger.info(f"generate_ideas_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         raise HTTPException(status_code=400, detail="No LLM API key configured. Please configure at least one API key in Settings.")
     
     # Helper function to call a single LLM
@@ -206,6 +224,29 @@ Focus on actionable improvements that address real customer pain points. Be spec
                     response.raise_for_status()
                     result = response.json()
                     return result['choices'][0]['message']['content']
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    url = f"{endpoint_url or ovh_endpoint}/chat/completions"
+                    response = await client.post(
+                        url,
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': model_name or ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
         except Exception as e:
             logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
             return None
@@ -219,16 +260,23 @@ Focus on actionable improvements that address real customer pain points. Be spec
         configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
     if mistral_key:
         configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    if ovh_key:
+        configured_llms.append(('ovh', ovh_key, 'OVH AI'))
     
     # If 2 or more LLMs are configured, call them in parallel and summarize
     # Limiter à 2 LLM maximum pour éviter la complexité excessive de la synthèse
     if len(configured_llms) >= 2:
-        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral)
+        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral, puis OVH)
         llms_to_use = configured_llms[:2]
         logger.info(f"{len(configured_llms)} LLMs configured, using {len(llms_to_use)} for parallel synthesis (limiting to 2 for better results)")
         try:
             # Call selected LLMs in parallel
-            tasks = [call_llm(provider, key, prompt) for provider, key, _ in llms_to_use]
+            tasks = []
+            for provider, key, _ in llms_to_use:
+                if provider == 'ovh':
+                    tasks.append(call_llm(provider, key, prompt, ovh_endpoint, ovh_model))
+                else:
+                    tasks.append(call_llm(provider, key, prompt))
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Collect valid results
@@ -268,6 +316,10 @@ Focus on actionable improvements that address real customer pain points. Be spec
                     summarizer = 'anthropic'
                     summarizer_key = anthropic_key
                     summarizer_name = 'Anthropic'
+                elif ovh_key:
+                    summarizer = 'ovh'
+                    summarizer_key = ovh_key
+                    summarizer_name = 'OVH AI'
                 elif mistral_key:
                     summarizer = 'mistral'
                     summarizer_key = mistral_key
@@ -300,7 +352,10 @@ Format your response as a JSON array with this structure:
   }}
 ]"""
                 
-                summary_content = await call_llm(summarizer, summarizer_key, summary_prompt)
+                if summarizer == 'ovh':
+                    summary_content = await call_llm(summarizer, summarizer_key, summary_prompt, ovh_endpoint, ovh_model)
+                else:
+                    summary_content = await call_llm(summarizer, summarizer_key, summary_prompt)
                 if summary_content:
                     json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
                     if json_match:
@@ -314,7 +369,16 @@ Format your response as a JSON array with this structure:
     
     # Single LLM logic (if not all 3 are configured, or if parallel call failed)
     try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key and not mistral_key):
+        # Use the configured provider first
+        if llm_provider == 'ovh' and ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        elif llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key and not mistral_key and not ovh_key):
             # Use Anthropic
             if anthropic_key:
                 content = await call_llm('anthropic', anthropic_key, prompt)
@@ -324,7 +388,7 @@ Format your response as a JSON array with this structure:
                         ideas_data = json.loads(json_match.group())
                         return [ImprovementIdea(**idea) for idea in ideas_data]
         
-        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key and not ovh_key):
             # Use Mistral
             if mistral_key:
                 content = await call_llm('mistral', mistral_key, prompt)
@@ -345,6 +409,14 @@ Format your response as a JSON array with this structure:
                         return [ImprovementIdea(**idea) for idea in ideas_data]
         
         # If provider is set but no matching key, try any available key
+        if ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
         if openai_key:
             content = await call_llm('openai', openai_key, prompt)
             if content:
@@ -479,9 +551,9 @@ Use appropriate emojis:
 
 Be specific and reference actual content from the posts when possible."""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         logger.info("[Recommended Actions] No LLM API key configured, cannot generate actions")
         return []
     
@@ -559,6 +631,30 @@ Be specific and reference actual content from the posts when possible."""
                     content = result['choices'][0]['message']['content']
                     logger.info(f"[Recommended Actions] Mistral API call successful (response length: {len(content)})")
                     return content
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    response = await client.post(
+                        f'{ovh_endpoint}/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 1500
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"[Recommended Actions] OVH AI API call successful (response length: {len(content)})")
+                    return content
         except httpx.HTTPStatusError as e:
             logger.error(f"[Recommended Actions] {provider} API HTTP error ({e.response.status_code}): {e}")
             if e.response.status_code == 401:
@@ -577,16 +673,24 @@ Be specific and reference actual content from the posts when possible."""
         configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
     if mistral_key:
         configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    if ovh_key:
+        configured_llms.append(('ovh', ovh_key, 'OVH AI'))
     
     # If 2 or more LLMs are configured, call them in parallel and summarize
     # Limiter à 2 LLM maximum pour éviter la complexité excessive de la synthèse
     if len(configured_llms) >= 2:
-        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral)
+        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral, puis OVH)
         llms_to_use = configured_llms[:2]
         logger.info(f"[Recommended Actions] {len(configured_llms)} LLMs configured, using {len(llms_to_use)} for parallel synthesis (limiting to 2 for better results)")
         try:
             # Call selected LLMs in parallel
-            tasks = [call_llm_for_actions(provider, key, prompt) for provider, key, _ in llms_to_use]
+            tasks = []
+            for provider, key, _ in llms_to_use:
+                if provider == 'ovh':
+                    # OVH needs special handling with endpoint and model
+                    tasks.append(call_llm_for_actions(provider, key, prompt))
+                else:
+                    tasks.append(call_llm_for_actions(provider, key, prompt))
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Collect valid results
@@ -672,7 +776,10 @@ Format your response as a JSON array with this structure:
     # Single LLM logic (if only 1 LLM is configured, or if parallel call failed)
     try:
         # Try provider-specific first
-        if llm_provider == 'anthropic' and anthropic_key:
+        if llm_provider == 'ovh' and ovh_key:
+            logger.info("[Recommended Actions] Calling OVH AI LLM (provider-specific)")
+            content = await call_llm_for_actions('ovh', ovh_key, prompt)
+        elif llm_provider == 'anthropic' and anthropic_key:
             logger.info("[Recommended Actions] Calling Anthropic LLM (provider-specific)")
             content = await call_llm_for_actions('anthropic', anthropic_key, prompt)
         elif llm_provider == 'mistral' and mistral_key:
@@ -682,13 +789,16 @@ Format your response as a JSON array with this structure:
             logger.info("[Recommended Actions] Calling OpenAI LLM (provider-specific)")
             content = await call_llm_for_actions('openai', openai_key, prompt)
         else:
-            # Try any available key (prefer OpenAI, then Anthropic, then Mistral)
+            # Try any available key (prefer OpenAI, then Anthropic, then OVH, then Mistral)
             if openai_key:
                 logger.info("[Recommended Actions] Calling OpenAI LLM (fallback order)")
                 content = await call_llm_for_actions('openai', openai_key, prompt)
             elif anthropic_key:
                 logger.info("[Recommended Actions] Calling Anthropic LLM (fallback order)")
                 content = await call_llm_for_actions('anthropic', anthropic_key, prompt)
+            elif ovh_key:
+                logger.info("[Recommended Actions] Calling OVH AI LLM (fallback order)")
+                content = await call_llm_for_actions('ovh', ovh_key, prompt)
             elif mistral_key:
                 logger.info("[Recommended Actions] Calling Mistral LLM (fallback order)")
                 content = await call_llm_for_actions('mistral', mistral_key, prompt)
@@ -806,7 +916,7 @@ def generate_recommended_actions_fallback(
 async def generate_improvement_ideas(request: ImprovementIdeaRequest):
     """Generate product improvement ideas based on customer feedback posts using LLM."""
     try:
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
         api_key = openai_key or anthropic_key or mistral_key
         llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
         
@@ -820,7 +930,7 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback using LLM."""
     try:
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
         api_key = openai_key or anthropic_key or mistral_key
         llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
         
@@ -966,11 +1076,11 @@ CRITICAL INSTRUCTIONS:
 - Prioritize insights that can lead to immediate action"""
 
     # Récupérer les clés API depuis la base de données en priorité
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
     logger.info(f"generate_whats_happening_insights_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         logger.error("generate_whats_happening_insights_with_llm: No API keys available, raising HTTPException")
         raise HTTPException(
             status_code=503,
@@ -1050,6 +1160,30 @@ CRITICAL INSTRUCTIONS:
                     content = result['choices'][0]['message']['content']
                     logger.info(f"Mistral API call successful, content length: {len(content)}")
                     return content
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    response = await client.post(
+                        f'{ovh_endpoint}/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"OVH AI API call successful, content length: {len(content)}")
+                    return content
         except httpx.HTTPStatusError as e:
             error_text = e.response.text[:500] if hasattr(e.response, 'text') else str(e)
             logger.error(f"{provider} API HTTP error: {e.response.status_code} - {error_text}")
@@ -1082,11 +1216,13 @@ CRITICAL INSTRUCTIONS:
         configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
     if mistral_key:
         configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    if ovh_key:
+        configured_llms.append(('ovh', ovh_key, 'OVH AI'))
     
     # Only use parallel + summarize if 2+ LLMs are configured AND no specific provider is set
     # Limiter à 2 LLM maximum pour éviter la complexité excessive de la synthèse
     if len(configured_llms) >= 2 and not llm_provider:
-        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral)
+        # Limiter à 2 LLM pour la synthèse (priorité: OpenAI, puis Anthropic, puis Mistral, puis OVH)
         llms_to_use = configured_llms[:2]
         logger.info(f"{len(configured_llms)} LLMs configured, using {len(llms_to_use)} for parallel synthesis (limiting to 2 for better results)")
         
@@ -1094,7 +1230,13 @@ CRITICAL INSTRUCTIONS:
             # Call selected LLMs in parallel
             import time
             parallel_start = time.time()
-            tasks = [call_llm_for_insights(provider, key, prompt) for provider, key, _ in llms_to_use]
+            tasks = []
+            for provider, key, _ in llms_to_use:
+                if provider == 'ovh':
+                    # OVH needs special handling - but call_llm_for_insights uses ovh_endpoint and ovh_model from closure
+                    tasks.append(call_llm_for_insights(provider, key, prompt))
+                else:
+                    tasks.append(call_llm_for_insights(provider, key, prompt))
             logger.info(f"Calling {len(tasks)} LLMs in parallel...")
             results = await asyncio.gather(*tasks, return_exceptions=True)
             parallel_elapsed = time.time() - parallel_start
@@ -1380,7 +1522,7 @@ async def get_whats_happening(request: WhatsHappeningRequest):
     try:
         # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
         try:
-            openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+            openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
         except Exception as e:
             logger.error(f"Error getting LLM API keys: {type(e).__name__}: {e}", exc_info=True)
             raise HTTPException(
@@ -1457,7 +1599,7 @@ Identified opportunities:
 
 Generate a sentence in English that summarizes the top improvement ideas in a clear and actionable way. Generate ONLY the sentence, without JSON formatting or quotes."""
         
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
         
         # Determine which provider to use
         # Priority: LLM_PROVIDER env var > available API keys
@@ -1840,9 +1982,9 @@ CRITICAL INSTRUCTIONS:
 - Prioritize insights that can lead to immediate action
 - Include ROI insights only if you can provide meaningful estimates based on the data"""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         return generate_improvements_analysis_fallback(pain_points, products, total_posts)
     
     # Helper function to call LLM
