@@ -30,7 +30,7 @@ from slowapi.errors import RateLimitExceeded
 logger = logging.getLogger(__name__)
 
 from . import database as db
-from .config import keywords_base
+from .keywords import keywords_base
 
 
 # Configure locale for French support

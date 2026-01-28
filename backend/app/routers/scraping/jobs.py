@@ -13,7 +13,7 @@ from ... import db
 from ...scraper import x_scraper, stackoverflow, github, reddit, trustpilot, ovh_forum, mastodon, g2_crowd, linkedin, discord
 from ...scraper import keyword_expander
 from ...analysis import sentiment, country_detection, relevance_scorer
-from ...config import keywords_base
+from ...keywords import keywords_base
 from .base import should_insert_post, log_scraping, RELEVANCE_THRESHOLD
 from .endpoints import KeywordsPayload
 

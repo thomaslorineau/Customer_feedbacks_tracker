@@ -19,7 +19,7 @@ from app.job_queue import (
     get_job_queue, close_job_queue, Job, JobStatus, JobType
 )
 from app import database as db
-from app.config import keywords_base
+from app.keywords import keywords_base
 
 # Configure logging
 logging.basicConfig(

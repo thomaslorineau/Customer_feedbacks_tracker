@@ -816,7 +816,7 @@ async def get_base_keywords():
     except Exception as e:
         logger.error(f"Error getting base keywords: {e}")
         # Fallback to defaults
-        from ..config.keywords_base import get_base_keywords_from_db
+        from ..keywords.keywords_base import get_base_keywords_from_db
         return get_base_keywords_from_db()
 
 
