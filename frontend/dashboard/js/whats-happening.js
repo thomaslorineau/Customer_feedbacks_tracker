@@ -1377,17 +1377,19 @@ async function updateRecommendedActions(posts, recentPosts, recentNegative, spik
                 </div>
             `;
         } else if (!llmAvailable) {
-            // No LLM API key configured - show nice message
+            // No LLM API key configured - show error message
             actionsContainer.innerHTML = `
                 <div class="recommended-actions-header">
                     <h3>Recommended Actions</h3>
                 </div>
                 <div class="recommended-actions-list">
-                    <div class="action-item action-no-llm">
-                        <span class="action-icon">🤖</span>
+                    <div class="action-item action-no-llm" style="border-left: 3px solid var(--warning, #f59e0b);">
+                        <span class="action-icon">⚠️</span>
                         <div class="action-text-container">
-                            <span class="action-text">AI-powered recommendations require an API key</span>
-                            <span class="action-hint">Configure your OpenAI or Anthropic API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent recommendations based on your feedback analysis.</span>
+                            <span class="action-text" style="font-weight: 600; color: var(--warning, #f59e0b);">Analysis cannot be performed</span>
+                            <span class="action-hint" style="margin-top: 8px; display: block; color: var(--text-secondary, #6b7280);">
+                                AI-powered recommendations require an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent recommendations based on your feedback analysis.
+                            </span>
                         </div>
                     </div>
                 </div>
