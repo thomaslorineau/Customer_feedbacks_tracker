@@ -443,34 +443,50 @@ async def set_llm_config(
             logger.info(f"  {key}: {value}")
     
     # Store in PostgreSQL app_config table (persistent across restarts)
-    # Only update keys that were explicitly provided in the request AND have a non-null value
-    # Use raw_payload_dict to check for explicit nulls (for deletion)
+    # CRITICAL: Only update keys that were explicitly provided in the request AND have a non-empty value
+    # Use raw_payload_dict to check for explicit nulls/empty strings (for deletion)
+    # IMPORTANT: If a key is not in raw_payload_dict, it means it wasn't sent at all - DO NOT TOUCH IT
     if 'openai_api_key' in raw_payload_dict:
-        if payload.openai_api_key and payload.openai_api_key.strip():
-            pg_set_config('OPENAI_API_KEY', payload.openai_api_key.strip())
+        # Key was explicitly provided in the request
+        openai_value = payload.openai_api_key.strip() if payload.openai_api_key else None
+        if openai_value:
+            pg_set_config('OPENAI_API_KEY', openai_value)
             logger.info("OpenAI API key saved to database")
         else:
             # Only delete if explicitly set to empty/null in the request
             pg_delete_config('OPENAI_API_KEY')
             logger.info("OpenAI API key removed from database (explicitly cleared)")
+    else:
+        # Key was NOT in the request - preserve existing value in database
+        logger.debug("OpenAI API key not in request - preserving existing value")
     
     if 'anthropic_api_key' in raw_payload_dict:
-        if payload.anthropic_api_key and payload.anthropic_api_key.strip():
-            pg_set_config('ANTHROPIC_API_KEY', payload.anthropic_api_key.strip())
+        # Key was explicitly provided in the request
+        anthropic_value = payload.anthropic_api_key.strip() if payload.anthropic_api_key else None
+        if anthropic_value:
+            pg_set_config('ANTHROPIC_API_KEY', anthropic_value)
             logger.info("Anthropic API key saved to database")
         else:
             # Only delete if explicitly set to empty/null in the request
             pg_delete_config('ANTHROPIC_API_KEY')
             logger.info("Anthropic API key removed from database (explicitly cleared)")
+    else:
+        # Key was NOT in the request - preserve existing value in database
+        logger.debug("Anthropic API key not in request - preserving existing value")
     
     if 'mistral_api_key' in raw_payload_dict:
-        if payload.mistral_api_key and payload.mistral_api_key.strip():
-            pg_set_config('MISTRAL_API_KEY', payload.mistral_api_key.strip())
+        # Key was explicitly provided in the request
+        mistral_value = payload.mistral_api_key.strip() if payload.mistral_api_key else None
+        if mistral_value:
+            pg_set_config('MISTRAL_API_KEY', mistral_value)
             logger.info("Mistral API key saved to database")
         else:
             # Only delete if explicitly set to empty/null in the request
             pg_delete_config('MISTRAL_API_KEY')
             logger.info("Mistral API key removed from database (explicitly cleared)")
+    else:
+        # Key was NOT in the request - preserve existing value in database
+        logger.debug("Mistral API key not in request - preserving existing value")
     
     # Only update llm_provider if it was explicitly provided in the request
     if 'llm_provider' in payload_dict and payload.llm_provider:
