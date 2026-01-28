@@ -95,7 +95,11 @@ class DiscordScraper(BaseScraper):
             logger.warning(f"[Discord] No channels found in guild {self.guild_id}")
             return []
         
-        logger.info(f"[Discord] Searching in {len(channels)} channels")
+        logger.info(f"[Discord] 🔍 Searching in {len(channels)} channels")
+        
+        if not channels:
+            logger.warning(f"[Discord] ⚠️ No channels found in guild {self.guild_id}")
+            return []
         
         # Search in each channel
         for idx, channel in enumerate(channels):
@@ -112,7 +116,7 @@ class DiscordScraper(BaseScraper):
                 # Search messages in this channel
                 messages = await self._search_channel_messages(channel_id, query, limit - len(all_messages))
                 
-                logger.info(f"[Discord] Channel {channel_name}: found {len(messages)} matching messages")
+                logger.info(f"[Discord] ✅ Channel {channel_name} (ID: {channel_id}): found {len(messages)} matching messages")
                 
                 for msg in messages:
                     msg_id = msg.get('id')
@@ -132,14 +136,26 @@ class DiscordScraper(BaseScraper):
                 logger.warning(f"[Discord] {error_msg}", exc_info=True)
                 continue
         
-        logger.info(f"[Discord] Total messages collected: {len(all_messages)}")
+        logger.info(f"[Discord] 📊 Total messages collected: {len(all_messages)} (limit: {limit})")
+        
+        if len(all_messages) == 0:
+            logger.warning(f"[Discord] ⚠️ No messages found! Query: '{query or '(all)'}', Channels searched: {len(channels)}")
+            # Log channel details for debugging
+            for ch in channels[:5]:
+                logger.info(f"[Discord]   - Channel: {ch.get('name', 'unknown')} (ID: {ch.get('id')}, Type: {ch.get('type')})")
+        
         return all_messages[:limit]
     
     async def _get_guild_channels(self) -> List[Dict[str, Any]]:
         """Get all channels in the Discord guild."""
         url = f"https://discord.com/api/v10/guilds/{self.guild_id}/channels"
+        # Ensure token doesn't already have "Bot " prefix
+        token = self.bot_token.strip()
+        if token.startswith("Bot "):
+            token = token[4:].strip()
         headers = {
-            "Authorization": f"Bot {self.bot_token}",
+            "Authorization": f"Bot {token}",
+            "Content-Type": "application/json",
             "User-Agent": "OVH-Tracker-Bot/1.0"
         }
         
@@ -184,8 +200,13 @@ class DiscordScraper(BaseScraper):
         # Discord API allows fetching up to 100 messages per request
         while len(all_messages) < limit:
             url = f"https://discord.com/api/v10/channels/{channel_id}/messages"
+            # Ensure token doesn't already have "Bot " prefix
+            token = self.bot_token.strip()
+            if token.startswith("Bot "):
+                token = token[4:].strip()
             headers = {
-                "Authorization": f"Bot {self.bot_token}",
+                "Authorization": f"Bot {token}",
+                "Content-Type": "application/json",
                 "User-Agent": "OVH-Tracker-Bot/1.0"
             }
             
@@ -207,10 +228,10 @@ class DiscordScraper(BaseScraper):
                 response.raise_for_status()
                 messages = response.json()
                 
-                logger.debug(f"[Discord] Fetched {len(messages)} raw messages from channel {channel_id}")
+                logger.info(f"[Discord] ✅ Fetched {len(messages)} raw messages from channel {channel_id} (status: {response.status_code})")
                 
                 if not messages:
-                    logger.debug(f"[Discord] No more messages in channel {channel_id}, stopping pagination")
+                    logger.info(f"[Discord] ⚠️ No more messages in channel {channel_id}, stopping pagination")
                     break
                 
                 # Filter messages that contain the query (if query is provided)
@@ -219,16 +240,42 @@ class DiscordScraper(BaseScraper):
                 total_fetched = len(messages)
                 matching_count = 0
                 
-                logger.debug(f"[Discord] Filtering {total_fetched} messages with query='{query or '(all)'}'")
+                logger.info(f"[Discord] 🔍 Filtering {total_fetched} messages with query='{query or '(all)'}'")
+                
+                # Log first few message contents for debugging
+                if total_fetched > 0:
+                    sample_messages = messages[:3]
+                    for idx, msg in enumerate(sample_messages):
+                        content_preview = msg.get('content', '')[:100]
+                        logger.info(f"[Discord] Sample message {idx+1}: content_length={len(msg.get('content', ''))}, preview='{content_preview}...'")
                 
                 for msg in messages:
-                    content = msg.get('content', '').lower()
+                    content = msg.get('content', '')
+                    content_lower = content.lower() if content else ''
+                    
                     # If query is empty/None, include all messages; otherwise filter by query
-                    if query_lower is None or query_lower in content:
+                    # Also include messages with empty content if query is empty (they might have embeds/attachments)
+                    should_include = False
+                    if query_lower is None or query == "":
+                        # Include all messages when query is empty
+                        should_include = True
+                    elif content_lower:
+                        # Only filter by query if message has content
+                        should_include = query_lower in content_lower
+                    else:
+                        # Message has no content and query is not empty - skip it
+                        logger.debug(f"[Discord] Skipping message with no content (query='{query}')")
+                        should_include = False
+                    
+                    if should_include:
                         matching_count += 1
                         try:
                             # Parse message
                             author = msg.get('author', {})
+                            if not author:
+                                logger.warning(f"[Discord] Message {msg.get('id', 'unknown')} has no author, skipping")
+                                continue
+                            
                             author_name = author.get('username', 'unknown')
                             author_discriminator = author.get('discriminator', '')
                             if author_discriminator and author_discriminator != '0':
@@ -236,8 +283,20 @@ class DiscordScraper(BaseScraper):
                             else:
                                 author_display = author_name
                             
-                            content_text = msg.get('content', '')
+                            # Use content or fallback to a placeholder if empty
+                            content_text = content if content else "[Message sans contenu texte]"
+                            
+                            # Check for embeds or attachments
+                            embeds = msg.get('embeds', [])
+                            attachments = msg.get('attachments', [])
+                            if not content_text and (embeds or attachments):
+                                content_text = f"[Message avec {len(embeds)} embed(s) et {len(attachments)} pièce(s) jointe(s)]"
+                            
                             message_id = msg.get('id')
+                            if not message_id:
+                                logger.warning(f"[Discord] Message has no ID, skipping")
+                                continue
+                            
                             channel_id_from_msg = msg.get('channel_id', channel_id)
                             
                             # Parse timestamp
@@ -246,7 +305,8 @@ class DiscordScraper(BaseScraper):
                                 # Discord timestamps are ISO 8601 strings
                                 try:
                                     created_at = datetime.fromisoformat(timestamp.replace('Z', '+00:00')).isoformat()
-                                except:
+                                except Exception as e:
+                                    logger.warning(f"[Discord] Failed to parse timestamp '{timestamp}': {e}")
                                     created_at = datetime.now().isoformat()
                             else:
                                 created_at = datetime.now().isoformat()
@@ -265,9 +325,13 @@ class DiscordScraper(BaseScraper):
                                 'sentiment_label': 'neutral',
                             }
                             all_messages.append(post)
+                            logger.debug(f"[Discord] ✅ Added message: {author_display} - {content_text[:50]}...")
                         except Exception as e:
+                            logger.error(f"[Discord] ❌ Error parsing Discord message: {e}", exc_info=True)
                             self.logger.log("warning", f"Error parsing Discord message: {e}")
                             continue
+                    else:
+                        logger.debug(f"[Discord] ⏭️ Message filtered out (query='{query}' not in content)")
                     
                     # Update before_id for pagination
                     before_id = msg.get('id')
