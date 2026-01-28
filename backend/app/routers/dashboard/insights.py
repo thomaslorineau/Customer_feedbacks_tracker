@@ -963,6 +963,7 @@ CRITICAL INSTRUCTIONS:
     # Helper function to call LLM
     async def call_llm_for_insights(provider: str, api_key: str, prompt: str) -> Optional[str]:
         """Call a single LLM and return the response content."""
+        logger.info(f"call_llm_for_insights: Calling {provider} API (key length: {len(api_key) if api_key else 0})")
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 if provider == 'openai':
@@ -984,7 +985,9 @@ CRITICAL INSTRUCTIONS:
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['choices'][0]['message']['content']
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"OpenAI API call successful, content length: {len(content)}")
+                    return content
                 
                 elif provider == 'anthropic':
                     response = await client.post(
@@ -1004,7 +1007,9 @@ CRITICAL INSTRUCTIONS:
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['content'][0]['text']
+                    content = result['content'][0]['text']
+                    logger.info(f"Anthropic API call successful, content length: {len(content)}")
+                    return content
                 
                 elif provider == 'mistral':
                     response = await client.post(
@@ -1025,11 +1030,18 @@ CRITICAL INSTRUCTIONS:
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['choices'][0]['message']['content']
-        except Exception as e:
-            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"Mistral API call successful, content length: {len(content)}")
+                    return content
+        except httpx.HTTPStatusError as e:
+            logger.error(f"{provider} API HTTP error: {e.response.status_code} - {e.response.text[:200]}")
             return None
-        return None
+        except httpx.TimeoutException as e:
+            logger.error(f"{provider} API timeout error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"{provider} API error: {type(e).__name__}: {e}", exc_info=True)
+            return None
     
     # If 2 or more LLMs are configured (and no specific provider is set), call them in parallel and summarize
     configured_llms = []
@@ -1181,33 +1193,38 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                 api_key_to_use = mistral_key
         
         if provider_to_use and api_key_to_use:
-            logger.info(f"Using single LLM: {provider_to_use}")
-            content = await call_llm_for_insights(provider_to_use, api_key_to_use, prompt)
-            
-            if content:
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    try:
-                        insights_data = json.loads(json_match.group())
-                        logger.info(f"Parsed {len(insights_data)} insights from {provider_to_use} response")
-                        if insights_data:
-                            return [WhatsHappeningInsight(**insight) for insight in insights_data], False
-                        else:
-                            logger.warning(f"{provider_to_use} returned empty insights array")
-                    except (json.JSONDecodeError, KeyError, TypeError) as e:
-                        logger.error(f"Error parsing {provider_to_use} response: {e}. Content: {content[:500]}")
+            logger.info(f"Using single LLM: {provider_to_use} (key length: {len(api_key_to_use)})")
+            try:
+                content = await call_llm_for_insights(provider_to_use, api_key_to_use, prompt)
+                logger.info(f"LLM call completed, content received: {bool(content)}, content length: {len(content) if content else 0}")
+                
+                if content:
+                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                    if json_match:
+                        try:
+                            insights_data = json.loads(json_match.group())
+                            logger.info(f"Parsed {len(insights_data)} insights from {provider_to_use} response")
+                            if insights_data:
+                                logger.info(f"Successfully generated {len(insights_data)} insights from {provider_to_use}, returning with used_fallback=False")
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
+                            else:
+                                logger.warning(f"{provider_to_use} returned empty insights array")
+                        except (json.JSONDecodeError, KeyError, TypeError) as e:
+                            logger.error(f"Error parsing {provider_to_use} response: {e}. Content: {content[:500]}")
+                    else:
+                        logger.warning(f"No JSON array found in {provider_to_use} response. Content length: {len(content)}, first 500 chars: {content[:500]}")
                 else:
-                    logger.warning(f"No JSON array found in {provider_to_use} response. Content: {content[:500]}")
-            else:
-                logger.warning(f"{provider_to_use} returned None or empty content")
+                    logger.warning(f"{provider_to_use} returned None or empty content")
+            except Exception as e:
+                logger.error(f"Exception during LLM call to {provider_to_use}: {type(e).__name__}: {e}", exc_info=True)
+        else:
+            logger.warning(f"No LLM provider selected. provider_to_use: {provider_to_use}, api_key_to_use: {bool(api_key_to_use)}")
         
         logger.warning("No valid LLM response received, using fallback")
         return generate_whats_happening_fallback(posts, stats, active_filters), True
     except Exception as e:
-        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
+        logger.error(f"LLM API error: {type(e).__name__}: {e}. Using fallback.", exc_info=True)
         return generate_whats_happening_fallback(posts, stats, active_filters), True
-    
-    return generate_whats_happening_fallback(posts, stats, active_filters), True
 
 
 def generate_whats_happening_fallback(
@@ -1291,7 +1308,9 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
         openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
         api_key = openai_key or anthropic_key or mistral_key
-        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral']
+        # LLM est disponible si au moins une clé API est configurée
+        # Le provider peut être None/empty, dans ce cas on utilisera le premier disponible
+        llm_available = bool(api_key)
         
         logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
         logger.info(f"get_whats_happening: OpenAI key length: {len(openai_key) if openai_key else 0}, Anthropic key length: {len(anthropic_key) if anthropic_key else 0}, Mistral key length: {len(mistral_key) if mistral_key else 0}")
