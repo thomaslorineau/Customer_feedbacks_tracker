@@ -124,7 +124,7 @@ async def get_queue_status():
 async def create_scrape_job(request: ScrapeJobRequest):
     """Enqueue a scraping job."""
     valid_sources = ['x', 'github', 'stackoverflow', 'reddit', 'news', 
-                     'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
+                     'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin', 'discord']
     
     if request.source not in valid_sources:
         raise HTTPException(

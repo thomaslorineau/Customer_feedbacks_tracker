@@ -166,9 +166,16 @@ async function loadConfiguration() {
     // Check immediately if both are already loaded
     checkAndRender();
     try {
-        const url = `${API_BASE_URL}/api/config`;
+        // Add cache-busting timestamp to ensure fresh data
+        const url = `${API_BASE_URL}/api/config?t=${Date.now()}`;
         console.log('Fetching configuration from:', url);
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            cache: 'no-store', // Prevent browser caching
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache'
+            }
+        });
         console.log('Response status:', response.status, response.statusText);
         if (!response.ok) {
             throw new Error(`Failed to load configuration: ${response.status} ${response.statusText}`);
@@ -428,6 +435,18 @@ function renderScrapersAPIKeys() {
     
     const scraperProviders = [
         { 
+            id: 'discord', 
+            name: 'Discord', 
+            icon: '💬',
+            description: 'Scrape Discord messages from OVH server (requires bot token and guild ID)',
+            docsUrl: 'https://discord.com/developers/docs/getting-started',
+            requiresAuth: true,
+            fields: [
+                { name: 'DISCORD_BOT_TOKEN', label: 'Bot Token' },
+                { name: 'DISCORD_GUILD_ID', label: 'Guild (Server) ID' }
+            ]
+        },
+        { 
             id: 'github', 
             name: 'GitHub', 
             icon: '🐙',
@@ -465,18 +484,6 @@ function renderScrapersAPIKeys() {
             fields: [
                 { name: 'TWITTER_BEARER_TOKEN', label: 'Bearer Token' }
             ]
-        },
-        { 
-            id: 'discord', 
-            name: 'Discord', 
-            icon: '💬',
-            description: 'Scrape Discord messages from OVH server (requires bot token and guild ID)',
-            docsUrl: 'https://discord.com/developers/docs/getting-started',
-            requiresAuth: true,
-            fields: [
-                { name: 'DISCORD_BOT_TOKEN', label: 'Bot Token' },
-                { name: 'DISCORD_GUILD_ID', label: 'Guild (Server) ID' }
-            ]
         }
     ];
     
@@ -513,6 +520,7 @@ function renderScrapersAPIKeys() {
 // Attach event listeners to provider buttons
 function attachButtonListeners(providerId) {
     const editBtn = document.getElementById(`edit-btn-${providerId}`);
+    const deleteBtn = document.getElementById(`delete-btn-${providerId}`);
     
     if (editBtn) {
         editBtn.addEventListener('click', (e) => {
@@ -523,6 +531,19 @@ function attachButtonListeners(providerId) {
                 window.enableEditMode(providerId);
             } else {
                 console.error('enableEditMode function not available');
+            }
+        });
+    }
+    
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Delete button clicked for:', providerId);
+            if (window.deleteAPIKey) {
+                window.deleteAPIKey(providerId);
+            } else {
+                console.error('deleteAPIKey function not available');
             }
         });
     }
@@ -575,6 +596,18 @@ function renderProviderCard(provider) {
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                             </svg>
                             Edit
+                        </button>
+                        <button class="btn-icon btn-danger" 
+                                id="delete-btn-${provider.id}"
+                                title="Delete API key"
+                                type="button"
+                                data-provider="${provider.id}"
+                                data-action="delete"
+                                style="color: var(--error-color);">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            </svg>
+                            Delete
                         </button>
                     </div>
                 </div>
@@ -641,10 +674,8 @@ function renderProviderCard(provider) {
                         }
                         <div class="form-actions">
                             <button type="submit" class="btn-save-key" id="save-btn-${provider.id}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                    <polyline points="17 21 17 13 7 13 7 21"/>
-                                    <polyline points="7 3 7 8 15 8"/>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6L9 17l-5-5"/>
                                 </svg>
                                 Save API Key
                             </button>
@@ -705,11 +736,11 @@ async function enableEditMode(provider) {
     ];
     
     const scraperProviders = [
+        { id: 'discord', name: 'Discord', icon: '💬', docsUrl: 'https://discord.com/developers/docs/getting-started' },
         { id: 'github', name: 'GitHub', icon: '🐙', docsUrl: 'https://github.com/settings/tokens' },
         { id: 'trustpilot', name: 'Trustpilot', icon: '⭐', docsUrl: 'https://developers.trustpilot.com/' },
         { id: 'linkedin', name: 'LinkedIn', icon: '💼', docsUrl: 'https://www.linkedin.com/developers/apps' },
-        { id: 'twitter', name: 'Twitter/X API', icon: '🐦', docsUrl: 'https://developer.twitter.com/en/portal/dashboard' },
-        { id: 'discord', name: 'Discord', icon: '💬', docsUrl: 'https://discord.com/developers/docs/getting-started' }
+        { id: 'twitter', name: 'Twitter/X API', icon: '🐦', docsUrl: 'https://developer.twitter.com/en/portal/dashboard' }
     ];
     
     const providerInfo = [...llmProviders, ...scraperProviders].find(p => p.id === provider);
@@ -750,6 +781,27 @@ async function enableEditMode(provider) {
         // Handle multi-field providers (LinkedIn, Discord)
         if (multiFieldProviders[provider]) {
             const fields = multiFieldProviders[provider];
+            // Get existing values from configData
+            const existingValues = {};
+            if (provider === 'discord') {
+                // Discord values are stored separately in configData.api_keys
+                const discordBotToken = configData.api_keys?.discord_bot_token?.masked || '';
+                const discordGuildId = configData.api_keys?.discord_guild_id?.masked || '';
+                // Try to get from the main discord key if available
+                const discordKey = configData.api_keys?.discord;
+                if (discordKey && discordKey.configured) {
+                    // Values might be in a nested structure
+                    existingValues['DISCORD_BOT_TOKEN'] = '';
+                    existingValues['DISCORD_GUILD_ID'] = '';
+                }
+            } else if (provider === 'linkedin') {
+                const linkedinKey = configData.api_keys?.linkedin;
+                if (linkedinKey && linkedinKey.configured) {
+                    existingValues['LINKEDIN_CLIENT_ID'] = '';
+                    existingValues['LINKEDIN_CLIENT_SECRET'] = '';
+                }
+            }
+            
             editFormHtml = `
                 <div class="api-key-form-container">
                     <form class="api-key-form" onsubmit="event.preventDefault(); saveAPIKey('${provider}');">
@@ -763,6 +815,7 @@ async function enableEditMode(provider) {
                                         class="api-key-input"
                                         placeholder="Enter your ${field.label}"
                                         autocomplete="off"
+                                        value="${existingValues[field.name] || ''}"
                                     />
                                     <button type="button" class="btn-toggle-visibility" onclick="toggleInputVisibility('key-input-${provider}-${field.name}')">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -775,10 +828,8 @@ async function enableEditMode(provider) {
                         `).join('')}
                         <div class="form-actions">
                             <button type="submit" class="btn-primary" id="save-btn-${provider}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                    <polyline points="17 21 17 13 7 13 7 21"/>
-                                    <polyline points="7 3 7 8 15 8"/>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M20 6L9 17l-5-5"/>
                                 </svg>
                                 Save API Key
                             </button>
@@ -820,10 +871,8 @@ async function enableEditMode(provider) {
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-save-key" id="save-btn-${provider}">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                                <polyline points="17 21 17 13 7 13 7 21"/>
-                                <polyline points="7 3 7 8 15 8"/>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 6L9 17l-5-5"/>
                             </svg>
                             Save API Key
                         </button>
@@ -928,15 +977,19 @@ async function saveAPIKey(provider) {
             : `key-input-${provider}`;
         const input = document.getElementById(inputId);
         if (!input) {
+            console.error(`Input field not found: ${inputId} for field ${field.name}`);
             showError(`Input field not found for ${field.name}`);
             return;
         }
         const value = input.value.trim();
+        console.log(`[saveAPIKey] Field ${field.name}: value length = ${value.length}, value = ${value.substring(0, 10)}...`);
         if (!value) {
             hasEmptyField = true;
         }
         values[field.name] = value;
     }
+    
+    console.log(`[saveAPIKey] Collected values for ${provider}:`, Object.keys(values));
     
     // Allow empty values for LLM providers (to clear existing keys)
     // For Discord, both fields are required if one is filled
@@ -946,14 +999,22 @@ async function saveAPIKey(provider) {
         if (provider === 'discord') {
             const hasBotToken = values['DISCORD_BOT_TOKEN'] && values['DISCORD_BOT_TOKEN'].trim();
             const hasGuildId = values['DISCORD_GUILD_ID'] && values['DISCORD_GUILD_ID'].trim();
+            // Check if Discord is already configured (if so, allow empty fields to keep existing values)
+            const discordKey = configData?.api_keys?.discord;
+            const isAlreadyConfigured = discordKey && discordKey.configured;
+            
             if (hasBotToken || hasGuildId) {
                 // At least one is filled, both are required
                 if (!hasBotToken || !hasGuildId) {
                     showError('Both Bot Token and Guild ID are required for Discord');
                     return;
                 }
+            } else if (!isAlreadyConfigured) {
+                // Both are empty and Discord is not configured - require at least one
+                showError('Please fill in at least one Discord field (Bot Token or Guild ID)');
+                return;
             }
-            // If both are empty, allow clearing
+            // If both are empty but Discord is already configured, allow saving (will keep existing values)
         } else {
             showError('Please fill in all required fields');
             return;
@@ -976,6 +1037,7 @@ async function saveAPIKey(provider) {
         } else {
             // For other providers, use a generic endpoint
             // Send all fields as a single request
+            console.log(`[saveAPIKey] Sending request for ${provider} with keys:`, Object.keys(values));
             const response = await fetch(`${API_BASE_URL}/api/config/set-key`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -984,6 +1046,7 @@ async function saveAPIKey(provider) {
             
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error(`[saveAPIKey] Error response for ${provider}:`, errorText);
                 throw new Error(`Failed to save API key: ${errorText}`);
             }
             
@@ -1018,8 +1081,15 @@ async function saveAPIKey(provider) {
             throw new Error(errorMessage);
         }
         
-        // Reload configuration
+        // Reload configuration with cache-busting to ensure fresh data
         await loadConfiguration();
+        
+        // Small delay to ensure backend has processed the update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reload again to get the latest data
+        await loadConfiguration();
+        
         showSuccess(`${provider.toUpperCase()} API key saved successfully!`);
         
         // Update badges and re-render sections
@@ -1039,15 +1109,125 @@ async function saveAPIKey(provider) {
     } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                <polyline points="17 21 17 13 7 13 7 21"/>
-                <polyline points="7 3 7 8 15 8"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6L9 17l-5-5"/>
             </svg>
             Save API Key
         `;
     }
 }
+
+// Delete API Key
+async function deleteAPIKey(provider) {
+    if (!confirm(`Are you sure you want to delete the ${provider.toUpperCase()} API key? This action cannot be undone.`)) {
+        return;
+    }
+    
+    // Find provider config
+    const providers = [
+        { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
+        { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
+        { id: 'mistral', fields: [{ name: 'MISTRAL_API_KEY' }] },
+        { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
+        { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
+        { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
+        { id: 'twitter', fields: [{ name: 'TWITTER_BEARER_TOKEN' }] },
+        { id: 'discord', fields: [{ name: 'DISCORD_BOT_TOKEN' }, { name: 'DISCORD_GUILD_ID' }] }
+    ];
+    
+    const providerConfig = providers.find(p => p.id === provider);
+    if (!providerConfig) {
+        showError('Unknown provider');
+        return;
+    }
+    
+    try {
+        // Prepare payload with empty values to delete the keys
+        let payload = {};
+        if (provider === 'openai') {
+            payload = { openai_api_key: '' };
+        } else if (provider === 'anthropic') {
+            payload = { anthropic_api_key: '' };
+        } else if (provider === 'mistral') {
+            payload = { mistral_api_key: '' };
+        } else {
+            // For other providers, send empty values for all fields
+            const emptyValues = {};
+            providerConfig.fields.forEach(field => {
+                emptyValues[field.name] = '';
+            });
+            const response = await fetch(`${API_BASE_URL}/api/config/set-key`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: provider, keys: emptyValues })
+            });
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to delete API key: ${errorText}`);
+            }
+            
+            // Reload configuration to refresh display
+            await loadConfiguration();
+            
+            // Re-render the specific section
+            if (provider === 'discord' || provider === 'linkedin' || provider === 'twitter') {
+                renderScrapersAPIKeys();
+            }
+            
+            showSuccess(`${provider.toUpperCase()} API key(s) deleted successfully!`);
+            return;
+        }
+        
+        // For OpenAI, Anthropic, and Mistral, use existing endpoint with empty string
+        const response = await fetch(`${API_BASE_URL}/api/llm-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            let errorMessage = 'Failed to delete API key';
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.detail || errorData.message || errorMessage;
+            } catch (e) {
+                const errorText = await response.text();
+                errorMessage = errorText || errorMessage;
+            }
+            throw new Error(errorMessage);
+        }
+        
+        // Reload configuration with cache-busting to ensure fresh data
+        await loadConfiguration();
+        
+        // Small delay to ensure backend has processed the update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reload again to get the latest data
+        await loadConfiguration();
+        
+        showSuccess(`${provider.toUpperCase()} API key deleted successfully!`);
+        
+        // Update badges and re-render sections
+        if (configData && configData.api_keys) {
+            // Check if it's an LLM provider
+            const llmProviders = ['openai', 'anthropic', 'mistral'];
+            if (llmProviders.includes(provider)) {
+                renderLLM();
+            } else {
+                renderScrapersAPIKeys();
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error deleting API key:', error);
+        showError(`Failed to delete ${provider.toUpperCase()} API key: ${error.message}`);
+    }
+}
+
+// Make deleteAPIKey available globally
+window.deleteAPIKey = deleteAPIKey;
 
 // Show Success
 function showSuccess(message) {
@@ -1134,10 +1314,8 @@ async function loadBaseKeywords() {
             </div>
             <div class="form-actions" style="margin-top: 1.5rem; max-width: 900px;">
                 <button class="btn-save-key" onclick="saveBaseKeywords()">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                        <polyline points="17 21 17 13 7 13 7 21"/>
-                        <polyline points="7 3 7 8 15 8"/>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 6L9 17l-5-5"/>
                     </svg>
                     Save Base Keywords
                 </button>
