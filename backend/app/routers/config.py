@@ -185,6 +185,7 @@ async def get_config():
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
     mistral_key = os.getenv('MISTRAL_API_KEY')
+    ovh_key = os.getenv('OVH_API_KEY')
     github_token = os.getenv('GITHUB_TOKEN')
     trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
     linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
@@ -224,6 +225,11 @@ async def get_config():
                 "masked": mask_key(mistral_key),
                 "length": len(mistral_key) if mistral_key else 0
             },
+            "ovh": {
+                "configured": bool(ovh_key),
+                "masked": mask_key(ovh_key),
+                "length": len(ovh_key) if ovh_key else 0
+            },
             "github": {
                 "configured": bool(github_token),
                 "masked": mask_key(github_token),
@@ -257,7 +263,9 @@ class LLMConfigPayload(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     mistral_api_key: Optional[str] = Field(None, description="Mistral API key")
-    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic|mistral)$", description="LLM provider")
+    ovh_api_key: Optional[str] = Field(None, description="OVH AI Endpoints API key")
+    ovh_model: Optional[str] = Field(None, description="OVH AI model to use")
+    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic|mistral|ovh)$", description="LLM provider")
 
 
 class KeywordsPayload(BaseModel):
@@ -325,16 +333,17 @@ async def get_llm_config():
     openai_key = pg_get_config('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY')
     anthropic_key = pg_get_config('ANTHROPIC_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
     mistral_key = pg_get_config('MISTRAL_API_KEY') or os.getenv('MISTRAL_API_KEY')
+    ovh_key = pg_get_config('OVH_API_KEY') or os.getenv('OVH_API_KEY')
     llm_provider = pg_get_config('LLM_PROVIDER') or os.getenv('LLM_PROVIDER', 'openai')
     
     return LLMConfigResponse(
         provider=llm_provider or 'openai',
-        api_key_set=bool(openai_key or anthropic_key or mistral_key),
-        available=bool(openai_key or anthropic_key or mistral_key),
+        api_key_set=bool(openai_key or anthropic_key or mistral_key or ovh_key),
+        available=bool(openai_key or anthropic_key or mistral_key or ovh_key),
         openai_api_key_set=bool(openai_key),
         anthropic_api_key_set=bool(anthropic_key),
         llm_provider=llm_provider or 'openai',
-        status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
+        status="configured" if (openai_key or anthropic_key or mistral_key or ovh_key) else "not_configured"
     )
 
 
@@ -405,6 +414,22 @@ async def set_llm_config(
             pg_delete_config('MISTRAL_API_KEY')
             logger.info("Mistral API key removed from database")
     
+    if payload.ovh_api_key is not None:
+        if payload.ovh_api_key and payload.ovh_api_key.strip():
+            pg_set_config('OVH_API_KEY', payload.ovh_api_key.strip())
+            logger.info("OVH API key saved to database")
+        else:
+            pg_delete_config('OVH_API_KEY')
+            logger.info("OVH API key removed from database")
+    
+    if payload.ovh_model is not None:
+        if payload.ovh_model and payload.ovh_model.strip():
+            pg_set_config('OVH_MODEL', payload.ovh_model.strip())
+            logger.info(f"OVH model set to: {payload.ovh_model}")
+        else:
+            pg_delete_config('OVH_MODEL')
+            logger.info("OVH model removed from database")
+    
     if payload.llm_provider:
         pg_set_config('LLM_PROVIDER', payload.llm_provider)
         logger.info(f"LLM provider set to: {payload.llm_provider}")
@@ -425,6 +450,16 @@ async def set_llm_config(
             os.environ['MISTRAL_API_KEY'] = payload.mistral_api_key
         elif 'MISTRAL_API_KEY' in os.environ:
             del os.environ['MISTRAL_API_KEY']
+    if payload.ovh_api_key is not None:
+        if payload.ovh_api_key:
+            os.environ['OVH_API_KEY'] = payload.ovh_api_key
+        elif 'OVH_API_KEY' in os.environ:
+            del os.environ['OVH_API_KEY']
+    if payload.ovh_model is not None:
+        if payload.ovh_model:
+            os.environ['OVH_MODEL'] = payload.ovh_model
+        elif 'OVH_MODEL' in os.environ:
+            del os.environ['OVH_MODEL']
     if payload.llm_provider:
         os.environ['LLM_PROVIDER'] = payload.llm_provider
     
@@ -437,6 +472,10 @@ async def set_llm_config(
             config.anthropic_api_key = payload.anthropic_api_key if payload.anthropic_api_key else None
         if payload.mistral_api_key is not None:
             config.mistral_api_key = payload.mistral_api_key if payload.mistral_api_key else None
+        if payload.ovh_api_key is not None:
+            config.ovh_api_key = payload.ovh_api_key if payload.ovh_api_key else None
+        if payload.ovh_model is not None:
+            config.ovh_model = payload.ovh_model if payload.ovh_model else 'DeepSeek-R1-Distill-Qwen-32B'
         if payload.llm_provider:
             config.llm_provider = payload.llm_provider
         logger.info("Config singleton updated for current session")
@@ -447,16 +486,17 @@ async def set_llm_config(
     openai_key = pg_get_config('OPENAI_API_KEY')
     anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
     mistral_key = pg_get_config('MISTRAL_API_KEY')
+    ovh_key = pg_get_config('OVH_API_KEY')
     llm_provider = pg_get_config('LLM_PROVIDER') or 'openai'
     
     return LLMConfigResponse(
         provider=llm_provider,
-        api_key_set=bool(openai_key or anthropic_key or mistral_key),
-        available=bool(openai_key or anthropic_key or mistral_key),
+        api_key_set=bool(openai_key or anthropic_key or mistral_key or ovh_key),
+        available=bool(openai_key or anthropic_key or mistral_key or ovh_key),
         openai_api_key_set=bool(openai_key),
         anthropic_api_key_set=bool(anthropic_key),
         llm_provider=llm_provider,
-        status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
+        status="configured" if (openai_key or anthropic_key or mistral_key or ovh_key) else "not_configured"
     )
 
 

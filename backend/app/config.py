@@ -45,6 +45,11 @@ class Config(BaseSettings):
     trustpilot_api_key: Optional[str] = Field(default=None, description="Trustpilot API key")
     github_token: Optional[str] = Field(default=None, description="GitHub token")
     
+    # OVH AI Endpoints Configuration
+    ovh_api_key: Optional[str] = Field(default=None, description="OVH AI Endpoints API key")
+    ovh_endpoint_url: str = Field(default="https://oai.endpoints.kepler.ai.cloud.ovh.net/v1", description="OVH AI Endpoints URL")
+    ovh_model: str = Field(default="DeepSeek-R1-Distill-Qwen-32B", description="OVH AI model to use")
+    
     # Third-party API credentials (optional - user provides their own)
     linkedin_client_id: Optional[str] = Field(default=None, description="LinkedIn client ID")
     linkedin_client_secret: Optional[str] = Field(default=None, description="LinkedIn client secret")
@@ -125,6 +130,18 @@ class Config(BaseSettings):
         return self.github_token
     
     @property
+    def _OVH_API_KEY(self) -> Optional[str]:
+        return self.ovh_api_key
+    
+    @property
+    def _OVH_ENDPOINT_URL(self) -> str:
+        return self.ovh_endpoint_url
+    
+    @property
+    def _OVH_MODEL(self) -> str:
+        return self.ovh_model
+    
+    @property
     def _LINKEDIN_CLIENT_ID(self) -> Optional[str]:
         return self.linkedin_client_id
     
@@ -166,6 +183,7 @@ class Config(BaseSettings):
             "openai": self._OPENAI_API_KEY,
             "anthropic": self._ANTHROPIC_API_KEY,
             "mistral": self._MISTRAL_API_KEY,
+            "ovh": self._OVH_API_KEY,
             "trustpilot": self._TRUSTPILOT_API_KEY,
             "github": self._GITHUB_TOKEN,
             # Third-party APIs (optional)
@@ -258,6 +276,7 @@ class Config(BaseSettings):
             "openai": lambda k: k.startswith("sk-") and len(k) > 20,
             "anthropic": lambda k: k.startswith("sk-ant-") and len(k) > 20,
             "mistral": lambda k: len(k) > 10,
+            "ovh": lambda k: len(k) > 10,  # OVH AI Endpoints API key
             "github": lambda k: (k.startswith("ghp_") or k.startswith("github_pat_")) and len(k) > 20,
             "trustpilot": lambda k: len(k) > 10,
             "linkedin_client_id": lambda k: len(k) > 10,
@@ -314,7 +333,7 @@ class Config(BaseSettings):
         summary.append("")
         summary.append("🔑 API Keys Status:")
         
-        providers = ["openai", "anthropic", "mistral", "github", "trustpilot"]
+        providers = ["openai", "anthropic", "mistral", "ovh", "github", "trustpilot"]
         for provider in providers:
             key = self.get_api_key(provider)
             if key:
@@ -420,6 +439,16 @@ def get_llm_client():
             return Anthropic(api_key=api_key)
         except ImportError:
             logger.error("[ERROR] Anthropic library not installed. Run: pip install anthropic")
+            return None
+    
+    elif provider == "ovh":
+        try:
+            from openai import OpenAI
+            # OVH AI Endpoints uses OpenAI-compatible API
+            logger.info(f"[OK] Initializing OVH AI Endpoints client")
+            return OpenAI(api_key=api_key, base_url=config.ovh_endpoint_url)
+        except ImportError:
+            logger.error("[ERROR] OpenAI library not installed (required for OVH AI). Run: pip install openai")
             return None
     
     else:

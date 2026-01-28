@@ -31,7 +31,7 @@ def get_llm_api_keys():
     puis depuis les variables d'environnement comme fallback.
     
     Returns:
-        tuple: (openai_key, anthropic_key, mistral_key, llm_provider)
+        tuple: (openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider)
     """
     try:
         from ...database import pg_get_config
@@ -40,6 +40,9 @@ def get_llm_api_keys():
         openai_key = pg_get_config('OPENAI_API_KEY')
         anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
         mistral_key = pg_get_config('MISTRAL_API_KEY')
+        ovh_key = pg_get_config('OVH_API_KEY')
+        ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+        ovh_model = pg_get_config('OVH_MODEL')
         llm_provider = pg_get_config('LLM_PROVIDER')
         
         # Fallback sur les variables d'environnement si pas en base
@@ -49,6 +52,12 @@ def get_llm_api_keys():
             anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if not mistral_key:
             mistral_key = os.getenv('MISTRAL_API_KEY')
+        if not ovh_key:
+            ovh_key = os.getenv('OVH_API_KEY')
+        if not ovh_endpoint:
+            ovh_endpoint = os.getenv('OVH_ENDPOINT_URL', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1')
+        if not ovh_model:
+            ovh_model = os.getenv('OVH_MODEL', 'DeepSeek-R1-Distill-Qwen-32B')
         if not llm_provider:
             llm_provider = os.getenv('LLM_PROVIDER', 'openai')
         
@@ -58,7 +67,7 @@ def get_llm_api_keys():
         else:
             llm_provider = 'openai'
             
-        return openai_key, anthropic_key, mistral_key, llm_provider
+        return openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider
     except Exception as e:
         logger.warning(f"Erreur lors de la récupération des clés API depuis la base de données: {e}")
         # Fallback complet sur les variables d'environnement
@@ -66,6 +75,9 @@ def get_llm_api_keys():
             os.getenv('OPENAI_API_KEY'),
             os.getenv('ANTHROPIC_API_KEY'),
             os.getenv('MISTRAL_API_KEY'),
+            os.getenv('OVH_API_KEY'),
+            os.getenv('OVH_ENDPOINT_URL', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'),
+            os.getenv('OVH_MODEL', 'DeepSeek-R1-Distill-Qwen-32B'),
             os.getenv('LLM_PROVIDER', 'openai').lower()
         )
 
@@ -125,15 +137,15 @@ Format your response as a JSON array with this structure:
 
 Focus on actionable improvements that address real customer pain points. Be specific and practical."""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
-    logger.info(f"generate_ideas_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
+    logger.info(f"generate_ideas_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, OVH key set: {bool(ovh_key)}, Provider: {llm_provider}")
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         raise HTTPException(status_code=400, detail="No LLM API key configured. Please configure at least one API key in Settings.")
     
     # Helper function to call a single LLM
-    async def call_llm(provider: str, api_key: str, prompt: str) -> Optional[str]:
+    async def call_llm(provider: str, api_key: str, prompt: str, endpoint_url: str = None, model_name: str = None) -> Optional[str]:
         """Call a single LLM and return the response content."""
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -198,38 +210,84 @@ Focus on actionable improvements that address real customer pain points. Be spec
                     response.raise_for_status()
                     result = response.json()
                     return result['choices'][0]['message']['content']
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    url = f"{endpoint_url or ovh_endpoint}/chat/completions"
+                    response = await client.post(
+                        url,
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': model_name or ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product improvement analyst. Generate actionable improvement ideas based on customer feedback.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
         except Exception as e:
             logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
             return None
         return None
     
-    # If all 3 LLMs are configured, call them in parallel and summarize with OpenAI
-    if openai_key and anthropic_key and mistral_key:
-        logger.info("All 3 LLMs configured, calling in parallel and summarizing with OpenAI")
+    # Count configured LLMs
+    configured_llms = []
+    if openai_key:
+        configured_llms.append(('openai', openai_key, 'OpenAI'))
+    if anthropic_key:
+        configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
+    if mistral_key:
+        configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    if ovh_key:
+        configured_llms.append(('ovh', ovh_key, 'OVH AI'))
+    
+    # If 3+ LLMs are configured, call them in parallel and summarize
+    if len(configured_llms) >= 3:
+        logger.info(f"{len(configured_llms)} LLMs configured, calling in parallel and summarizing")
         try:
-            # Call all 3 in parallel
-            results = await asyncio.gather(
-                call_llm('openai', openai_key, prompt),
-                call_llm('anthropic', anthropic_key, prompt),
-                call_llm('mistral', mistral_key, prompt),
-                return_exceptions=True
-            )
-            
-            openai_result, anthropic_result, mistral_result = results
+            # Call all configured LLMs in parallel
+            tasks = []
+            for provider, key, _ in configured_llms:
+                if provider == 'ovh':
+                    tasks.append(call_llm(provider, key, prompt, ovh_endpoint, ovh_model))
+                else:
+                    tasks.append(call_llm(provider, key, prompt))
+            results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Collect valid results
             valid_results = []
-            if openai_result and not isinstance(openai_result, Exception):
-                valid_results.append(('OpenAI', openai_result))
-            if anthropic_result and not isinstance(anthropic_result, Exception):
-                valid_results.append(('Anthropic', anthropic_result))
-            if mistral_result and not isinstance(mistral_result, Exception):
-                valid_results.append(('Mistral', mistral_result))
+            for i, (provider, key, name) in enumerate(configured_llms):
+                result = results[i]
+                if result and not isinstance(result, Exception):
+                    valid_results.append((name, result))
             
             if not valid_results:
                 raise HTTPException(status_code=500, detail="All LLM calls failed. Please check your API keys.")
             
-            # Use OpenAI to summarize the combined results
+            # Use the first available LLM to summarize (prefer OpenAI, then others)
+            summarizer = None
+            summarizer_key = None
+            if openai_key:
+                summarizer = 'openai'
+                summarizer_key = openai_key
+            elif anthropic_key:
+                summarizer = 'anthropic'
+                summarizer_key = anthropic_key
+            elif ovh_key:
+                summarizer = 'ovh'
+                summarizer_key = ovh_key
+            elif mistral_key:
+                summarizer = 'mistral'
+                summarizer_key = mistral_key
+            
             summary_prompt = f"""You are analyzing product improvement ideas from multiple AI models. Below are the ideas generated by {len(valid_results)} different AI models:
 
 {chr(10).join([f'{name} ideas:{chr(10)}{result}' for name, result in valid_results])}
@@ -253,7 +311,10 @@ Format your response as a JSON array with this structure:
   }}
 ]"""
             
-            summary_content = await call_llm('openai', openai_key, summary_prompt)
+            if summarizer == 'ovh':
+                summary_content = await call_llm(summarizer, summarizer_key, summary_prompt, ovh_endpoint, ovh_model)
+            else:
+                summary_content = await call_llm(summarizer, summarizer_key, summary_prompt)
             if summary_content:
                 json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
                 if json_match:
@@ -265,39 +326,50 @@ Format your response as a JSON array with this structure:
             logger.error(f"Error in parallel LLM call or summarization: {type(e).__name__}: {e}", exc_info=True)
             # Fall through to single LLM logic
     
-    # Single LLM logic (if not all 3 are configured, or if parallel call failed)
+    # Single LLM logic (if not enough LLMs configured, or if parallel call failed)
     try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key and not mistral_key):
-            # Use Anthropic
-            if anthropic_key:
-                content = await call_llm('anthropic', anthropic_key, prompt)
-                if content:
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        ideas_data = json.loads(json_match.group())
-                        return [ImprovementIdea(**idea) for idea in ideas_data]
+        # Use the configured provider first
+        if llm_provider == 'ovh' and ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
         
-        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
-            # Use Mistral
-            if mistral_key:
-                content = await call_llm('mistral', mistral_key, prompt)
-                if content:
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        ideas_data = json.loads(json_match.group())
-                        return [ImprovementIdea(**idea) for idea in ideas_data]
+        elif llm_provider == 'anthropic' and anthropic_key:
+            content = await call_llm('anthropic', anthropic_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
-            # Use OpenAI
-            if openai_key:
-                content = await call_llm('openai', openai_key, prompt)
-                if content:
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        ideas_data = json.loads(json_match.group())
-                        return [ImprovementIdea(**idea) for idea in ideas_data]
+        elif llm_provider == 'mistral' and mistral_key:
+            content = await call_llm('mistral', mistral_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
+        elif llm_provider == 'openai' and openai_key:
+            content = await call_llm('openai', openai_key, prompt)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
         
         # If provider is set but no matching key, try any available key
+        if ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    ideas_data = json.loads(json_match.group())
+                    return [ImprovementIdea(**idea) for idea in ideas_data]
+        
         if openai_key:
             content = await call_llm('openai', openai_key, prompt)
             if content:
@@ -432,72 +504,151 @@ Use appropriate emojis:
 
 Be specific and reference actual content from the posts when possible."""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         logger.info("[Recommended Actions] No LLM API key configured, returning empty list")
         return []
     
     try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
-            # Use Anthropic
-            api_key = anthropic_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.anthropic.com/v1/messages',
-                        headers={
-                            'x-api-key': api_key,
-                            'anthropic-version': '2023-06-01',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                            'max_tokens': 1500,
-                            'messages': [
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'system': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['content'][0]['text']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        actions_data = json.loads(json_match.group())
-                        return [RecommendedAction(**action) for action in actions_data]
+        if llm_provider == 'ovh' and ovh_key:
+            # Use OVH AI Endpoints
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f'{ovh_endpoint}/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': ovh_model,
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 1500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+        elif llm_provider == 'anthropic' and anthropic_key:
+            # Use Anthropic
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': anthropic_key,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                        'max_tokens': 1500,
+                        'messages': [
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'system': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['content'][0]['text']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
+        
+        elif llm_provider == 'openai' and openai_key:
             # Use OpenAI
-            api_key = openai_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.openai.com/v1/chat/completions',
-                        headers={
-                            'Authorization': f'Bearer {api_key}',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                            'messages': [
-                                {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'temperature': 0.7,
-                            'max_tokens': 1500
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        actions_data = json.loads(json_match.group())
-                        return [RecommendedAction(**action) for action in actions_data]
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {openai_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 1500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
+        
+        # Fallback to any available key
+        if ovh_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f'{ovh_endpoint}/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': ovh_model,
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 1500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
+        
+        elif openai_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {openai_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer support analyst. Generate specific, actionable recommended actions based on customer feedback.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 1500
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    actions_data = json.loads(json_match.group())
+                    return [RecommendedAction(**action) for action in actions_data]
     
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
@@ -583,9 +734,9 @@ def generate_recommended_actions_fallback(
 async def generate_improvement_ideas(request: ImprovementIdeaRequest):
     """Generate product improvement ideas based on customer feedback posts using LLM."""
     try:
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
-        api_key = openai_key or anthropic_key or mistral_key
-        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
+        api_key = openai_key or anthropic_key or mistral_key or ovh_key
+        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral', 'ovh']
         
         ideas = await generate_ideas_with_llm(request.posts, request.max_ideas)
         return ImprovementIdeasResponse(ideas=ideas, llm_available=llm_available)
@@ -597,9 +748,9 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback using LLM."""
     try:
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
-        api_key = openai_key or anthropic_key or mistral_key
-        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
+        api_key = openai_key or anthropic_key or mistral_key or ovh_key
+        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral', 'ovh']
         
         actions = await generate_recommended_actions_with_llm(
             request.posts, 
@@ -722,13 +873,16 @@ CRITICAL INSTRUCTIONS:
     openai_key = os.getenv('OPENAI_API_KEY')
     anthropic_key = os.getenv('ANTHROPIC_API_KEY')
     mistral_key = os.getenv('MISTRAL_API_KEY')
+    ovh_key = os.getenv('OVH_API_KEY')
+    ovh_endpoint = os.getenv('OVH_ENDPOINT_URL', 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1')
+    ovh_model = os.getenv('OVH_MODEL', 'DeepSeek-R1-Distill-Qwen-32B')
     llm_provider = os.getenv('LLM_PROVIDER', '').lower()
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         return generate_whats_happening_fallback(posts, stats, active_filters)
     
     # Helper function to call LLM
-    async def call_llm_for_insights(provider: str, api_key: str, prompt: str) -> Optional[str]:
+    async def call_llm_for_insights(provider: str, api_key: str, prompt: str, endpoint_url: str = None, model_name: str = None) -> Optional[str]:
         """Call a single LLM and return the response content."""
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
@@ -793,6 +947,29 @@ CRITICAL INSTRUCTIONS:
                     response.raise_for_status()
                     result = response.json()
                     return result['choices'][0]['message']['content']
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    url = f"{endpoint_url or ovh_endpoint}/chat/completions"
+                    response = await client.post(
+                        url,
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': model_name or ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
         except Exception as e:
             logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
             return None
@@ -806,13 +983,20 @@ CRITICAL INSTRUCTIONS:
         configured_llms.append(('anthropic', anthropic_key, 'Anthropic'))
     if mistral_key:
         configured_llms.append(('mistral', mistral_key, 'Mistral'))
+    if ovh_key:
+        configured_llms.append(('ovh', ovh_key, 'OVH AI'))
     
     # Only use parallel + summarize if 2+ LLMs are configured AND no specific provider is set
     if len(configured_llms) >= 2 and not llm_provider:
         logger.info(f"{len(configured_llms)} LLMs configured, calling in parallel and summarizing")
         try:
             # Call all configured LLMs in parallel
-            tasks = [call_llm_for_insights(provider, key, prompt) for provider, key, _ in configured_llms]
+            tasks = []
+            for provider, key, _ in configured_llms:
+                if provider == 'ovh':
+                    tasks.append(call_llm_for_insights(provider, key, prompt, ovh_endpoint, ovh_model))
+                else:
+                    tasks.append(call_llm_for_insights(provider, key, prompt))
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Collect valid results
@@ -838,6 +1022,10 @@ CRITICAL INSTRUCTIONS:
                     summarizer = 'anthropic'
                     summarizer_key = anthropic_key
                     summarizer_name = 'Anthropic'
+                elif ovh_key:
+                    summarizer = 'ovh'
+                    summarizer_key = ovh_key
+                    summarizer_name = 'OVH AI'
                 elif mistral_key:
                     summarizer = 'mistral'
                     summarizer_key = mistral_key
@@ -869,7 +1057,10 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
   }}
 ]"""
                     
-                    summary_content = await call_llm_for_insights(summarizer, summarizer_key, summary_prompt)
+                    if summarizer == 'ovh':
+                        summary_content = await call_llm_for_insights(summarizer, summarizer_key, summary_prompt, ovh_endpoint, ovh_model)
+                    else:
+                        summary_content = await call_llm_for_insights(summarizer, summarizer_key, summary_prompt)
                     if summary_content:
                         json_match = re.search(r'\[.*\]', summary_content, re.DOTALL)
                         if json_match:
@@ -883,94 +1074,144 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
     
     # Single LLM logic (if only 1 is configured, or if parallel call failed)
     try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+        if llm_provider == 'ovh' and ovh_key:
+            # Use OVH AI Endpoints
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f'{ovh_endpoint}/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': ovh_model,
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        elif llm_provider == 'anthropic' and anthropic_key:
             # Use Anthropic
-            api_key = anthropic_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.anthropic.com/v1/messages',
-                        headers={
-                            'x-api-key': api_key,
-                            'anthropic-version': '2023-06-01',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                            'max_tokens': 2000,
-                            'messages': [
-                                {'role': 'user', 'content': prompt}
-                            ]
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['content'][0]['text']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.anthropic.com/v1/messages',
+                    headers={
+                        'x-api-key': anthropic_key,
+                        'anthropic-version': '2023-06-01',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                        'max_tokens': 2000,
+                        'messages': [
+                            {'role': 'user', 'content': prompt}
+                        ]
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['content'][0]['text']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key and not anthropic_key and not mistral_key):
+        elif llm_provider == 'openai' and openai_key:
             # Use OpenAI
-            api_key = openai_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.openai.com/v1/chat/completions',
-                        headers={
-                            'Authorization': f'Bearer {api_key}',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                            'messages': [
-                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'temperature': 0.7,
-                            'max_tokens': 2000
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {openai_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
         
-        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+        elif llm_provider == 'mistral' and mistral_key:
             # Use Mistral
-            api_key = mistral_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.mistral.ai/v1/chat/completions',
-                        headers={
-                            'Authorization': f'Bearer {api_key}',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
-                            'messages': [
-                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'temperature': 0.7,
-                            'max_tokens': 2000
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        insights_data = json.loads(json_match.group())
-                        return [WhatsHappeningInsight(**insight) for insight in insights_data]
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    'https://api.mistral.ai/v1/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {mistral_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
+        
+        # Fallback to any available key
+        if ovh_key:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f'{ovh_endpoint}/chat/completions',
+                    headers={
+                        'Authorization': f'Bearer {ovh_key}',
+                        'Content-Type': 'application/json'
+                    },
+                    json={
+                        'model': ovh_model,
+                        'messages': [
+                            {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
+                            {'role': 'user', 'content': prompt}
+                        ],
+                        'temperature': 0.7,
+                        'max_tokens': 2000
+                    }
+                )
+                response.raise_for_status()
+                result = response.json()
+                content = result['choices'][0]['message']['content']
+                
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    insights_data = json.loads(json_match.group())
+                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
         
         return generate_whats_happening_fallback(posts, stats, active_filters)
     except Exception as e:
@@ -1046,11 +1287,11 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         if env_path.exists():
             load_dotenv(env_path, override=True)
         
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
-        api_key = openai_key or anthropic_key or mistral_key
-        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral']
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
+        api_key = openai_key or anthropic_key or mistral_key or ovh_key
+        llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral', 'ovh']
         
-        logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
+        logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, OVH key set: {bool(ovh_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
         
         insights = await generate_whats_happening_insights_with_llm(
             request.posts,
@@ -1086,70 +1327,123 @@ Identified opportunities:
 
 Generate a sentence in English that summarizes the top improvement ideas in a clear and actionable way. Generate ONLY the sentence, without JSON formatting or quotes."""
         
-        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
         
         # Determine which provider to use
         # Priority: LLM_PROVIDER env var > available API keys
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
-            # Use Anthropic
-            api_key = anthropic_key
-            if api_key:
-                try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(
-                            'https://api.anthropic.com/v1/messages',
-                            headers={
-                                'x-api-key': api_key,
-                                'anthropic-version': '2023-06-01',
-                                'Content-Type': 'application/json'
-                            },
-                            json={
-                                'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                                'max_tokens': 150,
-                                'messages': [
-                                    {'role': 'user', 'content': prompt}
-                                ]
-                            }
-                        )
-                        response.raise_for_status()
-                        result = response.json()
-                        summary = result['content'][0]['text'].strip()
-                        summary = summary.strip('"').strip("'")
-                        return {"summary": summary}
-                except Exception as e:
-                    logger.warning(f"Anthropic API error: {type(e).__name__}: {e}. Using fallback summary.")
-                    return {"summary": "Analyzing improvement opportunities..."}
+        if llm_provider == 'ovh' and ovh_key:
+            # Use OVH AI Endpoints
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f'{ovh_endpoint}/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {ovh_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 150
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    summary = result['choices'][0]['message']['content'].strip()
+                    summary = summary.strip('"').strip("'")
+                    return {"summary": summary}
+            except Exception as e:
+                logger.warning(f"OVH API error: {type(e).__name__}: {e}. Using fallback summary.")
+                return {"summary": "Analyzing improvement opportunities..."}
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+        elif llm_provider == 'anthropic' and anthropic_key:
+            # Use Anthropic
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        'https://api.anthropic.com/v1/messages',
+                        headers={
+                            'x-api-key': anthropic_key,
+                            'anthropic-version': '2023-06-01',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
+                            'max_tokens': 150,
+                            'messages': [
+                                {'role': 'user', 'content': prompt}
+                            ]
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    summary = result['content'][0]['text'].strip()
+                    summary = summary.strip('"').strip("'")
+                    return {"summary": summary}
+            except Exception as e:
+                logger.warning(f"Anthropic API error: {type(e).__name__}: {e}. Using fallback summary.")
+                return {"summary": "Analyzing improvement opportunities..."}
+        
+        elif llm_provider == 'openai' and openai_key:
             # Use OpenAI
-            api_key = openai_key
-            if api_key:
-                try:
-                    async with httpx.AsyncClient(timeout=30.0) as client:
-                        response = await client.post(
-                            'https://api.openai.com/v1/chat/completions',
-                            headers={
-                                'Authorization': f'Bearer {api_key}',
-                                'Content-Type': 'application/json'
-                            },
-                            json={
-                                'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                                'messages': [
-                                    {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
-                                    {'role': 'user', 'content': prompt}
-                                ],
-                                'temperature': 0.7,
-                                'max_tokens': 150
-                            }
-                        )
-                        response.raise_for_status()
-                        result = response.json()
-                        summary = result['choices'][0]['message']['content'].strip()
-                        summary = summary.strip('"').strip("'")
-                        return {"summary": summary}
-                except Exception as e:
-                    logger.warning(f"OpenAI API error: {type(e).__name__}: {e}. Using fallback summary.")
-                    return {"summary": "Analyzing improvement opportunities..."}
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        'https://api.openai.com/v1/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {openai_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 150
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    summary = result['choices'][0]['message']['content'].strip()
+                    summary = summary.strip('"').strip("'")
+                    return {"summary": summary}
+            except Exception as e:
+                logger.warning(f"OpenAI API error: {type(e).__name__}: {e}. Using fallback summary.")
+                return {"summary": "Analyzing improvement opportunities..."}
+        
+        # Fallback to any available key
+        if ovh_key:
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f'{ovh_endpoint}/chat/completions',
+                        headers={
+                            'Authorization': f'Bearer {ovh_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are a product analyst. Generate concise and actionable summaries.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 150
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    summary = result['choices'][0]['message']['content'].strip()
+                    summary = summary.strip('"').strip("'")
+                    return {"summary": summary}
+            except Exception as e:
+                logger.warning(f"OVH API error: {type(e).__name__}: {e}. Using fallback summary.")
         
         return {"summary": "Analyzing improvement opportunities..."}
     except Exception as e:
@@ -1474,13 +1768,13 @@ CRITICAL INSTRUCTIONS:
 - Prioritize insights that can lead to immediate action
 - Include ROI insights only if you can provide meaningful estimates based on the data"""
 
-    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+    openai_key, anthropic_key, mistral_key, ovh_key, ovh_endpoint, ovh_model, llm_provider = get_llm_api_keys()
     
-    if not openai_key and not anthropic_key and not mistral_key:
+    if not openai_key and not anthropic_key and not mistral_key and not ovh_key:
         return generate_improvements_analysis_fallback(pain_points, products, total_posts)
     
     # Helper function to call LLM
-    async def call_llm(provider: str, api_key: str, prompt: str) -> Optional[str]:
+    async def call_llm(provider: str, api_key: str, prompt: str, endpoint_url: str = None, model_name: str = None) -> Optional[str]:
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 if provider == 'openai':
@@ -1544,6 +1838,29 @@ CRITICAL INSTRUCTIONS:
                     response.raise_for_status()
                     result = response.json()
                     return result['choices'][0]['message']['content']
+                
+                elif provider == 'ovh':
+                    # OVH AI Endpoints uses OpenAI-compatible API
+                    url = f"{endpoint_url or ovh_endpoint}/chat/completions"
+                    response = await client.post(
+                        url,
+                        headers={
+                            'Authorization': f'Bearer {api_key}',
+                            'Content-Type': 'application/json'
+                        },
+                        json={
+                            'model': model_name or ovh_model,
+                            'messages': [
+                                {'role': 'system', 'content': 'You are an OVHcloud product improvement analyst. Generate specific, actionable insights with ROI estimates.'},
+                                {'role': 'user', 'content': prompt}
+                            ],
+                            'temperature': 0.7,
+                            'max_tokens': 2000
+                        }
+                    )
+                    response.raise_for_status()
+                    result = response.json()
+                    return result['choices'][0]['message']['content']
         except Exception as e:
             logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
             return None
@@ -1552,15 +1869,19 @@ CRITICAL INSTRUCTIONS:
     try:
         # Try to use configured provider or any available
         content = None
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
+        if llm_provider == 'ovh' and ovh_key:
+            content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+        elif llm_provider == 'anthropic' and anthropic_key:
             content = await call_llm('anthropic', anthropic_key, prompt)
-        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
+        elif llm_provider == 'mistral' and mistral_key:
             content = await call_llm('mistral', mistral_key, prompt)
-        elif llm_provider == 'openai' or (not llm_provider and openai_key):
+        elif llm_provider == 'openai' and openai_key:
             content = await call_llm('openai', openai_key, prompt)
         else:
             # Try any available
-            if openai_key:
+            if ovh_key:
+                content = await call_llm('ovh', ovh_key, prompt, ovh_endpoint, ovh_model)
+            elif openai_key:
                 content = await call_llm('openai', openai_key, prompt)
             elif anthropic_key:
                 content = await call_llm('anthropic', anthropic_key, prompt)
