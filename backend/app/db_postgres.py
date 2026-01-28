@@ -859,10 +859,27 @@ def pg_get_config(key: str) -> Optional[str]:
             if result:
                 # value is JSONB, extract the string value
                 value = result['value']
-                # JSONB values are stored as strings in the database
-                # If it's already a string, return it
+                # JSONB can store strings in different formats:
+                # - Direct string: "value"
+                # - JSON string: "\"value\"" (double-quoted)
+                # - Other types: dict, list, etc.
+                
+                if value is None:
+                    return None
+                
+                # If it's already a plain string, return it
                 if isinstance(value, str):
+                    # Check if it's a JSON-encoded string (starts and ends with quotes)
+                    if len(value) >= 2 and value.startswith('"') and value.endswith('"'):
+                        # It's a JSON-encoded string, decode it
+                        try:
+                            import json
+                            return json.loads(value)
+                        except (json.JSONDecodeError, TypeError):
+                            # If JSON parsing fails, return the string without outer quotes
+                            return value[1:-1] if len(value) > 2 else value
                     return value
+                
                 # If it's a dict or other type, convert to string
                 # But typically JSONB stores strings directly
                 return str(value) if value else None
@@ -876,7 +893,11 @@ def pg_set_config(key: str, value: str) -> bool:
     """Set a configuration value in app_config table."""
     try:
         with get_pg_cursor() as cur:
-            # Use JSONB to store the value
+            # Use JSONB to store the value as a JSON string
+            # PostgreSQL JSONB will store it correctly, and we'll extract it properly in pg_get_config
+            import json
+            # Store as JSON string to ensure proper handling
+            json_value = json.dumps(value)
             cur.execute(
                 """
                 INSERT INTO app_config (key, value, updated_at)
@@ -884,8 +905,9 @@ def pg_set_config(key: str, value: str) -> bool:
                 ON CONFLICT (key) 
                 DO UPDATE SET value = %s::jsonb, updated_at = CURRENT_TIMESTAMP
                 """,
-                (key, value, value)
+                (key, json_value, json_value)
             )
+            logger.debug(f"Config key {key} saved successfully (length: {len(value)})")
             return True
     except Exception as e:
         logger.error(f"Error setting config key {key}: {e}")

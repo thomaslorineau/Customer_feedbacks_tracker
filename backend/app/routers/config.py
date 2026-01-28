@@ -29,6 +29,7 @@ class LLMConfigResponse(BaseModel):
     # Legacy fields for backward compatibility
     openai_api_key_set: Optional[bool] = None
     anthropic_api_key_set: Optional[bool] = None
+    mistral_api_key_set: Optional[bool] = None
     llm_provider: Optional[str] = None
     status: Optional[str] = None
 
@@ -552,10 +553,16 @@ async def set_llm_config(
         logger.warning(f"Could not update config singleton: {e}")
     
     # Get updated values from database for response
+    # IMPORTANT: Always read from database to ensure we return the actual persisted values
     openai_key = pg_get_config('OPENAI_API_KEY')
     anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
     mistral_key = pg_get_config('MISTRAL_API_KEY')
     llm_provider = pg_get_config('LLM_PROVIDER') or 'openai'
+    
+    # Log what we're returning to help diagnose persistence issues
+    logger.info(f"Returning LLM config - OpenAI: {'set' if openai_key else 'not set'}, "
+                f"Anthropic: {'set' if anthropic_key else 'not set'}, "
+                f"Mistral: {'set' if mistral_key else 'not set'}")
     
     return LLMConfigResponse(
         provider=llm_provider,
@@ -563,6 +570,7 @@ async def set_llm_config(
         available=bool(openai_key or anthropic_key or mistral_key),
         openai_api_key_set=bool(openai_key),
         anthropic_api_key_set=bool(anthropic_key),
+        mistral_api_key_set=bool(mistral_key),
         llm_provider=llm_provider,
         status="configured" if (openai_key or anthropic_key or mistral_key) else "not_configured"
     )
