@@ -447,16 +447,15 @@ async def _process_keyword_job_async(job_id: str, keywords: List[str], limit: in
     # Update status to running immediately
     job['status'] = 'running'
     try:
-        db.create_job_record(job_id)
-        # Update status in DB immediately - use finalize_job but without error
-        import datetime
-        with db.get_db() as conn:
-            c = conn.cursor()
-            now = datetime.datetime.utcnow().isoformat()
-            c.execute('UPDATE jobs SET status = ?, updated_at = ? WHERE job_id = ?', ('running', now, job_id))
-            # commit is automatic with context manager
+        created = db.create_job_record(job_id, job_type='scrape_keywords_async')
+        if created:
+            logger.info(f"Created DB record for async keyword job {job_id[:8]}")
+        else:
+            logger.warning(f"Failed to create DB record for async keyword job {job_id[:8]} (may already exist or table missing)")
+        # Update status in DB immediately
+        db.update_job_progress(job_id, total_tasks, 0)
     except Exception as e:
-        logger.warning(f"Failed to update job status to running: {e}")
+        logger.error(f"Failed to create DB record for async keyword job {job_id[:8]}: {e}", exc_info=True)
     
     sources = ['x', 'github', 'stackoverflow', 'news', 'reddit', 'trustpilot', 'ovh-forum', 'mastodon', 'g2-crowd', 'linkedin']
     total_tasks = len(keywords) * len(sources)
@@ -723,10 +722,14 @@ async def _process_single_source_job_async(job_id: str, source: str, query: str,
     processing_start = scraping_end
     
     try:
-        db.create_job_record(job_id)
+        created = db.create_job_record(job_id, job_type='scrape_source', payload={'source': source, 'query': query, 'limit': limit})
+        if created:
+            logger.info(f"Created DB record for async job {job_id[:8]}")
+        else:
+            logger.warning(f"Failed to create DB record for async job {job_id[:8]} (may already exist or table missing)")
         db.update_job_progress(job_id, total_steps, 0)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to create DB record for async job {job_id[:8]}: {e}", exc_info=True)
     
     job['progress'] = {'total': total_steps, 'completed': 0}
     
@@ -1060,14 +1063,15 @@ async def start_single_source_job(
         }
         
         try:
-            db.create_job_record(job_id)
+            created = db.create_job_record(job_id, job_type='scrape_source', payload={'source': source, 'query': query, 'limit': limit})
+            if created:
+                logger.info(f"Created DB record for job {job_id[:8]}")
+            else:
+                logger.warning(f"Failed to create DB record for job {job_id[:8]} (may already exist or table missing)")
             db.update_job_progress(job_id, 100, 0)
         except Exception as db_error:
             # Log but don't fail - job can still proceed
-            try:
-                logger.warning(f"Failed to create DB record for job {job_id[:8]}: {db_error}")
-            except Exception:
-                pass
+            logger.error(f"Failed to create DB record for job {job_id[:8]}: {db_error}", exc_info=True)
         
         try:
             logger.info(f"[{source}] Starting job {job_id[:8]} in background thread...")
@@ -1138,10 +1142,14 @@ async def start_keyword_scrape(request: Request, payload: KeywordsPayload, limit
     }
 
     try:
-        db.create_job_record(job_id)
+        created = db.create_job_record(job_id, job_type='scrape_keywords', payload={'keywords': all_keywords, 'limit': limit})
+        if created:
+            logger.info(f"Created DB record for keyword job {job_id[:8]}")
+        else:
+            logger.warning(f"Failed to create DB record for keyword job {job_id[:8]} (may already exist or table missing)")
         db.update_job_progress(job_id, total_tasks, 0)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Failed to create DB record for keyword job {job_id[:8]}: {e}", exc_info=True)
 
     t = threading.Thread(target=_process_keyword_job, args=(job_id, all_keywords, limit, concurrency, delay), daemon=True)
     t.start()
@@ -1185,9 +1193,11 @@ async def get_job_status(job_id: str):
     # First check in-memory JOBS dict (for active jobs)
     job = JOBS.get(job_id)
     if job:
+        logger.debug(f"Job {job_id[:8]} found in memory: status={job.get('status')}")
         try:
             db_job = db.get_job_record(job_id)
             if db_job:
+                logger.debug(f"Job {job_id[:8]} also found in DB: status={db_job.get('status')}")
                 # For running jobs, use whichever progress is higher (memory or DB)
                 # This handles cases where DB updates fail but memory is still updated
                 if db_job.get('progress') and job.get('progress'):
@@ -1205,8 +1215,10 @@ async def get_job_status(job_id: str):
                 if db_job.get('status') in ('completed', 'failed', 'cancelled'):
                     if db_job['status'] != job.get('status'):
                         job['status'] = db_job['status']
+            else:
+                logger.debug(f"Job {job_id[:8]} not found in DB (only in memory)")
         except Exception as e:
-            logger.debug(f"Could not sync job {job_id} with DB: {e}")
+            logger.warning(f"Could not sync job {job_id[:8]} with DB: {e}", exc_info=True)
         
         if 'progress' not in job:
             job['progress'] = {'total': 0, 'completed': 0}
@@ -1222,16 +1234,18 @@ async def get_job_status(job_id: str):
         return job
     
     # If not in memory, check database (for completed/failed jobs)
+    logger.debug(f"Job {job_id[:8]} not found in memory, checking DB...")
     try:
         rec = db.get_job_record(job_id)
         if rec:
+            logger.info(f"Job {job_id[:8]} found in DB: status={rec.get('status')}")
             # If job is in DB with status "running" but not in memory, it's likely stuck (server restarted)
             # Mark it as failed after checking if it's been running for too long
             if rec.get('status') == 'running':
                 import time
                 from datetime import datetime
                 # Check if job has been running for more than 30 minutes (likely stuck)
-                updated_at = rec.get('updated_at')
+                updated_at = rec.get('updated_at') or rec.get('started_at') or rec.get('created_at')
                 if updated_at:
                     try:
                         # Parse timestamp (format: ISO string or timestamp)
@@ -1262,11 +1276,13 @@ async def get_job_status(job_id: str):
             
             logger.info(f"Returning job {job_id[:8]} from DB: status={rec.get('status')}, progress={rec.get('progress')}")
             return rec
+        else:
+            logger.debug(f"Job {job_id[:8]} not found in DB either")
     except Exception as e:
-        logger.debug(f"Error retrieving job {job_id} from DB: {e}")
+        logger.error(f"Error retrieving job {job_id[:8]} from DB: {e}", exc_info=True)
     
     # Job not found - return 404 with helpful message
-    logger.warning(f"Job {job_id} not found in memory or database")
+    logger.warning(f"Job {job_id[:8]} not found in memory or database (total jobs in memory: {len(JOBS)})")
     raise HTTPException(
         status_code=404, 
         detail=f'Job {job_id} not found. It may have been completed and cleaned up, or the server was restarted.'
