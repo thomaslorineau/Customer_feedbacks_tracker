@@ -1045,8 +1045,13 @@ CRITICAL INSTRUCTIONS:
         
         try:
             # Call selected LLMs in parallel
+            import time
+            parallel_start = time.time()
             tasks = [call_llm_for_insights(provider, key, prompt) for provider, key, _ in llms_to_use]
+            logger.info(f"Calling {len(tasks)} LLMs in parallel...")
             results = await asyncio.gather(*tasks, return_exceptions=True)
+            parallel_elapsed = time.time() - parallel_start
+            logger.info(f"Parallel LLM calls completed in {parallel_elapsed:.2f}s")
             
             # Collect valid results
             valid_results = []
@@ -1054,6 +1059,7 @@ CRITICAL INSTRUCTIONS:
                 result = results[i]
                 if result and not isinstance(result, Exception):
                     valid_results.append((name, result))
+                    logger.info(f"{name} LLM call succeeded")
                 elif isinstance(result, Exception):
                     logger.warning(f"{name} LLM call failed: {type(result).__name__}: {result}")
             
@@ -1342,6 +1348,8 @@ def generate_whats_happening_fallback(
 @router.post("/whats-happening", response_model=WhatsHappeningResponse)
 async def get_whats_happening(request: WhatsHappeningRequest):
     """Generate What's Happening insights based on filtered posts using LLM."""
+    import time
+    start_time = time.time()
     try:
         # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
         openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
@@ -1350,6 +1358,7 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         
         logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
         logger.info(f"get_whats_happening: OpenAI key length: {len(openai_key) if openai_key else 0}, Anthropic key length: {len(anthropic_key) if anthropic_key else 0}, Mistral key length: {len(mistral_key) if mistral_key else 0}")
+        logger.info(f"get_whats_happening: Starting LLM analysis for {len(request.posts)} posts")
         
         insights = await generate_whats_happening_insights_with_llm(
             request.posts,
@@ -1357,6 +1366,9 @@ async def get_whats_happening(request: WhatsHappeningRequest):
             request.active_filters,
             request.analysis_focus or ""
         )
+        
+        elapsed_time = time.time() - start_time
+        logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights")
         
         # Vérifier si les insights viennent du fallback (ils ont un format spécifique)
         # Le fallback génère des insights avec des titres génériques comme "Spike in Negative Feedback Detected"

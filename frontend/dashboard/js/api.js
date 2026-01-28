@@ -1,3 +1,24 @@
+// Helper function to add timeout to fetch requests
+async function fetchWithTimeout(url, options = {}, timeoutMs = 150000) { // 150 seconds default timeout (2.5 minutes)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error(`Request timeout after ${timeoutMs}ms`);
+        }
+        throw error;
+    }
+}
+
 // API client for backend communication
 export class API {
     constructor() {
@@ -183,7 +204,9 @@ export class API {
             url: p.url || null
         }));
         
-        const response = await fetch(`${this.baseURL}/api/whats-happening`, {
+        // Use fetchWithTimeout with 150 seconds timeout (LLM calls can take time, especially with multiple LLMs)
+        // Backend uses 60s timeout per LLM, so with 2 LLMs + synthesis, can take up to ~120s
+        const response = await fetchWithTimeout(`${this.baseURL}/api/whats-happening`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -192,7 +215,8 @@ export class API {
                 active_filters: activeFilters,
                 analysis_focus: analysisFocus || ''
             })
-        });
+        }, 150000); // 150 seconds timeout (2.5 minutes) to account for multiple LLMs + synthesis
+        
         if (!response.ok) {
             throw new Error(`Failed to get What's Happening insights: ${response.statusText}`);
         }

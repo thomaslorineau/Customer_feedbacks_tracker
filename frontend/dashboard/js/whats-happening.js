@@ -134,12 +134,12 @@ export async function updateWhatsHappening(state) {
         search_term: activeFilters.search || ''  // Include search term explicitly
     };
     
-    // Set a timeout to hide overlay after max 60 seconds (safety measure - increased for better UX)
+    // Set a timeout to hide overlay after max 180 seconds (safety measure - increased for multiple LLMs)
     const overlayTimeout = setTimeout(() => {
         if (overlay) {
             overlay.style.display = 'none';
         }
-    }, 60000);
+    }, 180000); // 3 minutes safety timeout
     
     // Call LLM API to generate insights
     let insights = [];
@@ -181,16 +181,33 @@ export async function updateWhatsHappening(state) {
             // Get analysis focus from settings
             const analysisFocus = localStorage.getItem('analysisFocus') || '';
             console.log('[whats-happening.js] Calling LLM API via fetch...');
-            const response = await fetch(`${baseURL}/api/whats-happening`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    posts: postsForAnalysis,
-                    stats: statsForLLM,
-                    active_filters: activeFiltersDescription,
-                    analysis_focus: analysisFocus
-                })
-            });
+            
+            // Create AbortController for timeout
+            // Backend uses 60s timeout per LLM, so with 2 LLMs + synthesis, can take up to ~120s
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 150000); // 150 seconds timeout (2.5 minutes)
+            
+            let response;
+            try {
+                response = await fetch(`${baseURL}/api/whats-happening`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        posts: postsForAnalysis,
+                        stats: statsForLLM,
+                        active_filters: activeFiltersDescription,
+                        analysis_focus: analysisFocus
+                    }),
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                if (fetchError.name === 'AbortError') {
+                    throw new Error('Request timeout: LLM analysis took too long (90s). Please try again or check your LLM configuration.');
+                }
+                throw fetchError;
+            }
             
             if (!response.ok) {
                 throw new Error(`Failed to get What's Happening insights: ${response.statusText}`);
@@ -232,14 +249,25 @@ export async function updateWhatsHappening(state) {
         // Show error message with retry option instead of fallback
         const content = document.getElementById('whatsHappeningContent');
         if (content) {
+            // Check if it's a timeout error
+            const isTimeout = error.message && (error.message.includes('timeout') || error.message.includes('Timeout'));
+            const errorMessage = isTimeout 
+                ? `LLM analysis timed out after 2.5 minutes. This can happen when multiple LLMs are configured and the synthesis takes too long. Please try again or consider using a single LLM provider.`
+                : `AI-powered analysis failed. ${error.message || 'Please check your LLM API keys in Settings.'}`;
+            
             content.innerHTML = `
                 <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ LLM Analysis Unavailable</h3>
+                    <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ ${isTimeout ? 'LLM Analysis Timeout' : 'LLM Analysis Unavailable'}</h3>
                     <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
-                        AI-powered analysis requires an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights based on your feedback analysis.
+                        ${errorMessage}
                     </p>
+                    ${!isTimeout ? `
+                    <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
+                        Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights.
+                    </p>
+                    ` : ''}
                     <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
-                        Without LLM, only basic statistics are available (not dynamic insights).
+                        ${isTimeout ? 'Tip: With 3 LLMs configured, the synthesis process can take longer. Consider using 1-2 LLMs for faster results.' : 'Without LLM, only basic statistics are available (not dynamic insights).'}
                     </p>
                     <button onclick="refreshWhatsHappening()" class="btn-refresh-analysis" style="margin-top: 16px; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500;">
                         🔄 Retry Analysis
