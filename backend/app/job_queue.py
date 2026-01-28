@@ -92,11 +92,15 @@ class RedisJobQueue:
     @property
     def client(self) -> Any:
         if self._client is None:
+            # Increase timeouts for production Docker environments
+            # socket_timeout should be higher than bzpopmax timeout to avoid premature disconnections
             self._client = redis.from_url(
                 self.redis_url,
                 decode_responses=True,
-                socket_timeout=5,
-                socket_connect_timeout=5
+                socket_timeout=30,  # Increased from 5 to 30 seconds
+                socket_connect_timeout=10,  # Increased from 5 to 10 seconds
+                socket_keepalive=True,  # Enable keepalive to maintain connection
+                socket_keepalive_options={}  # Use system defaults
             )
         return self._client
     
@@ -149,10 +153,34 @@ class RedisJobQueue:
         try:
             # Get highest priority job
             if timeout > 0:
-                result = self.client.bzpopmax(self.QUEUE_KEY, timeout=timeout)
-                if not result:
-                    return None
-                job_id = result[1]
+                try:
+                    result = self.client.bzpopmax(self.QUEUE_KEY, timeout=timeout)
+                    if not result:
+                        return None
+                    job_id = result[1]
+                except Exception as timeout_error:
+                    # Handle timeout and connection errors gracefully
+                    error_str = str(timeout_error).lower()
+                    error_type = type(timeout_error).__name__
+                    
+                    # Check for timeout errors (can be TimeoutError or generic timeout messages)
+                    if (error_type == "TimeoutError" or 
+                        "timeout" in error_str or 
+                        "timed out" in error_str or
+                        "reading from socket" in error_str):
+                        # Normal timeout - no job available, this is expected
+                        return None
+                    elif ("connection" in error_str or 
+                          "socket" in error_str or
+                          error_type == "ConnectionError"):
+                        logger.warning(f"Redis connection error during dequeue: {timeout_error}")
+                        # Try to reconnect on next call
+                        self.close()
+                        return None
+                    else:
+                        # Re-raise unexpected errors
+                        logger.error(f"Unexpected error during dequeue: {timeout_error}")
+                        raise
             else:
                 result = self.client.zpopmax(self.QUEUE_KEY, count=1)
                 if not result:
