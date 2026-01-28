@@ -321,6 +321,20 @@ function renderLLM() {
             icon: '🌊',
             description: 'Mistral models for advanced AI capabilities',
             docsUrl: 'https://console.mistral.ai/api-keys/'
+        },
+        { 
+            id: 'ovh', 
+            name: 'OVH AI Endpoints', 
+            icon: '☁️',
+            description: 'OVH AI Endpoints - OpenAI-compatible API (DeepSeek, Llama, Qwen, Mistral)',
+            docsUrl: 'https://endpoints.ai.cloud.ovh.net/',
+            hasModelSelect: true,
+            models: [
+                { id: 'DeepSeek-R1-Distill-Qwen-32B', name: 'DeepSeek R1 Distill Qwen 32B' },
+                { id: 'Llama-3.3-70B-Instruct', name: 'Llama 3.3 70B Instruct' },
+                { id: 'Qwen2.5-Coder-32B-Instruct', name: 'Qwen 2.5 Coder 32B' },
+                { id: 'Mistral-Small-3.1-24B-Instruct-2503', name: 'Mistral Small 3.1 24B' }
+            ]
         }
     ];
     
@@ -634,6 +648,23 @@ function renderProviderCard(provider) {
                                         </button>
                                     </div>
                                 </div>
+                                ${provider.hasModelSelect && provider.models ? `
+                                    <div class="form-group" style="margin-top: 1rem;">
+                                        <label for="model-select-${provider.id}">Model</label>
+                                        <select 
+                                            id="model-select-${provider.id}"
+                                            class="filter-select"
+                                            style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.95rem; background: var(--bg-primary); color: var(--text-primary);"
+                                        >
+                                            ${provider.models.map(m => `
+                                                <option value="${m.id}">${m.name}</option>
+                                            `).join('')}
+                                        </select>
+                                        <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.85em;">
+                                            Select the model to use with OVH AI Endpoints
+                                        </p>
+                                    </div>
+                                ` : ''}
                             `
                         }
                         <div class="form-actions">
@@ -838,6 +869,7 @@ async function saveAPIKey(provider) {
         { id: 'openai', fields: [{ name: 'OPENAI_API_KEY' }] },
         { id: 'anthropic', fields: [{ name: 'ANTHROPIC_API_KEY' }] },
         { id: 'mistral', fields: [{ name: 'MISTRAL_API_KEY' }] },
+        { id: 'ovh', fields: [{ name: 'OVH_API_KEY' }] },
         { id: 'github', fields: [{ name: 'GITHUB_TOKEN' }] },
         { id: 'trustpilot', fields: [{ name: 'TRUSTPILOT_API_KEY' }] },
         { id: 'linkedin', fields: [{ name: 'LINKEDIN_CLIENT_ID' }, { name: 'LINKEDIN_CLIENT_SECRET' }] },
@@ -871,7 +903,7 @@ async function saveAPIKey(provider) {
     }
     
     // Allow empty values for LLM providers (to clear existing keys)
-    const llmProviders = ['openai', 'anthropic', 'mistral'];
+    const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
     if (hasEmptyField && !llmProviders.includes(provider)) {
         showError('Please fill in all required fields');
         return;
@@ -890,6 +922,14 @@ async function saveAPIKey(provider) {
             payload = { anthropic_api_key: values.ANTHROPIC_API_KEY };
         } else if (provider === 'mistral') {
             payload = { mistral_api_key: values.MISTRAL_API_KEY };
+        } else if (provider === 'ovh') {
+            // Get OVH model from select
+            const modelSelect = document.getElementById('model-select-ovh');
+            const ovhModel = modelSelect ? modelSelect.value : 'DeepSeek-R1-Distill-Qwen-32B';
+            payload = { 
+                ovh_api_key: values.OVH_API_KEY,
+                ovh_model: ovhModel
+            };
         } else {
             // For other providers, use a generic endpoint
             // Send all fields as a single request
@@ -933,7 +973,7 @@ async function saveAPIKey(provider) {
         // Update badges and re-render sections
         if (configData && configData.api_keys) {
             // Check if it's an LLM provider
-            const llmProviders = ['openai', 'anthropic', 'mistral'];
+            const llmProviders = ['openai', 'anthropic', 'mistral', 'ovh'];
             if (llmProviders.includes(provider)) {
                 renderLLM();
             } else {

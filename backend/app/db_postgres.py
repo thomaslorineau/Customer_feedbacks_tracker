@@ -859,9 +859,12 @@ def pg_get_config(key: str) -> Optional[str]:
             if result:
                 # value is JSONB, extract the string value
                 value = result['value']
-                # JSONB values are stored as strings in the database
-                # If it's already a string, return it
+                # JSONB values are stored as JSON strings with quotes
+                # We need to strip the outer quotes if present
                 if isinstance(value, str):
+                    # Remove surrounding quotes if the string is a JSON string
+                    if value.startswith('"') and value.endswith('"'):
+                        return value[1:-1]
                     return value
                 # If it's a dict or other type, convert to string
                 # But typically JSONB stores strings directly
