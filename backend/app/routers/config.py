@@ -424,70 +424,114 @@ async def set_llm_config(
     logger.info("LLM configuration updated - saving to database")
     
     # Get the payload as dict to check which fields were actually provided
-    payload_dict = payload.model_dump(exclude_unset=True)
+    # Use exclude_unset=True to only get fields explicitly provided in the request
+    # Use exclude_none=True to exclude None values (even if explicitly sent as null)
+    # This ensures we only process fields that have actual values, not None/null
+    payload_dict = payload.model_dump(exclude_unset=True, exclude_none=True)
+    logger.info(f"Payload fields with values (exclude_unset+exclude_none): {list(payload_dict.keys())}")
+    
+    # Also get the raw payload to check for explicit nulls (for deletion purposes)
+    raw_payload_dict = payload.model_dump(exclude_unset=True)
+    logger.info(f"Payload fields explicitly provided (including nulls): {list(raw_payload_dict.keys())}")
+    
+    # Log payload values (masked for security)
+    for key in payload_dict:
+        value = payload_dict[key]
+        if value and isinstance(value, str) and len(value) > 10:
+            logger.info(f"  {key}: {value[:10]}... (length: {len(value)})")
+        else:
+            logger.info(f"  {key}: {value}")
     
     # Store in PostgreSQL app_config table (persistent across restarts)
-    # Only update keys that were explicitly provided in the request
-    if 'openai_api_key' in payload_dict:
+    # Only update keys that were explicitly provided in the request AND have a non-null value
+    # Use raw_payload_dict to check for explicit nulls (for deletion)
+    if 'openai_api_key' in raw_payload_dict:
         if payload.openai_api_key and payload.openai_api_key.strip():
             pg_set_config('OPENAI_API_KEY', payload.openai_api_key.strip())
             logger.info("OpenAI API key saved to database")
         else:
+            # Only delete if explicitly set to empty/null in the request
             pg_delete_config('OPENAI_API_KEY')
-            logger.info("OpenAI API key removed from database")
+            logger.info("OpenAI API key removed from database (explicitly cleared)")
     
-    if 'anthropic_api_key' in payload_dict:
+    if 'anthropic_api_key' in raw_payload_dict:
         if payload.anthropic_api_key and payload.anthropic_api_key.strip():
             pg_set_config('ANTHROPIC_API_KEY', payload.anthropic_api_key.strip())
             logger.info("Anthropic API key saved to database")
         else:
+            # Only delete if explicitly set to empty/null in the request
             pg_delete_config('ANTHROPIC_API_KEY')
-            logger.info("Anthropic API key removed from database")
+            logger.info("Anthropic API key removed from database (explicitly cleared)")
     
-    if 'mistral_api_key' in payload_dict:
+    if 'mistral_api_key' in raw_payload_dict:
         if payload.mistral_api_key and payload.mistral_api_key.strip():
             pg_set_config('MISTRAL_API_KEY', payload.mistral_api_key.strip())
             logger.info("Mistral API key saved to database")
         else:
+            # Only delete if explicitly set to empty/null in the request
             pg_delete_config('MISTRAL_API_KEY')
-            logger.info("Mistral API key removed from database")
+            logger.info("Mistral API key removed from database (explicitly cleared)")
     
-    if payload.llm_provider:
+    # Only update llm_provider if it was explicitly provided in the request
+    if 'llm_provider' in payload_dict and payload.llm_provider:
         pg_set_config('LLM_PROVIDER', payload.llm_provider)
         logger.info(f"LLM provider set to: {payload.llm_provider}")
     
     # Update environment variables for current session (so it works immediately)
-    # Only update keys that were explicitly provided
-    if 'openai_api_key' in payload_dict:
+    # CRITICAL: Only update keys that were explicitly provided in the request
+    # Use raw_payload_dict to check for explicit nulls (for deletion)
+    # Do NOT delete or modify keys that weren't in the payload - they should remain unchanged
+    if 'openai_api_key' in raw_payload_dict:
         if payload.openai_api_key and payload.openai_api_key.strip():
             os.environ['OPENAI_API_KEY'] = payload.openai_api_key.strip()
-        elif 'OPENAI_API_KEY' in os.environ:
-            del os.environ['OPENAI_API_KEY']
-    if 'anthropic_api_key' in payload_dict:
+            logger.info("Updated OPENAI_API_KEY in environment")
+        else:
+            # Only delete if explicitly set to empty/null in the request
+            if 'OPENAI_API_KEY' in os.environ:
+                del os.environ['OPENAI_API_KEY']
+                logger.info("Removed OPENAI_API_KEY from environment (explicitly cleared)")
+    # Do NOT update ANTHROPIC_API_KEY if it wasn't in the payload
+    if 'anthropic_api_key' in raw_payload_dict:
         if payload.anthropic_api_key and payload.anthropic_api_key.strip():
             os.environ['ANTHROPIC_API_KEY'] = payload.anthropic_api_key.strip()
-        elif 'ANTHROPIC_API_KEY' in os.environ:
-            del os.environ['ANTHROPIC_API_KEY']
-    if 'mistral_api_key' in payload_dict:
+            logger.info("Updated ANTHROPIC_API_KEY in environment")
+        else:
+            # Only delete if explicitly set to empty/null in the request
+            if 'ANTHROPIC_API_KEY' in os.environ:
+                del os.environ['ANTHROPIC_API_KEY']
+                logger.info("Removed ANTHROPIC_API_KEY from environment (explicitly cleared)")
+    # Do NOT update MISTRAL_API_KEY if it wasn't in the payload
+    if 'mistral_api_key' in raw_payload_dict:
         if payload.mistral_api_key and payload.mistral_api_key.strip():
             os.environ['MISTRAL_API_KEY'] = payload.mistral_api_key.strip()
-        elif 'MISTRAL_API_KEY' in os.environ:
-            del os.environ['MISTRAL_API_KEY']
-    if payload.llm_provider:
+            logger.info("Updated MISTRAL_API_KEY in environment")
+        else:
+            # Only delete if explicitly set to empty/null in the request
+            if 'MISTRAL_API_KEY' in os.environ:
+                del os.environ['MISTRAL_API_KEY']
+                logger.info("Removed MISTRAL_API_KEY from environment (explicitly cleared)")
+    # Only update LLM_PROVIDER if it was explicitly provided
+    if 'llm_provider' in payload_dict and payload.llm_provider:
         os.environ['LLM_PROVIDER'] = payload.llm_provider
+        logger.info(f"Updated LLM_PROVIDER to {payload.llm_provider}")
     
     # Also update the config singleton if it exists
+    # IMPORTANT: Only update fields that were explicitly provided in the request AND have values
+    # Do NOT overwrite other keys - they should remain unchanged
     try:
         from ..config import config
+        # Only update if the key is in payload_dict (has a non-null value)
         if 'openai_api_key' in payload_dict:
-            config.openai_api_key = payload.openai_api_key if payload.openai_api_key else None
+            config.openai_api_key = payload.openai_api_key.strip() if payload.openai_api_key else None
+        # Do NOT update anthropic_api_key if it wasn't in the payload with a value
         if 'anthropic_api_key' in payload_dict:
-            config.anthropic_api_key = payload.anthropic_api_key if payload.anthropic_api_key else None
+            config.anthropic_api_key = payload.anthropic_api_key.strip() if payload.anthropic_api_key else None
+        # Do NOT update mistral_api_key if it wasn't in the payload with a value
         if 'mistral_api_key' in payload_dict:
-            config.mistral_api_key = payload.mistral_api_key if payload.mistral_api_key else None
-        if payload.llm_provider:
+            config.mistral_api_key = payload.mistral_api_key.strip() if payload.mistral_api_key else None
+        if 'llm_provider' in payload_dict and payload.llm_provider:
             config.llm_provider = payload.llm_provider
-        logger.info("Config singleton updated for current session")
+        logger.info(f"Config singleton updated for current session (updated fields with values: {list(payload_dict.keys())})")
     except Exception as e:
         logger.warning(f"Could not update config singleton: {e}")
     
