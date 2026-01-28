@@ -731,14 +731,22 @@ async def get_recommended_actions(request: RecommendedActionRequest):
         api_key = openai_key or anthropic_key or mistral_key
         llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
         
+        logger.info(f"[Recommended Actions] Generating actions - Posts: {len(request.posts)}, Recent: {len(request.recent_posts)}, LLM available: {llm_available}")
+        
         actions = await generate_recommended_actions_with_llm(
             request.posts, 
             request.recent_posts, 
             request.stats, 
             request.max_actions
         )
+        
+        logger.info(f"[Recommended Actions] Generated {len(actions)} actions")
+        for i, action in enumerate(actions):
+            logger.info(f"  Action {i+1}: {action.icon} {action.text} (priority: {action.priority})")
+        
         return RecommendedActionsResponse(actions=actions, llm_available=llm_available)
     except Exception as e:
+        logger.error(f"[Recommended Actions] Error generating actions: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to generate recommended actions: {str(e)}")
 
 
