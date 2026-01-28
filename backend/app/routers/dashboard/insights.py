@@ -607,38 +607,57 @@ Format your response as a JSON array with this structure:
     try:
         # Try provider-specific first
         if llm_provider == 'anthropic' and anthropic_key:
+            logger.info("[Recommended Actions] Calling Anthropic LLM (provider-specific)")
             content = await call_llm_for_actions('anthropic', anthropic_key, prompt)
         elif llm_provider == 'mistral' and mistral_key:
+            logger.info("[Recommended Actions] Calling Mistral LLM (provider-specific)")
             content = await call_llm_for_actions('mistral', mistral_key, prompt)
         elif llm_provider == 'openai' and openai_key:
+            logger.info("[Recommended Actions] Calling OpenAI LLM (provider-specific)")
             content = await call_llm_for_actions('openai', openai_key, prompt)
         else:
             # Try any available key (prefer OpenAI, then Anthropic, then Mistral)
             if openai_key:
+                logger.info("[Recommended Actions] Calling OpenAI LLM (fallback order)")
                 content = await call_llm_for_actions('openai', openai_key, prompt)
             elif anthropic_key:
+                logger.info("[Recommended Actions] Calling Anthropic LLM (fallback order)")
                 content = await call_llm_for_actions('anthropic', anthropic_key, prompt)
             elif mistral_key:
+                logger.info("[Recommended Actions] Calling Mistral LLM (fallback order)")
                 content = await call_llm_for_actions('mistral', mistral_key, prompt)
             else:
+                logger.warning("[Recommended Actions] No LLM API key available, using fallback")
                 content = None
         
         if content:
+            logger.info(f"[Recommended Actions] LLM returned content (length: {len(content)})")
             json_match = re.search(r'\[.*\]', content, re.DOTALL)
             if json_match:
-                actions_data = json.loads(json_match.group())
-                return [RecommendedAction(**action) for action in actions_data]
+                try:
+                    actions_data = json.loads(json_match.group())
+                    logger.info(f"[Recommended Actions] Successfully parsed {len(actions_data)} actions from LLM response")
+                    return [RecommendedAction(**action) for action in actions_data]
+                except json.JSONDecodeError as e:
+                    logger.warning(f"[Recommended Actions] Failed to parse JSON from LLM response: {e}. Using fallback.")
+                    logger.debug(f"[Recommended Actions] JSON match content: {json_match.group()[:500]}")
+            else:
+                logger.warning("[Recommended Actions] No JSON array found in LLM response. Using fallback.")
+                logger.debug(f"[Recommended Actions] LLM response preview: {content[:500]}")
+        else:
+            logger.warning("[Recommended Actions] LLM returned None or empty content. Using fallback.")
     
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 401:
-            logger.warning(f"LLM API authentication failed (401): Invalid or expired API key. Using fallback.")
+            logger.warning(f"[Recommended Actions] LLM API authentication failed (401): Invalid or expired API key. Using fallback.")
         else:
-            logger.warning(f"LLM API error ({e.response.status_code}): {e}. Using fallback.")
+            logger.warning(f"[Recommended Actions] LLM API error ({e.response.status_code}): {e}. Using fallback.")
         return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
     except Exception as e:
-        logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
+        logger.warning(f"[Recommended Actions] LLM API error: {type(e).__name__}: {e}. Using fallback.", exc_info=True)
         return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
     
+    logger.info("[Recommended Actions] Falling back to rule-based actions")
     return generate_recommended_actions_fallback(posts, recent_posts, stats, max_actions)
 
 
