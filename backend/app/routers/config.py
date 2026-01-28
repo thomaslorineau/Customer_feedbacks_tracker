@@ -185,6 +185,9 @@ async def get_config():
     openai_key = pg_get_config('OPENAI_API_KEY')
     anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
     mistral_key = pg_get_config('MISTRAL_API_KEY')
+    ovh_key = pg_get_config('OVH_API_KEY')
+    ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+    ovh_model = pg_get_config('OVH_MODEL')
     github_token = pg_get_config('GITHUB_TOKEN')
     trustpilot_key = pg_get_config('TRUSTPILOT_API_KEY')
     linkedin_client_id = pg_get_config('LINKEDIN_CLIENT_ID')
@@ -192,6 +195,34 @@ async def get_config():
     twitter_bearer = pg_get_config('TWITTER_BEARER_TOKEN')
     discord_bot_token = pg_get_config('DISCORD_BOT_TOKEN')
     discord_guild_id = pg_get_config('DISCORD_GUILD_ID')
+    
+    # Normalize empty strings to None (empty string means explicitly deleted from DB)
+    if openai_key == '':
+        openai_key = None
+    if anthropic_key == '':
+        anthropic_key = None
+    if mistral_key == '':
+        mistral_key = None
+    if ovh_key == '':
+        ovh_key = None
+    if ovh_endpoint == '':
+        ovh_endpoint = None
+    if ovh_model == '':
+        ovh_model = None
+    if github_token == '':
+        github_token = None
+    if trustpilot_key == '':
+        trustpilot_key = None
+    if linkedin_client_id == '':
+        linkedin_client_id = None
+    if linkedin_client_secret == '':
+        linkedin_client_secret = None
+    if twitter_bearer == '':
+        twitter_bearer = None
+    if discord_bot_token == '':
+        discord_bot_token = None
+    if discord_guild_id == '':
+        discord_guild_id = None
     
     # Fallback to .env only if not in database (don't override DB values)
     # Reload .env to get latest values, but don't override existing env vars
@@ -201,28 +232,18 @@ async def get_config():
         # Load .env but don't override existing env vars (which may have DB values)
         load_dotenv(env_path, override=False)
     
-    # Use env vars as fallback only if not in database
-    if not openai_key:
-        openai_key = os.getenv('OPENAI_API_KEY')
-    if not anthropic_key:
-        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    if not mistral_key:
-        mistral_key = os.getenv('MISTRAL_API_KEY')
-    if not github_token:
-        github_token = os.getenv('GITHUB_TOKEN')
-    if not trustpilot_key:
-        trustpilot_key = os.getenv('TRUSTPILOT_API_KEY')
-    if not linkedin_client_id:
-        linkedin_client_id = os.getenv('LINKEDIN_CLIENT_ID')
-    if not linkedin_client_secret:
-        linkedin_client_secret = os.getenv('LINKEDIN_CLIENT_SECRET')
-    if not twitter_bearer:
-        twitter_bearer = os.getenv('TWITTER_BEARER_TOKEN')
-    if not discord_bot_token:
-        discord_bot_token = os.getenv('DISCORD_BOT_TOKEN')
-    if not discord_guild_id:
-        discord_guild_id = os.getenv('DISCORD_GUILD_ID')
-    provider = pg_get_config('LLM_PROVIDER') or os.getenv('LLM_PROVIDER', 'openai')
+    # IMPORTANT: Database is the source of truth. Do NOT use env vars as fallback.
+    # If a key is not in the database (None), it means it was never configured or was explicitly deleted.
+    # Using env vars as fallback would cause deleted keys to reappear, which is why the badge stays "Configured".
+    # Only use defaults for OVH endpoint if OVH key exists but endpoint is not set
+    # Do NOT set a default model - user must configure it
+    if ovh_key and ovh_endpoint is None:
+        ovh_endpoint = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
+    
+    # Get LLM provider from database, default to 'openai' if not set
+    provider = pg_get_config('LLM_PROVIDER')
+    if not provider:
+        provider = 'openai'
     if provider:
         provider = provider.lower()
     else:
@@ -259,6 +280,13 @@ async def get_config():
                 "configured": bool(mistral_key),
                 "masked": mask_key(mistral_key),
                 "length": len(mistral_key) if mistral_key else 0
+            },
+            "ovh": {
+                "configured": bool(ovh_key),
+                "masked": mask_key(ovh_key),
+                "length": len(ovh_key) if ovh_key else 0,
+                "endpoint": ovh_endpoint if ovh_endpoint else None,
+                "model": ovh_model if ovh_model else None
             },
             "github": {
                 "configured": bool(github_token),
@@ -301,7 +329,10 @@ class LLMConfigPayload(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     mistral_api_key: Optional[str] = Field(None, description="Mistral API key")
-    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic|mistral)$", description="LLM provider")
+    ovh_api_key: Optional[str] = Field(None, description="OVH AI API key")
+    ovh_endpoint_url: Optional[str] = Field(None, description="OVH AI Endpoint URL")
+    ovh_model: Optional[str] = Field(None, description="OVH AI Model name")
+    llm_provider: Optional[str] = Field(None, pattern="^(openai|anthropic|mistral|ovh)$", description="LLM provider")
 
 
 class KeywordsPayload(BaseModel):
@@ -489,6 +520,34 @@ async def set_llm_config(
         # Key was NOT in the request - preserve existing value in database
         logger.debug("Mistral API key not in request - preserving existing value")
     
+    # Handle OVH AI configuration
+    if 'ovh_api_key' in raw_payload_dict:
+        ovh_value = payload.ovh_api_key.strip() if payload.ovh_api_key else None
+        if ovh_value:
+            pg_set_config('OVH_API_KEY', ovh_value)
+            logger.info("OVH API key saved to database")
+        else:
+            pg_delete_config('OVH_API_KEY')
+            logger.info("OVH API key removed from database")
+    
+    if 'ovh_endpoint_url' in raw_payload_dict:
+        ovh_endpoint_value = payload.ovh_endpoint_url.strip() if payload.ovh_endpoint_url else None
+        if ovh_endpoint_value:
+            pg_set_config('OVH_ENDPOINT_URL', ovh_endpoint_value)
+            logger.info("OVH endpoint URL saved to database")
+        else:
+            pg_delete_config('OVH_ENDPOINT_URL')
+            logger.info("OVH endpoint URL removed from database")
+    
+    if 'ovh_model' in raw_payload_dict:
+        ovh_model_value = payload.ovh_model.strip() if payload.ovh_model else None
+        if ovh_model_value:
+            pg_set_config('OVH_MODEL', ovh_model_value)
+            logger.info(f"OVH model saved to database: {ovh_model_value}")
+        else:
+            pg_delete_config('OVH_MODEL')
+            logger.info("OVH model removed from database")
+    
     # Only update llm_provider if it was explicitly provided in the request
     if 'llm_provider' in payload_dict and payload.llm_provider:
         pg_set_config('LLM_PROVIDER', payload.llm_provider)
@@ -527,6 +586,35 @@ async def set_llm_config(
             if 'MISTRAL_API_KEY' in os.environ:
                 del os.environ['MISTRAL_API_KEY']
                 logger.info("Removed MISTRAL_API_KEY from environment (explicitly cleared)")
+    
+    # Handle OVH AI environment variables
+    if 'ovh_api_key' in raw_payload_dict:
+        if payload.ovh_api_key and payload.ovh_api_key.strip():
+            os.environ['OVH_API_KEY'] = payload.ovh_api_key.strip()
+            logger.info("Updated OVH_API_KEY environment variable")
+        else:
+            if 'OVH_API_KEY' in os.environ:
+                del os.environ['OVH_API_KEY']
+                logger.info("Removed OVH_API_KEY from environment")
+    
+    if 'ovh_endpoint_url' in raw_payload_dict:
+        if payload.ovh_endpoint_url and payload.ovh_endpoint_url.strip():
+            os.environ['OVH_ENDPOINT_URL'] = payload.ovh_endpoint_url.strip()
+            logger.info("Updated OVH_ENDPOINT_URL environment variable")
+        else:
+            if 'OVH_ENDPOINT_URL' in os.environ:
+                del os.environ['OVH_ENDPOINT_URL']
+                logger.info("Removed OVH_ENDPOINT_URL from environment")
+    
+    if 'ovh_model' in raw_payload_dict:
+        if payload.ovh_model and payload.ovh_model.strip():
+            os.environ['OVH_MODEL'] = payload.ovh_model.strip()
+            logger.info(f"Updated OVH_MODEL environment variable: {payload.ovh_model}")
+        else:
+            if 'OVH_MODEL' in os.environ:
+                del os.environ['OVH_MODEL']
+                logger.info("Removed OVH_MODEL from environment")
+    
     # Only update LLM_PROVIDER if it was explicitly provided
     if 'llm_provider' in payload_dict and payload.llm_provider:
         os.environ['LLM_PROVIDER'] = payload.llm_provider
@@ -1130,4 +1218,140 @@ async def create_ticket(payload: CreateJiraTicketPayload):
         raise HTTPException(status_code=400, detail=result.get('error', 'Failed to create ticket'))
     
     return result
+
+
+class OVHModelsResponse(BaseModel):
+    """Response model for OVH available models."""
+    models: List[str] = Field(..., description="List of available model names")
+    endpoint: Optional[str] = Field(None, description="OVH endpoint URL used")
+    error: Optional[str] = Field(None, description="Error message if models could not be fetched")
+
+
+@router.get(
+    "/api/ovh/models",
+    response_model=OVHModelsResponse,
+    summary="Get Available OVH AI Models",
+    description="""
+    Retrieves the list of available models from OVH AI Endpoints.
+    
+    **Requirements:**
+    - OVH API key must be configured
+    - OVH endpoint URL must be configured
+    
+    **Returns:**
+    - `models`: List of available model names
+    - `endpoint`: The endpoint URL used to fetch models
+    - `error`: Error message if models could not be fetched
+    
+    **Example Response:**
+    ```json
+    {
+        "models": ["Llama-3.1-70B-Instruct", "Qwen-2.5-72B-Instruct"],
+        "endpoint": "https://oai.endpoints.kepler.ai.cloud.ovh.net/v1",
+        "error": null
+    }
+    ```
+    """,
+    tags=["Configuration", "LLM", "OVH"]
+)
+async def get_ovh_models():
+    """Get available models from OVH AI Endpoints."""
+    import httpx
+    from ..database import pg_get_config
+    
+    # Get OVH configuration from database
+    ovh_key = pg_get_config('OVH_API_KEY')
+    ovh_endpoint = pg_get_config('OVH_ENDPOINT_URL')
+    
+    # Normalize empty strings
+    if ovh_key == '':
+        ovh_key = None
+    if ovh_endpoint == '':
+        ovh_endpoint = None
+    
+    # Use default endpoint if not configured
+    if not ovh_endpoint:
+        ovh_endpoint = 'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1'
+    
+    if not ovh_key:
+        return OVHModelsResponse(
+            models=[],
+            endpoint=ovh_endpoint,
+            error="OVH API key not configured. Please configure your OVH API key in Settings."
+        )
+    
+    try:
+        # Call OVH AI Endpoints /models endpoint (OpenAI-compatible)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f'{ovh_endpoint}/models',
+                headers={
+                    'Authorization': f'Bearer {ovh_key}',
+                    'Content-Type': 'application/json'
+                }
+            )
+            
+            if response.status_code == 401:
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=ovh_endpoint,
+                    error="Authentication failed. Please check your OVH API key."
+                )
+            
+            if response.status_code == 404:
+                # Some endpoints might not support /models, try alternative approach
+                logger.warning(f"OVH endpoint {ovh_endpoint} does not support /models endpoint")
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=ovh_endpoint,
+                    error="Models endpoint not available. Please configure the model manually."
+                )
+            
+            response.raise_for_status()
+            result = response.json()
+            
+            # Extract model IDs from the response
+            # OpenAI-compatible API returns: {"data": [{"id": "model-name", ...}, ...]}
+            models = []
+            if isinstance(result, dict) and 'data' in result:
+                models = [model['id'] for model in result['data'] if 'id' in model]
+            elif isinstance(result, list):
+                models = [model['id'] for model in result if isinstance(model, dict) and 'id' in model]
+            
+            if not models:
+                logger.warning(f"No models found in OVH response: {result}")
+                return OVHModelsResponse(
+                    models=[],
+                    endpoint=ovh_endpoint,
+                    error="No models found in the response. Please check your endpoint configuration."
+                )
+            
+            logger.info(f"Successfully retrieved {len(models)} models from OVH endpoint: {models[:5]}...")
+            return OVHModelsResponse(
+                models=sorted(models),  # Sort alphabetically for better UX
+                endpoint=ovh_endpoint,
+                error=None
+            )
+            
+    except httpx.TimeoutException:
+        logger.error(f"Timeout while fetching models from OVH endpoint: {ovh_endpoint}")
+        return OVHModelsResponse(
+            models=[],
+            endpoint=ovh_endpoint,
+            error="Request timeout. Please check your endpoint URL and network connection."
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error while fetching OVH models: {e.response.status_code} - {e.response.text[:200]}")
+        return OVHModelsResponse(
+            models=[],
+            endpoint=ovh_endpoint,
+            error=f"HTTP error {e.response.status_code}: {e.response.text[:200]}"
+        )
+    except Exception as e:
+        logger.error(f"Error fetching OVH models: {type(e).__name__}: {e}", exc_info=True)
+        return OVHModelsResponse(
+            models=[],
+            endpoint=ovh_endpoint,
+            error=f"Error fetching models: {str(e)}"
+        )
 
