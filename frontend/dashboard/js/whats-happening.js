@@ -117,6 +117,10 @@ export async function updateWhatsHappening(state) {
     const spikeDetected = avgNegativePer48h > 0 && recentNegative > avgNegativePer48h * 2.3; // 230% increase
     const spikePercentage = avgNegativePer48h > 0 ? Math.round(((recentNegative - avgNegativePer48h) / avgNegativePer48h) * 100) : 0;
     
+    // Get active filters description
+    const activeFilters = getActiveFilters(state);
+    const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
+    
     // Prepare stats for LLM analysis
     const statsForLLM = {
         total,
@@ -126,12 +130,9 @@ export async function updateWhatsHappening(state) {
         recent_negative: recentNegative,
         recent_total: recentPosts.length,
         spike_detected: spikeDetected,
-        spike_percentage: spikePercentage
+        spike_percentage: spikePercentage,
+        search_term: activeFilters.search || ''  // Include search term explicitly
     };
-    
-    // Get active filters description
-    const activeFilters = getActiveFilters(state);
-    const activeFiltersDescription = activeFilters.description || 'All posts (no filters)';
     
     // Set a timeout to hide overlay after max 60 seconds (safety measure - increased for better UX)
     const overlayTimeout = setTimeout(() => {
