@@ -632,26 +632,46 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
     isCreatingChart = false;
     
     // Force chart update to ensure rendering
-    if (sourceChart) {
-        // Use 'active' mode to ensure full rendering
-        sourceChart.update('active');
-        console.log('[source-chart-v2.js] Chart update() called');
+    if (sourceChart && !sourceChart.destroyed) {
+        try {
+            // Use 'active' mode to ensure full rendering
+            sourceChart.update('active');
+            console.log('[source-chart-v2.js] Chart update() called');
+        } catch (e) {
+            console.warn('[source-chart-v2.js] Error calling update() on chart:', e);
+        }
         
         // Force canvas to be visible and ensure proper rendering
         setTimeout(() => {
+            // Vérifier que sourceChart existe toujours et n'est pas détruit
+            if (!sourceChart || sourceChart.destroyed) {
+                console.warn('[source-chart-v2.js] Chart was destroyed before setTimeout callback, skipping update');
+                return;
+            }
+            
             if (canvas) {
                 canvas.style.display = 'block';
                 canvas.style.visibility = 'visible';
                 canvas.style.opacity = '1';
                 
                 // Force a resize to ensure Chart.js recalculates dimensions
-                if (sourceChart && sourceChart.resize) {
-                    sourceChart.resize();
-                    console.log('[source-chart-v2.js] Chart resize() called');
+                if (sourceChart && !sourceChart.destroyed && sourceChart.resize) {
+                    try {
+                        sourceChart.resize();
+                        console.log('[source-chart-v2.js] Chart resize() called');
+                    } catch (e) {
+                        console.warn('[source-chart-v2.js] Error calling resize() on chart:', e);
+                    }
                 }
                 
                 // Force another update after resize
-                sourceChart.update('active');
+                if (sourceChart && !sourceChart.destroyed) {
+                    try {
+                        sourceChart.update('active');
+                    } catch (e) {
+                        console.warn('[source-chart-v2.js] Error calling update() after resize:', e);
+                    }
+                }
                 
                 // Log final canvas state
                 const finalRect = canvas.getBoundingClientRect();
@@ -690,14 +710,20 @@ function createChartInstance(ctx, canvas, sourceData, sentimentBySource) {
                 
                 // Force one more update with animation to ensure rendering
                 if (sourceChart && !sourceChart.destroyed) {
-                    // Try to force a full re-render by destroying and recreating if needed
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        // Clear canvas first
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        // Then update chart
-                        sourceChart.update('active');
-                        console.log('[source-chart-v2.js] Final update() called with active mode after clear');
+                    try {
+                        // Try to force a full re-render by destroying and recreating if needed
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            // Clear canvas first
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            // Then update chart
+                            if (sourceChart && !sourceChart.destroyed) {
+                                sourceChart.update('active');
+                                console.log('[source-chart-v2.js] Final update() called with active mode after clear');
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[source-chart-v2.js] Error in final update:', e);
                     }
                 }
             }

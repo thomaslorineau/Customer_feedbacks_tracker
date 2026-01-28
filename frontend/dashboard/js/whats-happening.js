@@ -233,26 +233,17 @@ export async function updateWhatsHappening(state) {
         const content = document.getElementById('whatsHappeningContent');
         if (content) {
             content.innerHTML = `
-                <div style="text-align: center; padding: 30px; color: var(--text-primary);">
-                    <div style="font-size: 3em; margin-bottom: 16px;">⚠️</div>
-                    <h3 style="margin: 0 0 12px 0; color: var(--text-primary);">AI Analysis Unavailable</h3>
-                    <p style="margin: 0 0 20px 0; color: var(--text-secondary); line-height: 1.6;">
-                        Unable to generate AI insights. This could be due to:<br>
-                        • Missing or invalid LLM API keys in Settings<br>
-                        • Network connectivity issues<br>
-                        • LLM service temporarily unavailable
+                <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ LLM Analysis Unavailable</h3>
+                    <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
+                        AI-powered analysis requires an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights based on your feedback analysis.
                     </p>
-                    <button onclick="refreshWhatsHappening()" class="btn-refresh-analysis" style="margin: 0 auto;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-                            <polyline points="23 4 23 10 17 10"/>
-                            <polyline points="1 20 1 14 7 14"/>
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-                        </svg>
-                        Retry Analysis
+                    <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
+                        Without LLM, only basic statistics are available (not dynamic insights).
+                    </p>
+                    <button onclick="refreshWhatsHappening()" class="btn-refresh-analysis" style="margin-top: 16px; padding: 8px 16px; background: var(--accent-primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 500;">
+                        🔄 Retry Analysis
                     </button>
-                    <p style="margin-top: 16px; font-size: 0.9em; color: var(--text-muted);">
-                        <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Configure API keys</a> to enable AI-powered insights
-                    </p>
                 </div>
             `;
         }
@@ -492,7 +483,27 @@ export async function updateWhatsHappening(state) {
         return;
     }
     
-    console.log('[whats-happening.js] Content element found, updating with', insights.length, 'insights');
+    console.log('[whats-happening.js] Content element found, updating with', insights.length, 'insights', 'llm_available:', llmAvailable);
+    
+    // Vérifier si l'analyse vient du LLM ou du fallback
+    if (llmAvailable === false) {
+        console.warn('[whats-happening.js] Analysis is using fallback (hardcoded data), not LLM');
+        // Afficher un message d'avertissement au lieu des insights en dur
+        content.innerHTML = `
+            <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ LLM Analysis Unavailable</h3>
+                <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
+                    AI-powered analysis requires an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights based on your feedback analysis.
+                </p>
+                <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
+                    Without LLM, only basic statistics are available (not dynamic insights).
+                </p>
+            </div>
+        `;
+        // Ne pas afficher les insights du fallback (données en dur)
+        return;
+    }
+    
     let contentHTML = '';
     
     // Store insights globally for drawer access

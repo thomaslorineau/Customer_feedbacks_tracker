@@ -1109,11 +1109,40 @@ async function loadImprovementsAnalysis() {
         
         if (!analysisResponse.ok) {
             const errorText = await analysisResponse.text();
-            throw new Error(`Failed to generate analysis (${analysisResponse.status}): ${errorText || analysisResponse.statusText}`);
+            let errorMessage = `Failed to generate analysis (${analysisResponse.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorMessage;
+            } catch (e) {
+                // Si ce n'est pas du JSON, utiliser le texte brut
+                errorMessage = errorText || analysisResponse.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
         }
         
         const analysis = await analysisResponse.json();
-        console.log('[improvements] Analysis received, insights:', analysis.insights?.length || 0);
+        console.log('[improvements] Analysis received, insights:', analysis.insights?.length || 0, 'llm_available:', analysis.llm_available);
+        
+        // Vérifier si l'analyse vient du LLM ou du fallback
+        if (analysis.llm_available === false) {
+            console.warn('[improvements] Analysis is using fallback (hardcoded data), not LLM');
+            // Afficher un message d'avertissement
+            if (insightsContainer) {
+                insightsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 20px; background: rgba(245, 158, 11, 0.1); border-radius: 8px; border: 2px solid #f59e0b; margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 12px 0; color: #d97706;">⚠️ LLM Analysis Unavailable</h3>
+                        <p style="margin: 0 0 16px 0; color: var(--text-secondary); line-height: 1.6;">
+                            AI-powered analysis requires an API key. Please configure your OpenAI, Anthropic, or Mistral API key in <a href="/settings" style="color: var(--accent-primary); text-decoration: underline;">Settings</a> to enable intelligent insights based on your feedback analysis.
+                        </p>
+                        <p style="margin: 0; font-size: 0.9em; color: var(--text-muted);">
+                            Without LLM, only basic statistics are available (not dynamic insights).
+                        </p>
+                    </div>
+                `;
+            }
+            // Ne pas afficher les insights du fallback (données en dur)
+            return;
+        }
         
         // Store posts globally for drawer access
         window.currentImprovementsPosts = postsData.posts || [];

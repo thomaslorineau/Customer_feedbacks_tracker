@@ -415,6 +415,11 @@ function setupTimelineSelection(canvas, chart) {
     
     // Show hint on hover when not dragging
     canvas.addEventListener('mousemove', (e) => {
+        // Vérifier que le chart existe et est valide avant d'utiliser ses méthodes
+        if (!chart || !chart.chartArea) {
+            return;
+        }
+        
         if (isDragging) {
             // Update selection during drag
             const rect = canvas.getBoundingClientRect();
@@ -427,31 +432,45 @@ function setupTimelineSelection(canvas, chart) {
             }
         } else {
             // Show cursor hint
-            const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
-            if (points.length > 0) {
-                canvas.style.cursor = 'pointer';
-            } else {
+            try {
+                const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+                if (points && points.length > 0) {
+                    canvas.style.cursor = 'pointer';
+                } else {
+                    canvas.style.cursor = 'crosshair';
+                }
+            } catch (error) {
+                // Si l'appel échoue, utiliser un curseur par défaut
                 canvas.style.cursor = 'crosshair';
             }
         }
     });
     
     canvas.addEventListener('mousedown', (e) => {
+        // Vérifier que le chart existe et est valide avant d'utiliser ses méthodes
+        if (!chart || !chart.chartArea) {
+            return;
+        }
+        
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
         // Check if clicking on a bar (if so, let onClick handle it)
-        const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
-        if (points.length > 0) {
-            // Small delay to allow onClick to fire first
-            setTimeout(() => {
-                if (!isSelecting) {
-                    // onClick handled it, don't start selection
-                    return;
-                }
-            }, 50);
-            // Still allow selection if user drags
+        try {
+            const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+            if (points && points.length > 0) {
+                // Small delay to allow onClick to fire first
+                setTimeout(() => {
+                    if (!isSelecting) {
+                        // onClick handled it, don't start selection
+                        return;
+                    }
+                }, 50);
+                // Still allow selection if user drags
+            }
+        } catch (error) {
+            // Si l'appel échoue, continuer avec la sélection normale
         }
         
         // Start selection
