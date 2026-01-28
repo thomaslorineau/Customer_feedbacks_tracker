@@ -1036,7 +1036,6 @@ async def generate_whats_happening_insights_with_llm(
     search_term = stats.get('search_term', '')
     if not search_term and active_filters:
         # Try to extract search term from active_filters string (format: 'Search: "term"')
-        import re
         search_match = re.search(r'Search:\s*"([^"]+)"', active_filters)
         if search_match:
             search_term = search_match.group(1)
