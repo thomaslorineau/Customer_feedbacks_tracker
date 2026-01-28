@@ -5,7 +5,7 @@ import re
 import logging
 import asyncio
 import math
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from fastapi import APIRouter, HTTPException
 import httpx
 
@@ -834,7 +834,11 @@ async def generate_whats_happening_insights_with_llm(
     stats: dict,
     active_filters: str = "",
     analysis_focus: str = ""
-) -> List[WhatsHappeningInsight]:
+) -> Tuple[List[WhatsHappeningInsight], bool]:
+    """
+    Generate What's Happening insights using LLM API.
+    Returns: (insights, used_fallback) where used_fallback is True if fallback was used.
+    """
     """Generate What's Happening insights using LLM API."""
     # Récupérer les clés API depuis la base de données (priorité) ou variables d'environnement
     # Ne pas utiliser load_dotenv avec override=True car cela peut écraser les clés en mémoire
@@ -954,7 +958,7 @@ CRITICAL INSTRUCTIONS:
     
     if not openai_key and not anthropic_key and not mistral_key:
         logger.warning("generate_whats_happening_insights_with_llm: No API keys available, using fallback")
-        return generate_whats_happening_fallback(posts, stats, active_filters)
+        return generate_whats_happening_fallback(posts, stats, active_filters), True
     
     # Helper function to call LLM
     async def call_llm_for_insights(provider: str, api_key: str, prompt: str) -> Optional[str]:
@@ -1075,7 +1079,7 @@ CRITICAL INSTRUCTIONS:
                         insights_data = json.loads(json_match.group())
                         logger.info(f"Generated {len(insights_data)} insights from {valid_results[0][0]}")
                         if insights_data:
-                            return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                            return [WhatsHappeningInsight(**insight) for insight in insights_data], False, False
                     except (json.JSONDecodeError, KeyError, TypeError) as e:
                         logger.error(f"Error parsing LLM response: {e}. Content: {content[:500]}")
             else:
@@ -1134,7 +1138,7 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                                 insights_data = json.loads(json_match.group())
                                 logger.info(f"Generated {len(insights_data)} insights from summarized LLM results ({len(valid_results)} models)")
                                 if insights_data:
-                                    return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                                    return [WhatsHappeningInsight(**insight) for insight in insights_data], False
                                 else:
                                     logger.warning("Summarized LLM response returned empty insights array")
                             except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -1178,7 +1182,7 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                             insights_data = json.loads(json_match.group())
                             logger.info(f"Parsed {len(insights_data)} insights from Anthropic response")
                             if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
                             else:
                                 logger.warning("Anthropic returned empty insights array")
                         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -1217,7 +1221,7 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                             insights_data = json.loads(json_match.group())
                             logger.info(f"Parsed {len(insights_data)} insights from OpenAI response")
                             if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
                             else:
                                 logger.warning("OpenAI returned empty insights array")
                         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -1256,7 +1260,7 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                             insights_data = json.loads(json_match.group())
                             logger.info(f"Parsed {len(insights_data)} insights from Mistral response")
                             if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data]
+                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
                             else:
                                 logger.warning("Mistral returned empty insights array")
                         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -1265,12 +1269,12 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
                         logger.warning(f"No JSON array found in Mistral response. Content: {content[:500]}")
         
         logger.warning("No valid LLM response received, using fallback")
-        return generate_whats_happening_fallback(posts, stats, active_filters)
+        return generate_whats_happening_fallback(posts, stats, active_filters), True
     except Exception as e:
         logger.warning(f"LLM API error: {type(e).__name__}: {e}. Using fallback.")
-        return generate_whats_happening_fallback(posts, stats, active_filters)
+        return generate_whats_happening_fallback(posts, stats, active_filters), True
     
-    return generate_whats_happening_fallback(posts, stats, active_filters)
+    return generate_whats_happening_fallback(posts, stats, active_filters), True
 
 
 def generate_whats_happening_fallback(
@@ -1360,7 +1364,7 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         logger.info(f"get_whats_happening: OpenAI key length: {len(openai_key) if openai_key else 0}, Anthropic key length: {len(anthropic_key) if anthropic_key else 0}, Mistral key length: {len(mistral_key) if mistral_key else 0}")
         logger.info(f"get_whats_happening: Starting LLM analysis for {len(request.posts)} posts")
         
-        insights = await generate_whats_happening_insights_with_llm(
+        insights, used_fallback = await generate_whats_happening_insights_with_llm(
             request.posts,
             request.stats,
             request.active_filters,
@@ -1368,41 +1372,18 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         )
         
         elapsed_time = time.time() - start_time
-        logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights")
+        logger.info(f"get_whats_happening: LLM analysis completed in {elapsed_time:.2f}s, generated {len(insights)} insights, used_fallback={used_fallback}")
         
-        # Vérifier si les insights viennent du fallback
-        # Le fallback génère des insights avec des titres très spécifiques et génériques
-        # On vérifie si TOUS les insights correspondent exactement au format fallback
-        if llm_available and insights:
-            # Patterns très spécifiques du fallback (doivent correspondre exactement)
-            fallback_exact_patterns = [
-                "Spike in Negative Feedback Detected",  # Titre exact du fallback
-                "Top Product Impacted:",  # Format exact du fallback
-                'Top Issue: "',  # Format exact avec guillemets
-                "Analysis of"  # Format exact du fallback par défaut
-            ]
-            
-            # Vérifier si TOUS les insights correspondent exactement aux patterns fallback
-            # Si un seul insight ne correspond pas, c'est probablement du LLM
-            all_match_fallback = True
-            for insight in insights:
-                title_matches = any(
-                    insight.title.startswith(pattern) or pattern in insight.title
-                    for pattern in fallback_exact_patterns
-                )
-                if not title_matches:
-                    all_match_fallback = False
-                    break
-            
-            # Si tous les insights correspondent exactement au fallback ET qu'on a des clés API,
-            # c'est probablement que le LLM a échoué silencieusement
-            if all_match_fallback and len(insights) > 0:
-                logger.warning(f"get_whats_happening: LLM is configured but ALL insights match fallback patterns exactly. Setting llm_available=False. This likely indicates an LLM error or fallback was used.")
-                llm_available = False
-            else:
-                # Au moins un insight ne correspond pas au fallback, donc c'est probablement du LLM
-                logger.info(f"get_whats_happening: Insights don't all match fallback patterns, assuming LLM was used successfully. llm_available={llm_available}")
+        # Si le fallback a été utilisé explicitement, mettre llm_available à False
+        if used_fallback:
+            logger.warning(f"get_whats_happening: Fallback was used explicitly, setting llm_available=False")
+            llm_available = False
+        elif llm_available:
+            # Si on a des clés API et que le fallback n'a pas été utilisé, c'est du LLM
+            logger.info(f"get_whats_happening: LLM was used successfully (used_fallback=False), keeping llm_available=True")
+            logger.info(f"get_whats_happening: Insight titles: {[insight.title for insight in insights]}")
         
+        logger.info(f"get_whats_happening: Returning response with {len(insights)} insights, llm_available={llm_available}")
         return WhatsHappeningResponse(insights=insights, llm_available=llm_available)
     except Exception as e:
         logger.error(f"Failed to generate What's Happening insights: {e}", exc_info=True)
