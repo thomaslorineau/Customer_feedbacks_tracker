@@ -706,6 +706,14 @@ def generate_recommended_actions_fallback(
                 priority='low'
             ))
     
+    # Always return at least one action if there are posts, even if no specific patterns detected
+    if len(actions) == 0 and len(posts) > 0:
+        actions.append(RecommendedAction(
+            icon='📊',
+            text=f'Monitor: {total_negative} negative posts out of {len(posts)} total posts analyzed',
+            priority='low'
+        ))
+    
     return actions[:max_actions]
 
 
