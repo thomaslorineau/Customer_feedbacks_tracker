@@ -25,6 +25,51 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def get_llm_api_keys():
+    """
+    Récupère les clés API LLM depuis la base de données en priorité,
+    puis depuis les variables d'environnement comme fallback.
+    
+    Returns:
+        tuple: (openai_key, anthropic_key, mistral_key, llm_provider)
+    """
+    try:
+        from ...database import pg_get_config
+        
+        # Récupérer depuis la base de données en premier
+        openai_key = pg_get_config('OPENAI_API_KEY')
+        anthropic_key = pg_get_config('ANTHROPIC_API_KEY')
+        mistral_key = pg_get_config('MISTRAL_API_KEY')
+        llm_provider = pg_get_config('LLM_PROVIDER')
+        
+        # Fallback sur les variables d'environnement si pas en base
+        if not openai_key:
+            openai_key = os.getenv('OPENAI_API_KEY')
+        if not anthropic_key:
+            anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        if not mistral_key:
+            mistral_key = os.getenv('MISTRAL_API_KEY')
+        if not llm_provider:
+            llm_provider = os.getenv('LLM_PROVIDER', 'openai')
+        
+        # Normaliser le provider en lowercase
+        if llm_provider:
+            llm_provider = llm_provider.lower()
+        else:
+            llm_provider = 'openai'
+            
+        return openai_key, anthropic_key, mistral_key, llm_provider
+    except Exception as e:
+        logger.warning(f"Erreur lors de la récupération des clés API depuis la base de données: {e}")
+        # Fallback complet sur les variables d'environnement
+        return (
+            os.getenv('OPENAI_API_KEY'),
+            os.getenv('ANTHROPIC_API_KEY'),
+            os.getenv('MISTRAL_API_KEY'),
+            os.getenv('LLM_PROVIDER', 'openai').lower()
+        )
+
+
 async def generate_ideas_with_llm(posts: List[dict], max_ideas: int = 5) -> List[ImprovementIdea]:
     """Generate improvement ideas using LLM API."""
     from pathlib import Path
@@ -80,10 +125,7 @@ Format your response as a JSON array with this structure:
 
 Focus on actionable improvements that address real customer pain points. Be specific and practical."""
 
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    mistral_key = os.getenv('MISTRAL_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
     
     logger.info(f"generate_ideas_with_llm: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}")
     
@@ -390,11 +432,9 @@ Use appropriate emojis:
 
 Be specific and reference actual content from the posts when possible."""
 
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
     
-    if not openai_key and not anthropic_key:
+    if not openai_key and not anthropic_key and not mistral_key:
         logger.info("[Recommended Actions] No LLM API key configured, returning empty list")
         return []
     
@@ -543,9 +583,9 @@ def generate_recommended_actions_fallback(
 async def generate_improvement_ideas(request: ImprovementIdeaRequest):
     """Generate product improvement ideas based on customer feedback posts using LLM."""
     try:
-        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic'])
+        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        api_key = openai_key or anthropic_key or mistral_key
+        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
         
         ideas = await generate_ideas_with_llm(request.posts, request.max_ideas)
         return ImprovementIdeasResponse(ideas=ideas, llm_available=llm_available)
@@ -557,9 +597,9 @@ async def generate_improvement_ideas(request: ImprovementIdeaRequest):
 async def get_recommended_actions(request: RecommendedActionRequest):
     """Generate recommended actions based on customer feedback using LLM."""
     try:
-        api_key = os.getenv('OPENAI_API_KEY') or os.getenv('ANTHROPIC_API_KEY')
-        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
-        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic'])
+        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
+        api_key = openai_key or anthropic_key or mistral_key
+        llm_available = bool(api_key) or (llm_provider not in ['openai', 'anthropic', 'mistral'])
         
         actions = await generate_recommended_actions_with_llm(
             request.posts, 
@@ -1006,11 +1046,8 @@ async def get_whats_happening(request: WhatsHappeningRequest):
         if env_path.exists():
             load_dotenv(env_path, override=True)
         
-        openai_key = os.getenv('OPENAI_API_KEY')
-        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-        mistral_key = os.getenv('MISTRAL_API_KEY')
+        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
         api_key = openai_key or anthropic_key or mistral_key
-        llm_provider = os.getenv('LLM_PROVIDER', 'openai').lower()
         llm_available = bool(api_key) and llm_provider in ['openai', 'anthropic', 'mistral']
         
         logger.info(f"get_whats_happening: OpenAI key set: {bool(openai_key)}, Anthropic key set: {bool(anthropic_key)}, Mistral key set: {bool(mistral_key)}, Provider: {llm_provider}, LLM available: {llm_available}")
@@ -1049,9 +1086,7 @@ Identified opportunities:
 
 Generate a sentence in English that summarizes the top improvement ideas in a clear and actionable way. Generate ONLY the sentence, without JSON formatting or quotes."""
         
-        openai_key = os.getenv('OPENAI_API_KEY')
-        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-        llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+        openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
         
         # Determine which provider to use
         # Priority: LLM_PROVIDER env var > available API keys
@@ -1439,10 +1474,7 @@ CRITICAL INSTRUCTIONS:
 - Prioritize insights that can lead to immediate action
 - Include ROI insights only if you can provide meaningful estimates based on the data"""
 
-    openai_key = os.getenv('OPENAI_API_KEY')
-    anthropic_key = os.getenv('ANTHROPIC_API_KEY')
-    mistral_key = os.getenv('MISTRAL_API_KEY')
-    llm_provider = os.getenv('LLM_PROVIDER', '').lower()
+    openai_key, anthropic_key, mistral_key, llm_provider = get_llm_api_keys()
     
     if not openai_key and not anthropic_key and not mistral_key:
         return generate_improvements_analysis_fallback(pain_points, products, total_posts)
