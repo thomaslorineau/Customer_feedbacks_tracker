@@ -23,7 +23,8 @@
         }
 
         #beta-section {
-            scroll-margin-top: 100px;
+            scroll-margin-top: 120px;
+            scroll-padding-top: 120px;
         }
 
         .container {
@@ -380,7 +381,7 @@
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">Version 1.0.8</span>
                 <span class="badge badge-info">Production Ready</span>
-                <a href="#beta-section" class="badge-button">BETA</a>
+                <a href="#beta-section" class="badge-button" onclick="event.preventDefault(); const target = document.getElementById('beta-section'); if (target) { const offsetTop = target.offsetTop - 120; window.scrollTo({top: offsetTop, behavior: 'smooth'}); }">BETA</a>
             </div>
         </div>
 
@@ -636,7 +637,7 @@
         </div>
 
         <!-- Beta Section -->
-        <div id="beta-section" class="section" style="scroll-margin-top: 100px;">
+        <div id="beta-section" class="section">
             <h2>🧪 Statut Beta</h2>
             <p style="font-size: 1.1em; line-height: 1.8; margin-bottom: 20px;">
                 Ce projet est actuellement en <strong>version Beta - Production Ready</strong>. 
@@ -671,5 +672,28 @@
             </p>
         </div>
     </div>
+
+    <script>
+        // Ensure smooth scroll works for anchor links
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle all anchor links with smooth scroll
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const href = this.getAttribute('href');
+                    if (href === '#beta-section') {
+                        e.preventDefault();
+                        const target = document.querySelector(href);
+                        if (target) {
+                            const offsetTop = target.offsetTop - 120; // 120px offset from top
+                            window.scrollTo({
+                                top: offsetTop,
+                                behavior: 'smooth'
+                            });
+                        }
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
