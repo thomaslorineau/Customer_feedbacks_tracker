@@ -454,6 +454,7 @@ Be specific and reference actual content from the posts when possible."""
     # Helper function to call a single LLM
     async def call_llm_for_actions(provider: str, api_key: str, prompt: str) -> Optional[str]:
         """Call a single LLM and return the response content."""
+        logger.info(f"[Recommended Actions] Calling {provider} API...")
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 if provider == 'openai':
@@ -475,7 +476,9 @@ Be specific and reference actual content from the posts when possible."""
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['choices'][0]['message']['content']
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"[Recommended Actions] OpenAI API call successful (response length: {len(content)})")
+                    return content
                 
                 elif provider == 'anthropic':
                     response = await client.post(
@@ -496,7 +499,9 @@ Be specific and reference actual content from the posts when possible."""
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['content'][0]['text']
+                    content = result['content'][0]['text']
+                    logger.info(f"[Recommended Actions] Anthropic API call successful (response length: {len(content)})")
+                    return content
                 
                 elif provider == 'mistral':
                     response = await client.post(
@@ -517,9 +522,16 @@ Be specific and reference actual content from the posts when possible."""
                     )
                     response.raise_for_status()
                     result = response.json()
-                    return result['choices'][0]['message']['content']
+                    content = result['choices'][0]['message']['content']
+                    logger.info(f"[Recommended Actions] Mistral API call successful (response length: {len(content)})")
+                    return content
+        except httpx.HTTPStatusError as e:
+            logger.error(f"[Recommended Actions] {provider} API HTTP error ({e.response.status_code}): {e}")
+            if e.response.status_code == 401:
+                logger.error(f"[Recommended Actions] {provider} API authentication failed - check API key")
+            return None
         except Exception as e:
-            logger.warning(f"{provider} API error: {type(e).__name__}: {e}")
+            logger.error(f"[Recommended Actions] {provider} API error: {type(e).__name__}: {e}", exc_info=True)
             return None
         return None
     
