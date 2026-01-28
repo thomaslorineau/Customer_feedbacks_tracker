@@ -1079,7 +1079,7 @@ CRITICAL INSTRUCTIONS:
                         insights_data = json.loads(json_match.group())
                         logger.info(f"Generated {len(insights_data)} insights from {valid_results[0][0]}")
                         if insights_data:
-                            return [WhatsHappeningInsight(**insight) for insight in insights_data], False, False
+                            return [WhatsHappeningInsight(**insight) for insight in insights_data], False
                     except (json.JSONDecodeError, KeyError, TypeError) as e:
                         logger.error(f"Error parsing LLM response: {e}. Content: {content[:500]}")
             else:
@@ -1151,122 +1151,55 @@ Format your response as a JSON array with this structure (ALL TEXT IN ENGLISH):
             # Fall through to single LLM logic
     
     # Single LLM logic (if only 1 is configured, or if parallel call failed)
+    # Priorité: Si llm_provider est défini, l'utiliser. Sinon, utiliser le premier disponible (OpenAI > Anthropic > Mistral)
     try:
-        if llm_provider == 'anthropic' or (not llm_provider and anthropic_key and not openai_key):
-            # Use Anthropic
-            api_key = anthropic_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.anthropic.com/v1/messages',
-                        headers={
-                            'x-api-key': api_key,
-                            'anthropic-version': '2023-06-01',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('ANTHROPIC_MODEL', 'claude-3-haiku-20240307'),
-                            'max_tokens': 2000,
-                            'messages': [
-                                {'role': 'user', 'content': prompt}
-                            ]
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['content'][0]['text']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        try:
-                            insights_data = json.loads(json_match.group())
-                            logger.info(f"Parsed {len(insights_data)} insights from Anthropic response")
-                            if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
-                            else:
-                                logger.warning("Anthropic returned empty insights array")
-                        except (json.JSONDecodeError, KeyError, TypeError) as e:
-                            logger.error(f"Error parsing Anthropic response: {e}. Content: {content[:500]}")
-                    else:
-                        logger.warning(f"No JSON array found in Anthropic response. Content: {content[:500]}")
+        # Déterminer quel LLM utiliser
+        provider_to_use = None
+        api_key_to_use = None
         
-        elif llm_provider == 'openai' or (not llm_provider and openai_key and not anthropic_key and not mistral_key):
-            # Use OpenAI
-            api_key = openai_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.openai.com/v1/chat/completions',
-                        headers={
-                            'Authorization': f'Bearer {api_key}',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-                            'messages': [
-                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'temperature': 0.7,
-                            'max_tokens': 2000
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        try:
-                            insights_data = json.loads(json_match.group())
-                            logger.info(f"Parsed {len(insights_data)} insights from OpenAI response")
-                            if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
-                            else:
-                                logger.warning("OpenAI returned empty insights array")
-                        except (json.JSONDecodeError, KeyError, TypeError) as e:
-                            logger.error(f"Error parsing OpenAI response: {e}. Content: {content[:500]}")
-                    else:
-                        logger.warning(f"No JSON array found in OpenAI response. Content: {content[:500]}")
+        if llm_provider:
+            # Si un provider spécifique est défini, l'utiliser
+            if llm_provider == 'openai' and openai_key:
+                provider_to_use = 'openai'
+                api_key_to_use = openai_key
+            elif llm_provider == 'anthropic' and anthropic_key:
+                provider_to_use = 'anthropic'
+                api_key_to_use = anthropic_key
+            elif llm_provider == 'mistral' and mistral_key:
+                provider_to_use = 'mistral'
+                api_key_to_use = mistral_key
+        else:
+            # Sinon, utiliser le premier disponible (priorité: OpenAI > Anthropic > Mistral)
+            if openai_key:
+                provider_to_use = 'openai'
+                api_key_to_use = openai_key
+            elif anthropic_key:
+                provider_to_use = 'anthropic'
+                api_key_to_use = anthropic_key
+            elif mistral_key:
+                provider_to_use = 'mistral'
+                api_key_to_use = mistral_key
         
-        elif llm_provider == 'mistral' or (not llm_provider and mistral_key and not openai_key and not anthropic_key):
-            # Use Mistral
-            api_key = mistral_key
-            if api_key:
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    response = await client.post(
-                        'https://api.mistral.ai/v1/chat/completions',
-                        headers={
-                            'Authorization': f'Bearer {api_key}',
-                            'Content-Type': 'application/json'
-                        },
-                        json={
-                            'model': os.getenv('MISTRAL_MODEL', 'mistral-small'),
-                            'messages': [
-                                {'role': 'system', 'content': 'You are an OVHcloud customer feedback analyst. Generate key insights based on customer feedback posts.'},
-                                {'role': 'user', 'content': prompt}
-                            ],
-                            'temperature': 0.7,
-                            'max_tokens': 2000
-                        }
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    content = result['choices'][0]['message']['content']
-                    
-                    json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                    if json_match:
-                        try:
-                            insights_data = json.loads(json_match.group())
-                            logger.info(f"Parsed {len(insights_data)} insights from Mistral response")
-                            if insights_data:
-                                return [WhatsHappeningInsight(**insight) for insight in insights_data], False
-                            else:
-                                logger.warning("Mistral returned empty insights array")
-                        except (json.JSONDecodeError, KeyError, TypeError) as e:
-                            logger.error(f"Error parsing Mistral response: {e}. Content: {content[:500]}")
-                    else:
-                        logger.warning(f"No JSON array found in Mistral response. Content: {content[:500]}")
+        if provider_to_use and api_key_to_use:
+            logger.info(f"Using single LLM: {provider_to_use}")
+            content = await call_llm_for_insights(provider_to_use, api_key_to_use, prompt)
+            
+            if content:
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    try:
+                        insights_data = json.loads(json_match.group())
+                        logger.info(f"Parsed {len(insights_data)} insights from {provider_to_use} response")
+                        if insights_data:
+                            return [WhatsHappeningInsight(**insight) for insight in insights_data], False
+                        else:
+                            logger.warning(f"{provider_to_use} returned empty insights array")
+                    except (json.JSONDecodeError, KeyError, TypeError) as e:
+                        logger.error(f"Error parsing {provider_to_use} response: {e}. Content: {content[:500]}")
+                else:
+                    logger.warning(f"No JSON array found in {provider_to_use} response. Content: {content[:500]}")
+            else:
+                logger.warning(f"{provider_to_use} returned None or empty content")
         
         logger.warning("No valid LLM response received, using fallback")
         return generate_whats_happening_fallback(posts, stats, active_filters), True

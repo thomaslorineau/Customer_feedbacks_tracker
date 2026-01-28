@@ -381,7 +381,7 @@
             <div style="margin-top: 15px;">
                 <span class="badge badge-success">Version 1.0.8</span>
                 <span class="badge badge-info">Production Ready</span>
-                <a href="#beta-section" class="badge-button" onclick="event.preventDefault(); const target = document.getElementById('beta-section'); if (target) { const offsetTop = target.offsetTop - 120; window.scrollTo({top: offsetTop, behavior: 'smooth'}); }">BETA</a>
+                <a href="Beta/SLIDE_PITCH_PROJET.html" class="badge-button" target="_blank">BETA</a>
             </div>
         </div>
 
@@ -677,19 +677,18 @@
         // Ensure smooth scroll works for anchor links
         document.addEventListener('DOMContentLoaded', function() {
             // Handle all anchor links with smooth scroll
+            // Smooth scroll for internal anchor links (except beta button which opens external file)
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
                 anchor.addEventListener('click', function (e) {
                     const href = this.getAttribute('href');
-                    if (href === '#beta-section') {
-                        e.preventDefault();
-                        const target = document.querySelector(href);
-                        if (target) {
-                            const offsetTop = target.offsetTop - 120; // 120px offset from top
-                            window.scrollTo({
-                                top: offsetTop,
-                                behavior: 'smooth'
-                            });
-                        }
+                    e.preventDefault();
+                    const target = document.querySelector(href);
+                    if (target) {
+                        const offsetTop = target.offsetTop - 120; // 120px offset from top
+                        window.scrollTo({
+                            top: offsetTop,
+                            behavior: 'smooth'
+                        });
                     }
                 });
             });
