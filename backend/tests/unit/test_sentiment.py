@@ -76,6 +76,52 @@ class TestAnalyze:
         assert isinstance(result['score'], float)
         assert isinstance(result['label'], str)
         assert result['label'] in ['positive', 'negative', 'neutral']
+    
+    def test_analyze_french_problem_resolved_positively(self):
+        """Test that feedback starting with problem but ending positively is marked as positive."""
+        text = "J'ai eu un problème de facturation mais j'ai été très bien guidé jusqu'à la résolution."
+        result = sentiment.analyze(text, language='fr')
+        # Should be positive because the resolution is positive
+        assert result['label'] == 'positive', f"Expected positive, got {result['label']} with score {result['score']}"
+        assert result['score'] > 0.05
+    
+    def test_analyze_french_negative_remains_negative(self):
+        """Test that clearly negative feedback remains negative."""
+        text = "Service terrible, lent et inefficace. Je ne recommande pas."
+        result = sentiment.analyze(text, language='fr')
+        assert result['label'] == 'negative'
+        assert result['score'] < -0.05
+    
+    def test_analyze_french_mixed_with_but(self):
+        """Test feedback with 'but' that should lean positive."""
+        text = "Bon service mais pourrait être amélioré."
+        result = sentiment.analyze(text, language='fr')
+        # Should be neutral or slightly positive (service is good)
+        assert result['label'] in ['positive', 'neutral']
+        assert result['score'] >= -0.05
+    
+    def test_analyze_french_positive_remains_positive(self):
+        """Test that clearly positive feedback remains positive."""
+        text = "Excellent service, je recommande vivement."
+        result = sentiment.analyze(text, language='fr')
+        assert result['label'] == 'positive'
+        assert result['score'] > 0.05
+    
+    def test_analyze_french_reversal_detection(self):
+        """Test that reversal words are detected and sentiment changes accordingly."""
+        text = "J'avais un problème avec la facturation. Cependant, le support a été excellent et a résolu tout rapidement."
+        result = sentiment.analyze(text, language='fr')
+        # Should be positive due to reversal word "cependant"
+        assert result['label'] == 'positive'
+        assert result['score'] > 0.05
+    
+    def test_analyze_french_segment_weighting(self):
+        """Test that later segments have more weight in final score."""
+        text = "Le service était moyen. Mais maintenant c'est excellent!"
+        result = sentiment.analyze(text, language='fr')
+        # Should lean positive because last segment is positive and has more weight
+        assert result['label'] in ['positive', 'neutral']
+        assert result['score'] > -0.05
 
 
 
