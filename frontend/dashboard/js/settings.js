@@ -420,27 +420,6 @@ function renderLLM() {
             docsUrl: 'https://endpoints.ai.cloud.ovh.net/',
             hasModelSelect: true,
             models: ovhModels // Use dynamic models (empty array if not loaded yet)
-        },
-        { 
-            id: 'openai', 
-            name: 'OpenAI', 
-            icon: '🤖',
-            description: 'GPT models for sentiment analysis and text processing',
-            docsUrl: 'https://platform.openai.com/api-keys'
-        },
-        { 
-            id: 'anthropic', 
-            name: 'Anthropic', 
-            icon: '🧠',
-            description: 'Claude models for advanced text understanding',
-            docsUrl: 'https://console.anthropic.com/'
-        },
-        { 
-            id: 'mistral', 
-            name: 'Mistral AI', 
-            icon: '🌊',
-            description: 'Mistral models for advanced AI capabilities',
-            docsUrl: 'https://console.mistral.ai/api-keys/'
         }
     ];
     
