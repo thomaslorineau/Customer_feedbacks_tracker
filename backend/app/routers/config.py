@@ -36,10 +36,10 @@ class LLMConfigResponse(BaseModel):
 
 def get_version():
     """
-    Get application version from VERSION file, .version_minor, and git commit count.
+    Get application version from VERSION file and git commit count.
     
     Returns:
-        Version string in format "MAJOR.MINOR.PATCH" (e.g., "1.5.77")
+        Version string in format "MAJOR.COMMITS" (e.g., "1.547")
     """
     import subprocess
     from pathlib import Path
@@ -57,22 +57,8 @@ def get_version():
     except Exception:
         major = "1"
     
-    # Read MINOR from .version_minor file (auto-incremented on push)
+    # Get commit count as minor version
     minor = "0"
-    version_minor_path = version_path.parent / ".version_minor"
-    try:
-        if version_minor_path.exists():
-            with open(version_minor_path, "r", encoding="utf-8") as f:
-                minor = f.read().strip()
-                if not minor or not minor.isdigit():
-                    minor = "0"
-        else:
-            minor = "0"
-    except Exception:
-        minor = "0"
-    
-    # Calculate PATCH from commit count (last 2 digits to keep it short)
-    patch = "00"
     try:
         result = subprocess.run(
             ["git", "rev-list", "--count", "HEAD"],
@@ -84,17 +70,12 @@ def get_version():
         if result.returncode == 0:
             commit_count = result.stdout.strip()
             if commit_count and commit_count.isdigit():
-                # Prendre les 2 derniers chiffres (ex: 177 -> 77, 5 -> 05)
-                patch = str(int(commit_count) % 100).zfill(2)
-            else:
-                patch = "00"
-        else:
-            patch = "00"
+                minor = commit_count
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        patch = "00"
+        minor = "0"
     
-    # Return format: MAJOR.MINOR.PATCH
-    return f"{major}.{minor}.{patch}"
+    # Return format: MAJOR.COMMITS (e.g., 1.547)
+    return f"{major}.{minor}"
 
 
 @router.get(
@@ -104,10 +85,9 @@ def get_version():
     Returns the current application version and build date.
     
     **Version Format:**
-    - Format: `MAJOR.MINOR.PATCH` (e.g., "1.5.77")
+    - Format: `MAJOR.COMMITS` (e.g., "1.547")
     - MAJOR: From VERSION file
-    - MINOR: From .version_minor file (auto-incremented)
-    - PATCH: Last 2 digits of git commit count
+    - COMMITS: Total git commit count
     
     **Returns:**
     - `version`: Version string
@@ -116,8 +96,8 @@ def get_version():
     **Example Response:**
     ```json
     {
-        "version": "1.5.77",
-        "build_date": "2026-01-20T10:30:00"
+        "version": "1.547",
+        "build_date": "2026-02-02T10:30:00"
     }
     ```
     """,

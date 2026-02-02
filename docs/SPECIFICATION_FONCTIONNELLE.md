@@ -1,6 +1,6 @@
 # 📋 Spécification Fonctionnelle - OVH Customer Feedbacks Tracker
 
-**Version:** 1.0.8  
+**Version:** 1.547  
 **Date:** Janvier 2026  
 **Statut:** Beta
 

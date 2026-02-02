@@ -8,7 +8,7 @@
 
 | Métrique | Valeur |
 |----------|--------|
-| **Lignes de code** | **52 388 lignes** |
+| **Lignes de code** | **60 905 lignes** |
 | **Architecture** | Multi-services Docker (5 services) |
 | **Sources de scraping** | 10+ sources |
 | **Score sécurité** | **93/100** (OWASP Top 10: 9/9) |
@@ -88,7 +88,7 @@
 - 💰 Économise **15 000-40 000€** sur le développement
 - 🔒 Économise **19 940-39 960€** sur l'audit sécurité
 - 🎯 Atteint la **productivité d'un développeur expérimenté**
-- 📊 Livre un projet de **52 388 lignes en 3-4 semaines**
+- 📊 Livre un projet de **60 905 lignes en 3-4 semaines**
 
 **ROI Global : ~500-2 000x**  
 **Investissement total : 60-90€**  
@@ -97,4 +97,4 @@
 ---
 
 **Projet développé 100% avec VibeCoding (Cursor AI)**  
-**Janvier 2026 | Version 1.0.8**
+**Février 2026 | Version 1.547**

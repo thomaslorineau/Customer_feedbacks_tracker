@@ -46,7 +46,7 @@ except locale.Error:
 app = FastAPI(
     title="OVH Customer Feedbacks Tracker API",
     description="API for tracking and analyzing customer feedback from multiple sources (X/Twitter, Reddit, GitHub, Stack Overflow, Trustpilot, etc.)",
-    version="1.0.1",
+    version="1.x",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json"
