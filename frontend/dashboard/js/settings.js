@@ -11,8 +11,13 @@ let ovhModelsCache = null; // Cache for OVH models
 // Load and display version
 let versionData = null;
 async function loadVersion() {
-    console.log('[Version] Starting loadVersion...');
-    const url = `${API_BASE_URL}/api/version`;
+    console.log('[Version] Starting loadVersion, API_BASE_URL=', API_BASE_URL);
+    if (!API_BASE_URL) {
+        console.error('[Version] API_BASE_URL is not defined!');
+        return;
+    }
+    const url = API_BASE_URL + '/api/version';
+    console.log('[Version] URL constructed:', url);
     try {
         console.log('[Version] Fetching from:', url);
         const response = await fetch(url);
