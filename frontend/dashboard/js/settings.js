@@ -43,12 +43,18 @@ async function loadVersion() {
 // Render Environment Info
 function renderEnvironmentInfo() {
     const container = document.getElementById('environmentInfo');
-    if (!container) return;
+    if (!container) {
+        console.warn('[Environment] Container #environmentInfo not found');
+        return;
+    }
     
+    console.log('[Environment] Rendering - configData:', !!configData, 'versionData:', !!versionData);
     if (!configData || !versionData) {
+        console.warn('[Environment] Missing data - configData:', configData, 'versionData:', versionData);
         container.innerHTML = '<div class="skeleton-loader" style="height: 100px;"></div>';
         return;
     }
+    console.log('[Environment] Data OK - version:', versionData.version, 'env:', configData.environment);
     
     const buildDate = versionData.build_date ? new Date(versionData.build_date).toLocaleDateString('fr-FR', {
         year: 'numeric',
