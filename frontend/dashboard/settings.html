@@ -1839,12 +1839,25 @@
     <script src="/js/help-menu-loader.js"></script>
     <script src="/dashboard/js/settings.js?v=6.0"></script>
     <script>
-        // Force re-render of environment info after version loads
-        setTimeout(function() {
-            if (typeof renderEnvironmentInfo === 'function') {
-                renderEnvironmentInfo();
-            }
-        }, 1500);
+        // Load version directly and update environment section
+        setTimeout(async function() {
+            try {
+                const response = await fetch(window.location.origin + '/api/version');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Update version badge
+                    const badge = document.getElementById('versionBadge');
+                    if (badge) badge.textContent = 'v' + data.version;
+                    // Update environment section
+                    const container = document.getElementById('environmentInfo');
+                    if (container && data.version) {
+                        const env = (typeof configData !== 'undefined' && configData) ? configData.environment : 'production';
+                        const buildDate = data.build_date ? new Date(data.build_date).toLocaleDateString('fr-FR') : 'Unknown';
+                        container.innerHTML = '<div class="rate-limit-info" style="margin-bottom:1.5rem"><div class="info-card"><div class="info-card-label">Environment</div><div class="info-card-value" style="font-size:1.25rem;text-transform:capitalize">' + env + '</div></div><div class="info-card"><div class="info-card-label">Version</div><div class="info-card-value" style="font-size:1.25rem">v' + data.version + '</div></div><div class="info-card"><div class="info-card-label">Build Date</div><div class="info-card-value" style="font-size:0.95rem">' + buildDate + '</div></div></div><div style="margin-top:1.5rem"><h3 style="font-size:1rem;font-weight:600;margin-bottom:0.75rem">Version Notes</h3><div style="background:var(--bg-secondary);border-radius:8px;padding:1rem;border-left:3px solid var(--accent-primary)"><p style="font-size:0.9rem;margin:0"><strong>v' + data.version + '</strong> - ' + buildDate + '</p><p style="font-size:0.85rem;margin:0.5rem 0 0 0">Customer Feedbacks Tracker - Analyse automatisée des retours clients.</p></div></div>';
+                    }
+                }
+            } catch(e) { console.error('Version load error:', e); }
+        }, 1000);
         
         // Define toggleHelpMenu function immediately (before DOMContentLoaded)
         // This ensures it's available when the navigation link is clicked
