@@ -138,9 +138,31 @@ def get_version():
 async def get_app_version():
     """Get application version and build information."""
     import datetime
+    from pathlib import Path
+    
+    # Debug info for troubleshooting
+    debug = {}
+    possible_paths = [Path("/app"), Path(__file__).resolve().parents[2]]
+    for p in possible_paths:
+        key = str(p)
+        debug[key] = {
+            "exists": p.exists(),
+            "VERSION": (p / "VERSION").exists(),
+            "COMMIT_COUNT": (p / "COMMIT_COUNT").exists()
+        }
+        if (p / "VERSION").exists():
+            try:
+                debug[key]["VERSION_content"] = (p / "VERSION").read_text().strip()
+            except: pass
+        if (p / "COMMIT_COUNT").exists():
+            try:
+                debug[key]["COMMIT_COUNT_content"] = (p / "COMMIT_COUNT").read_text().strip()
+            except: pass
+    
     return {
         "version": get_version(),
-        "build_date": datetime.datetime.now().isoformat()
+        "build_date": datetime.datetime.now().isoformat(),
+        "debug": debug
     }
 
 
