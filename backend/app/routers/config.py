@@ -52,35 +52,41 @@ def get_version():
     
     major = "1"
     minor = "0"
+    debug_info = []
     
     # Find VERSION file
     for base_path in possible_paths:
         version_path = base_path / "VERSION"
+        debug_info.append(f"Checking VERSION at {version_path}: exists={version_path.exists()}")
         if version_path.exists():
             try:
                 with open(version_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
+                    debug_info.append(f"VERSION content: '{content}'")
                     if content:
                         major = content
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                debug_info.append(f"VERSION read error: {e}")
     
     # Find COMMIT_COUNT file (for Docker)
     for base_path in possible_paths:
         commit_count_path = base_path / "COMMIT_COUNT"
+        debug_info.append(f"Checking COMMIT_COUNT at {commit_count_path}: exists={commit_count_path.exists()}")
         if commit_count_path.exists():
             try:
                 with open(commit_count_path, "r", encoding="utf-8") as f:
                     content = f.read().strip()
+                    debug_info.append(f"COMMIT_COUNT content: '{content}'")
                     if content and content.isdigit():
                         minor = content
                         break
-            except Exception:
-                pass
+            except Exception as e:
+                debug_info.append(f"COMMIT_COUNT read error: {e}")
     
     # If COMMIT_COUNT not found, try git (works in local dev)
     if minor == "0":
+        debug_info.append("COMMIT_COUNT not found, trying git...")
         try:
             result = subprocess.run(
                 ["git", "rev-list", "--count", "HEAD"],
@@ -88,12 +94,17 @@ def get_version():
                 text=True,
                 timeout=5
             )
+            debug_info.append(f"git result: returncode={result.returncode}, stdout='{result.stdout.strip()}'")
             if result.returncode == 0:
                 content = result.stdout.strip()
                 if content and content.isdigit():
                     minor = content
-        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-            pass
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception) as e:
+            debug_info.append(f"git error: {e}")
+    
+    # Log debug info
+    logger.info(f"Version debug: {' | '.join(debug_info)}")
+    logger.info(f"Final version: {major}.{minor}")
     
     # Return format: MAJOR.COMMITS (e.g., 1.548)
     return f"{major}.{minor}"
