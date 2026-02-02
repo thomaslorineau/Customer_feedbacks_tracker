@@ -270,25 +270,32 @@ body.v1-page {
 }
 
 /* Media queries for responsive navigation */
-@media (max-width: 1200px) {
-    /* Hide tab text on smaller screens, show only icons */
+@media (max-width: 1600px) {
+    /* Hide button text, keep only emoji */
+    .btn-scrape-compact .btn-text,
+    .btn-cancel-scraping-compact .btn-text {
+        display: none;
+    }
+}
+
+@media (max-width: 1400px) {
+    /* Hide tab text on medium screens */
     .nav-tab span:not(.nav-tab-icon) {
         display: none;
     }
-    
     .nav-tab {
-        padding: 10px 12px; /* Reduce padding when text is hidden */
+        padding: 10px 12px;
     }
-    
+}
+
+@media (max-width: 1200px) {
     .nav-menu-left {
-        gap: 8px; /* Further reduce gap */
-        max-width: calc(100% - 180px); /* Adjust reserved space */
+        gap: 8px;
+        max-width: calc(100% - 180px);
     }
     
     .btn-scrape-compact {
-        padding: 5px 8px !important;
-        font-size: 0.7em !important;
-        max-width: 100px;
+        padding: 6px 8px !important;
     }
     
     .nav-menu-right {

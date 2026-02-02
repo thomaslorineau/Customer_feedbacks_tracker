@@ -662,13 +662,13 @@
         </div>
         <div class="nav-menu-right">
             <button class="btn-scrape-compact" id="scrapeAllBtn" title="Scrape new data from all sources">
-                🆕 Scrape
+                🆕<span class="btn-text"> Scrape</span>
             </button>
             <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScraping()" title="Cancel current scraping job">
-                ❌ Cancel
+                ❌<span class="btn-text"> Cancel</span>
             </button>
             <button class="btn-scrape-compact" id="generateImprovementsReportBtn" title="Generate PowerPoint report with improvements insights" style="background: var(--accent-primary); color: white;">
-                📊 PowerPoint
+                📊<span class="btn-text"> Report</span>
             </button>
             <a href="/docs/SLIDE_PITCH_PROJET.html" target="_blank" class="beta-badge" title="Voir le pitch du projet" style="text-decoration: none; display: inline-block;">BETA</a>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
@@ -860,7 +860,7 @@
             scrapeAllBtn.addEventListener('click', async () => {
                 try {
                     scrapeAllBtn.disabled = true;
-                    scrapeAllBtn.innerHTML = '⏳ Starting...';
+                    scrapeAllBtn.innerHTML = '⏳<span class="btn-text"> Starting...</span>';
                     
                     // Load keywords from localStorage
                     const saved = localStorage.getItem('ovh_queries');
@@ -870,14 +870,14 @@
                     const jobData = await api.startScrapingJob(keywords, 50, 2, 0.5);
                     
                     scrapeAllBtn.disabled = false;
-                    scrapeAllBtn.innerHTML = '🆕 Scrape';
+                    scrapeAllBtn.innerHTML = '🆕<span class="btn-text"> Scrape</span>';
                     
                     // Redirect to collection page to see progress
                     window.location.href = '/scraping';
                 } catch (error) {
                     console.error('Error starting scraping:', error);
                     scrapeAllBtn.disabled = false;
-                    scrapeAllBtn.innerHTML = '🆕 Scrape';
+                    scrapeAllBtn.innerHTML = '🆕<span class="btn-text"> Scrape</span>';
                     alert(`Error: ${error.message}`);
                 }
             });
