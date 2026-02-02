@@ -617,6 +617,43 @@
             box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
         
+        /* Page Action Buttons */
+        .btn-action {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            color: #1a1a2e;
+            white-space: nowrap;
+        }
+        .btn-action:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.4);
+        }
+        .btn-action.btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+        .btn-action.btn-primary:hover {
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+        }
+        .btn-action.btn-cancel {
+            background: #ef4444;
+            color: white;
+        }
+        .btn-action.btn-cancel:hover {
+            background: #dc2626;
+        }
+        .btn-action:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
     </style>
 </head>
 <body class="has-nav-menu">
@@ -661,15 +698,6 @@
             </div>
         </div>
         <div class="nav-menu-right">
-            <button class="btn-scrape-compact" id="scrapeAllBtn" title="Scrape new data from all sources">
-                🆕<span class="btn-text"> Scrape</span>
-            </button>
-            <button class="btn-cancel-scraping-compact" id="cancelScrapingBtn" style="display: none; padding: 4px 12px; font-size: 0.85em; background: #ef4444; color: white; border: 1px solid #dc2626; border-radius: 6px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;" onclick="cancelScraping()" title="Cancel current scraping job">
-                ❌<span class="btn-text"> Cancel</span>
-            </button>
-            <button class="btn-scrape-compact" id="generateImprovementsReportBtn" title="Generate PowerPoint report with improvements insights" style="background: var(--accent-primary); color: white;">
-                📊<span class="btn-text"> Report</span>
-            </button>
             <a href="/docs/SLIDE_PITCH_PROJET.html" target="_blank" class="beta-badge" title="Voir le pitch du projet" style="text-decoration: none; display: inline-block;">BETA</a>
             <span class="version-badge" id="versionBadge" title="Application version">v1.0.1</span>
             <button class="theme-toggle" id="themeToggleBtn" title="Toggle theme">🌓</button>
@@ -678,9 +706,22 @@
 
     <div class="improvements-container">
         <!-- Page Header -->
-        <header class="page-header">
-            <h1>💡 Improvements Opportunities</h1>
-            <p>Discover actionable insights and improvement opportunities from customer feedback</p>
+        <header class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h1>💡 Improvements Opportunities</h1>
+                <p>Discover actionable insights and improvement opportunities from customer feedback</p>
+            </div>
+            <div class="page-actions" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <button class="btn-action" id="scrapeAllBtn" title="Scrape new data from all sources">
+                    🆕 Scrape
+                </button>
+                <button class="btn-action btn-cancel" id="cancelScrapingBtn" style="display: none;" onclick="cancelScraping()" title="Cancel current scraping job">
+                    ❌ Cancel
+                </button>
+                <button class="btn-action btn-primary" id="generateImprovementsReportBtn" title="Generate PowerPoint report">
+                    📊 Report
+                </button>
+            </div>
         </header>
         
         <!-- Period Filter -->
@@ -860,7 +901,7 @@
             scrapeAllBtn.addEventListener('click', async () => {
                 try {
                     scrapeAllBtn.disabled = true;
-                    scrapeAllBtn.innerHTML = '⏳<span class="btn-text"> Starting...</span>';
+                    scrapeAllBtn.innerHTML = '⏳ Starting...';
                     
                     // Load keywords from localStorage
                     const saved = localStorage.getItem('ovh_queries');
@@ -870,14 +911,14 @@
                     const jobData = await api.startScrapingJob(keywords, 50, 2, 0.5);
                     
                     scrapeAllBtn.disabled = false;
-                    scrapeAllBtn.innerHTML = '🆕<span class="btn-text"> Scrape</span>';
+                    scrapeAllBtn.innerHTML = '🆕 Scrape';
                     
                     // Redirect to collection page to see progress
                     window.location.href = '/scraping';
                 } catch (error) {
                     console.error('Error starting scraping:', error);
                     scrapeAllBtn.disabled = false;
-                    scrapeAllBtn.innerHTML = '🆕<span class="btn-text"> Scrape</span>';
+                    scrapeAllBtn.innerHTML = '🆕 Scrape';
                     alert(`Error: ${error.message}`);
                 }
             });
