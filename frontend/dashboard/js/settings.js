@@ -11,13 +11,15 @@ let ovhModelsCache = null; // Cache for OVH models
 // Load and display version
 let versionData = null;
 async function loadVersion() {
+    console.log('[Version] Starting loadVersion...');
+    const url = `${API_BASE_URL}/api/version`;
     try {
-        console.log('[Version] Fetching from:', `${API_BASE_URL}/api/version`);
-        const response = await fetch(`${API_BASE_URL}/api/version`);
+        console.log('[Version] Fetching from:', url);
+        const response = await fetch(url);
         console.log('[Version] Response status:', response.status);
         if (response.ok) {
             versionData = await response.json();
-            console.log('[Version] Data received:', JSON.stringify(versionData));
+            console.log('[Version] Data received:', versionData);
             const versionBadge = document.getElementById('versionBadge');
             if (versionBadge) {
                 versionBadge.textContent = `v${versionData.version}`;
@@ -29,16 +31,25 @@ async function loadVersion() {
                 renderEnvironmentInfo();
             }
         } else {
-            console.error('[Version] Bad response:', response.status, await response.text());
+            const text = await response.text();
+            console.error('[Version] Bad response:', response.status, text);
         }
     } catch (error) {
-        console.error('[Version] Failed to load:', error);
+        console.error('[Version] Failed to load:', error, error.message, error.stack);
         // Still try to render with what we have
         if (configData) {
             renderEnvironmentInfo();
         }
     }
 }
+
+// Fallback: try to load version after a delay if initial load failed
+setTimeout(function() {
+    if (!versionData) {
+        console.log('[Version] Retry loading version...');
+        loadVersion();
+    }
+}, 2000);
 
 // Render Environment Info
 function renderEnvironmentInfo() {
