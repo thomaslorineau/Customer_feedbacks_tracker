@@ -157,7 +157,7 @@ Invoke-WebRequest -Uri "http://127.0.0.1:8000/generate-improvement-ideas" `
     -Body $body
 ```
 
-**Note :** Nécessite une clé API LLM (OPENAI_API_KEY ou ANTHROPIC_API_KEY). Sinon, utilise un fallback basé sur des règles.
+**Note :** Nécessite une clé API LLM (OVH_API_KEY). Sinon, utilise un fallback basé sur des règles.
 
 ### 4.5. Endpoint POST /admin/cleanup-duplicates
 
@@ -250,7 +250,7 @@ La base de données PostgreSQL est initialisée automatiquement lors du premier 
 - ✅ Scraper GitHub, Stack Overflow, Trustpilot
 - ✅ Frontend dashboard avec filtres avancés
 - ✅ Backlog sidebar avec commentaires
-- ✅ Génération d'idées avec LLM (OpenAI/Anthropic)
+- ✅ Génération d'idées avec LLM (OVH AI Endpoints)
 - ✅ Timeline & Histogram avec pie chart
 - ✅ Product labeling automatique
 - ✅ Light/Dark mode

@@ -688,7 +688,6 @@ TOTAL: 3-4 semaines de développement avec VibeCoding
 **Contributeurs :**
 - **Thomas Lorineau** - Team Leader PU Domain
 - **Stephane Bautista** - Product Manager VPS
-- **Jules Lamoril** - Team Leader CCO Social Media
 
 **Document préparé par:** Équipe VibeCoding  
 **Date:** Janvier 2026  

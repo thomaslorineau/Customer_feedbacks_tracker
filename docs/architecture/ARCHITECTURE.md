@@ -14,7 +14,7 @@
 │  │  ┌────────────────────────────────────────────────────────────────┐ │   │
 │  │  │  /scraping (Scraping & Configuration)                         │ │   │
 │  │  │  ├─ Keywords configuration                                     │ │   │
-│  │  │  ├─ LLM configuration (OpenAI/Anthropic)                       │ │   │
+│  │  │  ├─ LLM configuration (OVH AI Endpoints)                       │ │   │
 │  │  │  ├─ Scraping controls & job management                         │ │   │
 │  │  │  ├─ Statistics dashboard                                       │ │   │
 │  │  │  ├─ Filters & Search                                           │ │   │
@@ -366,7 +366,7 @@ ovh-complaints-tracker/
 | **Database** | PostgreSQL | Persistent storage of real posts only |
 | **Job Queue** | Redis | Asynchronous job processing for scraping operations (with in-memory fallback) |
 | **Charts** | Chart.js | Interactive timeline, histogram, and product distribution charts |
-| **LLM** | OpenAI GPT-4o-mini / Anthropic Claude 3 Haiku | AI-powered recommended actions and improvement ideas |
+| **LLM** | OVH AI Endpoints (Mixtral, Llama, Mistral) | AI-powered recommended actions and improvement ideas |
 
 ## Key Design Decisions
 

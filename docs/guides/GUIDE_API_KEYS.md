@@ -1,8 +1,8 @@
-# 🔑 Guide: Gestion sécurisée des clés API LLM
+# 🔑 Guide: Gestion sécurisée des clés API
 
 ## 📋 Vue d'ensemble
 
-Ce guide explique comment implémenter **proprement** la gestion des clés API pour les services LLM (OpenAI, Anthropic, Google, etc.) dans votre application.
+Ce guide explique comment implémenter **proprement** la gestion des clés API pour OVH AI Endpoints et les services de scraping dans votre application.
 
 > **Note:** Ce projet a été développé **100% avec VibeCoding** (Cursor AI).
 
@@ -23,13 +23,13 @@ Ce guide explique comment implémenter **proprement** la gestion des clés API p
 
 ### 3. **Sécurité**
 - ✅ Jamais de logging des clés complètes
-- ✅ Masquage pour les logs (`sk-proj-...abc123`)
+- ✅ Masquage pour les logs (`eyJhbG...abc123`)
 - ✅ Accès centralisé via `config.py`
 - ✅ Type hints et validation
 
-### 4. **Support multi-providers**
-- ✅ OpenAI, Anthropic, Google
-- ✅ Configuration dynamique du provider
+### 4. **Support OVH AI**
+- ✅ OVH AI Endpoints (provider principal)
+- ✅ Configuration dynamique
 - ✅ Fallback gracieux si clé manquante
 
 ---
@@ -41,20 +41,11 @@ Ce guide explique comment implémenter **proprement** la gestion des clés API p
 **Éditer `backend/.env`:**
 
 ```dotenv
-# LLM Provider (openai, anthropic, google)
-LLM_PROVIDER=openai
-
-# OpenAI API Key
-# Get from: https://platform.openai.com/api-keys
-OPENAI_API_KEY=sk-proj-VOTRE_CLE_ICI
-
-# Anthropic API Key (optional)
-# Get from: https://console.anthropic.com/
-ANTHROPIC_API_KEY=
-
-# Google AI API Key (optional)
-# Get from: https://makersuite.google.com/app/apikey
-GOOGLE_API_KEY=
+# LLM Provider - OVH AI Endpoints
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 
 # Optional: Enhanced scraping
 TRUSTPILOT_API_KEY=
@@ -101,7 +92,7 @@ def analyze_with_llm(text: str):
         client = get_llm_client()
         
         response = client.chat.completions.create(
-            model="gpt-4",
+            model=config.OVH_MODEL,
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": text}
@@ -148,7 +139,7 @@ def scrape_with_api():
 
 ```python
 # ✅ Récupérer via config
-api_key = config.get_api_key("openai")
+api_key = config.get_api_key("ovh")
 
 # ✅ Masquer pour logging
 logger.info(f"Using key: {config.mask_api_key(api_key)}")
@@ -165,7 +156,7 @@ validation = config.validate_required_keys()
 
 ```python
 # ❌ JAMAIS hardcoder une clé
-api_key = "sk-proj-abc123..."
+api_key = "eyJhbGciOiJSUzI1N..."
 
 # ❌ JAMAIS logger une clé complète
 logger.info(f"API Key: {api_key}")
@@ -198,11 +189,10 @@ python -m uvicorn app.main:app --reload
 # 🔧 APPLICATION CONFIGURATION
 # ==================================================
 # Environment: development
-# LLM Provider: openai
+# LLM Provider: ovh
 # 
 # 🔑 API Keys Status:
-#   ✅ openai      : sk-proj-...abc123
-#   ❌ anthropic   : Not configured
+#   ✅ ovh         : eyJhbG...abc123
 #   ...
 ```
 
@@ -212,9 +202,9 @@ python -m uvicorn app.main:app --reload
 from app.config import config
 
 # Tester le masquage
-key = "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz"
+key = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 masked = config.mask_api_key(key)
-print(masked)  # Affiche: sk-proj-...vwxyz
+print(masked)  # Affiche: eyJhbG...WT9...
 
 # JAMAIS:
 print(key)  # ❌ N'affiche JAMAIS la clé complète
@@ -226,7 +216,7 @@ print(key)  # ❌ N'affiche JAMAIS la clé complète
 from app.config import config
 
 # Tester la validation
-providers = ["openai", "github", "trustpilot"]
+providers = ["ovh", "github", "trustpilot"]
 for provider in providers:
     is_valid = config.is_api_key_valid_format(provider)
     print(f"{provider}: {'✅' if is_valid else '❌'}")
@@ -238,10 +228,10 @@ for provider in providers:
 
 ### Étapes pour changer une clé API
 
-1. **Générer une nouvelle clé** sur le portail du provider
+1. **Générer une nouvelle clé** sur https://endpoints.ai.cloud.ovh.net/
 2. **Mettre à jour `.env`:**
    ```dotenv
-   OPENAI_API_KEY=sk-proj-NOUVELLE_CLE
+   OVH_API_KEY=nouveau_token_ovh
    ```
 3. **Redémarrer le serveur:**
    ```bash
@@ -251,71 +241,42 @@ for provider in providers:
    ```
 4. **Vérifier les logs:**
    ```
-   ✅ API key for openai: configured (51 chars)
+   ✅ API key for ovh: configured
    ```
-5. **Révoquer l'ancienne clé** sur le portail
+5. **Révoquer l'ancien token** sur le portail OVH
 
 ---
 
-## 📊 Support multi-providers
+## 📊 Configuration OVH AI Endpoints
 
-### Configuration par provider
+### Configuration
 
-**OpenAI:**
 ```dotenv
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-proj-...
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 ```
 
-**Anthropic:**
-```dotenv
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=sk-ant-...
-```
+### Modèles disponibles
 
-**Google AI:**
-```dotenv
-LLM_PROVIDER=google
-GOOGLE_API_KEY=AIza...
-```
-
-### Changer de provider dynamiquement
-
-```python
-from app.config import config
-
-# Changer de provider (avant de créer le client)
-config.LLM_PROVIDER = "anthropic"
-client = get_llm_client()
-```
+| Modèle | Description |
+|--------|-------------|
+| `Mixtral-8x22B-Instruct-v0.1` | Puissant, recommandé |
+| `Llama-3.1-70B-Instruct` | Alternative performante |
+| `Mistral-7B-Instruct` | Léger, pour tests |
 
 ---
 
 ## 🛡️ Sécurité avancée (Production)
 
-### 1. Gestionnaire de secrets
+### 1. Permissions minimales
 
-Au lieu de `.env` en production:
+- Créer des tokens avec permissions limitées
+- Un projet = un token dédié
+- Limites de ressources configurées
 
-```python
-# AWS Secrets Manager
-import boto3
-
-def get_secret(secret_name):
-    client = boto3.client('secretsmanager')
-    response = client.get_secret_value(SecretId=secret_name)
-    return response['SecretString']
-
-OPENAI_API_KEY = get_secret('prod/openai-api-key')
-```
-
-### 2. Permissions minimales
-
-- Créer des clés avec permissions limitées
-- Un projet = une clé dédiée
-- Limites de dépenses configurées
-
-### 3. Surveillance
+### 2. Surveillance
 
 ```python
 import time
@@ -338,12 +299,12 @@ def monitor_api_calls(func):
     return wrapper
 
 @monitor_api_calls
-def call_openai_api(prompt):
+def call_ovh_api(prompt):
     client = get_llm_client()
     # ...
 ```
 
-### 4. Rate limiting par clé
+### 3. Rate limiting par clé
 
 ```python
 from collections import defaultdict
@@ -381,7 +342,6 @@ def check_api_rate_limit(provider: str, max_calls: int = 100, window_minutes: in
 - [ ] Gestion d'erreur si clé manquante
 - [ ] Rotation régulière des clés (tous les 3-6 mois)
 - [ ] Monitoring des appels API
-- [ ] Limites de dépenses configurées
 - [ ] Clés différentes pour dev/staging/prod
 - [ ] Permissions minimales sur les clés
 - [ ] Plan de réponse si clé compromise
@@ -392,15 +352,12 @@ def check_api_rate_limit(provider: str, max_calls: int = 100, window_minutes: in
 
 ### Portails de gestion des clés
 
-- **OpenAI:** https://platform.openai.com/api-keys
-- **Anthropic:** https://console.anthropic.com/
-- **Google AI:** https://makersuite.google.com/app/apikey
+- **OVH AI Endpoints:** https://endpoints.ai.cloud.ovh.net/
 - **GitHub:** https://github.com/settings/tokens
 
 ### Documentation
 
-- **OpenAI Best Practices:** https://platform.openai.com/docs/guides/production-best-practices
-- **Anthropic Security:** https://docs.anthropic.com/claude/docs/security
+- **OVH AI Endpoints:** https://help.ovhcloud.com/csm/fr-ai-endpoints-capabilities
 - **12-Factor App:** https://12factor.net/config
 
 ---
@@ -409,8 +366,8 @@ def check_api_rate_limit(provider: str, max_calls: int = 100, window_minutes: in
 
 Si une clé API est exposée:
 
-1. **IMMÉDIAT:** Révoquer la clé sur le portail
-2. Générer une nouvelle clé
+1. **IMMÉDIAT:** Révoquer le token sur le portail OVH
+2. Générer un nouveau token
 3. Mettre à jour `.env` et redémarrer
 4. Vérifier l'historique Git: `git log --all -- .env`
 5. Si commitée, purger l'historique Git
@@ -421,5 +378,6 @@ Si une clé API est exposée:
 ---
 
 **Créé le:** 15 janvier 2026  
-**Version:** 1.0  
+**Mis à jour:** Février 2026  
+**Version:** 2.0  
 **Statut:** ✅ Production-ready

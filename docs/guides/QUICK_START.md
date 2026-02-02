@@ -129,11 +129,11 @@ pip install -r requirements.txt --force-reinstall
 Pour utiliser les fonctionnalités LLM et certains scrapers, vous devez configurer les clés API dans `backend/.env` :
 
 ```dotenv
-# LLM Configuration
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=
-GOOGLE_API_KEY=
+# LLM Configuration - OVH AI Endpoints
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 
 # Scrapers API Keys
 TRUSTPILOT_API_KEY=

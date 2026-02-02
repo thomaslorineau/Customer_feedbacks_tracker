@@ -333,6 +333,18 @@ async def update_product_labels(request: Request):
 # LOGO ENDPOINTS
 # ============================================================================
 
+def find_frontend_path():
+    """Find frontend directory using multiple fallback paths (same as main.py)."""
+    possible_paths = [
+        Path("/app/frontend"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "frontend",  # Docker relative
+        Path(__file__).resolve().parents[2] / "frontend",  # Local dev
+    ]
+    for path in possible_paths:
+        if path.exists():
+            return path
+    return None
+
 @router.post("/api/upload-logo")
 async def upload_logo(file: UploadFile = File(...)):
     """Upload OVHcloud logo file."""
@@ -350,8 +362,14 @@ async def upload_logo(file: UploadFile = File(...)):
     # Determine file extension
     file_ext = file.filename.split('.')[-1].lower()
     
+    # Find frontend path using same method as main.py
+    frontend_path = find_frontend_path()
+    if not frontend_path:
+        logger.error("Frontend directory not found. Cannot save logo.")
+        raise HTTPException(status_code=500, detail="Frontend directory not found. Cannot save logo.")
+    
     # Save to assets/logo directory
-    assets_logo_path = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "logo"
+    assets_logo_path = frontend_path / "assets" / "logo"
     assets_logo_path.mkdir(parents=True, exist_ok=True)
     
     # If SVG or starts with SVG content, always save as .svg
@@ -381,7 +399,16 @@ async def upload_logo(file: UploadFile = File(...)):
 @router.get("/api/logo-status")
 async def get_logo_status():
     """Check if logo file exists."""
-    assets_logo_path = Path(__file__).resolve().parents[2] / "frontend" / "assets" / "logo"
+    # Find frontend path using same method as main.py
+    frontend_path = find_frontend_path()
+    if not frontend_path:
+        logger.warning("Frontend directory not found. Cannot check logo status.")
+        return {
+            "exists": False,
+            "message": "Frontend directory not found"
+        }
+    
+    assets_logo_path = frontend_path / "assets" / "logo"
     
     # Check for SVG first (preferred)
     svg_path = assets_logo_path / "ovhcloud-logo.svg"

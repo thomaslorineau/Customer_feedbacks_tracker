@@ -61,14 +61,11 @@ Créez un fichier `.env` dans le dossier `backend/` :
 # Configuration CORS
 CORS_ORIGINS=http://localhost:3000,http://localhost:8080
 
-# Configuration LLM (pour la génération d'idées)
-OPENAI_API_KEY=votre_cle_api_openai
-OPENAI_MODEL=gpt-4o-mini
-
-# Ou utiliser Anthropic
-ANTHROPIC_API_KEY=votre_cle_api_anthropic
-LLM_PROVIDER=anthropic
-ANTHROPIC_MODEL=claude-3-haiku-20240307
+# Configuration LLM - OVH AI Endpoints
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 ```
 
 ### Étape 5 : Démarrer le Backend
@@ -864,9 +861,11 @@ gcloud run deploy ovh-tracker \
 # CORS - Limiter aux domaines autorisés
 CORS_ORIGINS=https://votre-domaine.com,https://www.votre-domaine.com
 
-# LLM Configuration
-OPENAI_API_KEY=votre_cle_secrete
-OPENAI_MODEL=gpt-4o-mini
+# LLM Configuration - OVH AI Endpoints
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 
 # Base de données - DuckDB (par défaut, pas de configuration nécessaire)
 # L'application utilise DuckDB automatiquement

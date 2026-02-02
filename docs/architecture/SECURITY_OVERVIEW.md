@@ -26,20 +26,21 @@
 
 ---
 
-## 🚨 ACTION URGENTE - CRITIQUE
+## 🚨 ACTIONS DE SÉCURITÉ
 
-### ⚠️ Clé API OpenAI exposée
+### ✅ Migration vers OVH AI Endpoints
 
-**Priorité:** IMMÉDIATE  
-**Fichier:** [URGENT_API_KEY.md](URGENT_API_KEY.md)
+L'application utilise maintenant **OVH AI Endpoints** comme provider LLM principal.
 
-**Actions requises:**
-1. Révoquer la clé `sk-proj-hiswPnhf...` sur https://platform.openai.com/api-keys
-2. Générer une nouvelle clé
-3. Mettre à jour `backend/.env`
-4. Redémarrer le serveur
+**Configuration actuelle :**
+- Provider : OVH AI Endpoints (interne)
+- Authentification : Token OVH
+- Avantage : Données sécurisées dans l'infrastructure OVH
 
-**Sans cette action, votre compte OpenAI reste exposé!**
+**Actions recommandées :**
+1. Vérifier la validité du token OVH régulièrement
+2. Configurer les alertes de consommation
+3. Rotation des tokens tous les 6 mois
 
 ---
 
@@ -243,17 +244,19 @@ def save_queries(keywords: list):
         c.execute("INSERT ... VALUES (?, ?)", (kw, now))
 ```
 
-### 7. Clé API masquée ⚠️
-**À régénérer IMMÉDIATEMENT**
+### 7. Configuration LLM sécurisée ✅
+**Migré vers OVH AI Endpoints**
 
-Le fichier `.env` a été mis à jour:
+Le fichier `.env` utilise maintenant OVH AI :
 ```dotenv
-# SECURITY WARNING: This key should be regenerated!
-# The previous key was exposed and should be considered compromised.
-OPENAI_API_KEY=your_openai_api_key_here
+# LLM Configuration - OVH AI Endpoints
+LLM_PROVIDER=ovh
+OVH_API_KEY=votre_token_ovh
+OVH_ENDPOINT_URL=https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1
+OVH_MODEL=Mixtral-8x22B-Instruct-v0.1
 ```
 
-**⚠️ Action requise:** Voir [URGENT_API_KEY.md](URGENT_API_KEY.md)
+**✅ Avantage :** Données traitées dans l'infrastructure OVH
 
 ---
 

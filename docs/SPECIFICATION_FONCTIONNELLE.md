@@ -159,8 +159,9 @@ opportunity_score = relevance_score + sentiment_score + recency_score + engageme
   - Engagement (0-10 points) : Basé sur vues, commentaires et réactions
 
 #### 3.4 Page "Settings" (`/settings`)
-- **Configuration API Keys** : OpenAI, Anthropic, Google, GitHub, Trustpilot
-- **Sélection provider LLM** : OpenAI ou Anthropic
+- **Configuration API Keys** : OVH AI, GitHub, Trustpilot
+- **Sélection provider LLM** : OVH AI Endpoints
+- **Configuration OVH AI** : Token, URL endpoint, modèle
 - **Gestion Base Keywords** : Édition des keywords de base (brands, products, problems, leadership)
 - **Email Notifications** : Configuration des triggers de notification par email pour les posts problématiques
   - Création/édition de triggers avec conditions personnalisables
@@ -331,14 +332,18 @@ Les paramètres SMTP sont configurés via variables d'environnement :
 
 ### 7. Intégration LLM
 
-#### 6.1 Providers supportés
-- **OpenAI** : GPT-4o-mini (par défaut)
-- **Anthropic** : Claude 3 Haiku
+#### 7.1 Provider supporté
+- **OVH AI Endpoints** : Modèles hébergés en interne (Mixtral-8x22B, Llama-3.1-70B, Mistral-7B)
 
-#### 6.2 Fonctionnalités LLM
+#### 7.2 Configuration
+- **OVH_API_KEY** : Token d'authentification OVH AI
+- **OVH_ENDPOINT_URL** : URL de l'endpoint (ex: `https://xxx.endpoints.kepler.ai.cloud.ovh.net/api/openai_compat/v1`)
+- **OVH_MODEL** : Nom du modèle (ex: `Mixtral-8x22B-Instruct-v0.1`)
+
+#### 7.3 Fonctionnalités LLM
 - **Actions recommandées** : Suggestions contextuelles basées sur les posts filtrés
 - **Idées d'amélioration** : Génération d'idées depuis le backlog
-- **Analyse produit** : Résumé des problèmes pour un produit spécifique ⭐ **NOUVEAU**
+- **Analyse produit** : Résumé des problèmes pour un produit spécifique
 - **Fallback** : Analyse basée sur règles si LLM indisponible
 
 ---
