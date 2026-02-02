@@ -1370,7 +1370,22 @@ def get_job_record(job_id: str) -> Optional[Dict]:
             if row:
                 # RealDictCursor already returns dict-like object, but ensure it's a proper dict
                 if hasattr(row, 'keys'):
-                    return dict(row)
+                    job_dict = dict(row)
+                    # Ensure progress is properly formatted if it exists in payload
+                    if 'payload' in job_dict and isinstance(job_dict['payload'], dict):
+                        payload = job_dict['payload']
+                        if 'progress' in payload:
+                            # Extract progress from payload if it exists there
+                            job_dict['progress'] = payload.get('progress', {'total': 0, 'completed': 0})
+                    elif 'progress' not in job_dict:
+                        # If no progress field, create default based on progress column
+                        progress_val = job_dict.get('progress', 0) or 0
+                        if isinstance(progress_val, int):
+                            # If progress is an integer, assume it's a percentage
+                            job_dict['progress'] = {'total': 100, 'completed': progress_val}
+                        else:
+                            job_dict['progress'] = {'total': 0, 'completed': 0}
+                    return job_dict
                 return row
             return None
     except Exception as e:

@@ -71,6 +71,35 @@ def find_frontend_path():
             return path
     return None
 
+# Mount docs directory FIRST (before other static files to avoid conflicts)
+def find_docs_path():
+    """Find docs directory using multiple fallback paths."""
+    possible_paths = [
+        Path("/app/docs"),  # Docker absolute path
+        Path(__file__).resolve().parents[1] / "docs",  # Docker relative (backend/app -> backend -> docs)
+        Path(__file__).resolve().parents[2] / "docs",  # Local dev (backend/app -> backend -> VibeCoding -> docs)
+        Path(__file__).resolve().parents[2].parent / "docs",  # Alternative path
+    ]
+    for path in possible_paths:
+        if path.exists():
+            logger.info(f"Found docs directory at: {path}")
+            return path
+    logger.warning(f"Docs directory not found. Tried paths: {[str(p) for p in possible_paths]}")
+    return None
+
+docs_path = find_docs_path()
+if docs_path:
+    # Verify the file exists before mounting
+    test_file = docs_path / "SLIDE_PITCH_PROJET.html"
+    if test_file.exists():
+        app.mount("/docs", StaticFiles(directory=str(docs_path), html=True), name="docs")
+        logger.info(f"✅ Docs directory mounted at /docs from {docs_path}")
+        logger.info(f"✅ Test file exists: {test_file}")
+    else:
+        logger.warning(f"Docs directory found at {docs_path} but SLIDE_PITCH_PROJET.html not found")
+else:
+    logger.warning("Docs directory not found. Documentation files will not be served.")
+
 frontend_path = find_frontend_path()
 if frontend_path:
     # Mount dashboard CSS and JS
@@ -102,7 +131,8 @@ if frontend_path:
         improvements_js_path = improvements_path / "js"
         if improvements_js_path.exists():
             app.mount("/improvements/js", StaticFiles(directory=str(improvements_js_path), html=False), name="improvements-js")
-else:
+
+if not frontend_path:
     logger.warning("Frontend directory not found. Static files will not be served.")
 
 # Enable CORS for frontend - restrict to specific ports for security
@@ -229,6 +259,22 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors()}
     )
 
+
+# Test route to verify docs mounting (temporary, for debugging)
+@app.get("/test-docs")
+async def test_docs():
+    """Test endpoint to verify docs directory is accessible."""
+    docs_path = find_docs_path()
+    if docs_path:
+        test_file = docs_path / "SLIDE_PITCH_PROJET.html"
+        return {
+            "docs_path": str(docs_path),
+            "docs_path_exists": docs_path.exists(),
+            "test_file": str(test_file),
+            "test_file_exists": test_file.exists(),
+            "mounted": True
+        }
+    return {"mounted": False, "error": "Docs path not found"}
 
 # Include routers
 from .routers import auth, config, scraping, dashboard, admin, email, pages

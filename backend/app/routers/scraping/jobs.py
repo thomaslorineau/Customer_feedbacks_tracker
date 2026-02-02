@@ -1060,18 +1060,30 @@ async def start_single_source_job(
             'errors': [],
             'cancelled': False,
             'error': None,
+            'source': source,  # Add source to job for easier debugging
+            'query': query,  # Add query to job for easier debugging
         }
+        
+        logger.info(f"[{source}] Created job {job_id[:8]} in memory (total jobs: {len(JOBS)})")
         
         try:
             created = db.create_job_record(job_id, job_type='scrape_source', payload={'source': source, 'query': query, 'limit': limit})
             if created:
-                logger.info(f"Created DB record for job {job_id[:8]}")
+                logger.info(f"[{source}] Created DB record for job {job_id[:8]}")
             else:
-                logger.warning(f"Failed to create DB record for job {job_id[:8]} (may already exist or table missing)")
+                logger.warning(f"[{source}] Failed to create DB record for job {job_id[:8]} (may already exist or table missing)")
+            
+            # Verify job was created in DB
+            verify_job = db.get_job_record(job_id)
+            if verify_job:
+                logger.info(f"[{source}] Verified job {job_id[:8]} exists in DB: status={verify_job.get('status')}")
+            else:
+                logger.error(f"[{source}] Job {job_id[:8]} NOT found in DB after creation!")
+            
             db.update_job_progress(job_id, 100, 0)
         except Exception as db_error:
             # Log but don't fail - job can still proceed
-            logger.error(f"Failed to create DB record for job {job_id[:8]}: {db_error}", exc_info=True)
+            logger.error(f"[{source}] Failed to create DB record for job {job_id[:8]}: {db_error}", exc_info=True)
         
         try:
             logger.info(f"[{source}] Starting job {job_id[:8]} in background thread...")
@@ -1238,7 +1250,26 @@ async def get_job_status(job_id: str):
     try:
         rec = db.get_job_record(job_id)
         if rec:
-            logger.info(f"Job {job_id[:8]} found in DB: status={rec.get('status')}")
+            logger.info(f"Job {job_id[:8]} found in DB: status={rec.get('status')}, payload={rec.get('payload')}")
+            # Convert DB record to job format expected by frontend
+            # Ensure all required fields are present
+            if 'progress' not in rec or not isinstance(rec.get('progress'), dict):
+                # Try to extract progress from payload or create default
+                if 'payload' in rec and isinstance(rec['payload'], dict):
+                    rec['progress'] = rec['payload'].get('progress', {'total': 100, 'completed': 0})
+                else:
+                    progress_val = rec.get('progress', 0) or 0
+                    if isinstance(progress_val, int):
+                        rec['progress'] = {'total': 100, 'completed': progress_val}
+                    else:
+                        rec['progress'] = {'total': 100, 'completed': 0}
+            
+            # Ensure results and errors lists exist
+            if 'results' not in rec:
+                rec['results'] = []
+            if 'errors' not in rec:
+                rec['errors'] = []
+            
             # If job is in DB with status "running" but not in memory, it's likely stuck (server restarted)
             # Mark it as failed after checking if it's been running for too long
             if rec.get('status') == 'running':
@@ -1283,6 +1314,28 @@ async def get_job_status(job_id: str):
     
     # Job not found - return 404 with helpful message
     logger.warning(f"Job {job_id[:8]} not found in memory or database (total jobs in memory: {len(JOBS)})")
+    
+    # Log all job IDs in memory for debugging (first 10)
+    if JOBS:
+        job_ids_sample = list(JOBS.keys())[:10]
+        logger.debug(f"Sample job IDs in memory: {[j[:8] for j in job_ids_sample]}")
+    
+    # Try one more time to get from DB with more detailed logging
+    try:
+        rec = db.get_job_record(job_id)
+        if rec:
+            logger.info(f"Job {job_id[:8]} found in DB on second attempt: status={rec.get('status')}")
+            # Return the job even if not in memory
+            if 'progress' not in rec or not isinstance(rec.get('progress'), dict):
+                rec['progress'] = {'total': 100, 'completed': rec.get('progress', 0) or 0}
+            if 'results' not in rec:
+                rec['results'] = []
+            if 'errors' not in rec:
+                rec['errors'] = []
+            return rec
+    except Exception as e:
+        logger.error(f"Error on second DB attempt for job {job_id[:8]}: {e}")
+    
     raise HTTPException(
         status_code=404, 
         detail=f'Job {job_id} not found. It may have been completed and cleaned up, or the server was restarted.'
