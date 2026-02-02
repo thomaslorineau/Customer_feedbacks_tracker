@@ -1839,6 +1839,13 @@
     <script src="/js/help-menu-loader.js"></script>
     <script src="/dashboard/js/settings.js?v=6.0"></script>
     <script>
+        // Force re-render of environment info after version loads
+        setTimeout(function() {
+            if (typeof renderEnvironmentInfo === 'function') {
+                renderEnvironmentInfo();
+            }
+        }, 1500);
+        
         // Define toggleHelpMenu function immediately (before DOMContentLoaded)
         // This ensures it's available when the navigation link is clicked
         window.toggleHelpMenu = function() {
