@@ -49,14 +49,15 @@ function renderEnvironmentInfo() {
     }
     
     console.log('[Environment] Rendering - configData:', !!configData, 'versionData:', !!versionData);
-    if (!configData || !versionData) {
-        console.warn('[Environment] Missing data - configData:', configData, 'versionData:', versionData);
-        container.innerHTML = '<div class="skeleton-loader" style="height: 100px;"></div>';
-        return;
-    }
-    console.log('[Environment] Data OK - version:', versionData.version, 'env:', configData.environment);
     
-    const buildDate = versionData.build_date ? new Date(versionData.build_date).toLocaleDateString('fr-FR', {
+    // Use fallback values if data is missing
+    const env = configData?.environment || 'Unknown';
+    const version = versionData?.version || 'Unknown';
+    const buildDateRaw = versionData?.build_date;
+    
+    console.log('[Environment] Using - version:', version, 'env:', env);
+    
+    const buildDate = buildDateRaw ? new Date(buildDateRaw).toLocaleDateString('fr-FR', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -69,13 +70,13 @@ function renderEnvironmentInfo() {
             <div class="info-card">
                 <div class="info-card-label">Environment</div>
                 <div class="info-card-value" style="font-size: 1.25rem; text-transform: capitalize;">
-                    ${configData.environment || 'Unknown'}
+                    ${env}
                 </div>
             </div>
             <div class="info-card">
                 <div class="info-card-label">Version</div>
                 <div class="info-card-value" style="font-size: 1.25rem;">
-                    v${versionData.version || 'Unknown'}
+                    v${version}
                 </div>
             </div>
             <div class="info-card">
@@ -92,10 +93,10 @@ function renderEnvironmentInfo() {
             </h3>
             <div style="background: var(--bg-secondary); border-radius: 8px; padding: 1rem; border-left: 3px solid var(--accent-primary);">
                 <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; margin: 0;">
-                    <strong style="color: var(--text-primary);">v${versionData.version}</strong> - Build ${buildDate}
+                    <strong style="color: var(--text-primary);">v${version}</strong> - Build ${buildDate}
                 </p>
                 <p style="color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; margin: 0.5rem 0 0 0;">
-                    This version includes improvements to the scraping system, enhanced error handling, and UI refinements.
+                    Customer Feedbacks Tracker - Analyse automatisée des retours clients.
                 </p>
             </div>
         </div>
@@ -203,10 +204,8 @@ async function loadConfiguration() {
         renderLLM();
         renderScrapersAPIKeys();
         renderRateLimiting();
-        // Render environment info if version data is already loaded
-        if (versionData) {
-            renderEnvironmentInfo();
-        }
+        // Always render environment info (uses fallbacks if data missing)
+        renderEnvironmentInfo();
     } catch (error) {
         console.error('Error loading configuration:', error);
         showError(`Failed to load configuration: ${error.message}`);
