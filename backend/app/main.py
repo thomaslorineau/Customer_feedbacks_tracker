@@ -372,11 +372,16 @@ def startup_event():
         from .scheduler.jobs import daily_backup_job
         scheduler.add_job(daily_backup_job, 'cron', hour=2, minute=0, id='auto_backup_daily')
         
+        # Recheck answered status: every 3 hours (checks 50 posts per run)
+        from .scheduler.jobs import recheck_answered_status_job
+        scheduler.add_job(recheck_answered_status_job, 'interval', hours=3, id='recheck_answered')
+        
         scheduler.start()
         logger.info("[SCHEDULER] Started:")
         logger.info("  - Auto-scrape: every 3 hours")
         logger.info("  - Auto-backup (hourly): every hour (keeps 24 backups)")
         logger.info("  - Auto-backup (daily): daily at 2 AM (keeps 30 backups)")
+        logger.info("  - Recheck answered: every 3 hours (50 posts/run)")
 
 
 @app.on_event("shutdown")
