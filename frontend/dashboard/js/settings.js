@@ -12,21 +12,27 @@ let ovhModelsCache = null; // Cache for OVH models
 let versionData = null;
 async function loadVersion() {
     try {
+        console.log('[Version] Fetching from:', `${API_BASE_URL}/api/version`);
         const response = await fetch(`${API_BASE_URL}/api/version`);
+        console.log('[Version] Response status:', response.status);
         if (response.ok) {
             versionData = await response.json();
+            console.log('[Version] Data received:', JSON.stringify(versionData));
             const versionBadge = document.getElementById('versionBadge');
             if (versionBadge) {
                 versionBadge.textContent = `v${versionData.version}`;
                 versionBadge.title = `Version ${versionData.version} - Build: ${new Date(versionData.build_date).toLocaleDateString()}`;
+                console.log('[Version] Badge updated to:', versionBadge.textContent);
             }
             // Also render in environment section (will be called after configData is loaded)
             if (configData) {
                 renderEnvironmentInfo();
             }
+        } else {
+            console.error('[Version] Bad response:', response.status, await response.text());
         }
     } catch (error) {
-        console.warn('Failed to load version:', error);
+        console.error('[Version] Failed to load:', error);
         // Still try to render with what we have
         if (configData) {
             renderEnvironmentInfo();
