@@ -36,45 +36,66 @@ class LLMConfigResponse(BaseModel):
 
 def get_version():
     """
-    Get application version from VERSION file and git commit count.
+    Get application version from VERSION file and commit count.
     
     Returns:
-        Version string in format "MAJOR.COMMITS" (e.g., "1.547")
+        Version string in format "MAJOR.COMMITS" (e.g., "1.548")
     """
     import subprocess
     from pathlib import Path
     
-    # Read MAJOR from VERSION file
-    version_path = Path(__file__).resolve().parents[2] / "VERSION"
-    try:
-        if version_path.exists():
-            with open(version_path, "r", encoding="utf-8") as f:
-                major = f.read().strip()
-                if not major:
-                    major = "1"
-        else:
-            major = "1"
-    except Exception:
-        major = "1"
+    # Try multiple paths for Docker and local dev compatibility
+    possible_paths = [
+        Path("/app"),  # Docker path
+        Path(__file__).resolve().parents[2],  # Local dev (backend/)
+    ]
     
-    # Get commit count as minor version
+    major = "1"
     minor = "0"
-    try:
-        result = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=version_path.parent,
-            timeout=5
-        )
-        if result.returncode == 0:
-            commit_count = result.stdout.strip()
-            if commit_count and commit_count.isdigit():
-                minor = commit_count
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        minor = "0"
     
-    # Return format: MAJOR.COMMITS (e.g., 1.547)
+    # Find VERSION file
+    for base_path in possible_paths:
+        version_path = base_path / "VERSION"
+        if version_path.exists():
+            try:
+                with open(version_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content:
+                        major = content
+                        break
+            except Exception:
+                pass
+    
+    # Find COMMIT_COUNT file (for Docker)
+    for base_path in possible_paths:
+        commit_count_path = base_path / "COMMIT_COUNT"
+        if commit_count_path.exists():
+            try:
+                with open(commit_count_path, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                    if content and content.isdigit():
+                        minor = content
+                        break
+            except Exception:
+                pass
+    
+    # If COMMIT_COUNT not found, try git (works in local dev)
+    if minor == "0":
+        try:
+            result = subprocess.run(
+                ["git", "rev-list", "--count", "HEAD"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                content = result.stdout.strip()
+                if content and content.isdigit():
+                    minor = content
+        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
+            pass
+    
+    # Return format: MAJOR.COMMITS (e.g., 1.548)
     return f"{major}.{minor}"
 
 

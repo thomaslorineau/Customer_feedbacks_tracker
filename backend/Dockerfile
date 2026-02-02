@@ -51,6 +51,9 @@ COPY --from=builder /root/.local /root/.local
 COPY app/ /app/app/
 COPY scripts/ /app/scripts/
 
+# Copy version files for runtime version detection
+COPY VERSION COMMIT_COUNT /app/
+
 # Copy and set up entrypoint script
 COPY scripts/docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
