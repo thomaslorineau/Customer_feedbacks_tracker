@@ -84,6 +84,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frontend:/app/frontend:ro
+      - ./docs:/app/docs:ro  # Mount docs for pitch slides
       - ./backend/app:/app/app:ro  # Mount backend code for live updates without rebuild
       - ./backend/backups:/app/backups
     healthcheck:
