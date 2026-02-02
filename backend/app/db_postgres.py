@@ -40,12 +40,16 @@ def _get_pool():
         if not DATABASE_URL:
             raise RuntimeError("DATABASE_URL environment variable not set")
         
+        # Pool size configurable via environment variable (default: 50 for production)
+        minconn = int(os.getenv('DB_POOL_MIN', '2'))
+        maxconn = int(os.getenv('DB_POOL_MAX', '50'))
+        
         _connection_pool = pool.ThreadedConnectionPool(
-            minconn=2,
-            maxconn=20,
+            minconn=minconn,
+            maxconn=maxconn,
             dsn=DATABASE_URL
         )
-        logger.info("PostgreSQL connection pool created")
+        logger.info(f"PostgreSQL connection pool created (min={minconn}, max={maxconn})")
     return _connection_pool
 
 
@@ -58,17 +62,35 @@ def get_pg_connection(autocommit=True):
         autocommit: If True, automatically commit on success. If False, caller must commit/rollback.
     """
     pool = _get_pool()
-    conn = pool.getconn()
+    conn = None
     try:
-        yield conn
-        if autocommit:
-            conn.commit()
-    except Exception as e:
-        conn.rollback()
-        logger.error(f"PostgreSQL error: {e}")
-        raise
+        # Try to get connection with timeout handling
+        try:
+            conn = pool.getconn()
+        except pool.PoolError as e:
+            # Pool exhausted - log detailed error and raise
+            logger.error(f"Connection pool exhausted: {e}. Pool size: max={pool.maxconn}")
+            raise RuntimeError(
+                f"Database connection pool exhausted. "
+                f"Max connections: {pool.maxconn}. "
+                f"This usually means too many concurrent requests. "
+                f"Consider increasing DB_POOL_MAX environment variable."
+            ) from e
+        
+        try:
+            yield conn
+            if autocommit:
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"PostgreSQL error: {e}")
+            raise
     finally:
-        pool.putconn(conn)
+        if conn:
+            try:
+                pool.putconn(conn)
+            except Exception as e:
+                logger.error(f"Error returning connection to pool: {e}")
 
 
 @contextmanager
