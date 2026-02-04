@@ -69,6 +69,12 @@ Thumbs.db
 *.tmp
 *.temp
 
+# SSL certificates - CRITICAL: Never commit private keys!
+*.pem
+*.key
+*.crt
+nginx/ssl/
+
 
 
 
