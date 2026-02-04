@@ -61,40 +61,40 @@ jobs:
           PGPASSWORD=test_password psql -h localhost -U ocft_user -d ocft_tracker -f backend/scripts/init_postgres.sql
         continue-on-error: true
 
-      - name: Start server and run UI tests
+      - name: Start server in background
         env:
           DATABASE_URL: postgresql://ocft_user:test_password@localhost:5432/ocft_tracker
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: test
         run: |
-          # Start server in background
           cd backend
-          python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-          SERVER_PID=$!
-          cd ..
+          nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          sleep 5
           
-          # Wait for server to be ready
-          echo "Waiting for server to start..."
-          for i in {1..30}; do
-            if curl -s http://127.0.0.1:8000/ > /dev/null 2>&1; then
-              echo "Server is ready!"
-              break
+      - name: Wait for server
+        run: |
+          echo "Waiting for server..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/ > /dev/null 2>&1; then
+              echo "Server ready!"
+              exit 0
             fi
             echo "Attempt $i/30..."
             sleep 2
           done
-          
-          # Check if server is running
-          if ! curl -s http://127.0.0.1:8000/ > /dev/null 2>&1; then
-            echo "ERROR: Server failed to start"
-            exit 1
-          fi
-          
-          # Run UI tests
-          python backend/scripts/ui_test.py --no-server --base-url http://127.0.0.1:8000
-          
-          # Cleanup
-          kill $SERVER_PID 2>/dev/null || true
+          echo "Server logs:"
+          cat /tmp/server.log || true
+          exit 1
+
+      - name: Run UI tests
+        env:
+          DATABASE_URL: postgresql://ocft_user:test_password@localhost:5432/ocft_tracker
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+        run: |
+          echo "Running: python backend/scripts/ui_test.py --no-server --base-url http://localhost:8000"
+          python backend/scripts/ui_test.py --no-server --base-url http://localhost:8000
         timeout-minutes: 5
 
       - name: Upload screenshots on failure
@@ -104,3 +104,4 @@ jobs:
           name: ui-test-screenshots
           path: backend/test_screenshots/
           retention-days: 7
+          if-no-files-found: ignore
